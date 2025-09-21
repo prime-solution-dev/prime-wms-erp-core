@@ -5,7 +5,7 @@ import (
 	"prime-erp-core/internal/models"
 )
 
-func GetAllUnit() ([]models.Unit, error) {
+func GetAllUnit(topics []string) ([]models.Unit, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, err
@@ -13,10 +13,14 @@ func GetAllUnit() ([]models.Unit, error) {
 	defer db.CloseGORM(gormx)
 
 	units := []models.Unit{}
+	query := gormx.Preload("UnitMethodItems").Preload("UnitMethodItems.UnitUomItems")
 
-	result := gormx.Preload("UnitMethodItems").Preload("UnitMethodItems.UnitUomItems").Find(&units)
-	if result.Error != nil {
-		return nil, result.Error
+	if len(topics) > 0 {
+		query = query.Where("topic IN ?", topics)
+	}
+
+	if err := query.Find(&units).Error; err != nil {
+		return nil, err
 	}
 
 	return units, nil

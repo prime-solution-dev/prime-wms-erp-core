@@ -53,6 +53,7 @@ type GetUnitMethodResponse struct {
 
 type GetAllUnitResponse struct {
 	ID              string                  `json:"id"`
+	Topic           string                  `json:"topic"`     // PO, SO
 	UnitCode        string                  `json:"unit_code"` // PC, KG
 	UnitName        string                  `json:"unit_name"`
 	UnitMethodItems []GetUnitMethodResponse `json:"unit_method_items"`
