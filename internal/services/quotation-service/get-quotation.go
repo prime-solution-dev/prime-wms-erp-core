@@ -62,6 +62,11 @@ type GetQuotationResponse struct {
 	Remark                      string                     `gorm:"type:varchar(255)" json:"remark"`
 	IsApproved                  bool                       `gorm:"type:boolean" json:"is_approved"`
 	StatusApprove               string                     `gorm:"type:varchar(50)" json:"status_approve"`
+	TotalVat                    float64                    `gorm:"type:numeric" json:"total_vat"`
+	TotalDiscount               float64                    `gorm:"type:numeric" json:"total_discount"`
+	SubtotalExclVat             float64                    `gorm:"type:numeric" json:"subtotal_excl_vat"`
+	TotalTransportCostVat       float64                    `gorm:"type:numeric" json:"total_transport_cost_vat"`
+	RemarkApproval              string                     `gorm:"type:varchar(255)" json:"remark_approval"`
 	CreateDate                  *time.Time                 `gorm:"type:date" json:"create_date"`
 	CreateBy                    string                     `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate                  *time.Time                 `gorm:"type:date" json:"update_date"`
@@ -96,6 +101,11 @@ type GetQuotationItemResponse struct {
 	NetPricePerWeightExclTransport float64    `gorm:"type:numeric" json:"net_price_per_weight_excl_transport"` //NetPriceWeightUnit
 	Status                         string     `gorm:"type:varchar(50)" json:"status"`
 	Remark                         string     `gorm:"type:varchar(255)" json:"remark"`
+	SubtotalExclVat                float64    `gorm:"type:numeric" json:"subtotal_excl_vat"`
+	TotalVat                       float64    `gorm:"type:numeric" json:"total_vat"`
+	UnitUom                        string     `gorm:"type:varchar(50)" json:"unit_uom"`
+	TotalDiscount                  float64    `gorm:"type:numeric" json:"total_discount"`
+	TotalDiscountPercent           float64    `gorm:"type:numeric" json:"total_discount_percent"`
 	CreateDate                     *time.Time `gorm:"type:date" json:"create_date"`
 	CreateBy                       string     `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate                     *time.Time `gorm:"type:date" json:"update_date"`
