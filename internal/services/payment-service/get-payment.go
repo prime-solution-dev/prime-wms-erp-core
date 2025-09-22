@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
-	repositoryPayment "prime-erp-core/internal/repositories/Payment"
+	repositoryPayment "prime-erp-core/internal/repositories/payment"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -18,7 +18,7 @@ type GetPaymentRequest struct {
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
-type ResultSale struct {
+type ResultPayment struct {
 	Total      int              `json:"total"`
 	Page       int              `json:"page"`
 	PageSize   int              `json:"page_size"`
@@ -39,7 +39,7 @@ func GetPayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errPayment
 	}
 
-	resultSale := ResultSale{
+	resultSale := ResultPayment{
 		Total:      totalRecords,
 		Page:       req.Page,
 		PageSize:   req.PageSize,

@@ -15,7 +15,7 @@ type GetSaleRequest struct {
 	CustomerCode  []string    `json:"customer_code"`
 	Status        []string    `json:"status"`
 	StatusPayment []string    `json:"status_payment"`
-	IsApproved    []string    `json:"is_approved"`
+	IsApproved    []bool      `json:"is_approved"`
 	Page          int         `json:"page"`
 	PageSize      int         `json:"page_size"`
 }

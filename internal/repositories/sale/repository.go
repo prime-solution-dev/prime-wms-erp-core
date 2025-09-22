@@ -11,7 +11,7 @@ import (
 )
 
 // Create
-func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, statusPayment []string, isApproved []string, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -58,12 +58,12 @@ func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, stat
 	}
 	searchIsApproved := ""
 	if len(isApproved) > 0 {
-		quotedStrings := make([]string, len(isApproved))
-		for i, s := range isApproved {
-			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		boolStrings := make([]string, len(isApproved))
+		for i, b := range isApproved {
+			boolStrings[i] = fmt.Sprintf("%t", b)
 		}
-		whereInClause := strings.Join(quotedStrings, ", ")
-		searchIsApproved = fmt.Sprintf(` and sale.is_approved IN (%s)`, whereInClause)
+		whereInClause := strings.Join(boolStrings, ", ")
+		searchIsApproved = fmt.Sprintf(` AND sale.is_approved IN (%s)`, whereInClause)
 	}
 
 	var saleID []uuid.UUID

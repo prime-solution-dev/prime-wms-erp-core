@@ -17,7 +17,7 @@ type GetDepositRequest struct {
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
-type ResultSale struct {
+type ResultDeposit struct {
 	Total      int              `json:"total"`
 	Page       int              `json:"page"`
 	PageSize   int              `json:"page_size"`
@@ -38,7 +38,7 @@ func GetDeposit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errDeposit
 	}
 
-	resultSale := ResultSale{
+	resultSale := ResultDeposit{
 		Total:      totalRecords,
 		Page:       req.Page,
 		PageSize:   req.PageSize,
