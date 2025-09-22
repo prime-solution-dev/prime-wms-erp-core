@@ -35,10 +35,10 @@ type Quotation struct {
 	EffectiveDatePrice          *time.Time `json:"effective_date_price"`
 	ExpirePriceDay              int        `json:"expire_price_day"`
 	ExpirePriceDate             *time.Time `json:"expire_price_date"`
-	PassPriceList               bool       `json:"pass_price_list"`
-	PassAtpCheck                bool       `json:"pass_atp_check"`
-	PassCreditLimit             bool       `json:"pass_credit_limit"`
-	PassPriceExpire             bool       `json:"pass_price_expire"`
+	PassPriceList               string     `json:"pass_price_list"`
+	PassAtpCheck                string     `json:"pass_atp_check"`
+	PassCreditLimit             string     `json:"pass_credit_limit"`
+	PassPriceExpire             string     `json:"pass_price_expire"`
 	Status                      string     `json:"status"`
 	Remark                      string     `json:"remark"`
 	IsApproved                  bool       `json:"is_approved"`
@@ -68,8 +68,8 @@ type QuotationItem struct {
 	SaleQty                        float64    `json:"sale_qty"`
 	SaleUnit                       string     `json:"sale_unit"`
 	SaleUnitType                   string     `json:"sale_unit_type"`
-	PassPrice                      bool       `json:"pass_price"`
-	PassWeight                     bool       `json:"pass_weight"`
+	PassPrice                      string     `json:"pass_price"`
+	PassWeight                     string     `json:"pass_weight"`
 	PriceUnit                      float64    `json:"price_unit"`
 	TotalAmount                    float64    `json:"total_amount"` //TotalPrice
 	TransportCostUnit              float64    `json:"transport_cost_unit"`
