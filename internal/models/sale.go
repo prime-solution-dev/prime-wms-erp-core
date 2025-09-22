@@ -47,6 +47,7 @@ type Sale struct {
 	CreateBy                    string     `json:"create_by"`
 	UpdateDate                  *time.Time `json:"update_date"`
 	UpdateBy                    string     `json:"update_by"`
+	SaleItem                    []SaleItem `json:"sale_item"`
 }
 
 func (Sale) TableName() string { return "sale" }

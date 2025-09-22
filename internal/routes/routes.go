@@ -5,6 +5,7 @@ import (
 
 	approvalService "prime-erp-core/internal/services/approval-service"
 	creditService "prime-erp-core/internal/services/credit-service"
+	depositService "prime-erp-core/internal/services/deposit-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
@@ -48,6 +49,11 @@ func RegisterRoutes(ctx *gin.Engine) {
 
 	sale.POST("/GetSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.GetSale)
+	})
+	//deposit
+	deposit := ctx.Group("/deposit")
+	deposit.POST("/GetDeposit", func(c *gin.Context) {
+		utils.ProcessRequest(c, depositService.GetDeposit)
 	})
 
 	//approval
