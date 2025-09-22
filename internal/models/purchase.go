@@ -8,7 +8,7 @@ import (
 
 type PrePurchase struct {
 	ID               uuid.UUID         `gorm:"primary_key;not null" json:"id"`
-	PrePurchaseCode  string            `json:"pre_purchase_code"`
+	PrePurchaseCode  string            `gorm:"unique;not null" json:"pre_purchase_code"`
 	PurchaseType     string            `json:"purchase_type"`
 	CompanyCode      string            `json:"company_code"`
 	SiteCode         string            `json:"site_code"`
@@ -73,7 +73,7 @@ func (PrePurchaseItem) TableName() string {
 
 type Purchase struct {
 	ID              uuid.UUID      `gorm:"primary_key;not null" json:"id"`
-	PurchaseCode    string         `json:"purchase_code"`
+	PurchaseCode    string         `gorm:"unique;not null" json:"purchase_code"`
 	PurchaseType    string         `json:"purchase_type"`
 	CompanyCode     string         `json:"company_code"`
 	SiteCode        string         `json:"site_code"`
@@ -165,6 +165,7 @@ type CreatePOBigLotItemRequest struct {
 }
 
 type CreatePOBigLotRequest struct {
+	PrePurchaseCode string                      `json:"pre_purchase_code"`
 	CompanyCode     string                      `json:"company_code"`
 	SiteCode        string                      `json:"site_code"`
 	SupplierCode    string                      `json:"supplier_code"`
