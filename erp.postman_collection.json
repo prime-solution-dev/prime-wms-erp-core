@@ -162,7 +162,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "[{\r\n     \r\n\t \"customer_code\":\"c1\",\r\n\t \"amount\":111,\r\n\t \"request_type\":\"BASE\",\r\n\t \"status\":\"PENDING\", \r\n\t \"reason\":\"r1\",\r\n\t \"effective_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"expire_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"request_date\":\"2024-12-03T07:24:31.765Z\"\r\n\t \r\n}]",
+					"raw": "[{\r\n     \r\n     \"id\":\"ccabe61e-d6f8-4064-ab9a-e21c80ba67b8\",\r\n     \"status\":\"REJECT\"\r\n     \r\n}]",
 					"options": {
 						"raw": {
 							"language": "json"
