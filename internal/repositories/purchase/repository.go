@@ -13,7 +13,19 @@ func CreatePOBigLot(prePurchase []models.PrePurchase) error {
 	}
 	defer db.CloseGORM(gormx)
 
-	result := gormx.Create(&prePurchase)
+	tx := gormx.Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		} else if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit().Error
+		}
+	}()
+
+	result := tx.Create(&prePurchase)
 	if result.Error != nil {
 		return result.Error
 	}
