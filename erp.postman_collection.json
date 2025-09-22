@@ -1,0 +1,188 @@
+{
+	"info": {
+		"_postman_id": "d0fcd6f5-68c6-4f53-89cb-ff53c32903ca",
+		"name": "erp",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43625603",
+		"_collection_link": "https://champ-5741577.postman.co/workspace/champ's-Workspace~651e3d54-90af-43c7-838e-71a7da293ab7/collection/43625603-d0fcd6f5-68c6-4f53-89cb-ff53c32903ca?action=share&source=collection_link&creator=43625603"
+	},
+	"item": [
+		{
+			"name": "GetApproval",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"document_code\": [\"PO CODE\"],\r\n    \"status\": \"PENDING\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/approval/GetApproval",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"approval",
+						"GetApproval"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateApproval",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n    \"approve_topic\": \"POT\",\r\n    \"document_type\": \"PO\",\r\n    \"document_code\": \"PO CODE\",\r\n    \"action_date\": \"2024-12-03T07:24:31.765Z\",\r\n    \"status\": \"PENDING\",\r\n    \"remark\": \"-\",\r\n    \"curent_step_seq\": 1,\r\n    \"md_item_code\":\"CTM-CTM1\",//fix\r\n    \"create_by\":\"userLogin\" \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://wms-uat.prime-lab.cc/api/erp/approval/CreateApproval",
+					"protocol": "https",
+					"host": [
+						"wms-uat",
+						"prime-lab",
+						"cc"
+					],
+					"path": [
+						"api",
+						"erp",
+						"approval",
+						"CreateApproval"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateApproval",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n     \r\n\t            \"transaction_code\": \"\",\r\n\t\t\t\t\"transaction_type\": \"\",\r\n\t\t\t\t\"amount\":           \"\",\r\n\t\t\t\t\"adjust_amount\":    \"\",\r\n\t\t\t\t\"effective_dtm\":    \"\",\r\n\t\t\t\t\"expire_dtm\":       \"\",\r\n\t\t\t\t\"force_expire_dtm\": \"\",\r\n\t\t\t\t\"is_approve\":       \"\",\r\n\t\t\t\t\"status\":           \"\",\r\n\t\t\t\t\"reason\":           \"\",\r\n\t\t\t\t\"approve_date\":     \"\"\r\n\t \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/credit/UpdateApproval",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"credit",
+						"UpdateApproval"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetCreditRequest",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": " {\r\n     \r\n \r\n} ",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/credit/GetCreditRequest",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"credit",
+						"GetCreditRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateCreditRequest",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n     \r\n\t \"customer_code\":\"c1\",\r\n\t \"amount\":111,\r\n\t \"request_type\":\"BASE\",\r\n\t \"status\":\"PENDING\", \r\n\t \"reason\":\"r1\",\r\n\t \"effective_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"expire_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"request_date\":\"2024-12-03T07:24:31.765Z\"\r\n\t \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/credit/CreateCreditRequest",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"credit",
+						"CreateCreditRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateCreditRequest",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n     \r\n\t \"customer_code\":\"c1\",\r\n\t \"amount\":111,\r\n\t \"request_type\":\"BASE\",\r\n\t \"status\":\"PENDING\", \r\n\t \"reason\":\"r1\",\r\n\t \"effective_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"expire_dtm\":\"2024-12-03T07:24:31.765Z\",\r\n\t \"request_date\":\"2024-12-03T07:24:31.765Z\"\r\n\t \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/credit/CreateCreditRequest",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"credit",
+						"CreateCreditRequest"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

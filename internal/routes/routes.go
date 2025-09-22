@@ -64,6 +64,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCreditCurrent", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCreditCurrentAPI)
 	})
+	credit.POST("/GetCreditRequest", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCreditRequests)
+	})
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.CreateCreditRequest)
 	})

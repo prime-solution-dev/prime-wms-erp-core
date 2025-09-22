@@ -39,14 +39,16 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 		if req[i].Status == "COMPLETED" {
 			creditExtra := []models.CreditExtra{}
-			creditExtra = append(creditExtra, models.CreditExtra{
-				//ExtraType:    "",
-				Amount: req[i].Amount,
-				//EffectiveDtm: "",
-				//ExpireDtm:    "",
-				DocRef: req[i].RequestCode,
-				//ApproveDate:  "",
-			})
+			if req[i].RequestType == "EXTRA" {
+				creditExtra = append(creditExtra, models.CreditExtra{
+					//ExtraType:    "",
+					Amount: req[i].Amount,
+					//EffectiveDtm: "",
+					//ExpireDtm:    "",
+					DocRef: req[i].RequestCode,
+					//ApproveDate:  "",
+				})
+			}
 
 			credit = append(credit, models.Credit{
 				CustomerCode: req[i].CustomerCode,
