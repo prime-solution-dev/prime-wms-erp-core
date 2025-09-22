@@ -19,7 +19,7 @@ type GetInvoiceRequest struct {
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
-type resultInvoice struct {
+type ResultInvoice struct {
 	Total      int              `json:"total"`
 	Page       int              `json:"page"`
 	PageSize   int              `json:"page_size"`
@@ -40,7 +40,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errDeposit
 	}
 
-	resultInvoice := resultInvoice{
+	resultInvoice := ResultInvoice{
 		Total:      totalRecords,
 		Page:       req.Page,
 		PageSize:   req.PageSize,

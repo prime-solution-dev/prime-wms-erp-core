@@ -67,7 +67,7 @@ func GetPaymentPreload(id []uuid.UUID, customerCode []string, status []string, i
 
 		var count = len(paymentID)
 
-		query := gormx.Preload("paymentItem")
+		query := gormx.Preload("PaymentInvoice")
 
 		query = query.Where("id in (?)", paymentID)
 

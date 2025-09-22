@@ -16,10 +16,11 @@ type Payment struct {
 	Status       string    `json:"status"` // PENDING, COMPLETED, CANCELLED
 	Remark       string    `json:"remark"`
 
-	CreateBy   string    `json:"create_by"`
-	CreateDtm  time.Time `json:"create_dtm"`
-	UpdateBy   string    `json:"update_by"`
-	UpdateDate time.Time `json:"update_date"`
+	CreateBy       string           `json:"create_by"`
+	CreateDtm      time.Time        `json:"create_dtm"`
+	UpdateBy       string           `json:"update_by"`
+	UpdateDate     time.Time        `json:"update_date"`
+	PaymentInvoice []PaymentInvoice `json:"payment_invoice"`
 }
 
 func (Payment) TableName() string {
