@@ -6,6 +6,8 @@ import (
 	approvalService "prime-erp-core/internal/services/approval-service"
 	creditService "prime-erp-core/internal/services/credit-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
+	invoiceService "prime-erp-core/internal/services/invoice-service"
+	paymentService "prime-erp-core/internal/services/payment-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
@@ -40,7 +42,16 @@ func RegisterRoutes(ctx *gin.Engine) {
 	quotation.POST("/CreateQuotation", func(c *gin.Context) {
 		utils.ProcessRequest(c, quotationService.CreateQuotation)
 	})
-
+	//invoice
+	invoice := ctx.Group("/invoice")
+	invoice.POST("/GetInvoice", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.GetInvoice)
+	})
+	//payment
+	payment := ctx.Group("/GetPayment")
+	payment.POST("/GetPayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.GetPayment)
+	})
 	//sale
 	sale := ctx.Group("/sale")
 	sale.POST("/CreateSale", func(c *gin.Context) {

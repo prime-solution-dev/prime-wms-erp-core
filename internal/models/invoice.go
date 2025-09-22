@@ -7,25 +7,27 @@ import (
 )
 
 type Invoice struct {
-	ID                  uuid.UUID  `json:"id"`
-	InvoiceCode         string     `json:"invoice_code"`
-	DocRef              string     `json:"doc_ref"`
-	DocRefType          string     `json:"doc_ref_type"`
-	CustomerCode        string     `json:"customer_code"`
-	DueDate             *time.Time `json:"due_date"`
-	TransportCostType   string     `json:"transport_cost_type"`
-	TotalTransportCost  float64    `json:"total_transport_cost"`
-	TotalPrice          float64    `json:"total_price"`
-	TotalWeight         float64    `json:"total_weight"`
-	TotalDeposit        float64    `json:"total_deposit"`
-	TotalNetPrice       float64    `json:"total_net_price"`
-	TotalNetPriceWeight float64    `json:"total_net_price_weight"`
-	Status              string     `json:"status"`
-	Remark              string     `json:"remark"`
-	CreateBy            string     `json:"create_by"`
-	CreateDtm           *time.Time `json:"create_dtm"`
-	UpdateBy            string     `json:"update_by"`
-	UpdateDate          *time.Time `json:"update_date"`
+	ID                  uuid.UUID        `json:"id"`
+	InvoiceCode         string           `json:"invoice_code"`
+	DocRef              string           `json:"doc_ref"`
+	DocRefType          string           `json:"doc_ref_type"`
+	CustomerCode        string           `json:"customer_code"`
+	DueDate             *time.Time       `json:"due_date"`
+	TransportCostType   string           `json:"transport_cost_type"`
+	TotalTransportCost  float64          `json:"total_transport_cost"`
+	TotalPrice          float64          `json:"total_price"`
+	TotalWeight         float64          `json:"total_weight"`
+	TotalDeposit        float64          `json:"total_deposit"`
+	TotalNetPrice       float64          `json:"total_net_price"`
+	TotalNetPriceWeight float64          `json:"total_net_price_weight"`
+	Status              string           `json:"status"`
+	Remark              string           `json:"remark"`
+	CreateBy            string           `json:"create_by"`
+	CreateDtm           *time.Time       `json:"create_dtm"`
+	UpdateBy            string           `json:"update_by"`
+	UpdateDate          *time.Time       `json:"update_date"`
+	InvoiceItem         []InvoiceItem    `json:"invoice_item"`
+	InvoiceDeposit      []InvoiceDeposit `json:"invoice_deposit"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
