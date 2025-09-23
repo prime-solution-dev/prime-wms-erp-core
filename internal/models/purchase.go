@@ -183,10 +183,11 @@ type CreatePOBigLotRequest struct {
 }
 
 type GetPOBigLotListRequest struct {
-	CompanyCode string `json:"company_code"`
-	SiteCode    string `json:"site_code"`
-	Page        int    `json:"page"`
-	PageSize    int    `json:"page_size"`
+	PrePurchaseCodes []string `json:"pre_purchase_codes"`
+	CompanyCode      string   `json:"company_code"`
+	SiteCode         string   `json:"site_code"`
+	Page             int      `json:"page"`
+	PageSize         int      `json:"page_size"`
 }
 
 type GetPOBigLotItemResponse struct {
