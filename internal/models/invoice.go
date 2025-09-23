@@ -20,6 +20,7 @@ type Invoice struct {
 	TotalDeposit        float64          `json:"total_deposit"`
 	TotalNetPrice       float64          `json:"total_net_price"`
 	TotalNetPriceWeight float64          `json:"total_net_price_weight"`
+	TotalAmount         float64          `json:"total_amount"`
 	Status              string           `json:"status"`
 	Remark              string           `json:"remark"`
 	CreateBy            string           `json:"create_by"`

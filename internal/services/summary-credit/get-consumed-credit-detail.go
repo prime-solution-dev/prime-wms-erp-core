@@ -11,8 +11,17 @@ import (
 )
 
 type ConsumedCreditDetail struct {
-	Sale    models.Sale      `json:"sale"`
-	Invoice []models.Invoice `json:"invoice"`
+	SaleCode       string                  `json:"sale_code"`
+	SoAmount       float64                 `json:"so_amount"`
+	SoRemainAmount float64                 `json:"so_remain_amount"`
+	ConsumedAmount float64                 `json:"consumed_amount"`
+	Invoice        []ConsumedCreditInvoice `json:"invoice"`
+}
+type ConsumedCreditInvoice struct {
+	InvoiceCode       string  `json:"invoice_code"`
+	InvoiceAmount     float64 `json:"invoice_amount"`
+	InvoicePaidAmount float64 `json:"invoice_paid_amount"`
+	ConsumedAmount    float64 `json:"consumed_amount"`
 }
 
 func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -63,15 +72,27 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	for _, sale := range resultSale {
 		var matchedInvoices []models.Invoice
+		sumInvoiceTotalAmount := 0.00
+		consumedCreditInvoice := []ConsumedCreditInvoice{}
 		for _, invoice := range resultInvoice {
 			if invoice.DocRef == sale.SaleCode {
+				sumInvoiceTotalAmount += invoice.TotalAmount
 				matchedInvoices = append(matchedInvoices, invoice)
 			}
+			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
+				InvoiceCode:       invoice.InvoiceCode,
+				InvoiceAmount:     invoice.TotalAmount,
+				InvoicePaidAmount: 1,
+				ConsumedAmount:    1,
+			})
 		}
 
 		detail := ConsumedCreditDetail{
-			Sale:    sale,
-			Invoice: matchedInvoices,
+			SaleCode:       sale.SaleCode,
+			SoAmount:       sale.TotalAmount,
+			SoRemainAmount: sale.TotalAmount - sumInvoiceTotalAmount,
+			ConsumedAmount: sale.TotalAmount - sumInvoiceTotalAmount,
+			Invoice:        consumedCreditInvoice,
 		}
 
 		resultConsumend = append(resultConsumend, detail)
