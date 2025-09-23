@@ -49,9 +49,9 @@ func GetCreditPreload(id []uuid.UUID, customerCode []string, isActive []string, 
 	}
 	var creditID []uuid.UUID
 	gormx.Table("credit").Select("credit.id").
-		Joins("inner join credit on credit.id = credit_extra.credit_id").
+		Joins("left join credit_extra  on credit.id = credit_extra.credit_id").
 		Where("1=1 " + searchID + "" + searchCustomerCode + "" + searchIsActive + "").
-		Group("credit.id").Scan(creditID)
+		Group("credit.id").Scan(&creditID)
 
 	if len(creditID) > 0 {
 
@@ -76,7 +76,7 @@ func GetCreditPreload(id []uuid.UUID, customerCode []string, isActive []string, 
 
 		}
 
-		err = query.Order("update_dtm desc").Find(&credit).Error
+		err = query.Order("update_date desc").Find(&credit).Error
 		sqlDB, err1 := gormx.DB()
 		if err1 != nil {
 			return nil, 0, 0, err1
