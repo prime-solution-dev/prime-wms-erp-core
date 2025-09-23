@@ -35,7 +35,7 @@ func CreatePOBigLot(prePurchase []models.PrePurchase) error {
 }
 
 // Get
-func GetPOBigLotList(companyCode string, siteCode string, page int, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPOBigLotList(prePurchaseCodes []string, companyCode string, siteCode string, page int, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -46,7 +46,7 @@ func GetPOBigLotList(companyCode string, siteCode string, page int, pageSize int
 	totalRecords := int64(0)
 
 	preloadQuery := gormx.Preload("PrePurchaseItems")
-	filterSite := preloadQuery.Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+	filterSite := preloadQuery.Where("company_code = ? AND site_code = ? AND pre_purchase_code IN ?", companyCode, siteCode, prePurchaseCodes)
 
 	if err := filterSite.Find(&prePurchaseList).Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err

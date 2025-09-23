@@ -20,7 +20,7 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	prePurchaseList, total, page, pageSize, totalPage, err := purchaseRepository.GetPOBigLotList(req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
+	prePurchaseList, total, page, pageSize, totalPage, err := purchaseRepository.GetPOBigLotList(req.PrePurchaseCodes, req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
 	if err != nil {
 		return nil, errors.New("failed to get big lot list: " + err.Error())
 	}
