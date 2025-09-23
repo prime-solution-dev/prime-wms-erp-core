@@ -12,6 +12,7 @@ import (
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
 	saleService "prime-erp-core/internal/services/sale-service"
+	summaryService "prime-erp-core/internal/services/summary-credit"
 	unitService "prime-erp-core/internal/services/unit-service"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
@@ -94,6 +95,15 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	credit.POST("/UpdateCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.UpdateCreditRequest)
+	})
+	credit.POST("/GetCredit", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCredit)
+	})
+
+	//summaryService
+	summary := ctx.Group("/summary")
+	summary.POST("/GetConsumend", func(c *gin.Context) {
+		utils.ProcessRequest(c, summaryService.GetConsumend)
 	})
 
 	//unit

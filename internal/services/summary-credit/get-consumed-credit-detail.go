@@ -3,29 +3,26 @@ package summaryService
 import (
 	"encoding/json"
 	"errors"
+	"prime-erp-core/internal/models"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
-	paymentService "prime-erp-core/internal/services/payment-service"
 	saleService "prime-erp-core/internal/services/sale-service"
 
 	"github.com/gin-gonic/gin"
 )
 
-type GetPaidInvoiceRequest struct {
-	CustomerCode string `json:"customer_code"`
-}
-type ResultGetPaidInvoice struct {
-	TotalAmount float64 `json:"total_Amount"`
-	PaidInvoice float64 `json:"paid_invoice"`
+type ConsumedCreditDetail struct {
+	Sale    models.Sale      `json:"sale"`
+	Invoice []models.Invoice `json:"invoice"`
 }
 
-func GetPaidInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-
+	resultConsumend := []ConsumedCreditDetail{}
 	requestDataGetSale := map[string]interface{}{
 		"customer_code":  []string{req.CustomerCode},
 		"status":         []string{"PENDING", "COMPLETED"},
@@ -44,10 +41,8 @@ func GetPaidInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	resultSale := sale.(saleService.ResultSale).Sale
 	saleCode := []string{}
-	totalAmount := 0.00
 	for _, saleValue := range resultSale {
 		saleCode = append(saleCode, saleValue.SaleCode)
-		totalAmount += saleValue.TotalAmount
 	}
 
 	requestDataGetInvoice := map[string]interface{}{
@@ -65,36 +60,22 @@ func GetPaidInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errGetInvoice
 	}
 	resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
-	invoiceCode := []string{}
-	for _, invoiceValue := range resultInvoice {
-		invoiceCode = append(invoiceCode, invoiceValue.InvoiceCode)
-	}
 
-	requestDataGetPayment := map[string]interface{}{
-		"invoice_code": invoiceCode,
-	}
-
-	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
-	if err != nil {
-		return nil, err
-	}
-
-	paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
-	if errGetPayment != nil {
-		return nil, errGetPayment
-	}
-	paidInvoice := 0.00
-	resultPayment := paymentle.(paymentService.ResultPayment).Payment
-	for _, paymentValue := range resultPayment {
-		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
-			paidInvoice += paymentInvoiceValue.Amount
+	for _, sale := range resultSale {
+		var matchedInvoices []models.Invoice
+		for _, invoice := range resultInvoice {
+			if invoice.DocRef == sale.SaleCode {
+				matchedInvoices = append(matchedInvoices, invoice)
+			}
 		}
+
+		detail := ConsumedCreditDetail{
+			Sale:    sale,
+			Invoice: matchedInvoices,
+		}
+
+		resultConsumend = append(resultConsumend, detail)
 	}
 
-	resultGetPaidInvoice := ResultGetPaidInvoice{
-		TotalAmount: totalAmount,
-		PaidInvoice: paidInvoice,
-	}
-
-	return resultGetPaidInvoice, nil
+	return resultConsumend, nil
 }
