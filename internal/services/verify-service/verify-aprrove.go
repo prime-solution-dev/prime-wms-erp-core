@@ -140,7 +140,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		//Price
 		priceKey := document.DocRef
 		newPriceReq := priceService.GetComparePriceRequest{}
-		newPriceReq.UnitCode = `PCS`      //TODO: get from config
+		newPriceReq.UnitCode = `PC`       //TODO: get from config
 		newPriceReq.UnitCodeWeight = `KG` //TODO: get from config
 
 		//Expiry
