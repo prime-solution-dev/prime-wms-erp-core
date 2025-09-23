@@ -104,8 +104,10 @@ func ComparePrice(req GetComparePriceRequest) (GetComparePriceResponse, error) {
 	})
 
 	//  Adjust Transport Cost Unit to match total
-	adjustTransportCosts(res.Items, totalTransportCostAll, &sumTransportUnit, true)
-	adjustTransportCosts(res.Items, totalTransportCostAll, &sumTransportUnitWeight, false)
+	if req.TransportType == `INCL` {
+		adjustTransportCosts(res.Items, totalTransportCostAll, &sumTransportUnit, true)
+		adjustTransportCosts(res.Items, totalTransportCostAll, &sumTransportUnitWeight, false)
+	}
 
 	//  Calculate net price
 	var subtotalExclTransport, subtotalExclTransportWeight float64
@@ -188,34 +190,37 @@ func calculateTransportCost(itemValue, totalValue, totalTransport float64, exist
 
 func adjustTransportCosts(items []ItemComparePrice, totalTransport float64, sumTransport *float64, isUnit bool) {
 	diff := totalTransport - *sumTransport
+	diff = math.Round(diff*100) / 100
 	if diff == 0 {
 		return
 	}
 
-	for i := range items {
-		var val float64
-		if isUnit {
-			val = float64Val(items[i].TransportCostUnit)
-		} else {
-			val = float64Val(items[i].TransportCostUnitWeight)
-		}
+	for diff != 0 {
+		for i := range items {
+			var val float64
+			if isUnit {
+				val = float64Val(items[i].TransportCostUnit)
+			} else {
+				val = float64Val(items[i].TransportCostUnitWeight)
+			}
 
-		if diff > 0 {
-			val += 0.01
-			diff -= 0.01
-		} else if diff < 0 {
-			val -= 0.01
-			diff += 0.01
-		}
+			if diff > 0 {
+				val += 0.01
+				diff -= 0.01
+			} else if diff < 0 {
+				val -= 0.01
+				diff += 0.01
+			}
 
-		if isUnit {
-			items[i].TransportCostUnit = float64Ptr(val)
-		} else {
-			items[i].TransportCostUnitWeight = float64Ptr(val)
-		}
+			if isUnit {
+				items[i].TransportCostUnit = float64Ptr(val)
+			} else {
+				items[i].TransportCostUnitWeight = float64Ptr(val)
+			}
 
-		if diff == 0 {
-			break
+			if diff == 0 {
+				break
+			}
 		}
 	}
 }
