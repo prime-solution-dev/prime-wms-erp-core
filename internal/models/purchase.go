@@ -181,3 +181,96 @@ type CreatePOBigLotRequest struct {
 	Remark          string                      `json:"remark"`
 	Items           []CreatePOBigLotItemRequest `json:"items"`
 }
+
+type GetPOBigLotListRequest struct {
+	PrePurchaseCodes []string `json:"pre_purchase_codes"`
+	CompanyCode      string   `json:"company_code"`
+	SiteCode         string   `json:"site_code"`
+	Page             int      `json:"page"`
+	PageSize         int      `json:"page_size"`
+}
+
+type GetPOBigLotItemResponse struct {
+	ID                   string  `json:"id"`
+	PrePurchaseID        string  `json:"pre_purchase_id"`
+	ProductGroupType     string  `json:"product_group_type"`
+	ProductGroupCode     string  `json:"product_group_code"`
+	ProductGroupName     string  `json:"product_group_name"`
+	Qty                  float64 `json:"qty"`
+	Unit                 string  `json:"unit"`
+	PurchaseQty          float64 `json:"purchase_qty"`
+	PurchaseUnit         string  `json:"purchase_unit"`
+	PurchaseUnitType     string  `json:"purchase_unit_type"`
+	PriceUnit            float64 `json:"price_unit"`
+	TotalDiscount        float64 `json:"total_discount"`
+	TotalAmount          float64 `json:"total_amount"`
+	UnitUOM              string  `json:"unit_uom"`
+	TotalCost            float64 `json:"total_cost"`
+	TotalDiscountPercent float64 `json:"total_discount_percent"`
+	TotalVat             float64 `json:"total_vat"`
+	SubtotalExclVat      float64 `json:"subtotal_excl_vat"`
+	WeightUnit           float64 `json:"weight_unit"`
+	TotalWeight          float64 `json:"total_weight"`
+	Status               string  `json:"status"`
+	Remark               string  `json:"remark"`
+	CreateDate           string  `json:"create_date"`
+	CreateBy             string  `json:"create_by"`
+	UpdateDate           string  `json:"update_date"`
+	UpdateBy             string  `json:"update_by"`
+}
+
+type GetPOBigLotResponse struct {
+	ID               string                    `json:"id"`
+	PrePurchaseCode  string                    `json:"pre_purchase_code"`
+	PurchaseType     string                    `json:"purchase_type"`
+	CompanyCode      string                    `json:"company_code"`
+	SiteCode         string                    `json:"site_code"`
+	SupplierCode     string                    `json:"supplier_code"`
+	SupplierName     string                    `json:"supplier_name"`
+	DeliveryAddress  string                    `json:"delivery_address"`
+	Status           string                    `json:"status"`
+	TotalAmount      float64                   `json:"total_amount"`
+	TotalWeight      float64                   `json:"total_weight"`
+	TotalDiscount    float64                   `json:"total_discount"`
+	TotalVat         float64                   `json:"total_vat"`
+	SubtotalExclVat  float64                   `json:"subtotal_excl_vat"`
+	IsApproved       bool                      `json:"is_approved"`
+	StatusApprove    string                    `json:"status_approve"`
+	Remark           string                    `json:"remark"`
+	CreateBy         string                    `json:"create_by"`
+	CreateDate       string                    `json:"create_date"`
+	UpdateBy         string                    `json:"update_by"`
+	UpdateDate       string                    `json:"update_date"`
+	PrePurchaseItems []GetPOBigLotItemResponse `json:"pre_purchase_items"`
+}
+
+type GetPOBigLotListResponse struct {
+	Total      int                   `json:"total"`
+	Page       int                   `json:"page"`
+	PageSize   int                   `json:"page_size"`
+	TotalPages int                   `json:"total_pages"`
+	BigLotList []GetPOBigLotResponse `json:"big_lot_list"`
+}
+
+// Supplier DTOs
+type GetSupplierListRequest struct {
+	SupplierCodes []string `json:"supplier_code"`
+}
+
+type GetSupplierListResponse struct {
+	Total      int        `json:"total"`
+	Page       int        `json:"page"`
+	PageSize   int        `json:"page_size"`
+	TotalPages int        `json:"total_pages"`
+	Supplier   []Supplier `json:"supplier"`
+}
+
+type Supplier struct {
+	ID           uuid.UUID `json:"id"`
+	SupplierCode string    `json:"supplier_code"`
+	SupplierName string    `json:"supplier_name"`
+	CreateBy     string    `json:"create_by"`
+	CreateDtm    time.Time `json:"create_dtm"`
+	UpdateBy     string    `json:"update_by"`
+	UpdateDtm    time.Time `json:"update_dtm"`
+}

@@ -65,8 +65,10 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, fmt.Errorf("effective date is required for quotation %s", quotationReq.QuotationCode)
 		}
 
+		quotationCode := uuid.New().String()
+
 		if tempQuotation.QuotationCode == "" {
-			tempQuotation.QuotationCode = uuid.New().String()
+			tempQuotation.QuotationCode = quotationCode
 		}
 
 		tempQuotation.CreateDate = &now
@@ -92,7 +94,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:             quotationReq.QuotationCode,
+			DocRef:             quotationCode,
 			CustomerCode:       quotationReq.CustomerCode,
 			EffectiveDatePrice: *quotationReq.EffectiveDatePrice,
 			Items:              []verifyService.VerifyApproveItem{},
@@ -152,7 +154,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				for _, quotation := range createQuotations {
 					if !doc.IsPassPrice {
 						quotation.IsApproved = false
-						quotation.StatusApprove = "PROCESS"
+						quotation.StatusApprove = "PENDING"
 					} else {
 						quotation.IsApproved = true
 						quotation.StatusApprove = "COMPLETED"
