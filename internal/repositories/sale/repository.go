@@ -110,3 +110,96 @@ func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, stat
 		return nil, 0, 0, err
 	}
 }
+
+type SaleWithInvoiceItems struct {
+	Sale         models.Sale
+	InvoiceItems []models.InvoiceItem
+}
+
+func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, error) {
+
+	sqlx, err := db.ConnectSqlx(`prime_erp`)
+	if err != nil {
+		return nil, err
+	}
+	searchCustomerCode := ""
+	if customerCode != "" {
+		searchCustomerCode = fmt.Sprintf(` and s.customer_code  = '%s'`, customerCode)
+	}
+
+	query := fmt.Sprintf(`
+		    SELECT 
+        s.sale_code, 
+        s.customer_code, 
+        s.total_amount,
+        it.id as item_id, 
+        it.document_ref, 
+        it.total_amount as invoice_total_amount
+    FROM sale s
+    LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
+		where 1=1 
+		%s
+		 ORDER BY s.sale_code
+	`, searchCustomerCode)
+
+	rows, err := db.ExecuteQuery(sqlx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer sqlx.Close()
+
+	saleMap := make(map[string]*SaleWithInvoiceItems)
+
+	for _, row := range rows {
+		// ดึงข้อมูลจาก map
+		saleCode := row["sale_code"].(string)
+		sumInvoiceTotalAmount := 0.00
+		// สร้าง Sale object
+		sale := models.Sale{
+			SaleCode:    saleCode,
+			CompanyCode: row["customer_code"].(string),
+			TotalAmount: row["total_amount"].(float64), // หรือแปลงถ้าเป็น string
+		}
+
+		// สร้าง InvoiceItem object
+		var invoiceItem models.InvoiceItem
+		idStr, _ := row["item_id"].(string)
+
+		id, _ := uuid.Parse(idStr)
+
+		if id != uuid.Nil { // ถ้ามี invoice item จริง
+			invoiceItem = models.InvoiceItem{
+				ID:          id,
+				DocumentRef: row["document_ref"].(string),
+				TotalAmount: row["invoice_total_amount"].(float64),
+			}
+			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
+		}
+
+		// group by sale_code
+		if existing, ok := saleMap[saleCode]; ok {
+			if invoiceItem.ID != uuid.Nil {
+				existing.InvoiceItems = append(existing.InvoiceItems, invoiceItem)
+			}
+		} else {
+			newSale := &SaleWithInvoiceItems{
+				Sale:         sale,
+				InvoiceItems: []models.InvoiceItem{},
+			}
+
+			if invoiceItem.ID != uuid.Nil {
+				newSale.InvoiceItems = append(newSale.InvoiceItems, invoiceItem)
+			}
+
+			saleMap[saleCode] = newSale
+		}
+	}
+
+	// แปลง map เป็น slice
+	var results []SaleWithInvoiceItems
+	for _, v := range saleMap {
+		results = append(results, *v)
+	}
+
+	return results, nil
+}

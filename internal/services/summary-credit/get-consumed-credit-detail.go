@@ -3,9 +3,7 @@ package summaryService
 import (
 	"encoding/json"
 	"errors"
-	"prime-erp-core/internal/models"
-	invoiceService "prime-erp-core/internal/services/invoice-service"
-	saleService "prime-erp-core/internal/services/sale-service"
+	repositorySale "prime-erp-core/internal/repositories/sale"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,6 +25,42 @@ type ConsumedCreditInvoice struct {
 func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	result, errGetSale := repositorySale.GetSalesWithInvoiceItems(req.CustomerCode)
+	if errGetSale != nil {
+		return nil, errGetSale
+	}
+	resultConsumend := []ConsumedCreditDetail{}
+	for _, resultValue := range result {
+		sumInvoiceTotalAmount := 0.00
+		consumedCreditInvoice := []ConsumedCreditInvoice{}
+		for _, invoiceItemsValue := range resultValue.InvoiceItems {
+			sumInvoiceTotalAmount += invoiceItemsValue.TotalAmount
+			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
+				InvoiceCode:       "invoiceItemsValue.InvoiceCode",
+				InvoiceAmount:     invoiceItemsValue.TotalAmount,
+				InvoicePaidAmount: 1,
+				ConsumedAmount:    1,
+			})
+		}
+
+		detail := ConsumedCreditDetail{
+			SaleCode:       resultValue.Sale.SaleCode,
+			SoAmount:       resultValue.Sale.TotalAmount,
+			SoRemainAmount: resultValue.Sale.TotalAmount - sumInvoiceTotalAmount,
+			ConsumedAmount: resultValue.Sale.TotalAmount - sumInvoiceTotalAmount,
+			Invoice:        consumedCreditInvoice,
+		}
+
+		resultConsumend = append(resultConsumend, detail)
+
+	}
+
+	/* var req GetPaidInvoiceRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
@@ -96,7 +130,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		resultConsumend = append(resultConsumend, detail)
-	}
+	} */
 
-	return resultConsumend, nil
+	return result, nil
 }

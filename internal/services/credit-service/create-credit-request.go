@@ -72,3 +72,6 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		"message": "Approval create request successfully",
 	}, nil
 }
+
+// RequestType Base  ให้เอา customer ไป where credit_request status = pedding type base ว่ามีไหม ถ้า มี return กลับและสร้างไม่ได้
+// RequestType extra ไม่ต้องเช็ค

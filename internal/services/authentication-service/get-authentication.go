@@ -18,6 +18,7 @@ type GetRequesterRequest struct {
 type Requester struct {
 	RequesterType string
 	RequesterID   string
+	RequesterCode string
 }
 
 func GetRequester(requestData map[string]interface{}) ([]Requester, error) {

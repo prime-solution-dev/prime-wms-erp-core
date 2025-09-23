@@ -65,7 +65,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			newApprovalItemPermission := models.ApprovalItemPermission{
 				ID:             approvalItemPermissionID,
 				ApprovalItemID: approvalItemID,
-				UserCode:       requesterValue.RequesterID,
+				UserCode:       requesterValue.RequesterCode,
 			}
 			approvalItemPermissionValue = append(approvalItemPermissionValue, newApprovalItemPermission)
 		}
