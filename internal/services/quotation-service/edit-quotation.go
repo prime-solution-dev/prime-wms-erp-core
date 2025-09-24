@@ -49,7 +49,7 @@ func EditQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	approvalResponse, ok := approvalResult.(approvalService.ResultApproval)
 	var approvalUpdateResult interface{} = nil
-	if ok || len(approvalResponse.ApprovalRes) > 0 {
+	if ok && len(approvalResponse.ApprovalRes) > 0 {
 		updateApprovalReq := []struct {
 			ID     uuid.UUID `json:"id"`
 			Status string    `json:"status"`
