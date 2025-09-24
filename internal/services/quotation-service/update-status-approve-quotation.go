@@ -74,14 +74,19 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 		return nil, fmt.Errorf("invalid status: %s", req.Status)
 	}
 
+	updateFields := map[string]interface{}{
+		"status":          quotationStatus,
+		"status_approve":  quotationStatusApprove,
+		"remark_approval": req.Remark,
+		"update_date":     gormx.NowFunc(),
+	}
+	if req.Status == "COMPLETED" {
+		updateFields["is_approved"] = true
+	}
+
 	if err := gormx.Model(&models.Quotation{}).
 		Where("id = ?", req.ID).
-		Updates(map[string]interface{}{
-			"status":          quotationStatus,
-			"status_approve":  quotationStatusApprove,
-			"remark_approval": req.Remark,
-			"update_date":     gormx.NowFunc(),
-		}).Error; err != nil {
+		Updates(updateFields).Error; err != nil {
 		return nil, fmt.Errorf("failed to update quotation status: %v", err)
 	}
 
