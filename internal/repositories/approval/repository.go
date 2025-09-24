@@ -152,7 +152,7 @@ func UpdateApproval(aproval []models.Approval, aprovalItem []models.ApprovalItem
 	}
 	rowsAffected := 0
 	for _, aprovalValue := range aproval {
-		result := gormx.Table("aproval").Where("id = ?", aprovalValue.ID).Updates(&aprovalValue)
+		result := gormx.Table("approval").Where("id = ?", aprovalValue.ID).Updates(&aprovalValue)
 
 		if result.Error != nil {
 			gormx.Rollback()

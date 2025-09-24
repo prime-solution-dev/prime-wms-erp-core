@@ -43,6 +43,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	quotation.POST("/CreateQuotation", func(c *gin.Context) {
 		utils.ProcessRequest(c, quotationService.CreateQuotation)
 	})
+	quotation.POST("/RequestApproveQuotation", func(c *gin.Context) {
+		utils.ProcessRequest(c, quotationService.RequestApproveQuotation)
+	})
+	quotation.POST("/UpdateStatusApproveQuotation", func(c *gin.Context) {
+		utils.ProcessRequest(c, quotationService.UpdateStatusApproveQuotation)
+	})
 	//invoice
 	invoice := ctx.Group("/invoice")
 	invoice.POST("/GetInvoice", func(c *gin.Context) {

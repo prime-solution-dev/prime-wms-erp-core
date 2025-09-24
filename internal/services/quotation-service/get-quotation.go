@@ -14,6 +14,7 @@ import (
 )
 
 type GetQuotationRequest struct {
+	ID            []string `json:"id"`
 	QuotationCode []string `json:"quotation_code"`
 	SiteCode      []string `json:"site_code"`
 	CompanyCode   []string `json:"company_code"`
@@ -138,6 +139,10 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	query := gormx.Preload("Items").
 		Order("quotation.update_date DESC")
+
+	if len(req.ID) > 0 {
+		query = query.Where("id IN ?", req.ID)
+	}
 
 	if len(req.QuotationCode) > 0 {
 		query = query.Where("quotation_code IN ?", req.QuotationCode)
