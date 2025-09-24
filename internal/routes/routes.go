@@ -105,7 +105,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	summary.POST("/GetConsumend", func(c *gin.Context) {
 		utils.ProcessRequest(c, summaryService.GetConsumend)
 	})
-
+	summary.POST("/GetSummaryCredit", func(c *gin.Context) {
+		utils.ProcessRequest(c, summaryService.GetSummaryCredit)
+	})
 	//unit
 	unit := ctx.Group("/unit")
 	unit.POST("/GetAllUnit", func(c *gin.Context) {

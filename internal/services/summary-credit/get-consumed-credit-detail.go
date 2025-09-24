@@ -58,6 +58,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	resultPayment := paymentle.(paymentService.ResultPayment).Payment
 	paymentValueMap := map[string]float64{}
+	sumPaidInvoice := 0.00
 	for _, paymentValue := range resultPayment {
 		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
 
@@ -67,6 +68,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			} else {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap
 			}
+			sumPaidInvoice += paymentInvoiceValue.Amount
 
 		}
 
@@ -98,9 +100,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ConsumedAmount: resultValue.Sale.TotalAmount - sumInvoiceTotalAmount,
 			Invoice:        consumedCreditInvoice,
 		}
-
 		resultConsumend = append(resultConsumend, detail)
-
 	}
 
 	/* var req GetPaidInvoiceRequest
@@ -175,5 +175,10 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		resultConsumend = append(resultConsumend, detail)
 	} */
 
-	return resultConsumend, nil
+	if req.PaidInvoice {
+		return sumPaidInvoice, nil
+	} else {
+		return resultConsumend, nil
+	}
+
 }
