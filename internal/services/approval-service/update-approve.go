@@ -5,10 +5,8 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryApproval "prime-erp-core/internal/repositories/approval"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func UpdateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -23,9 +21,9 @@ func UpdateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	approvalItemValue := []models.ApprovalItem{}
 	approvalItemPermissionValue := []models.ApprovalItemPermission{}
 
-	for i, approval := range req {
+	for i := range req {
 
-		for o := range approval.ApprovalItem {
+		/* 	for o := range approval.ApprovalItem {
 			req[i].ApprovalItem[o].StepSeq = 1
 			req[i].ApprovalItem[o].IsCondition = false
 			jsonDataApprovalItem, _ := json.Marshal(req[i].ApprovalItem[o])
@@ -36,13 +34,13 @@ func UpdateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			req[i].ApprovalItem[o].ApprovalItemPermission = []models.ApprovalItemPermission{}
 			approvalItemValue = append(approvalItemValue, req[i].ApprovalItem[o])
 
-		}
+		} */
 
-		if req[i].ApproveCode != "" {
+		/* if req[i].ApproveCode != "" {
 			req[i].ApproveCode = approval.ApproveCode
 		} else {
 			req[i].ApproveCode = uuid.New().String()
-		}
+		} */
 		/* jsonDataApproval, _ := json.Marshal(req[i])
 		req[i].DocumentData = jsonDataApproval */
 		req[i].ApprovalItem = []models.ApprovalItem{}
