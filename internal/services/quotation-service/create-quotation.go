@@ -189,6 +189,14 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				}
 			}
 		}
+	} else {
+		// If not verifying price, create response for all quotations with default values
+		for _, quotation := range createQuotations {
+			res = append(res, CreateQuotationResponse{
+				IsPass:        true, // Default to true when not verifying
+				QuotationCode: quotation.QuotationCode,
+			})
+		}
 	}
 
 	// check duplicate quotation codes
