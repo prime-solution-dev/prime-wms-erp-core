@@ -39,11 +39,17 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 	}
 	defer db.CloseGORM(gormx)
 
-	updateApprovalReq := []models.Approval{{
-		ID:     req.ApprovalID,
-		Status: req.Status,
-		Remark: req.Remark,
-	}}
+	updateApprovalReq := []struct {
+		ID     uuid.UUID `json:"id"`
+		Status string    `json:"status"`
+		Remark string    `json:"remark"`
+	}{
+		{
+			ID:     req.ApprovalID,
+			Status: req.Status,
+			Remark: req.Remark,
+		},
+	}
 
 	updateApprovalPayload, _ := json.Marshal(updateApprovalReq)
 	approvalResult, err := approvalService.UpdateApproval(ctx, string(updateApprovalPayload))
@@ -61,7 +67,7 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 	case "REJECT":
 		quotationStatus = "CANCELED"
 		quotationStatusApprove = "REJECT"
-	case "COMPLETED	":
+	case "COMPLETED":
 		quotationStatus = "PENDING"
 		quotationStatusApprove = "COMPLETED"
 	default:
