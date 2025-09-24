@@ -9,6 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type GetPaidInvoiceRequest struct {
+	CustomerCode string `json:"customer_code"`
+	PaidInvoice  bool   `json:"paid_invoice"`
+}
 type ConsumedCreditDetail struct {
 	SaleCode       string                  `json:"sale_code"`
 	SoAmount       float64                 `json:"so_amount"`
@@ -21,6 +25,10 @@ type ConsumedCreditInvoice struct {
 	InvoiceAmount     float64 `json:"invoice_amount"`
 	InvoicePaidAmount float64 `json:"invoice_paid_amount"`
 	ConsumedAmount    float64 `json:"consumed_amount"`
+}
+type ResultGetPaidInvoices struct {
+	TotalAmount float64 `json:"total_Amount"`
+	PaidInvoice float64 `json:"paid_invoice"`
 }
 
 func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -66,14 +74,14 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if exist {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
 			} else {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
 			}
 			sumPaidInvoice += paymentInvoiceValue.Amount
 
 		}
 
 	}
-
+	totalAmount := 0.00
 	for _, resultValue := range result {
 		sumInvoiceTotalAmount := 0.00
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
@@ -92,6 +100,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 		}
+		totalAmount += resultValue.Sale.TotalAmount
 
 		detail := ConsumedCreditDetail{
 			SaleCode:       resultValue.Sale.SaleCode,
@@ -103,80 +112,13 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		resultConsumend = append(resultConsumend, detail)
 	}
 
-	/* var req GetPaidInvoiceRequest
-
-	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
-		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	resultGetPaidInvoices := ResultGetPaidInvoices{
+		TotalAmount: totalAmount,
+		PaidInvoice: sumPaidInvoice,
 	}
-	resultConsumend := []ConsumedCreditDetail{}
-	requestDataGetSale := map[string]interface{}{
-		"customer_code":  []string{req.CustomerCode},
-		"status":         []string{"PENDING", "COMPLETED"},
-		"status_payment": []string{"PENDING"},
-		"is_approved":    []bool{true},
-	}
-
-	jsonBytesSale, err := json.Marshal(requestDataGetSale)
-	if err != nil {
-		return nil, err
-	}
-
-	sale, errGetSale := saleService.GetSale(ctx, string(jsonBytesSale))
-	if errGetSale != nil {
-		return nil, errGetSale
-	}
-	resultSale := sale.(saleService.ResultSale).Sale
-	saleCode := []string{}
-	for _, saleValue := range resultSale {
-		saleCode = append(saleCode, saleValue.SaleCode)
-	}
-
-	requestDataGetInvoice := map[string]interface{}{
-		"customer_code": []string{req.CustomerCode},
-		"doc_ref":       saleCode,
-	}
-
-	jsonBytesInvoice, err := json.Marshal(requestDataGetInvoice)
-	if err != nil {
-		return nil, err
-	}
-
-	invoice, errGetInvoice := invoiceService.GetInvoice(ctx, string(jsonBytesInvoice))
-	if errGetInvoice != nil {
-		return nil, errGetInvoice
-	}
-	resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
-
-	for _, sale := range resultSale {
-		var matchedInvoices []models.Invoice
-		sumInvoiceTotalAmount := 0.00
-		consumedCreditInvoice := []ConsumedCreditInvoice{}
-		for _, invoice := range resultInvoice {
-			if invoice.DocRef == sale.SaleCode {
-				sumInvoiceTotalAmount += invoice.TotalAmount
-				matchedInvoices = append(matchedInvoices, invoice)
-			}
-			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
-				InvoiceCode:       invoice.InvoiceCode,
-				InvoiceAmount:     invoice.TotalAmount,
-				InvoicePaidAmount: 1,
-				ConsumedAmount:    1,
-			})
-		}
-
-		detail := ConsumedCreditDetail{
-			SaleCode:       sale.SaleCode,
-			SoAmount:       sale.TotalAmount,
-			SoRemainAmount: sale.TotalAmount - sumInvoiceTotalAmount,
-			ConsumedAmount: sale.TotalAmount - sumInvoiceTotalAmount,
-			Invoice:        consumedCreditInvoice,
-		}
-
-		resultConsumend = append(resultConsumend, detail)
-	} */
 
 	if req.PaidInvoice {
-		return sumPaidInvoice, nil
+		return resultGetPaidInvoices, nil
 	} else {
 		return resultConsumend, nil
 	}

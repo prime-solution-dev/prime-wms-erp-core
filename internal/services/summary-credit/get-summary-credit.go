@@ -50,9 +50,14 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	for _, creditValue := range resultCredit {
 		creditLimit += creditValue.Amount
 		for _, creditExtraValue := range creditValue.CreditExtra {
-			if creditValue.EffectiveDtm.After(time.Now()) || creditValue.EffectiveDtm.Equal(time.Now()) {
+			if creditValue.EffectiveDtm == nil {
 				increaseCreditLimit += creditExtraValue.Amount
+			} else {
+				if creditValue.EffectiveDtm.After(time.Now()) || creditValue.EffectiveDtm.Equal(time.Now()) {
+					increaseCreditLimit += creditExtraValue.Amount
+				}
 			}
+
 		}
 	}
 
@@ -78,7 +83,7 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	if errApproval != nil {
 		return nil, errApproval
 	}
-	resultGetPaidInvoice := paidInvoice.(ResultGetPaidInvoice)
+	resultGetPaidInvoice := paidInvoice.(ResultGetPaidInvoices)
 
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,

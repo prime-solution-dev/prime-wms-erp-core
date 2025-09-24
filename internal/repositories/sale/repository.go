@@ -129,8 +129,10 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 
 	query := fmt.Sprintf(`
 		    SELECT 
+			s.id,
         s.sale_code, 
         s.customer_code, 
+		s.status_payment,
         s.total_amount,
         it.id as item_id, 
         it.document_ref, 
@@ -138,8 +140,8 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		i.invoice_code 
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-	JOIN invoice  i  ON i.id = it.invoice_id 
-		where i.invoice_type = 'AR'    
+	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and i.invoice_type = 'AR'
+		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
 		%s
 		 ORDER BY s.sale_code
 	`, searchCustomerCode)
@@ -156,11 +158,16 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		// ดึงข้อมูลจาก map
 		saleCode := row["sale_code"].(string)
 		sumInvoiceTotalAmount := 0.00
+		idStrSale, _ := row["id"].(string)
+
+		idSale, _ := uuid.Parse(idStrSale)
 		// สร้าง Sale object
 		sale := models.Sale{
-			SaleCode:    saleCode,
-			CompanyCode: row["customer_code"].(string),
-			TotalAmount: row["total_amount"].(float64), // หรือแปลงถ้าเป็น string
+			ID:            idSale,
+			SaleCode:      saleCode,
+			CompanyCode:   row["customer_code"].(string),
+			TotalAmount:   row["total_amount"].(float64),
+			StatusPayment: row["status_payment"].(string),
 		}
 
 		// สร้าง InvoiceItem object
@@ -205,4 +212,23 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 	}
 
 	return results, nil
+}
+func UpdateStatusPayment(sale []models.Sale) (int, error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected := 0
+	for _, saleValue := range sale {
+		result := gormx.Table("sale").Where("id = ?", saleValue.ID).Select("status_payment").Updates(&saleValue)
+
+		if result.Error != nil {
+			gormx.Rollback()
+			return 0, result.Error
+		}
+		rowsAffected = int(result.RowsAffected)
+	}
+
+	return rowsAffected, nil
 }

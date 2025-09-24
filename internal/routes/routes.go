@@ -64,6 +64,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/CreateSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.CreateSale)
 	})
+	sale.POST("/UpdateSaleStatusPayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
+	})
 
 	sale.POST("/GetSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.GetSale)
@@ -114,6 +117,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	summary.POST("/GetSummaryCredit", func(c *gin.Context) {
 		utils.ProcessRequest(c, summaryService.GetSummaryCredit)
 	})
+	summary.POST("/GetOutStandingSo", func(c *gin.Context) {
+		utils.ProcessRequest(c, summaryService.GetOutStandingSo)
+	})
+
 	//unit
 	unit := ctx.Group("/unit")
 	unit.POST("/GetAllUnit", func(c *gin.Context) {
