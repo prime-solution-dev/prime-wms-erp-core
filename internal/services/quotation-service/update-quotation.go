@@ -92,8 +92,10 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		tempQuotation.UpdateDate = &now
 		tempQuotation.UpdateBy = user
 
-		tempQuotation.ExpirePriceDate = &expiryDate
-		tempQuotation.ExpirePriceDay = int(expiryDays)
+		if quotationReq.Status != "TEMP" {
+			tempQuotation.ExpirePriceDate = &expiryDate
+			tempQuotation.ExpirePriceDay = int(expiryDays)
+		}
 
 		updateQuotations = append(updateQuotations, tempQuotation)
 
@@ -182,6 +184,14 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					}
 				}
 			}
+		}
+	} else {
+		// If not verifying price, create response for all quotations with default values
+		for _, quotation := range updateQuotations {
+			res = append(res, UpdateQuotationResponse{
+				IsPass:        true, // Default to true when not verifying
+				QuotationCode: quotation.QuotationCode,
+			})
 		}
 	}
 
