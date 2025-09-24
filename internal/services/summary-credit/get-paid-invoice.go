@@ -12,6 +12,7 @@ import (
 
 type GetPaidInvoiceRequest struct {
 	CustomerCode string `json:"customer_code"`
+	PaidInvoice  bool   `json:"paid_invoice"`
 }
 type ResultGetPaidInvoice struct {
 	TotalAmount float64 `json:"total_Amount"`

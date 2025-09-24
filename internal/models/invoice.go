@@ -39,6 +39,7 @@ type InvoiceItem struct {
 	ID                    uuid.UUID  `json:"id"`
 	InvoiceItem           string     `json:"invoice_item"`
 	InvoiceID             uuid.UUID  `json:"invoice_id"`
+	InvoiceCode           string     `gorm:"-" json:"invoice_code"`
 	InvoiceQty            float64    `json:"invoice_qty"`
 	InvoiceUnit           string     `json:"invoice_unit"`
 	InvoiceUnitType       string     `json:"invoice_unit_type"`

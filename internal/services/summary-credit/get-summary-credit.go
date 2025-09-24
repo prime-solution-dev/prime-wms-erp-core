@@ -65,7 +65,16 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		remainDeposit += depositValue.AmountRemain
 	}
 
-	paidInvoice, errApproval := GetPaidInvoice(ctx, string(jsonBytesCustomerCode))
+	requestDataGetConsumend := map[string]interface{}{
+		"customer_code": req.CustomerCode,
+		"paid_invoice":  true,
+	}
+	jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
+	if err != nil {
+		return nil, err
+	}
+
+	paidInvoice, errApproval := GetConsumend(ctx, string(jsonBytesGetConsumend))
 	if errApproval != nil {
 		return nil, errApproval
 	}
