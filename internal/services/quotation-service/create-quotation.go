@@ -100,6 +100,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if quotationReq.Status == "PENDING" {
 			tempQuotation.ExpirePriceDate = &expiryDate
 			tempQuotation.ExpirePriceDay = int(expiryDays)
+
 		}
 
 		createQuotations = append(createQuotations, tempQuotation)
