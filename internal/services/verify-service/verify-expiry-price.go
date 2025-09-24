@@ -48,7 +48,7 @@ func VerifyExpiryPriceLogic(gormx *gorm.DB, req []VerifyExpiryPriceRequest) (*[]
 
 	topic := `PRICE`
 	configCodes := []string{`EXPIRY_PRICE_DAYS`}
-	configMap, err := getConfigSystem(gormx, topic, configCodes)
+	configMap, err := GetConfigSystem(gormx, topic, configCodes)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func VerifyExpiryPriceLogic(gormx *gorm.DB, req []VerifyExpiryPriceRequest) (*[]
 	return &res, nil
 }
 
-func getConfigSystem(gomx *gorm.DB, topics string, configCodes []string) (map[string]models.SystemConfig, error) {
+func GetConfigSystem(gomx *gorm.DB, topics string, configCodes []string) (map[string]models.SystemConfig, error) {
 	var configMap map[string]models.SystemConfig
 
 	configMap = make(map[string]models.SystemConfig)
