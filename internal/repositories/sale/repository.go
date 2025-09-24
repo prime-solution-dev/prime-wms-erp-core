@@ -134,10 +134,12 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
         s.total_amount,
         it.id as item_id, 
         it.document_ref, 
-        it.total_amount as invoice_total_amount
+        it.total_amount as invoice_total_amount,
+		i.invoice_code 
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-		where 1=1 
+	JOIN invoice  i  ON i.id = it.invoice_id 
+		where i.invoice_type = 'AR'    
 		%s
 		 ORDER BY s.sale_code
 	`, searchCustomerCode)
@@ -170,6 +172,7 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		if id != uuid.Nil { // ถ้ามี invoice item จริง
 			invoiceItem = models.InvoiceItem{
 				ID:          id,
+				InvoiceCode: row["invoice_code"].(string),
 				DocumentRef: row["document_ref"].(string),
 				TotalAmount: row["invoice_total_amount"].(float64),
 			}

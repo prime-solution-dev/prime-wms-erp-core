@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	repositorySale "prime-erp-core/internal/repositories/sale"
+	paymentService "prime-erp-core/internal/services/payment-service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,17 +36,59 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errGetSale
 	}
 	resultConsumend := []ConsumedCreditDetail{}
+	invoiceCode := []string{}
+	for _, resultValue := range result {
+		for _, invoiceItemsValue := range resultValue.InvoiceItems {
+			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
+		}
+	}
+
+	requestDataGetPayment := map[string]interface{}{
+		"invoice_code": invoiceCode,
+	}
+
+	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
+	if err != nil {
+		return nil, err
+	}
+
+	paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+	if errGetPayment != nil {
+		return nil, errGetPayment
+	}
+	resultPayment := paymentle.(paymentService.ResultPayment).Payment
+	paymentValueMap := map[string]float64{}
+	for _, paymentValue := range resultPayment {
+		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+
+			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
+			if exist {
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
+			} else {
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap
+			}
+
+		}
+
+	}
+
 	for _, resultValue := range result {
 		sumInvoiceTotalAmount := 0.00
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
+			invoicePaidAmount := 0.00
+			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
+			if exist {
+				invoicePaidAmount = paymentItemMap
+			}
 			sumInvoiceTotalAmount += invoiceItemsValue.TotalAmount
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
-				InvoiceCode:       "invoiceItemsValue.InvoiceCode",
+				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceItemsValue.TotalAmount,
-				InvoicePaidAmount: 1,
-				ConsumedAmount:    1,
+				InvoicePaidAmount: invoicePaidAmount,
+				ConsumedAmount:    invoiceItemsValue.TotalAmount - invoicePaidAmount,
 			})
+			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 		}
 
 		detail := ConsumedCreditDetail{
@@ -132,5 +175,5 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		resultConsumend = append(resultConsumend, detail)
 	} */
 
-	return result, nil
+	return resultConsumend, nil
 }
