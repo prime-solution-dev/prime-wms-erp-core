@@ -26,6 +26,7 @@ type RequestApproveQuotationResponse struct {
 func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	req := RequestApproveQuotationRequest{}
 	res := RequestApproveQuotationResponse{}
+	var approvalIDs []uuid.UUID
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
@@ -68,32 +69,50 @@ func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{},
 		return nil, fmt.Errorf("failed to marshal quotation to JSON: %v", err)
 	}
 
-	createApprovalReq := []models.Approval{{
-		ApproveTopic: "QO",
-		DocumentType: "QO",
-		DocumentCode: quotation.QuotationCode,
-		Status:       "PENDING",
-		Remark:       "",
-		MDItemCode:   "CTM-CTM4",
-		CreateBy:     "ADMIN",
-		DocumentData: quotationJSON,
-	}}
-
-	approvalPayload, _ := json.Marshal(createApprovalReq)
-	approvalResult, err := approvalService.CreateApproval(ctx, string(approvalPayload))
+	approvalReq := approvalService.GetApprovalRequest{
+		Page:         1,
+		PageSize:     1,
+		DocumentCode: []string{quotation.QuotationCode},
+	}
+	approvalPayload, _ := json.Marshal(approvalReq)
+	approvalResult, err := approvalService.GetApproval(ctx, string(approvalPayload))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create approval: %v", err)
+		return nil, err
 	}
+	approvalResponse, ok := approvalResult.(approvalService.ResultApproval)
+	if !ok || len(approvalResponse.ApprovalRes) == 0 {
+		createApprovalReq := []models.Approval{{
+			ApproveTopic: "QPC ",
+			DocumentType: "QO",
+			DocumentCode: quotation.QuotationCode,
+			Status:       "PENDING",
+			Remark:       "",
+			MDItemCode:   "CTM-CTM4",
+			CreateBy:     "ADMIN",
+			DocumentData: quotationJSON,
+		}}
 
-	// Extract approval ID from the response
-	approvalResponse, ok := approvalResult.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("unexpected approval response format")
-	}
+		approvalPayload, _ := json.Marshal(createApprovalReq)
+		approvalResult, err := approvalService.CreateApproval(ctx, string(approvalPayload))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create approval: %v", err)
+		}
 
-	approvalIDs, ok := approvalResponse["id"].([]uuid.UUID)
-	if !ok || len(approvalIDs) == 0 {
-		return nil, fmt.Errorf("no approval ID returned")
+		// Extract approval ID from the response
+		approvalResponse, ok := approvalResult.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected approval response format")
+		}
+
+		approvalIDs, ok = approvalResponse["id"].([]uuid.UUID)
+		if !ok || len(approvalIDs) == 0 {
+			return nil, fmt.Errorf("no approval ID returned")
+		}
+	} else {
+		// If approval already exists, get its ID
+		for _, approval := range approvalResponse.ApprovalRes {
+			approvalIDs = append(approvalIDs, approval.ID)
+		}
 	}
 
 	// Update quotation status_approve to "PROCESS"
