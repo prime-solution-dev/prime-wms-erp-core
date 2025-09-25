@@ -11,7 +11,7 @@ type CreditRequest struct {
 	RequestCode                  string     `json:"request_code"`
 	CustomerCode                 string     `json:"customer_code"`
 	CustomerName                 string     `gorm:"-" json:"customer_name"`
-	TemporaryIncreaseCreditLimit float64    `gorm:"-" json:"temporary_increase_credit_limit"`
+	TemporaryIncreaseCreditLimit float64    `json:"temporary_increase_credit_limit"`
 	ConsumedCredit               float64    `gorm:"-" json:"consumed_credit"`
 	BalanceCreditLimit           float64    `gorm:"-" json:"balance_credit_limit"`
 	CustomeStatus                bool       `gorm:"-" json:"customer_status"`
@@ -24,6 +24,7 @@ type CreditRequest struct {
 	ExpireDtm                    *time.Time `json:"expire_dtm"`
 	RequestDate                  *time.Time `json:"request_date"`
 	ActionDate                   *time.Time `json:"action_date"`
+	IsAction                     bool       `json:"is_action"`
 	CreateBy                     string     `json:"create_by"`
 	CreateDtm                    *time.Time `json:"create_dtm"`
 	UpdateBy                     string     `json:"update_by"`

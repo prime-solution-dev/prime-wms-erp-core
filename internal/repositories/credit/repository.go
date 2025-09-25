@@ -215,7 +215,12 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pa
 
 	}
 
-	err = query.Order("update_date desc").Find(&creditRequest).Error
+	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
+		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit," +
+		"MAX(CASE WHEN request_type = 'BASE' THEN (is_approve::int) ELSE NULL END)::boolean AS is_approve," +
+		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
+		"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
+		Group("customer_code").Find(&creditRequest).Error
 	sqlDB, err1 := gormx.DB()
 	if err1 != nil {
 		return nil, 0, 0, err1
