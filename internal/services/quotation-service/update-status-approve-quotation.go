@@ -84,29 +84,41 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 		"update_date":     gormx.NowFunc(),
 	}
 	if req.Status == "COMPLETED" {
-		//get config
-		topic := `PRICE`
-		configCodes := []string{`EXPIRY_PRICE_DAYS`}
-		configMap, err := verifyService.GetConfigSystem(gormx, topic, configCodes)
-		if err != nil {
-			return nil, err
+		// Query existing quotation to check expire_price_date
+		var existingQuotation models.Quotation
+		if err := gormx.Where("id = ?", req.ID).First(&existingQuotation).Error; err != nil {
+			return nil, fmt.Errorf("failed to get existing quotation: %v", err)
 		}
 
-		expiryDaysConfig, exists := configMap[fmt.Sprintf(`%s|%s`, topic, `EXPIRY_PRICE_DAYS`)]
-		if !exists {
-			return nil, errors.New("missing configuration for expiry price days")
+		// Check if expire_price_date has expired
+		now := time.Now()
+		isPriceExpired := existingQuotation.ExpirePriceDate == nil || existingQuotation.ExpirePriceDate.Before(now)
+
+		if isPriceExpired {
+			//get config
+			topic := `PRICE`
+			configCodes := []string{`EXPIRY_PRICE_DAYS`}
+			configMap, err := verifyService.GetConfigSystem(gormx, topic, configCodes)
+			if err != nil {
+				return nil, err
+			}
+
+			expiryDaysConfig, exists := configMap[fmt.Sprintf(`%s|%s`, topic, `EXPIRY_PRICE_DAYS`)]
+			if !exists {
+				return nil, errors.New("missing configuration for expiry price days")
+			}
+
+			expiryDays, err := strconv.ParseInt(expiryDaysConfig.Value, 10, 64)
+			if err != nil {
+				return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
+			}
+
+			expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
+
+			updateFields["effective_date_price"] = gormx.NowFunc()
+			updateFields["expire_price_day"] = int(expiryDays)
+			updateFields["expire_price_date"] = &expiryDate
 		}
-
-		expiryDays, err := strconv.ParseInt(expiryDaysConfig.Value, 10, 64)
-		if err != nil {
-			return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
-		}
-
-		expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
-
-		updateFields["effective_date_price"] = gormx.NowFunc()
-		updateFields["expire_price_day"] = int(expiryDays)
-		updateFields["expire_price_date"] = &expiryDate
 		updateFields["is_approved"] = true
 	}
 
