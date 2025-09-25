@@ -15,24 +15,19 @@ import (
 	"github.com/google/uuid"
 )
 
-type CreateQuotationRequest struct {
+type UpdateQuotationRequest struct {
 	IsVerifyPrice bool                `json:"is_verify_price"` // true = verify, if not verified can't create
 	Quotations    []QuotationDocument `json:"quotations"`
 }
 
-type QuotationDocument struct {
-	models.Quotation
-	Items []models.QuotationItem `json:"items"`
-}
-
-type CreateQuotationResponse struct {
+type UpdateQuotationResponse struct {
 	IsPass        bool   `json:"is_pass"`
 	QuotationCode string `json:"quotation_code"`
 }
 
-func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
-	req := CreateQuotationRequest{}
-	res := []CreateQuotationResponse{}
+func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := UpdateQuotationRequest{}
+	res := []UpdateQuotationResponse{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
@@ -74,36 +69,35 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
 
-	createQuotations := []models.Quotation{}
-	createQuotationItems := []models.QuotationItem{}
+	updateQuotations := []models.Quotation{}
+	updateQuotationItems := []models.QuotationItem{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	for _, quotationReq := range req.Quotations {
 		tempQuotation := quotationReq.Quotation
-		tempQuotation.ID = uuid.New()
 
 		if quotationReq.EffectiveDatePrice == nil {
 			return nil, fmt.Errorf("effective date is required for quotation %s", quotationReq.QuotationCode)
 		}
 
-		quotationCode := uuid.New().String()
-
-		if tempQuotation.QuotationCode == "" {
-			tempQuotation.QuotationCode = quotationCode
+		if tempQuotation.ID == uuid.Nil {
+			return nil, fmt.Errorf("quotation ID is required for update")
 		}
 
-		tempQuotation.CreateDate = &now
-		tempQuotation.CreateBy = user
+		if tempQuotation.QuotationCode == "" {
+			return nil, fmt.Errorf("quotation code is required for update")
+		}
+
+		// Only update timestamp and user for update
 		tempQuotation.UpdateDate = &now
 		tempQuotation.UpdateBy = user
 
-		if quotationReq.Status == "PENDING" {
+		if quotationReq.Status != "TEMP" {
 			tempQuotation.ExpirePriceDate = &expiryDate
 			tempQuotation.ExpirePriceDay = int(expiryDays)
-
 		}
 
-		createQuotations = append(createQuotations, tempQuotation)
+		updateQuotations = append(updateQuotations, tempQuotation)
 
 		//Approval
 		verifyReqKey := fmt.Sprintf(`%s|%s`, quotationReq.CompanyCode, quotationReq.SiteCode)
@@ -121,13 +115,14 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:             quotationCode,
+			DocRef:             tempQuotation.QuotationCode,
 			CustomerCode:       quotationReq.CustomerCode,
 			EffectiveDatePrice: *quotationReq.EffectiveDatePrice,
 			Items:              []verifyService.VerifyApproveItem{},
 		}
 
 		for _, item := range quotationReq.Items {
+			// Generate new ID for each item (updateInit approach)
 			item.ID = uuid.New()
 			item.QuotationID = tempQuotation.ID
 
@@ -135,12 +130,13 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				item.QuotationItem = uuid.New().String()
 			}
 
+			// Set create/update timestamps and user
 			item.CreateDate = &now
 			item.CreateBy = user
 			item.UpdateDate = &now
 			item.UpdateBy = user
 
-			createQuotationItems = append(createQuotationItems, item)
+			updateQuotationItems = append(updateQuotationItems, item)
 
 			//Approval
 			newApprItem := verifyService.VerifyApproveItem{
@@ -173,37 +169,30 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 			for _, doc := range verifyRes.Documents {
-				res = append(res, CreateQuotationResponse{
+				res = append(res, UpdateQuotationResponse{
 					IsPass:        doc.IsPassPrice,
 					QuotationCode: doc.DocRef,
 				})
 
-				for _, quotation := range createQuotations {
+				for i := range updateQuotations {
 					if !doc.IsPassPrice {
-						quotation.IsApproved = false
-						quotation.StatusApprove = "PENDING"
+						updateQuotations[i].IsApproved = false
+						updateQuotations[i].StatusApprove = "PENDING"
 					} else {
-						quotation.IsApproved = true
-						quotation.StatusApprove = "COMPLETED"
+						updateQuotations[i].IsApproved = true
+						updateQuotations[i].StatusApprove = "COMPLETED"
 					}
 				}
 			}
 		}
 	} else {
 		// If not verifying price, create response for all quotations with default values
-		for _, quotation := range createQuotations {
-			res = append(res, CreateQuotationResponse{
+		for _, quotation := range updateQuotations {
+			res = append(res, UpdateQuotationResponse{
 				IsPass:        true, // Default to true when not verifying
 				QuotationCode: quotation.QuotationCode,
 			})
 		}
-	}
-
-	// check duplicate quotation codes
-	var existCount int64
-	codes := make([]string, 0, len(createQuotations))
-	for _, q := range createQuotations {
-		codes = append(codes, q.QuotationCode)
 	}
 
 	tx := gormx.Begin()
@@ -216,33 +205,30 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}()
 
-	if len(codes) > 0 {
+	// Update quotations
+	for _, quotation := range updateQuotations {
 		if err := tx.Model(&models.Quotation{}).
-			Where("quotation_code IN ?", codes).
-			Count(&existCount).Error; err != nil {
+			Where("id = ?", quotation.ID).
+			Updates(quotation).Error; err != nil {
 			tx.Rollback()
-			return nil, err
-		}
-
-		if existCount > 0 {
-			tx.Rollback()
-			return nil, errors.New("duplicate quotation code detected")
+			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
 		}
 	}
 
-	// Insert quotations
-	if len(createQuotations) > 0 {
-		if err := tx.Create(&createQuotations).Error; err != nil {
+	// Delete existing quotation items and insert new ones (updateInit approach)
+	for _, quotation := range updateQuotations {
+		// Delete existing items
+		if err := tx.Where("quotation_id = ?", quotation.ID).Delete(&models.QuotationItem{}).Error; err != nil {
 			tx.Rollback()
-			return nil, err
+			return nil, fmt.Errorf("failed to delete existing quotation items: %v", err)
 		}
 	}
 
-	// Insert items
-	if len(createQuotationItems) > 0 {
-		if err := tx.Create(&createQuotationItems).Error; err != nil {
+	// Insert new items
+	if len(updateQuotationItems) > 0 {
+		if err := tx.Create(&updateQuotationItems).Error; err != nil {
 			tx.Rollback()
-			return nil, err
+			return nil, fmt.Errorf("failed to create quotation items: %v", err)
 		}
 	}
 

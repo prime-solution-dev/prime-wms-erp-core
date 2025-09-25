@@ -12,6 +12,7 @@ import (
 
 type GetSaleRequest struct {
 	ID            []uuid.UUID `json:"id"`
+	SaleCode      []string    `json:"sale_code"`
 	CustomerCode  []string    `json:"customer_code"`
 	Status        []string    `json:"status"`
 	StatusPayment []string    `json:"status_payment"`
@@ -35,7 +36,7 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(req.ID, req.CustomerCode, req.Status, req.StatusPayment, req.IsApproved, req.Page, req.PageSize)
+	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusPayment, req.IsApproved, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 // Create
-func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -27,6 +27,16 @@ func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, stat
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchID = fmt.Sprintf(` and sale.id IN (%s)`, whereInClause)
+	}
+
+	searchSaleCode := ""
+	if len(saleCode) > 0 {
+		quotedStrings := make([]string, len(saleCode))
+		for i, s := range saleCode {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchSaleCode = fmt.Sprintf(` and sale.sale_code IN (%s)`, whereInClause)
 	}
 
 	searchCustomerCode := ""
@@ -69,7 +79,7 @@ func GetSalePreload(id []uuid.UUID, customerCode []string, status []string, stat
 	var saleID []uuid.UUID
 	gormx.Table("sale").Select("sale.id").
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
-		Where("1=1 " + searchID + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusPayment + "" + searchIsApproved + "").
+		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusPayment + "" + searchIsApproved + "").
 		Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {
