@@ -136,10 +136,6 @@ func (PurchaseItem) TableName() string {
 }
 
 // DTOs
-type CreatePOResponse struct {
-	ID string `json:"id"`
-}
-
 type CreatePOBigLotItemRequest struct {
 	PreItem              string  `json:"pre_item"`
 	ProductGroupType     string  `json:"product_group_type"`
