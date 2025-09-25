@@ -43,6 +43,11 @@ type Sale struct {
 	Remark                      string     `json:"remark"`
 	IsApproved                  bool       `json:"is_approved"`
 	StatusApprove               string     `json:"status_approve"`
+	TotalVat                    float64    `json:"total_vat"`
+	TotalDiscount               float64    `json:"total_discount"`
+	SubtotalExclVat             float64    `json:"subtotal_excl_vat"`
+	TotalTransportCostVat       float64    `json:"total_transport_cost_vat"`
+	RemarkApproval              string     `json:"remark_approval"`
 	CreateDate                  *time.Time `json:"create_date"`
 	CreateBy                    string     `json:"create_by"`
 	UpdateDate                  *time.Time `json:"update_date"`
@@ -80,6 +85,11 @@ type SaleItem struct {
 	NetPricePerWeightExclTransport float64    `json:"net_price_per_weight_excl_transport"` //NetPriceWeightUnit
 	Status                         string     `json:"status"`
 	Remark                         string     `json:"remark"`
+	SubtotalExclVat                float64    `json:"subtotal_excl_vat"`
+	TotalVat                       float64    `json:"total_vat"`
+	UnitUom                        string     `json:"unit_uom"`
+	TotalDiscount                  float64    `json:"total_discount"`
+	TotalDiscountPercent           float64    `json:"total_discount_percent"`
 	CreateDate                     *time.Time `json:"create_date"`
 	CreateBy                       string     `json:"create_by"`
 	UpdateDate                     *time.Time `json:"update_date"`

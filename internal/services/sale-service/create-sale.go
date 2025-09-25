@@ -67,14 +67,19 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		tempSale := saleReq.Sale
 		tempSale.ID = uuid.New()
 
+		saleCode := uuid.New().String()
+
 		if tempSale.SaleCode == "" {
-			tempSale.SaleCode = uuid.New().String()
+			tempSale.SaleCode = saleCode
 		}
 
 		tempSale.CreateDate = &now
 		tempSale.CreateBy = user
 		tempSale.UpdateDate = &now
 		tempSale.UpdateBy = user
+		tempSale.StatusApprove = "COMPLETED"
+		tempSale.IsApproved = true
+		tempSale.Status = "PENDING"
 
 		createSales = append(createSales, tempSale)
 
@@ -96,7 +101,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:       tempSale.SaleCode,
+			DocRef:       saleCode,
 			CustomerCode: saleReq.CustomerCode,
 			Items:        []verifyService.VerifyApproveItem{},
 		}
