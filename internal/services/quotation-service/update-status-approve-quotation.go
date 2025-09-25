@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	approvalService "prime-erp-core/internal/services/approval-service"
+	verifyService "prime-erp-core/internal/services/verify-service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -81,6 +84,29 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 		"update_date":     gormx.NowFunc(),
 	}
 	if req.Status == "COMPLETED" {
+		//get config
+		topic := `PRICE`
+		configCodes := []string{`EXPIRY_PRICE_DAYS`}
+		configMap, err := verifyService.GetConfigSystem(gormx, topic, configCodes)
+		if err != nil {
+			return nil, err
+		}
+
+		expiryDaysConfig, exists := configMap[fmt.Sprintf(`%s|%s`, topic, `EXPIRY_PRICE_DAYS`)]
+		if !exists {
+			return nil, errors.New("missing configuration for expiry price days")
+		}
+
+		expiryDays, err := strconv.ParseInt(expiryDaysConfig.Value, 10, 64)
+		if err != nil {
+			return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
+		}
+
+		expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
+
+		updateFields["effective_date_price"] = gormx.NowFunc()
+		updateFields["expire_price_day"] = int(expiryDays)
+		updateFields["expire_price_date"] = &expiryDate
 		updateFields["is_approved"] = true
 	}
 
