@@ -77,43 +77,8 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 	return prePurchase
 }
 
-func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) error {
-	user := `system` // TODO: get from ctx
-
-	approvalReq := []models.Approval{}
-
-	for _, pp := range prePurchase {
-		approvalReq = append(approvalReq, models.Approval{
-			ApproveTopic:  "PPOL",
-			DocumentType:  "PPO",
-			DocumentCode:  pp.PrePurchaseCode,
-			ActionDate:    time.Now(),
-			Status:        pp.StatusApprove,
-			Remark:        "-",
-			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
-			CreateBy:      user,
-		})
-	}
-
-	approvalReqJson, err := json.Marshal(approvalReq)
-	if err != nil {
-		return errors.New("failed to marshal JSON from struct: " + err.Error())
-	}
-
-	approvalReqString := string(approvalReqJson)
-
-	approvalIDs, err := approvalService.CreateApproval(ctx, approvalReqString)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("approvalIDs:", approvalIDs)
-	return nil
-}
-
 func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.PrePurchaseItem) []models.GetPOBigLotItemResponse {
-	items := make([]models.GetPOBigLotItemResponse, 0, len(prePurchaseItems))
+	items := []models.GetPOBigLotItemResponse{}
 
 	for _, item := range prePurchaseItems {
 		items = append(items, models.GetPOBigLotItemResponse{
@@ -147,33 +112,6 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 	return items
 }
 
-func GetBigLotToApproval(ctx *gin.Context, prePurchaseCodes []string) ([]models.Approval, error) {
-	approvalReq := approvalService.GetApprovalRequest{
-		DocumentCode: prePurchaseCodes,
-		Page:         1,
-		PageSize:     len(prePurchaseCodes),
-	}
-
-	approvalReqJson, err := json.Marshal(approvalReq)
-	if err != nil {
-		return nil, errors.New("failed to marshal JSON from struct: " + err.Error())
-	}
-
-	approvalReqString := string(approvalReqJson)
-
-	resp, err := approvalService.GetApproval(ctx, approvalReqString)
-	if err != nil {
-		return nil, errors.New("failed to get approval list: " + err.Error())
-	}
-
-	approvalResp, ok := resp.(approvalService.ResultApproval)
-	if !ok {
-		return nil, errors.New("failed to assertion approval type")
-	}
-
-	return approvalResp.ApprovalRes, nil
-}
-
 func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) models.GetPOBigLotResponse {
 	return models.GetPOBigLotResponse{
 		ID:               prePurchases.ID.String(),
@@ -197,20 +135,6 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		UpdateBy:         prePurchases.UpdateBy,
 		UpdateDate:       prePurchases.UpdateDate.Format(time.RFC3339),
 		PrePurchaseItems: MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems),
-	}
-}
-
-func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) models.PrePurchase {
-	return models.PrePurchase{
-		ID:              req.ID,
-		Status:          req.Status,
-		TotalAmount:     req.TotalAmount,
-		TotalWeight:     req.TotalWeight,
-		TotalDiscount:   req.TotalDiscount,
-		TotalVat:        req.TotalVat,
-		SubtotalExclVat: req.SubtotalExclVat,
-		IsApproved:      req.IsApproved,
-		StatusApprove:   req.StatusApprove,
 	}
 }
 
@@ -251,4 +175,123 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 	}
 
 	return results
+}
+
+func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) models.PrePurchase {
+	return models.PrePurchase{
+		ID:              req.ID,
+		Status:          req.Status,
+		TotalAmount:     req.TotalAmount,
+		TotalWeight:     req.TotalWeight,
+		TotalDiscount:   req.TotalDiscount,
+		TotalVat:        req.TotalVat,
+		SubtotalExclVat: req.SubtotalExclVat,
+		IsApproved:      req.IsApproved,
+		StatusApprove:   req.StatusApprove,
+	}
+}
+
+// Approval action
+func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) error {
+	user := `system` // TODO: get from ctx
+
+	approvalReq := []models.Approval{}
+
+	for _, pp := range prePurchase {
+		approvalReq = append(approvalReq, models.Approval{
+			ApproveTopic:  "PPOL",
+			DocumentType:  "PPO",
+			DocumentCode:  pp.PrePurchaseCode,
+			ActionDate:    time.Now(),
+			Status:        pp.StatusApprove,
+			Remark:        "-",
+			CurentStepSeq: 1,
+			MDItemCode:    "CTM-CTM1",
+			CreateBy:      user,
+		})
+	}
+
+	approvalReqJson, err := json.Marshal(approvalReq)
+	if err != nil {
+		return errors.New("failed to marshal JSON from struct: " + err.Error())
+	}
+
+	approvalReqString := string(approvalReqJson)
+
+	approvalIDs, err := approvalService.CreateApproval(ctx, approvalReqString)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("approvalIDs:", approvalIDs)
+	return nil
+}
+
+func GetBigLotToApproval(ctx *gin.Context, prePurchaseCodes []string) ([]models.Approval, error) {
+	approvalReq := approvalService.GetApprovalRequest{
+		DocumentCode: prePurchaseCodes,
+		Page:         1,
+		PageSize:     len(prePurchaseCodes),
+	}
+
+	approvalReqJson, err := json.Marshal(approvalReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal JSON from struct: " + err.Error())
+	}
+
+	approvalReqString := string(approvalReqJson)
+
+	resp, err := approvalService.GetApproval(ctx, approvalReqString)
+	if err != nil {
+		return nil, errors.New("failed to get approval list: " + err.Error())
+	}
+
+	approvalResp, ok := resp.(approvalService.ResultApproval)
+	if !ok {
+		return nil, errors.New("failed to assertion approval type")
+	}
+
+	return approvalResp.ApprovalRes, nil
+}
+
+func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
+	fmt.Println("KAO")
+	prePurchaseCodes := []string{}
+	mapUpdateList := make(map[string]models.Approval)
+
+	for _, req := range updateReqs {
+		prePurchaseCodes = append(prePurchaseCodes, req.PrePurchaseCode)
+		mapUpdateList[req.PrePurchaseCode] = models.Approval{
+			DocumentCode: req.PrePurchaseCode,
+			Status:       req.StatusApprove,
+		}
+	}
+
+	approvalList, err := GetBigLotToApproval(ctx, prePurchaseCodes)
+	if err != nil {
+		return errors.New("failed get approvals")
+	}
+
+	updateApprovalReq := []models.Approval{}
+
+	for _, approval := range approvalList {
+		updateApprovalReq = append(updateApprovalReq, models.Approval{
+			ID:     approval.ID,
+			Status: mapUpdateList[approval.DocumentCode].Status,
+		})
+	}
+
+	approvalReqJson, err := json.Marshal(updateApprovalReq)
+	if err != nil {
+		return errors.New("failed to marshal JSON from struct: " + err.Error())
+	}
+
+	resp, err := approvalService.UpdateApproval(ctx, string(approvalReqJson))
+	if err != nil {
+		return errors.New("failed to update approval: " + err.Error())
+	}
+
+	fmt.Println("updated approval: ", resp)
+
+	return nil
 }
