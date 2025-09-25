@@ -62,7 +62,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			})
 
 		}
-
+		req[i].IsAction = true
 		creditRequestValue = append(creditRequestValue, req[i])
 	}
 	if len(creditTransaction) > 0 {

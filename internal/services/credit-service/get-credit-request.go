@@ -7,7 +7,6 @@ import (
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	customerService "prime-erp-core/internal/services/customer-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -40,6 +39,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		return nil, errApproval
 	}
 	customerCode := []string{}
+
 	for _, creditValue := range credit {
 		customerCode = append(customerCode, creditValue.CustomerCode)
 	}
@@ -63,35 +63,35 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		return nil, err
 	}
 
-	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
-	if errGetCredit != nil {
-		return nil, errGetCredit
-	}
-	creditExtraValueMap := map[string]float64{}
+	/* 	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
+	   	if errGetCredit != nil {
+	   		return nil, errGetCredit
+	   	}
+	   	creditExtraValueMap := map[string]float64{}
 
-	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
-		for _, creditExtraValue := range creditValue.CreditExtra {
+	   	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
+	   		for _, creditExtraValue := range creditValue.CreditExtra {
 
-			if creditExtraValue.EffectiveDtm == nil {
-				creditExtraItemMap, exist := creditExtraValueMap[creditValue.CustomerCode]
-				if exist {
-					creditExtraValueMap[creditValue.CustomerCode] = creditExtraItemMap + creditExtraValue.Amount
-				} else {
-					creditExtraValueMap[creditValue.CustomerCode] = creditExtraValue.Amount
-				}
-			} else {
-				if (creditExtraValue.EffectiveDtm.After(time.Now()) || creditExtraValue.EffectiveDtm.Equal(time.Now())) && (creditExtraValue.ExpireDtm.After(time.Now()) || creditExtraValue.ExpireDtm.Equal(time.Now())) {
-					creditExtraItemMap, exist := creditExtraValueMap[creditValue.CustomerCode]
-					if exist {
-						creditExtraValueMap[creditValue.CustomerCode] = creditExtraItemMap + creditExtraValue.Amount
-					} else {
-						creditExtraValueMap[creditValue.CustomerCode] = creditExtraValue.Amount
-					}
-				}
-			}
+	   			if creditExtraValue.EffectiveDtm == nil {
+	   				creditExtraItemMap, exist := creditExtraValueMap[creditValue.CustomerCode]
+	   				if exist {
+	   					creditExtraValueMap[creditValue.CustomerCode] = creditExtraItemMap + creditExtraValue.Amount
+	   				} else {
+	   					creditExtraValueMap[creditValue.CustomerCode] = creditExtraValue.Amount
+	   				}
+	   			} else {
+	   				if (creditExtraValue.EffectiveDtm.After(time.Now()) || creditExtraValue.EffectiveDtm.Equal(time.Now())) && (creditExtraValue.ExpireDtm.After(time.Now()) || creditExtraValue.ExpireDtm.Equal(time.Now())) {
+	   					creditExtraItemMap, exist := creditExtraValueMap[creditValue.CustomerCode]
+	   					if exist {
+	   						creditExtraValueMap[creditValue.CustomerCode] = creditExtraItemMap + creditExtraValue.Amount
+	   					} else {
+	   						creditExtraValueMap[creditValue.CustomerCode] = creditExtraValue.Amount
+	   					}
+	   				}
+	   			}
 
-		}
-	}
+	   		}
+	   	} */
 
 	getDepositRes, errGetDeposit := depositService.GetDeposit(ctx, string(jsonBytesGetCredit))
 	if errGetDeposit != nil {
@@ -114,15 +114,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-		conMapCreditExtra, exist := creditExtraValueMap[credit[i].CustomerCode]
-		if exist {
-			credit[i].TemporaryIncreaseCreditLimit = conMapCreditExtra
-		}
+
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
 		if exist {
 			credit[i].ConsumedCredit = conMapremainDeposit
 		}
-		credit[i].BalanceCreditLimit = credit[i].Amount - credit[i].ConsumedCredit
+		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
 
 	}
 

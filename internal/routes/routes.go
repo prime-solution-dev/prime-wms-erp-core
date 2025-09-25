@@ -115,6 +115,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCredit", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCredit)
 	})
+	credit.POST("/GetHistory", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetHistory)
+	})
 
 	//summaryService
 	summary := ctx.Group("/summary")
