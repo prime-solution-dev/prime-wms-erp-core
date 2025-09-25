@@ -142,4 +142,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPOBigLot)
 	})
+	purchase.POST("/UpdatePOBigLot", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.UpdatePOBigLot)
+	})
 }

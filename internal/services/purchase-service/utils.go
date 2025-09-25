@@ -147,6 +147,33 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 	return items
 }
 
+func GetBigLotToApproval(ctx *gin.Context, prePurchaseCodes []string) ([]models.Approval, error) {
+	approvalReq := approvalService.GetApprovalRequest{
+		DocumentCode: prePurchaseCodes,
+		Page:         1,
+		PageSize:     len(prePurchaseCodes),
+	}
+
+	approvalReqJson, err := json.Marshal(approvalReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal JSON from struct: " + err.Error())
+	}
+
+	approvalReqString := string(approvalReqJson)
+
+	resp, err := approvalService.GetApproval(ctx, approvalReqString)
+	if err != nil {
+		return nil, errors.New("failed to get approval list: " + err.Error())
+	}
+
+	approvalResp, ok := resp.(approvalService.ResultApproval)
+	if !ok {
+		return nil, errors.New("failed to assertion approval type")
+	}
+
+	return approvalResp.ApprovalRes, nil
+}
+
 func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) models.GetPOBigLotResponse {
 	return models.GetPOBigLotResponse{
 		ID:               prePurchases.ID.String(),
@@ -171,4 +198,57 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		UpdateDate:       prePurchases.UpdateDate.Format(time.RFC3339),
 		PrePurchaseItems: MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems),
 	}
+}
+
+func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) models.PrePurchase {
+	return models.PrePurchase{
+		ID:              req.ID,
+		Status:          req.Status,
+		TotalAmount:     req.TotalAmount,
+		TotalWeight:     req.TotalWeight,
+		TotalDiscount:   req.TotalDiscount,
+		TotalVat:        req.TotalVat,
+		SubtotalExclVat: req.SubtotalExclVat,
+		IsApproved:      req.IsApproved,
+		StatusApprove:   req.StatusApprove,
+	}
+}
+
+func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRequest) []models.PrePurchaseItem {
+	results := []models.PrePurchaseItem{}
+
+	for _, reqItem := range req {
+		if reqItem.ID == nil || *reqItem.ID == uuid.Nil {
+			newID := uuid.New()
+			reqItem.ID = &newID
+		}
+
+		item := models.PrePurchaseItem{
+			ID:                   *reqItem.ID,
+			PrePurchaseID:        reqItem.PrePurchaseID,
+			HierarchyType:        reqItem.ProductGroupType,
+			HierarchyCode:        reqItem.ProductGroupCode,
+			Qty:                  reqItem.Qty,
+			Unit:                 reqItem.Unit,
+			PurchaseQty:          reqItem.PurchaseQty,
+			PurchaseUnit:         reqItem.PurchaseUnit,
+			PurchaseUnitType:     reqItem.PurchaseUnitType,
+			PriceUnit:            reqItem.PriceUnit,
+			TotalDiscount:        reqItem.TotalDiscount,
+			TotalAmount:          reqItem.TotalAmount,
+			UnitUOM:              reqItem.UnitUOM,
+			TotalCost:            reqItem.TotalCost,
+			TotalDiscountPercent: reqItem.TotalDiscountPercent,
+			TotalVat:             reqItem.TotalVat,
+			SubtotalExclVat:      reqItem.SubtotalExclVat,
+			WeightUnit:           reqItem.WeightUnit,
+			TotalWeight:          reqItem.TotalWeight,
+			Status:               reqItem.Status,
+			Remark:               reqItem.Remark,
+		}
+
+		results = append(results, item)
+	}
+
+	return results
 }
