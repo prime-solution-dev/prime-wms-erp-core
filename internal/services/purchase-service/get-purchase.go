@@ -25,6 +25,7 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to get big lot list: " + err.Error())
 	}
 
+	prePurchaseCodes := []string{}
 	supplierReq := models.GetSupplierListRequest{}
 	for _, prePurchase := range prePurchaseList {
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, prePurchase.SupplierCode)
@@ -69,6 +70,17 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mapSupplier[suppliers.SupplierCode] = suppliers
 	}
 
+	// Get status approves
+	approvalsResp, err := GetBigLotToApproval(ctx, prePurchaseCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	mapStatusApprove := map[string]string{}
+	for _, approval := range approvalsResp {
+		mapStatusApprove[approval.DocumentCode] = approval.Status
+	}
+
 	result := models.GetPOBigLotListResponse{
 		Total:      total,
 		Page:       page,
@@ -80,6 +92,7 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		bigLotResponse := MapPrePurchasesModelToBigLotsResponse(prePurchase)
 
 		bigLotResponse.SupplierName = mapSupplier[prePurchase.SupplierCode].SupplierName
+		bigLotResponse.StatusApprove = mapStatusApprove[prePurchase.PrePurchaseCode]
 
 		result.BigLotList = append(result.BigLotList, bigLotResponse)
 	}

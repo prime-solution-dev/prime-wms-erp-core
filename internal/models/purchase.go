@@ -252,6 +252,43 @@ type GetPOBigLotListResponse struct {
 	BigLotList []GetPOBigLotResponse `json:"big_lot_list"`
 }
 
+type UpdatePOBigLotItemRequest struct {
+	ID                   *uuid.UUID `json:"id"`
+	PrePurchaseID        uuid.UUID  `json:"pre_purchase_id"`
+	ProductGroupType     string     `json:"product_group_type"`
+	ProductGroupCode     string     `json:"product_group_code"`
+	Qty                  float64    `json:"qty"`
+	Unit                 string     `json:"unit"`
+	PurchaseQty          float64    `json:"purchase_qty"`
+	PurchaseUnit         string     `json:"purchase_unit"`
+	PurchaseUnitType     string     `json:"purchase_unit_type"`
+	PriceUnit            float64    `json:"price_unit"`
+	TotalDiscount        float64    `json:"total_discount"`
+	TotalAmount          float64    `json:"total_amount"`
+	UnitUOM              string     `json:"unit_uom"`
+	TotalCost            float64    `json:"total_cost"`
+	TotalDiscountPercent float64    `json:"total_discount_percent"`
+	TotalVat             float64    `json:"total_vat"`
+	SubtotalExclVat      float64    `json:"subtotal_excl_vat"`
+	WeightUnit           float64    `json:"weight_unit"`
+	TotalWeight          float64    `json:"total_weight"`
+	Status               string     `json:"status"`
+	Remark               string     `json:"remark"`
+}
+
+type UpdatePOBigLotRequest struct {
+	ID               uuid.UUID                   `json:"id"`
+	Status           string                      `json:"status"`
+	TotalAmount      float64                     `json:"total_amount"`
+	TotalWeight      float64                     `json:"total_weight"`
+	TotalDiscount    float64                     `json:"total_discount"`
+	TotalVat         float64                     `json:"total_vat"`
+	SubtotalExclVat  float64                     `json:"subtotal_excl_vat"`
+	IsApproved       bool                        `json:"is_approved"`
+	StatusApprove    string                      `json:"status_approve"`
+	PrePurchaseItems []UpdatePOBigLotItemRequest `json:"pre_purchase_items"`
+}
+
 // Supplier DTOs
 type GetSupplierListRequest struct {
 	SupplierCodes []string `json:"supplier_code"`

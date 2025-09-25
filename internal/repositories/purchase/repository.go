@@ -1,13 +1,14 @@
 package purchaseRepository
 
 import (
+	"fmt"
 	"math"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 )
 
 // Create
-func CreatePOBigLot(prePurchase []models.PrePurchase) error {
+func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
@@ -26,7 +27,7 @@ func CreatePOBigLot(prePurchase []models.PrePurchase) error {
 		}
 	}()
 
-	result := tx.Create(&prePurchase)
+	result := tx.Create(&prePurchases)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -59,4 +60,65 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode string, siteCode str
 	}
 
 	return prePurchaseList, int(totalRecords), page, pageSize, int(math.Ceil(float64(totalRecords) / float64(pageSize))), nil
+}
+
+// Update
+func UpdatePOBigLot(prePurchases []models.PrePurchase) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	tx := gormx.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		} else if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit().Error
+		}
+	}()
+
+	for _, prePurchase := range prePurchases {
+		// update pre_purchase
+		result := tx.Model(&models.PrePurchase{}).
+			Where("id = ?", prePurchase.ID).
+			Updates(prePurchase)
+
+		fmt.Println("pre purchase result: ", result)
+
+		if result.Error != nil {
+			err = result.Error
+			return
+		}
+
+		// delete old items
+		delResult := tx.Where("pre_purchase_id = ?", prePurchase.ID).
+			Delete(&models.PrePurchaseItem{})
+
+		if result.Error != nil {
+			err = result.Error
+			return
+		}
+
+		fmt.Println("pre purchase result: ", delResult)
+
+		// set PrePurchaseID ให้แน่ใจว่า insert ถูก
+		for i := range prePurchase.PrePurchaseItems {
+			prePurchase.PrePurchaseItems[i].PrePurchaseID = prePurchase.ID
+		}
+
+		// insert new items
+		if len(prePurchase.PrePurchaseItems) > 0 {
+			if result := tx.Create(&prePurchase.PrePurchaseItems); result.Error != nil {
+				err = result.Error
+				return
+			}
+		}
+	}
+
+	return
 }
