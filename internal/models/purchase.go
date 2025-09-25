@@ -289,6 +289,13 @@ type UpdatePOBigLotRequest struct {
 	PrePurchaseItems []UpdatePOBigLotItemRequest `json:"pre_purchase_items"`
 }
 
+type UpdateStatusApprovePOBigLotRequest struct {
+	ID              uuid.UUID `json:"id"`
+	PrePurchaseCode string    `json:"pre_purchase_code"`
+	IsApproved      bool      `json:"is_approved"`
+	StatusApprove   string    `json:"status_approve"`
+}
+
 // Supplier DTOs
 type GetSupplierListRequest struct {
 	SupplierCodes []string `json:"supplier_code"`
