@@ -14,10 +14,10 @@ import (
 )
 
 type CreateSaleRequest struct {
-	IsVerifyPrice      bool
-	IsVerifyCredit     bool
-	IsVerifyExpiryDate bool
-	IsVerifyInventory  bool
+	IsVerifyPrice      bool `json:"is_verify_price"`       // true = verify, if not verified can't create
+	IsVerifyCredit     bool `json:"is_verify_credit"`      // true = verify, if not verified can't create
+	IsVerifyExpiryDate bool `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
+	IsVerifyInventory  bool `json:"is_verify_inventory"`
 	Sales              []SaleDocument
 }
 
