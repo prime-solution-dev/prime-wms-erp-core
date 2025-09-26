@@ -75,7 +75,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "[{\r\n     \r\n\t            \"transaction_code\": \"\",\r\n\t\t\t\t\"transaction_type\": \"\",\r\n\t\t\t\t\"amount\":           \"\",\r\n\t\t\t\t\"adjust_amount\":    \"\",\r\n\t\t\t\t\"effective_dtm\":    \"\",\r\n\t\t\t\t\"expire_dtm\":       \"\",\r\n\t\t\t\t\"force_expire_dtm\": \"\",\r\n\t\t\t\t\"is_approve\":       \"\",\r\n\t\t\t\t\"status\":           \"\",\r\n\t\t\t\t\"reason\":           \"\",\r\n\t\t\t\t\"approve_date\":     \"\"\r\n\t \r\n}]",
+					"raw": "{\r\n    \"id\": \"78b651f0-7e22-4a58-a3cf-10cc8fe6a9e3\",\r\n    \"status\": \"REVIEW\",\r\n    \"remark\": \"remark review\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -83,14 +83,14 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:9115/credit/UpdateApproval",
+					"raw": "http://localhost:9115/approval/UpdateApproval",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "9115",
 					"path": [
-						"credit",
+						"approval",
 						"UpdateApproval"
 					]
 				}
@@ -104,7 +104,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": " {\r\n     \r\n \r\n} ",
+					"raw": "{\r\n     \r\n \r\n} ",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -179,6 +179,180 @@
 					"path": [
 						"credit",
 						"CreateCreditRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetSale",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/sale/GetSale",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"sale",
+						"GetSale"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetDeposit",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"customer_code\":[\"CUST01\"]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/deposit/GetDeposit",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"deposit",
+						"GetDeposit"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetConsumend",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"customer_code\":\"CUST01\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/summary/GetConsumend",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"summary",
+						"GetConsumend"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetSummaryCredit",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"customer_code\":[\"CUST01\"]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/summary/GetSummaryCredit",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"summary",
+						"GetSummaryCredit"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetOutStandingSo",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"customer_code\":\"CUST01\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/summary/GetOutStandingSo",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"summary",
+						"GetOutStandingSo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateSaleStatusPayment",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n    \"id\": \"16230428-c512-4a6b-94af-56bd150c5521\",\r\n    \"status_payment\": \"COMPLETED\" \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/sale/UpdateSaleStatusPayment",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"sale",
+						"UpdateSaleStatusPayment"
 					]
 				}
 			},

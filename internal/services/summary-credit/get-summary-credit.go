@@ -5,6 +5,7 @@ import (
 	"errors"
 	creditService "prime-erp-core/internal/services/credit-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -71,7 +72,7 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	}
 
 	requestDataGetConsumend := map[string]interface{}{
-		"customer_code": req.CustomerCode,
+		"customer_code": strings.Join(req.CustomerCode, ""),
 		"paid_invoice":  true,
 	}
 	jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
