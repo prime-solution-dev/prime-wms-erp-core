@@ -170,7 +170,7 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 
 	//Sale
 	querySale := fmt.Sprintf(`
-		select s.sale_code ,s.customer_code, s.total_price , s.total_transport_cost , s.transport_cost_type 
+		select s.sale_code ,s.customer_code, s.total_amount , s.total_transport_cost , s.transport_cost_type 
 		from sale s 
 		where s.status = 'PENDDING' and s.is_approved = true 
 			and s.customer_code in ('%s')
@@ -190,7 +190,7 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 	for _, row := range rowsSale {
 		saleCode := row["sale_code"].(string)
 		customerCode := row["customer_code"].(string)
-		totalPrice := row["total_price"].(float64)
+		totalPrice := row["total_amount"].(float64)
 		totalTransCost := row["total_transport_cost"].(float64)
 		transType := row["transport_cost_type"].(string)
 

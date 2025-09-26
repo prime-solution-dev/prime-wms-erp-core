@@ -14,10 +14,10 @@ import (
 )
 
 type CreateSaleRequest struct {
-	IsVerifyPrice      bool
-	IsVerifyCredit     bool
-	IsVerifyExpiryDate bool
-	IsVerifyInventory  bool
+	IsVerifyPrice      bool `json:"is_verify_price"`       // true = verify, if not verified can't create
+	IsVerifyCredit     bool `json:"is_verify_credit"`      // true = verify, if not verified can't create
+	IsVerifyExpiryDate bool `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
+	IsVerifyInventory  bool `json:"is_verify_inventory"`
 	Sales              []SaleDocument
 }
 
@@ -146,6 +146,20 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		for _, doc := range verifyRes.Documents {
+			// Check if critical validations fail - don't allow creation if they fail
+			if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassExpiryPrice {
+				res = append(res, CreateSaleResponse{
+					IsPass:           false,
+					IsPassPrice:      doc.IsPassPrice,
+					IsPassCredit:     doc.IsPassCredit,
+					IsPassInventory:  doc.IsPassInventory,
+					IsPassExpiryDate: doc.IsPassExpiryPrice,
+					SaleCode:         doc.DocRef,
+				})
+				// Return immediately - don't create sale if critical validations fail
+				return res, nil
+			}
+
 			res = append(res, CreateSaleResponse{
 				IsPass:           doc.IsPassPrice && doc.IsPassCredit && doc.IsPassInventory && doc.IsPassExpiryPrice,
 				IsPassPrice:      doc.IsPassPrice,
@@ -154,6 +168,29 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				IsPassExpiryDate: doc.IsPassExpiryPrice,
 				SaleCode:         doc.DocRef,
 			})
+
+			for _, sale := range createSales {
+				if doc.IsPassPrice {
+					sale.PassPriceList = "Y"
+				} else {
+					sale.PassPriceList = "N"
+				}
+				if doc.IsPassExpiryPrice {
+					sale.PassPriceExpire = "Y"
+				} else {
+					sale.PassPriceExpire = "N"
+				}
+				if doc.IsPassCredit {
+					sale.PassCreditLimit = "Y"
+				} else {
+					sale.PassCreditLimit = "N"
+				}
+				if doc.IsPassInventory {
+					sale.PassAtpCheck = "Y"
+				} else {
+					sale.PassAtpCheck = "N"
+				}
+			}
 		}
 	}
 
