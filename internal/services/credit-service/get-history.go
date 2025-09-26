@@ -18,14 +18,14 @@ type GetHistoryReq struct {
 	PageSize     int         `json:"page_size"`
 }
 type GetHistoryRes struct {
-	ID                  uuid.UUID `json:"id"`
-	CreditLimit         float64   `json:"credit_limit"`
-	IncreaseCreditLimit float64   `json:"increase_credit_limit"`
-	StartDateTime       time.Time `json:"start_date_time"`
-	EndDateTime         time.Time `json:"end_date_time"`
-	SubmitDateTime      time.Time `json:"submit_date_time"`
-	ApproveDateTime     time.Time `json:"approve_date_time"`
-	Status              string    `json:"status"`
+	ID                  uuid.UUID  `json:"id"`
+	CreditLimit         float64    `json:"credit_limit"`
+	IncreaseCreditLimit float64    `json:"increase_credit_limit"`
+	StartDateTime       *time.Time `json:"start_date_time"`
+	EndDateTime         *time.Time `json:"end_date_time"`
+	SubmitDateTime      *time.Time `json:"submit_date_time"`
+	ApproveDateTime     *time.Time `json:"approve_date_time"`
+	Status              string     `json:"status"`
 }
 type ResultHistory struct {
 	Total      int             `json:"total"`
@@ -57,10 +57,10 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					ID:                  creditValue.ID,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
-					StartDateTime:       *creditValue.EffectiveDtm,
-					EndDateTime:         *creditValue.ExpireDtm,
-					SubmitDateTime:      *creditValue.CreateDtm,
-					ApproveDateTime:     *creditValue.ActionDate,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
 				})
 			}
@@ -69,10 +69,10 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					ID:                  creditValue.ID,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
-					StartDateTime:       *creditValue.EffectiveDtm,
-					EndDateTime:         *creditValue.ExpireDtm,
-					SubmitDateTime:      *creditValue.CreateDtm,
-					ApproveDateTime:     *creditValue.ActionDate,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
 				})
 			}
@@ -82,10 +82,10 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					ID:                  creditValue.ID,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
-					StartDateTime:       *creditValue.EffectiveDtm,
-					EndDateTime:         *creditValue.ExpireDtm,
-					SubmitDateTime:      *creditValue.CreateDtm,
-					ApproveDateTime:     *creditValue.ActionDate,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
 				}
 			}
@@ -94,10 +94,10 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					ID:                  creditValue.ID,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
-					StartDateTime:       *creditValue.EffectiveDtm,
-					EndDateTime:         *creditValue.ExpireDtm,
-					SubmitDateTime:      *creditValue.CreateDtm,
-					ApproveDateTime:     *creditValue.ActionDate,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
 				}
 			}
@@ -131,10 +131,10 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				ID:                  creditExtraValue.ID,
 				CreditLimit:         0,
 				IncreaseCreditLimit: creditExtraValue.Amount,
-				StartDateTime:       *creditExtraValue.EffectiveDtm,
-				EndDateTime:         *creditExtraValue.ExpireDtm,
-				SubmitDateTime:      *creditExtraValue.CreateDtm,
-				ApproveDateTime:     *creditExtraValue.ApproveDate,
+				StartDateTime:       creditExtraValue.EffectiveDtm,
+				EndDateTime:         creditExtraValue.ExpireDtm,
+				SubmitDateTime:      creditExtraValue.CreateDtm,
+				ApproveDateTime:     creditExtraValue.ApproveDate,
 				Status:              isActive,
 			})
 		}
@@ -142,9 +142,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ID:                  creditValue.ID,
 			CreditLimit:         creditValue.Amount,
 			IncreaseCreditLimit: 0,
-			StartDateTime:       *creditValue.EffectiveDtm,
-			SubmitDateTime:      *creditValue.CreateDtm,
-			ApproveDateTime:     *creditValue.ApproveDate,
+			StartDateTime:       creditValue.EffectiveDtm,
+			SubmitDateTime:      creditValue.CreateDtm,
+			ApproveDateTime:     creditValue.ApproveDate,
 			Status:              isActive,
 		})
 	}
