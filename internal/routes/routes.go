@@ -75,6 +75,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
 	})
 
+	sale.POST("/EditSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.EditSale)
+	})
 	sale.POST("/GetSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.GetSale)
 	})
