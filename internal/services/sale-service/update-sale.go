@@ -136,7 +136,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Verification
-	if req.IsVerifyPrice || req.IsVerifyCredit || req.IsVerifyExpiryDate || req.IsVerifyInventory {
+	if req.IsVerifyPrice || req.IsVerifyCredit || req.IsVerifyInventory {
 		for _, verifyReq := range verifyReqMap {
 			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
 			if err != nil {
@@ -145,7 +145,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 			for _, doc := range verifyRes.Documents {
 				// Check if critical validations fail - don't allow update if they fail
-				if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassExpiryPrice {
+				if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassPrice {
 					res = append(res, UpdateSaleResponse{
 						IsPass:           false,
 						IsPassPrice:      doc.IsPassPrice,
@@ -156,6 +156,11 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					})
 					// Return immediately - don't update sale if critical validations fail
 					// return res, nil
+					updateSales[0].IsApproved = false
+					updateSales[0].StatusApprove = "PENDING"
+				} else {
+					updateSales[0].IsApproved = true
+					updateSales[0].StatusApprove = "COMPLETED"
 				}
 
 				res = append(res, UpdateSaleResponse{
