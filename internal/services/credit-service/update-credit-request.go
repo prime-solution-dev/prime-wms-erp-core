@@ -7,6 +7,7 @@ import (
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -27,10 +28,10 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 				TransactionType: "BASE",
 				Amount:          req[i].Amount,
 				AdjustAmount:    0,
-				/* EffectiveDtm:    time.Now(),
-				ExpireDtm:       time.Now(),
-				ForceExpireDtm:  time.Now(),
-				ApproveDate:     "", */
+				EffectiveDtm:    req[i].EffectiveDtm,
+				ExpireDtm:       req[i].ExpireDtm,
+				//ForceExpireDtm:  req[i].e,
+				//ApproveDate:     "",
 				IsApprove: false,
 				Status:    "REJECT",
 				Reason:    "",
@@ -39,26 +40,30 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 		if req[i].Status == "COMPLETED" {
 			creditExtra := []models.CreditExtra{}
+			CreditID := uuid.New()
 			if req[i].RequestType == "EXTRA" {
 				creditExtra = append(creditExtra, models.CreditExtra{
+					ID:       uuid.New(),
+					CreditID: CreditID,
 					//ExtraType:    "",
-					Amount: req[i].Amount,
-					//EffectiveDtm: "",
-					//ExpireDtm:    "",
-					DocRef: req[i].RequestCode,
+					Amount:       req[i].Amount,
+					EffectiveDtm: req[i].EffectiveDtm,
+					ExpireDtm:    req[i].ExpireDtm,
+					DocRef:       req[i].RequestCode,
 					//ApproveDate:  "",
 				})
 			}
 
 			credit = append(credit, models.Credit{
+				ID:           CreditID,
 				CustomerCode: req[i].CustomerCode,
 				Amount:       req[i].Amount,
-				//EffectiveDtm:       "",
-				IsActive: true,
-				DocRef:   req[i].RequestCode,
+				EffectiveDtm: req[i].EffectiveDtm,
+				IsActive:     true,
+				DocRef:       req[i].RequestCode,
 				//ApproveDate:        "",
-				//AlertBalanceCredit: "",
-				CreditExtra: creditExtra,
+				AlertBalanceCredit: false,
+				CreditExtra:        creditExtra,
 			})
 
 		}

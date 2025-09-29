@@ -5,6 +5,7 @@ import (
 
 	approvalService "prime-erp-core/internal/services/approval-service"
 	creditService "prime-erp-core/internal/services/credit-service"
+	CronjobService "prime-erp-core/internal/services/cronjob-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
@@ -151,4 +152,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdateStatusApprovePOBigLot)
 	})
+	///cronjob
+	cronjob := ctx.Group("/cronjob")
+	cronjob.POST("/credit-request", func(c *gin.Context) {
+		utils.ProcessRequest(c, CronjobService.CreditRequestEffectiveDtm)
+	})
+
 }
