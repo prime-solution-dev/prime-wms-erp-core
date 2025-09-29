@@ -122,8 +122,20 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCredit", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCredit)
 	})
+	credit.POST("/CreateCredit", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.CreateCredit)
+	})
 	credit.POST("/GetHistory", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetHistory)
+	})
+	credit.POST("/GetSummaryCredit", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetSummaryCredit)
+	})
+	credit.POST("/CreateCreditTransaction", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.CreateCreditTransaction)
+	})
+	credit.POST("/DeleteCreditExtra", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.DeleteCreditExtra)
 	})
 
 	//summaryService
@@ -131,9 +143,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	summary.POST("/GetConsumend", func(c *gin.Context) {
 		utils.ProcessRequest(c, summaryService.GetConsumend)
 	})
-	summary.POST("/GetSummaryCredit", func(c *gin.Context) {
-		utils.ProcessRequest(c, summaryService.GetSummaryCredit)
-	})
+
 	summary.POST("/GetOutStandingSo", func(c *gin.Context) {
 		utils.ProcessRequest(c, summaryService.GetOutStandingSo)
 	})

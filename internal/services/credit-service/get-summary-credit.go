@@ -1,10 +1,10 @@
-package summaryService
+package creditService
 
 import (
 	"encoding/json"
 	"errors"
-	creditService "prime-erp-core/internal/services/credit-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
+	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
 	"time"
 
@@ -24,7 +24,7 @@ type ResultGetSummaryCredit struct {
 
 func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
-	var req creditService.GetApprovalRequest
+	var req GetApprovalRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
@@ -38,11 +38,11 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		return nil, err
 	}
 
-	credit, errApproval := creditService.GetCredit(ctx, string(jsonBytesCustomerCode))
+	credit, errApproval := GetCredit(ctx, string(jsonBytesCustomerCode))
 	if errApproval != nil {
 		return nil, errApproval
 	}
-	resultCredit := credit.(creditService.ResultCredit).Credit
+	resultCredit := credit.(ResultCredit).Credit
 
 	creditLimit := 0.00
 	increaseCreditLimit := 0.00
@@ -80,11 +80,11 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		return nil, err
 	}
 
-	paidInvoice, errApproval := GetConsumend(ctx, string(jsonBytesGetConsumend))
+	paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
 	if errApproval != nil {
 		return nil, errApproval
 	}
-	resultGetPaidInvoice := paidInvoice.(ResultGetPaidInvoices)
+	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
 
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,

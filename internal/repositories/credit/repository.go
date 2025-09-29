@@ -180,6 +180,24 @@ func DeleteCredit(creditID []uuid.UUID) error {
 
 	return nil
 }
+func DeleteCreditExtra(creditExtraID []uuid.UUID) error {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+	for _, creditExtraValue := range creditExtraID {
+		result := gormx.Table("credit_extra").Where("id = ?", creditExtraValue).Delete(&models.CreditExtra{})
+
+		if result.Error != nil {
+			gormx.Rollback()
+			return result.Error
+		}
+
+	}
+
+	return nil
+}
 func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 

@@ -7,6 +7,8 @@ import (
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	customerService "prime-erp-core/internal/services/customer-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
+	summaryService "prime-erp-core/internal/services/summary-credit"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -108,6 +110,21 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
+	requestDataGetConsumend := map[string]interface{}{
+		"customer_code": strings.Join(req.CustomerCode, ""),
+		"paid_invoice":  true,
+	}
+	jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
+	if err != nil {
+		return nil, err
+	}
+
+	paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
+	if errApproval != nil {
+		return nil, errApproval
+	}
+	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
+
 	for i := range credit {
 		conMapCustomer, exist := convertCustomerMap[credit[i].CustomerCode]
 		if exist {
@@ -117,7 +134,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
 		if exist {
-			credit[i].ConsumedCredit = conMapremainDeposit
+			credit[i].ConsumedCredit = conMapremainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice)
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
 

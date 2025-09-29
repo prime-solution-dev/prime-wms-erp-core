@@ -1,9 +1,11 @@
 package CronjobService
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -11,16 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-)
+	creditService "prime-erp-core/internal/services/credit-service"
 
-type ResultCreditRequest struct {
-	Total         int                    `json:"total"`
-	Page          int                    `json:"page"`
-	PageSize      int                    `json:"page_size"`
-	TotalPages    int                    `json:"total_pages"`
-	CreditRequest []models.CreditRequest `json:"credit_request"`
-}
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
 
 func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
@@ -45,22 +42,76 @@ func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{
 	if err != nil {
 		fmt.Println("Response Status:", err)
 	}
-	var creditRequest ResultCreditRequest
+	var creditRequest creditService.ResultCreditRequest
 	err = json.Unmarshal(body, &creditRequest)
 	if err != nil {
 		fmt.Println("Response Status:", err)
 	}
 
 	fmt.Println("Response Status:", resp.Status)
-
+	credit := []models.Credit{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
-
 		if creditRequestValue.EffectiveDtm.After(time.Now()) || creditRequestValue.EffectiveDtm.Equal(time.Now()) {
-			fmt.Println("effective_date is today or in the future")
+			creditExtra := []models.CreditExtra{}
+			CreditID := uuid.New()
+			if creditRequestValue.RequestType == "EXTRA" {
+				creditExtra = append(creditExtra, models.CreditExtra{
+					ID:       uuid.New(),
+					CreditID: CreditID,
+					//ExtraType:    "",
+					Amount:       creditRequestValue.Amount,
+					EffectiveDtm: creditRequestValue.EffectiveDtm,
+					ExpireDtm:    creditRequestValue.ExpireDtm,
+					DocRef:       creditRequestValue.RequestCode,
+					//ApproveDate:  "",
+				})
+			}
+			credit = append(credit, models.Credit{
+				ID:           CreditID,
+				CustomerCode: creditRequestValue.CustomerCode,
+				Amount:       creditRequestValue.Amount,
+				EffectiveDtm: creditRequestValue.EffectiveDtm,
+				IsActive:     true,
+				DocRef:       creditRequestValue.RequestCode,
+				//ApproveDate:        "",
+				AlertBalanceCredit: false,
+				CreditExtra:        creditExtra,
+			})
 		}
-
+		if creditRequestValue.BalanceCreditLimit < 0 {
+			//// ส่ง email
+		}
+	}
+	jsonBytesCredit, err := json.Marshal(credit)
+	if err != nil {
+		return nil, err
+	}
+	urlCreateCredit := os.Getenv("base_url_erp") + "/credit/CreateCredit"
+	reqCreateCredit, err := http.NewRequest("POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
+	if err != nil {
+		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	return creditRequest, nil
+	reqCreateCredit.Header.Set("Content-Type", "application/json")
+
+	// Create a client and execute the request
+	clientCreateCredit := &http.Client{}
+	respCreateCredit, errCreateCredit := clientCreateCredit.Do(reqCreateCredit)
+	if errCreateCredit != nil {
+		return nil, errors.New("Error parsing DateTo: " + errCreateCredit.Error())
+	}
+	defer respCreateCredit.Body.Close()
+
+	bodyCreateCredit, err := io.ReadAll(respCreateCredit.Body)
+	if err != nil {
+		return nil, err
+	}
+	var convertCreateCredit interface{}
+	err = json.Unmarshal(bodyCreateCredit, &convertCreateCredit)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 
 }

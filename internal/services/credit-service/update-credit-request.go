@@ -25,7 +25,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if req[i].Status == "REJECT" {
 			creditTransaction = append(creditTransaction, models.CreditTransaction{
 				TransactionCode: req[i].RequestCode,
-				TransactionType: "BASE",
+				TransactionType: req[i].RequestType,
 				Amount:          req[i].Amount,
 				AdjustAmount:    0,
 				EffectiveDtm:    req[i].EffectiveDtm,
