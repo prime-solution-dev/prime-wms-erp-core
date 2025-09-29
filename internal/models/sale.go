@@ -63,6 +63,8 @@ type SaleItem struct {
 	SaleItem                       string     `json:"sale_item"`
 	ProductCode                    string     `json:"product_code"`
 	ProductDesc                    string     `json:"product_desc"`
+	DocumentRef                    string     `json:"document_ref"`
+	DocumentRefItem                string     `json:"document_ref_item"`
 	Qty                            float64    `json:"qty"`
 	OriginQty                      float64    `json:"origin_qty"`
 	Unit                           string     `json:"unit"`
