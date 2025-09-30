@@ -43,20 +43,14 @@ func SendEmailAlertForNewBrand(ctx *gin.Context, jsonPayload string) (interface{
 		bodyContent := fmt.Sprintf(`
 		 
 			<p>Customer Code : "%s"</p>
-			<br/>
 			<p>Customer Name : "%s"</p>
 			<br/>
-			<br/>
 			<p>Credit limit (THB) : "%.2f"</p>
-			<br/>
 			<p>Increase Credit limit (THB) : "%.2f"</p>
-			<br/>
 			<p>Total Credit limit (THB) : "%.2f"</p>
-			 <br/>
 			<p>Consumed Credit : "%.2f"</p>
-			<br/>
 			<p>Balance Credit Limit :  "%.2f"</p>
-		 
+		 	<br/>
 	`, creditRequestValue.CustomerCode, creditRequestValue.CustomerName, creditRequestValue.Amount, creditRequestValue.TemporaryIncreaseCreditLimit,
 			creditRequestValue.Amount+creditRequestValue.TemporaryIncreaseCreditLimit, creditRequestValue.ConsumedCredit, creditRequestValue.BalanceCreditLimit)
 		bodyRows += bodyContent
