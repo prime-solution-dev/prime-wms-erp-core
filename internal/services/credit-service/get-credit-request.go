@@ -136,7 +136,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		if exist {
 			credit[i].ConsumedCredit = conMapremainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice)
 		}
-		credit[i].BalanceCreditLimit = -10000 //(credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
+		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
 
 	}
 

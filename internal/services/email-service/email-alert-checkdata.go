@@ -44,7 +44,6 @@ func SendEmailAlertForNewBrand(ctx *gin.Context, jsonPayload string) (interface{
 		 
 			<p>Customer Code : "%s"</p>
 			<p>Customer Name : "%s"</p>
-			<br/>
 			<p>Credit limit (THB) : "%.2f"</p>
 			<p>Increase Credit limit (THB) : "%.2f"</p>
 			<p>Total Credit limit (THB) : "%.2f"</p>
