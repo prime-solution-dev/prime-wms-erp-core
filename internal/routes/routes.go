@@ -86,6 +86,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/UpdateSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateSale)
 	})
+	sale.POST("/RequestApproveSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.RequestApproveSale)
+	})
+	sale.POST("/UpdateStatusApproveSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateStatusApproveSale)
+	})
 	//deposit
 	deposit := ctx.Group("/deposit")
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
