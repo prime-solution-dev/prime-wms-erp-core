@@ -7,6 +7,7 @@ import (
 	creditService "prime-erp-core/internal/services/credit-service"
 	CronjobService "prime-erp-core/internal/services/cronjob-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
+	emailservice "prime-erp-core/internal/services/email-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	priceService "prime-erp-core/internal/services/price-service"
@@ -172,6 +173,11 @@ func RegisterRoutes(ctx *gin.Engine) {
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {
 		utils.ProcessRequest(c, CronjobService.CreditRequestEffectiveDtm)
+	})
+	//email alert
+	emailAlert := ctx.Group("/emailAlert")
+	emailAlert.POST("/SendEmailAlertForNewBrand", func(c *gin.Context) {
+		utils.ProcessRequest(c, emailservice.SendEmailAlertForNewBrand)
 	})
 
 }

@@ -50,6 +50,7 @@ func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{
 
 	fmt.Println("Response Status:", resp.Status)
 	credit := []models.Credit{}
+	creditRequestForAlert := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
 		if creditRequestValue.EffectiveDtm.After(time.Now()) || creditRequestValue.EffectiveDtm.Equal(time.Now()) {
 			creditExtra := []models.CreditExtra{}
@@ -79,37 +80,70 @@ func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{
 			})
 		}
 		if creditRequestValue.BalanceCreditLimit < 0 {
-			//// ส่ง email
+			creditRequestForAlert = append(creditRequestForAlert, creditRequestValue)
 		}
 	}
-	jsonBytesCredit, err := json.Marshal(credit)
-	if err != nil {
-		return nil, err
-	}
-	urlCreateCredit := os.Getenv("base_url_erp") + "/credit/CreateCredit"
-	reqCreateCredit, err := http.NewRequest("POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
-	if err != nil {
-		return nil, errors.New("Error parsing DateTo: " + err.Error())
-	}
+	if len(credit) > 0 {
+		jsonBytesCredit, err := json.Marshal(credit)
+		if err != nil {
+			return nil, err
+		}
+		urlCreateCredit := os.Getenv("base_url_erp") + "/credit/CreateCredit"
+		reqCreateCredit, err := http.NewRequest("POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
+		if err != nil {
+			return nil, errors.New("Error parsing DateTo: " + err.Error())
+		}
 
-	reqCreateCredit.Header.Set("Content-Type", "application/json")
+		reqCreateCredit.Header.Set("Content-Type", "application/json")
 
-	// Create a client and execute the request
-	clientCreateCredit := &http.Client{}
-	respCreateCredit, errCreateCredit := clientCreateCredit.Do(reqCreateCredit)
-	if errCreateCredit != nil {
-		return nil, errors.New("Error parsing DateTo: " + errCreateCredit.Error())
-	}
-	defer respCreateCredit.Body.Close()
+		// Create a client and execute the request
+		clientCreateCredit := &http.Client{}
+		respCreateCredit, errCreateCredit := clientCreateCredit.Do(reqCreateCredit)
+		if errCreateCredit != nil {
+			return nil, errors.New("Error parsing DateTo: " + errCreateCredit.Error())
+		}
+		defer respCreateCredit.Body.Close()
 
-	bodyCreateCredit, err := io.ReadAll(respCreateCredit.Body)
-	if err != nil {
-		return nil, err
+		bodyCreateCredit, err := io.ReadAll(respCreateCredit.Body)
+		if err != nil {
+			return nil, err
+		}
+		var convertCreateCredit interface{}
+		err = json.Unmarshal(bodyCreateCredit, &convertCreateCredit)
+		if err != nil {
+			return nil, err
+		}
 	}
-	var convertCreateCredit interface{}
-	err = json.Unmarshal(bodyCreateCredit, &convertCreateCredit)
-	if err != nil {
-		return nil, err
+	if len(creditRequestForAlert) > 0 {
+		jsonBytesEmailAlert, err := json.Marshal(creditRequestForAlert)
+		if err != nil {
+			return nil, err
+		}
+		urlEmailAlert := os.Getenv("base_url_erp") + "/emailAlert/SendEmailAlertForNewBrand"
+		reqEmailAlert, err := http.NewRequest("POST", urlEmailAlert, bytes.NewBuffer(jsonBytesEmailAlert))
+		if err != nil {
+			return nil, errors.New("Error parsing DateTo: " + err.Error())
+		}
+
+		reqEmailAlert.Header.Set("Content-Type", "application/json")
+
+		// Create a client and execute the request
+		clientEmailAlert := &http.Client{}
+		respEmailAlert, errEmailAlert := clientEmailAlert.Do(reqEmailAlert)
+		if errEmailAlert != nil {
+			return nil, errors.New("Error parsing DateTo: " + errEmailAlert.Error())
+		}
+		defer respEmailAlert.Body.Close()
+
+		bodyEmailAlert, err := io.ReadAll(respEmailAlert.Body)
+		if err != nil {
+			return nil, err
+		}
+		var convertEmailAlert interface{}
+		err = json.Unmarshal(bodyEmailAlert, &convertEmailAlert)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return nil, nil
