@@ -1,5 +1,0 @@
-package approvalService
-
-func VerifyCreditLogic() {
-
-}
