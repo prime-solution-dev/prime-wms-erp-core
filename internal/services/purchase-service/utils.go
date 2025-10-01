@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/models"
+	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -52,7 +55,6 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 
 	prePurchase := models.PrePurchase{
 		ID:              uuid.New(),
-		PrePurchaseCode: req.PrePurchaseCode,
 		PurchaseType:    "LOT",
 		CompanyCode:     req.CompanyCode,
 		SiteCode:        req.SiteCode,
@@ -294,4 +296,54 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 	fmt.Println("updated approval: ", resp)
 
 	return nil
+}
+
+// System Config
+// pre_purchase_code ex. PPO-LOT20250930-0001; value ex. 20250930-0001
+func GetPrePurchaseCodeConfig() (*models.SystemConfig, error) {
+	topicCodes := []string{"PPO"}
+	configCodes := []string{"LOT"}
+
+	prePurchaseConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	prePurchaseConfigMap := make(map[string]models.SystemConfig)
+
+	for _, poRunConfig := range prePurchaseConfigs {
+		prePurchaseConfigMap[fmt.Sprintf("%s|%s", poRunConfig.TopicCode, poRunConfig.ConfigCode)] = poRunConfig
+	}
+
+	config := prePurchaseConfigMap["PPO|LOT"]
+	return &config, nil
+}
+
+func ConvertConfigToLatestPrePurchaseNumber(prePurchaseConfig models.SystemConfig) (int, error) {
+	result := 0
+
+	if len(prePurchaseConfig.Value) < 1 {
+		return result, nil
+	}
+
+	valueParts := strings.Split(prePurchaseConfig.Value, "-")
+	latestDate := valueParts[0]
+	latestNo := valueParts[1]
+
+	t1, _ := time.Parse("2006-01-02", latestDate)
+	t2 := time.Now()
+
+	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
+	t2Day := time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, t2.Location())
+
+	if t1Day.Equal(t2Day) {
+		lastNum, err := strconv.Atoi(latestNo)
+		if err != nil {
+			return 0, err
+		}
+
+		result = lastNum
+	}
+
+	return result, nil
 }
