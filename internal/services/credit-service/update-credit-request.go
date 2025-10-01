@@ -120,7 +120,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	} else {
 		return map[string]interface{}{
 			"status":  "success",
-			"message": "Approval Not Have Rows Affected",
+			"message": "Approval Not Have Rows Affected ",
 		}, nil
 	}
 }
