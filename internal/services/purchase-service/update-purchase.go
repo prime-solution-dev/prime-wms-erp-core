@@ -5,7 +5,6 @@ import (
 	"errors"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,15 +16,10 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	user := "system"
-	now := time.Now()
-
 	prePurchases := []models.PrePurchase{}
 
 	for _, r := range req {
 		prePurchase := MapUpdatePOBigLotRequestToPrePurchase(r)
-		prePurchase.UpdateDate = &now
-		prePurchase.UpdateBy = user
 		prePurchase.PrePurchaseItems = MapUpdatePOBigLotRequestToPrePurchaseItem(r.PrePurchaseItems)
 		prePurchases = append(prePurchases, prePurchase)
 	}
