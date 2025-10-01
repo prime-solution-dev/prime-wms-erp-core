@@ -81,6 +81,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	for _, quotationReq := range req.Quotations {
+
 		tempQuotation := quotationReq.Quotation
 		tempQuotation.ID = uuid.New()
 
