@@ -161,7 +161,6 @@ type CreatePOBigLotItemRequest struct {
 }
 
 type CreatePOBigLotRequest struct {
-	PrePurchaseCode string                      `json:"pre_purchase_code"`
 	CompanyCode     string                      `json:"company_code"`
 	SiteCode        string                      `json:"site_code"`
 	SupplierCode    string                      `json:"supplier_code"`
