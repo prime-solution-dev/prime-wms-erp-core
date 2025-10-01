@@ -5,14 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/models"
+	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotItemRequest, prePurchaseID uuid.UUID, user string) []models.PrePurchaseItem {
+func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotItemRequest, prePurchaseID uuid.UUID, user string, now time.Time) []models.PrePurchaseItem {
 	items := make([]models.PrePurchaseItem, 0, len(reqItems))
 
 	for _, item := range reqItems {
@@ -41,7 +44,9 @@ func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotIte
 			Status:               item.Status,
 			Remark:               item.Remark,
 			CreateBy:             user,
+			CreateDtm:            now,
 			UpdateBy:             user,
+			UpdateDtm:            now,
 		})
 	}
 	return items
@@ -49,10 +54,10 @@ func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotIte
 
 func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models.PrePurchase {
 	user := `system` // TODO: get from ctx
+	now := time.Now().UTC()
 
 	prePurchase := models.PrePurchase{
 		ID:              uuid.New(),
-		PrePurchaseCode: req.PrePurchaseCode,
 		PurchaseType:    "LOT",
 		CompanyCode:     req.CompanyCode,
 		SiteCode:        req.SiteCode,
@@ -69,10 +74,12 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
 		CreateBy:        user,
+		CreateDtm:       now,
 		UpdateBy:        user,
+		UpdateDtm:       now,
 	}
 
-	prePurchase.PrePurchaseItems = MapBigLotRequestToPrePurchaseItemsModel(req.Items, prePurchase.ID, user)
+	prePurchase.PrePurchaseItems = MapBigLotRequestToPrePurchaseItemsModel(req.Items, prePurchase.ID, user, now)
 
 	return prePurchase
 }
@@ -103,9 +110,9 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 			Status:               item.Status,
 			Remark:               item.Remark,
 			CreateBy:             item.CreateBy,
-			CreateDate:           item.CreateDate.Format(time.RFC3339),
+			CreateDtm:            item.CreateDtm.Format(time.RFC3339),
 			UpdateBy:             item.UpdateBy,
-			UpdateDate:           item.UpdateDate.Format(time.RFC3339),
+			UpdateDtm:            item.UpdateDtm.Format(time.RFC3339),
 		})
 	}
 
@@ -131,15 +138,17 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		StatusApprove:    prePurchases.StatusApprove,
 		Remark:           prePurchases.Remark,
 		CreateBy:         prePurchases.CreateBy,
-		CreateDate:       prePurchases.CreateDate.Format(time.RFC3339),
+		CreateDtm:        prePurchases.CreateDtm.Format(time.RFC3339),
 		UpdateBy:         prePurchases.UpdateBy,
-		UpdateDate:       prePurchases.UpdateDate.Format(time.RFC3339),
+		UpdateDtm:        prePurchases.UpdateDtm.Format(time.RFC3339),
 		PrePurchaseItems: MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems),
 	}
 }
 
 func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRequest) []models.PrePurchaseItem {
 	results := []models.PrePurchaseItem{}
+	user := "system"
+	now := time.Now().UTC()
 
 	for _, reqItem := range req {
 		if reqItem.ID == nil || *reqItem.ID == uuid.Nil {
@@ -169,6 +178,8 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 			TotalWeight:          reqItem.TotalWeight,
 			Status:               reqItem.Status,
 			Remark:               reqItem.Remark,
+			UpdateBy:             user,
+			UpdateDtm:            now,
 		}
 
 		results = append(results, item)
@@ -178,6 +189,9 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 }
 
 func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) models.PrePurchase {
+	user := "system"
+	now := time.Now().UTC()
+
 	return models.PrePurchase{
 		ID:              req.ID,
 		Status:          req.Status,
@@ -188,6 +202,8 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 		SubtotalExclVat: req.SubtotalExclVat,
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
+		UpdateBy:        user,
+		UpdateDtm:       now,
 	}
 }
 
@@ -294,4 +310,54 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 	fmt.Println("updated approval: ", resp)
 
 	return nil
+}
+
+// System Config
+// pre_purchase_code ex. PPO-LOT20250930-0001; value ex. 20250930-0001
+func GetPrePurchaseCodeConfig() (*models.SystemConfig, error) {
+	topicCodes := []string{"PPO"}
+	configCodes := []string{"LOT"}
+
+	prePurchaseConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	prePurchaseConfigMap := make(map[string]models.SystemConfig)
+
+	for _, poRunConfig := range prePurchaseConfigs {
+		prePurchaseConfigMap[fmt.Sprintf("%s|%s", poRunConfig.TopicCode, poRunConfig.ConfigCode)] = poRunConfig
+	}
+
+	config := prePurchaseConfigMap["PPO|LOT"]
+	return &config, nil
+}
+
+func ConvertConfigToLatestPrePurchaseNumber(prePurchaseConfig models.SystemConfig) (int, error) {
+	result := 0
+
+	if len(prePurchaseConfig.Value) < 1 {
+		return result, nil
+	}
+
+	valueParts := strings.Split(prePurchaseConfig.Value, "-")
+	latestDate := valueParts[0]
+	latestNo := valueParts[1]
+
+	t1, _ := time.Parse("2006-01-02", latestDate)
+	t2 := time.Now()
+
+	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
+	t2Day := time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, t2.Location())
+
+	if t1Day.Equal(t2Day) {
+		lastNum, err := strconv.Atoi(latestNo)
+		if err != nil {
+			return 0, err
+		}
+
+		result = lastNum
+	}
+
+	return result, nil
 }

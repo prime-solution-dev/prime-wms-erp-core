@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"prime-erp-core/internal/models"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,13 +32,17 @@ func SendEmailAlertForNewBrand(ctx *gin.Context, jsonPayload string) (interface{
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	host := "smtp.office365.com"
-	port := 587
-	user := "WMSPrime@prime-solution.cc"
-	password := "Prime$ol101@"
-	sender := "WMSPrime@prime-solution.cc"
+	host := os.Getenv("email_host")
+	portStr := os.Getenv("email_port")
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Fatalf("Invalid port: %v", err)
+	}
+	user := os.Getenv("email_user")
+	password := os.Getenv("email_password")
+	sender := os.Getenv("email_sender")
 	recipients := []string{"champsamui8@gmail.com"}
-	subject := "Daily Sale Notification as of " + time.Now().AddDate(0, 0, -1).Format("02/01/2006")
+	subject := "Credit Limit Exceeded" + time.Now().AddDate(0, 0, -1).Format("02/01/2006")
 
 	var bodyRows string
 	for _, creditRequestValue := range req {
