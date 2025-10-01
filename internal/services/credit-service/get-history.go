@@ -124,9 +124,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
-		isActive := "Inactive"
+		isActive := "INACTIVE"
 		if creditValue.IsActive {
-			isActive = "Active"
+			isActive = "ACTIVE"
 		}
 
 		for _, creditExtraValue := range creditValue.CreditExtra {
