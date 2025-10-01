@@ -48,6 +48,7 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	user := `system` // TODO: get from ctx
 	now := time.Now()
 	nowTruc := now.Truncate(24 * time.Hour)
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	//get config
 	topic := `PRICE`
@@ -66,8 +67,8 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err != nil {
 		return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
 	}
-
-	expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
+	expiryDateTemp := time.Now().AddDate(0, 0, int(expiryDays))
+	expiryDate := time.Date(expiryDateTemp.Year(), expiryDateTemp.Month(), expiryDateTemp.Day(), 0, 0, 0, 0, expiryDateTemp.Location())
 
 	updateQuotations := []models.Quotation{}
 	updateQuotationItems := []models.QuotationItem{}
@@ -89,12 +90,23 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		// Only update timestamp and user for update
-		tempQuotation.UpdateDate = &now
+		tempQuotation.UpdateDate = &nowDateOnly
 		tempQuotation.UpdateBy = user
 
 		if quotationReq.Status != "TEMP" {
 			tempQuotation.ExpirePriceDate = &expiryDate
 			tempQuotation.ExpirePriceDay = int(expiryDays)
+		}
+
+		if tempQuotation.DeliveryDate != nil {
+			deliveryDateOnly := time.Date(tempQuotation.DeliveryDate.Year(), tempQuotation.DeliveryDate.Month(), tempQuotation.DeliveryDate.Day(), 0, 0, 0, 0, tempQuotation.DeliveryDate.Location())
+			tempQuotation.DeliveryDate = &deliveryDateOnly
+		}
+
+		// Convert EffectiveDatePrice to date-only format
+		if tempQuotation.EffectiveDatePrice != nil {
+			effectiveDateOnly := time.Date(tempQuotation.EffectiveDatePrice.Year(), tempQuotation.EffectiveDatePrice.Month(), tempQuotation.EffectiveDatePrice.Day(), 0, 0, 0, 0, tempQuotation.EffectiveDatePrice.Location())
+			tempQuotation.EffectiveDatePrice = &effectiveDateOnly
 		}
 
 		updateQuotations = append(updateQuotations, tempQuotation)
@@ -131,9 +143,9 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 			// Set create/update timestamps and user
-			item.CreateDate = &now
+			item.CreateDate = &nowDateOnly
 			item.CreateBy = user
-			item.UpdateDate = &now
+			item.UpdateDate = &nowDateOnly
 			item.UpdateBy = user
 
 			updateQuotationItems = append(updateQuotationItems, item)

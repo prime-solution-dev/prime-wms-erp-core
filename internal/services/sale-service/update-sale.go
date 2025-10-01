@@ -60,6 +60,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	user := `system` // TODO: get from ctx
 	now := time.Now()
 	nowTruc := now.Truncate(24 * time.Hour)
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	updateSales := []models.Sale{}
 	updateSaleItems := []models.SaleItem{}
@@ -77,7 +78,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		// Only update timestamp and user for update
-		tempSale.UpdateDate = &now
+		tempSale.UpdateDate = &nowDateOnly
 		tempSale.UpdateBy = user
 
 		updateSales = append(updateSales, tempSale)
@@ -108,7 +109,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for _, item := range saleReq.Items {
 			// Ensure item belongs to this sale
 			item.SaleID = tempSale.ID
-			item.UpdateDate = &now
+			item.UpdateDate = &nowDateOnly
 			item.UpdateBy = user
 
 			updateSaleItems = append(updateSaleItems, item)

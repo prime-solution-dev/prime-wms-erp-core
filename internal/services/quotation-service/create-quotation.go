@@ -53,6 +53,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	user := `system` // TODO: get from ctx
 	now := time.Now()
 	nowTruc := now.Truncate(24 * time.Hour)
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	//get config
 	topic := `PRICE`
@@ -72,7 +73,8 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
 	}
 
-	expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
+	expiryDateTemp := time.Now().AddDate(0, 0, int(expiryDays))
+	expiryDate := time.Date(expiryDateTemp.Year(), expiryDateTemp.Month(), expiryDateTemp.Day(), 0, 0, 0, 0, expiryDateTemp.Location())
 
 	createQuotations := []models.Quotation{}
 	createQuotationItems := []models.QuotationItem{}
@@ -92,15 +94,21 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			tempQuotation.QuotationCode = quotationCode
 		}
 
-		tempQuotation.CreateDate = &now
+		tempQuotation.CreateDate = &nowDateOnly
 		tempQuotation.CreateBy = user
-		tempQuotation.UpdateDate = &now
+		tempQuotation.UpdateDate = &nowDateOnly
 		tempQuotation.UpdateBy = user
+		tempQuotation.EffectiveDatePrice = &nowDateOnly
 
 		if quotationReq.Status == "PENDING" {
 			tempQuotation.ExpirePriceDate = &expiryDate
 			tempQuotation.ExpirePriceDay = int(expiryDays)
+		}
 
+		// Convert DeliveryDate to date-only format if provided
+		if tempQuotation.DeliveryDate != nil {
+			deliveryDateOnly := time.Date(tempQuotation.DeliveryDate.Year(), tempQuotation.DeliveryDate.Month(), tempQuotation.DeliveryDate.Day(), 0, 0, 0, 0, tempQuotation.DeliveryDate.Location())
+			tempQuotation.DeliveryDate = &deliveryDateOnly
 		}
 
 		createQuotations = append(createQuotations, tempQuotation)
@@ -135,9 +143,9 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				item.QuotationItem = uuid.New().String()
 			}
 
-			item.CreateDate = &now
+			item.CreateDate = &nowDateOnly
 			item.CreateBy = user
-			item.UpdateDate = &now
+			item.UpdateDate = &nowDateOnly
 			item.UpdateBy = user
 
 			createQuotationItems = append(createQuotationItems, item)
