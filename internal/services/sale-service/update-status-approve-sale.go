@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
@@ -74,11 +75,14 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		return nil, fmt.Errorf("invalid status: %s", req.Status)
 	}
 
+	now := time.Now()
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
 	updateFields := map[string]interface{}{
 		"status":          quotationStatus,
 		"status_approve":  quotationStatusApprove,
 		"remark_approval": req.Remark,
-		"update_date":     gormx.NowFunc(),
+		"update_date":     nowDateOnly,
 	}
 
 	if err := gormx.Model(&models.Sale{}).
@@ -93,7 +97,7 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 			Where("sale_id = ?", req.ID).
 			Updates(map[string]interface{}{
 				"status":      "CANCELED",
-				"update_date": gormx.NowFunc(),
+				"update_date": nowDateOnly,
 			}).Error; err != nil {
 			return nil, fmt.Errorf("failed to update sale items status: %v", err)
 		}
