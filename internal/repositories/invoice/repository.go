@@ -1,6 +1,7 @@
 package saleRepository
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"prime-erp-core/internal/db"
@@ -11,7 +12,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, customerCode []string, status []string, docRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -37,6 +38,15 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, customerCode []stri
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchInvoiceCode = fmt.Sprintf(` and invoice.invoice_code IN (%s)`, whereInClause)
+	}
+	searchInvoiceType := ""
+	if len(invoiceType) > 0 {
+		quotedStrings := make([]string, len(invoiceType))
+		for i, s := range invoiceType {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchInvoiceType = fmt.Sprintf(` and invoice.invoice_type IN (%s)`, whereInClause)
 	}
 	searchCustomerCode := ""
 	if len(customerCode) > 0 {
@@ -69,7 +79,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, customerCode []stri
 	var invoiceID []uuid.UUID
 	gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
+		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
 		Group("invoice.id").Scan(&invoiceID)
 
 	if len(invoiceID) > 0 {
@@ -109,4 +119,31 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, customerCode []stri
 	} else {
 		return nil, 0, 0, err
 	}
+}
+func CreateInvoice(invoice []models.Invoice) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+	tx := gormx.Begin()
+	defer func() {
+		if rc := recover(); rc != nil {
+			tx.Rollback()
+			err = errors.New("panic error cant't save approval")
+		}
+	}()
+	if err = tx.Error; err != nil {
+		return err
+	}
+	if len(invoice) > 0 {
+		result := tx.Create(&invoice)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+
+	err = tx.Commit().Error
+	return err
 }

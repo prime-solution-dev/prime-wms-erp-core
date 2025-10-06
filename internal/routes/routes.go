@@ -63,6 +63,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	invoice.POST("/GetInvoice", func(c *gin.Context) {
 		utils.ProcessRequest(c, invoiceService.GetInvoice)
 	})
+	invoice.POST("/CreateInvoice", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.CreateInvoice)
+	})
+
 	//payment
 	payment := ctx.Group("/GetPayment")
 	payment.POST("/GetPayment", func(c *gin.Context) {

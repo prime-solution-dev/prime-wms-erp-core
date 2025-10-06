@@ -13,6 +13,7 @@ import (
 type GetInvoiceRequest struct {
 	ID           []uuid.UUID `json:"id"`
 	InvoiceCode  []string    `json:"invoice_code"`
+	InvoiceType  []string    `json:"invoice_type"`
 	CustomerCode []string    `json:"customer_code"`
 	Status       []string    `json:"status"`
 	DocRef       []string    `json:"doc_ref"`
@@ -35,7 +36,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.CustomerCode, req.Status, req.DocRef, req.Page, req.PageSize)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.Page, req.PageSize)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
