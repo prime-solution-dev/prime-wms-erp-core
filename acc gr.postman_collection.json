@@ -1,0 +1,40 @@
+{
+	"info": {
+		"_postman_id": "0f6d8924-1aad-488b-a9fd-a3f33127d60b",
+		"name": "acc gr",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43625603",
+		"_collection_link": "https://champ-5741577.postman.co/workspace/champ's-Workspace~651e3d54-90af-43c7-838e-71a7da293ab7/collection/43625603-0f6d8924-1aad-488b-a9fd-a3f33127d60b?action=share&source=collection_link&creator=43625603"
+	},
+	"item": [
+		{
+			"name": "GetInvoice",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/invoice/GetInvoice",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"invoice",
+						"GetInvoice"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

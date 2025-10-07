@@ -120,7 +120,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		return nil, 0, 0, err
 	}
 }
-func CreateInvoice(invoice []models.Invoice) (err error) {
+func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (err error) {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
 	if err != nil {
@@ -143,7 +143,40 @@ func CreateInvoice(invoice []models.Invoice) (err error) {
 			return result.Error
 		}
 	}
-
+	if len(invoiceItem) > 0 {
+		result := tx.Create(&invoiceItem)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
 	err = tx.Commit().Error
 	return err
+}
+func UpdateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (int, error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected := 0
+	for _, invoiceValue := range invoice {
+		result := gormx.Table("invoice").Where("id = ?", invoiceValue.ID).Updates(&invoiceValue)
+
+		if result.Error != nil {
+			gormx.Rollback()
+			return 0, result.Error
+		}
+		rowsAffected = int(result.RowsAffected)
+	}
+	for _, invoiceItemValue := range invoiceItem {
+		result := gormx.Table("invoice_item").Where("id = ?", invoiceItemValue.ID).Updates(&invoiceItemValue)
+
+		if result.Error != nil {
+			gormx.Rollback()
+			return 0, result.Error
+		}
+	}
+
+	return rowsAffected, nil
 }

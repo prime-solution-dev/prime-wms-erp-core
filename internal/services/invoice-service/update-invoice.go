@@ -7,10 +7,9 @@ import (
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
-func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -19,35 +18,28 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
-	invoiceIDForReturn := []uuid.UUID{}
 	for i, invoice := range req {
-		invoiceID := uuid.New()
-		req[i].ID = invoiceID
-
-		invoiceIDForReturn = append(invoiceIDForReturn, invoiceID)
-
-		if req[i].InvoiceCode == "" {
-			req[i].InvoiceCode = uuid.New().String()
-		}
 		req[i].InvoiceItem = []models.InvoiceItem{}
 		invoiceValue = append(invoiceValue, req[i])
 		for i := range invoice.InvoiceItem {
-			invoiceItemID := uuid.New()
-			req[i].InvoiceItem[i].ID = invoiceItemID
-			req[i].InvoiceItem[i].InvoiceID = invoiceID
-			req[i].InvoiceItem[i].InvoiceItem = string(i)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[i])
 		}
 	}
 
-	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue)
+	rowsAffected, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, invoiceItemValue)
 	if errCreateApproval != nil {
 		return nil, errCreateApproval
 	}
 
-	return map[string]interface{}{
-		"id":      invoiceIDForReturn,
-		"status":  "success",
-		"message": "Create Invoice Successfully",
-	}, nil
+	if rowsAffected > 0 {
+		return map[string]interface{}{
+			"status":  "success",
+			"message": "Approval updated successfully",
+		}, nil
+	} else {
+		return map[string]interface{}{
+			"status":  "success",
+			"message": "Approval Not Have Rows Affected ",
+		}, nil
+	}
 }
