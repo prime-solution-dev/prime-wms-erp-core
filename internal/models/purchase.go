@@ -281,6 +281,8 @@ type UpdatePOBigLotRequest struct {
 	SubtotalExclVat  float64                     `json:"subtotal_excl_vat"`
 	IsApproved       bool                        `json:"is_approved"`
 	StatusApprove    string                      `json:"status_approve"`
+	Remark           string                      `json:"remark"`
+	DeliveryAddress  string                      `json:"delivery_address"`
 	PrePurchaseItems []UpdatePOBigLotItemRequest `json:"pre_purchase_items"`
 }
 

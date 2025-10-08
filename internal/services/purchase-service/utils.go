@@ -202,6 +202,8 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 		SubtotalExclVat: req.SubtotalExclVat,
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
+		DeliveryAddress: req.DeliveryAddress,
+		Remark:          req.Remark,
 		UpdateBy:        user,
 		UpdateDtm:       now,
 	}
