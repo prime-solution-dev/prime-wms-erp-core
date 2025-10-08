@@ -152,7 +152,7 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 			Where("id = ?", prePurchase.ID).Updates(map[string]interface{}{
 			"status_approve": prePurchase.StatusApprove,
 			"is_approved":    prePurchase.IsApproved,
-			"update_date":    time.Now(),
+			"update_dtm":     time.Now().UTC(),
 		}); result.Error != nil {
 			err = result.Error
 			return
