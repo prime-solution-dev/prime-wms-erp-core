@@ -13,7 +13,7 @@ type Invoice struct {
 	InvoiceType     string           `json:"invoice_type"`
 	DocumentRefType string           `json:"document_ref_type"`
 	DocumentRef     string           `json:"document_ref"`
-	CreditTermDay   string           `json:"credit_term_day"`
+	CreditTermDay   float64          `json:"credit_term_day"`
 	PaymentDate     *time.Time       `json:"payment_date"`
 	DocumentDate    *time.Time       `json:"document_date"`
 	TaxDate         *time.Time       `json:"tax_date"`
@@ -40,19 +40,24 @@ type InvoiceItem struct {
 	InvoiceID             uuid.UUID `json:"invoice_id"`
 	InvoiceItem           string    `json:"invoice_item"`
 	InvoiceCode           string    `gorm:"-" json:"invoice_code"`
-	InvoiceQty            float64   `json:"invoice_qty"`
-	InvoiceUnit           string    `json:"invoice_unit"`
-	InvoiceUnitType       string    `json:"invoice_unit_type"`
+	DocRefItem            string    `json:"doc_ref_item"`
 	ProductCode           string    `json:"product_code"`
 	Qty                   float64   `json:"qty"`
 	UnitCode              string    `json:"unit_code"`
 	PriceUnit             float64   `json:"price_unit"`
+	CreateBy              string    `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm             time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy              string    `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDTM             time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+	InvoiceQty            float64   `json:"invoice_qty"`
+	InvoiceUnit           string    `json:"invoice_unit"`
+	InvoiceUnitType       string    `json:"invoice_unit_type"`
 	UnitUom               string    `json:"unit_uom"`
-	WeightUnit            string    `json:"weight_unit"`
-	Avg_weightUnit        string    `json:"avg_weight_unit"`
-	TotalWeight           string    `json:"total_weight"`
-	TotalDiscount         string    `json:"total_discount"`
-	TotalDiscount_percent string    `json:"total_discount_percent"`
+	WeightUnit            float64   `json:"weight_unit"`
+	Avg_weightUnit        float64   `json:"avg_weight_unit"`
+	TotalWeight           float64   `json:"total_weight"`
+	TotalDiscount         float64   `json:"total_discount"`
+	TotalDiscount_percent float64   `json:"total_discount_percent"`
 	DocumentRefType       string    `json:"document_ref_type"`
 	DocumentRef           string    `json:"document_ref"`
 	DocumentRefItem       string    `json:"document_ref_item"`
@@ -63,10 +68,6 @@ type InvoiceItem struct {
 	TotalVat              float64   `json:"total_vat"`
 	Status                string    `json:"status"`
 	Remark                string    `json:"remark"`
-	CreateBy              string    `gorm:"type:varchar(100)" json:"create_by"`
-	CreateDtm             time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
-	UpdateBy              string    `gorm:"type:varchar(100)" json:"update_by"`
-	UpdateDTM             time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 }
 
 func (InvoiceItem) TableName() string { return "invoice_item" }

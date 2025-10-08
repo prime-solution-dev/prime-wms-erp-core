@@ -5,6 +5,7 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,15 +30,18 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if req[i].InvoiceCode == "" {
 			req[i].InvoiceCode = uuid.New().String()
 		}
-		req[i].InvoiceItem = []models.InvoiceItem{}
-		invoiceValue = append(invoiceValue, req[i])
-		for i := range invoice.InvoiceItem {
+
+		for o := range invoice.InvoiceItem {
 			invoiceItemID := uuid.New()
-			req[i].InvoiceItem[i].ID = invoiceItemID
-			req[i].InvoiceItem[i].InvoiceID = invoiceID
-			req[i].InvoiceItem[i].InvoiceItem = string(i)
-			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[i])
+			req[i].InvoiceItem[o].ID = invoiceItemID
+			req[i].InvoiceItem[o].InvoiceID = invoiceID
+			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
+			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
+
+		req[i].InvoiceItem = []models.InvoiceItem{}
+		req[i].InvoiceDeposit = []models.InvoiceDeposit{}
+		invoiceValue = append(invoiceValue, req[i])
 	}
 
 	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue)

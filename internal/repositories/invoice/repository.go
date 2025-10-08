@@ -105,7 +105,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 
 		}
 
-		err = query.Order("update_date desc").Find(&invoice).Error
+		err = query.Order("update_dtm desc").Find(&invoice).Error
 		sqlDB, err1 := gormx.DB()
 		if err1 != nil {
 			return nil, 0, 0, err1
