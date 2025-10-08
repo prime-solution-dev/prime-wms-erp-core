@@ -19,11 +19,13 @@ func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
 	for i, invoice := range req {
-		req[i].InvoiceItem = []models.InvoiceItem{}
-		invoiceValue = append(invoiceValue, req[i])
-		for i := range invoice.InvoiceItem {
-			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[i])
+
+		for o := range invoice.InvoiceItem {
+			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
+		req[i].InvoiceItem = []models.InvoiceItem{}
+		req[i].InvoiceDeposit = []models.InvoiceDeposit{}
+		invoiceValue = append(invoiceValue, req[i])
 	}
 
 	rowsAffected, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, invoiceItemValue)
