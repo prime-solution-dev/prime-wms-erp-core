@@ -344,7 +344,11 @@ func ConvertConfigToLatestPrePurchaseNumber(prePurchaseConfig models.SystemConfi
 	latestDate := valueParts[0]
 	latestNo := valueParts[1]
 
-	t1, _ := time.Parse("2006-01-02", latestDate)
+	t1, err := time.ParseInLocation("20060102", latestDate, time.Local)
+	if err != nil {
+		return result, err
+	}
+
 	t2 := time.Now()
 
 	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
