@@ -10,8 +10,10 @@ import (
 	emailservice "prime-erp-core/internal/services/email-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
+	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+
 	quotationService "prime-erp-core/internal/services/quotation-service"
 	saleService "prime-erp-core/internal/services/sale-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
@@ -170,20 +172,29 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, unitService.GetAllUnit)
 	})
 
-	//purchase
 	purchase := ctx.Group("/purchase")
+	//pre-purchase
 	purchase.POST("/CreatePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CreatePOBigLot)
+		utils.ProcessRequest(c, prePurchaseService.CreatePOBigLot)
 	})
 	purchase.POST("/GetPOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.GetPOBigLot)
+		utils.ProcessRequest(c, prePurchaseService.GetPOBigLot)
 	})
 	purchase.POST("/UpdatePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.UpdatePOBigLot)
+		utils.ProcessRequest(c, prePurchaseService.UpdatePOBigLot)
 	})
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.UpdateStatusApprovePOBigLot)
+		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
 	})
+
+	//purchase
+	purchase.POST("/CreatePO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CreatePO)
+	})
+	purchase.POST("/GetPO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.GetPO)
+	})
+
 	///cronjob
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {

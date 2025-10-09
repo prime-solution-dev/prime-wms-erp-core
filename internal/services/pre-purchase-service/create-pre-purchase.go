@@ -1,11 +1,12 @@
-package purchaseService
+package prePurchaseService
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/models"
-	purchaseRepository "prime-erp-core/internal/repositories/purchase"
+
+	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	"time"
 
@@ -51,7 +52,7 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	if err := purchaseRepository.CreatePOBigLot(prePurchases); err != nil {
+	if err := prePurchaseRepository.CreatePOBigLot(prePurchases); err != nil {
 		return nil, errors.New("failed to create big lot: " + err.Error())
 	}
 
