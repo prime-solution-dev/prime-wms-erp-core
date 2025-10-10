@@ -1,10 +1,10 @@
-package purchaseService
+package prePurchaseService
 
 import (
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/models"
-	purchaseRepository "prime-erp-core/internal/repositories/purchase"
+	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,7 +24,7 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		prePurchases = append(prePurchases, prePurchase)
 	}
 
-	if err := purchaseRepository.UpdatePOBigLot(prePurchases); err != nil {
+	if err := prePurchaseRepository.UpdatePOBigLot(prePurchases); err != nil {
 		return nil, errors.New("fail to update big lot: " + err.Error())
 	}
 
@@ -43,7 +43,7 @@ func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interfac
 		return nil, err
 	}
 
-	if err := purchaseRepository.UpdateStatusApprovePOBigLot(req); err != nil {
+	if err := prePurchaseRepository.UpdateStatusApprovePOBigLot(req); err != nil {
 		return nil, errors.New("failed to update pre purchase status approve: " + err.Error())
 	}
 
