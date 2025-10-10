@@ -96,6 +96,7 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 		items = append(items, models.GetPOBigLotItemResponse{
 			ID:                   item.ID.String(),
 			PrePurchaseID:        item.PrePurchaseID.String(),
+			PreItem:              item.PreItem,
 			ProductGroupType:     item.HierarchyType,
 			ProductGroupCode:     item.HierarchyCode,
 			Qty:                  item.Qty,
