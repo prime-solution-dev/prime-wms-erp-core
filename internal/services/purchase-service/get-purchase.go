@@ -1,79 +1,54 @@
 package purchaseService
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
-	"net/http"
-	"os"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
+	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 
 	"github.com/gin-gonic/gin"
 )
 
-func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
-	req := models.GetPOBigLotListRequest{}
+func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.GetPurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	prePurchaseList, total, page, pageSize, totalPage, err := purchaseRepository.GetPOBigLotList(req.PrePurchaseCodes, req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
+	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseList(req.PurchaseCodes, req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
 	if err != nil {
-		return nil, errors.New("failed to get big lot list: " + err.Error())
+		return nil, errors.New("failed to get purchase list: " + err.Error())
 	}
 
+	purchaseCodes := []string{}
 	prePurchaseCodes := []string{}
 	supplierReq := models.GetSupplierListRequest{}
-	for _, prePurchase := range prePurchaseList {
-		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, prePurchase.SupplierCode)
+	productCodes := []string{}
+	for _, purchase := range purchases {
+		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, purchase.SupplierCode)
+		purchaseCodes = append(purchaseCodes, purchase.PurchaseCode)
+
+		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
+			prePurchaseCodes = append(prePurchaseCodes, *purchase.DocRef)
+		}
+
+		for _, item := range purchase.PurchaseItems {
+			productCodes = append(productCodes, item.ProductCode)
+		}
 	}
 
-	jsonData, err := json.Marshal(supplierReq)
+	// Get suppliers
+	mapSupplier, err := prePurchaseService.GetSupplierByCode(supplierReq)
 	if err != nil {
-		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
+		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
 
-	getSuppliers, err := http.NewRequest("POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
+	// Get Approvals
+	approvalsResp, err := prePurchaseService.GetPOApproval(ctx, purchaseCodes)
 	if err != nil {
-		return nil, errors.New("failed to create HTTP request: " + err.Error())
-	}
-
-	getSuppliers.Header.Set("Content-Type", "application/json")
-
-	// Create a client and execute the request
-	client := &http.Client{}
-	resp, err := client.Do(getSuppliers)
-	if err != nil {
-		return nil, errors.New("failed to execute HTTP request: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
-	}
-
-	supplierBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.New("failed to read response body: " + err.Error())
-	}
-
-	supplierResponse := models.GetSupplierListResponse{}
-	if err := json.Unmarshal(supplierBody, &supplierResponse); err != nil {
-		return nil, errors.New("failed to decode JSON response: " + err.Error())
-	}
-
-	mapSupplier := map[string]models.Supplier{}
-	for _, suppliers := range supplierResponse.Supplier {
-		mapSupplier[suppliers.SupplierCode] = suppliers
-	}
-
-	// Get status approves
-	approvalsResp, err := GetBigLotToApproval(ctx, prePurchaseCodes)
-	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to get purchase approvals: " + err.Error())
 	}
 
 	mapStatusApprove := map[string]string{}
@@ -81,20 +56,91 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mapStatusApprove[approval.DocumentCode] = approval.Status
 	}
 
-	result := models.GetPOBigLotListResponse{
+	// Get PrePurchase
+	prePurchaseReq := models.GetPOBigLotListRequest{
+		PrePurchaseCodes: prePurchaseCodes,
+		CompanyCode:      req.CompanyCode,
+		SiteCode:         req.SiteCode,
+		Page:             1,
+		PageSize:         len(prePurchaseCodes),
+	}
+
+	mapPrePurchase, err := GetRelatedPrePurchase(ctx, prePurchaseReq)
+	if err != nil {
+		return nil, errors.New("failed to get pre purchase list: " + err.Error())
+	}
+
+	// Get Products
+	productReq := models.GetProductRequest{
+		ProductCode: productCodes,
+		SiteCode:    []string{req.SiteCode},
+		CompanyCode: []string{req.CompanyCode},
+	}
+
+	mapProduct, err := GetProductByCode(productReq)
+	if err != nil {
+		return nil, errors.New("failed to get product list: " + err.Error())
+	}
+
+	// Get Product Group One
+	productGroupOne := models.GetGroupRequest{
+		GroupCodes: []string{"PRODUCT_GROUP1"},
+	}
+
+	mapProductGroupOne, err := GetProductGroup(productGroupOne)
+	if err != nil {
+		return nil, errors.New("failed to get product group one list: " + err.Error())
+	}
+
+	// Create Result
+	result := models.GetPurchaseResponse{
 		Total:      total,
 		Page:       page,
 		PageSize:   pageSize,
 		TotalPages: totalPage,
 	}
 
-	for _, prePurchase := range prePurchaseList {
-		bigLotResponse := MapPrePurchasesModelToBigLotsResponse(prePurchase)
+	for _, purchase := range purchases {
+		purchaseResponse := MapPurchaseModelToPurchaseResponse(purchase)
 
-		bigLotResponse.SupplierName = mapSupplier[prePurchase.SupplierCode].SupplierName
-		bigLotResponse.StatusApprove = mapStatusApprove[prePurchase.PrePurchaseCode]
+		if supplier, ok := mapSupplier[purchase.SupplierCode]; ok {
+			purchaseResponse.SupplierName = supplier.SupplierName
+		}
 
-		result.BigLotList = append(result.BigLotList, bigLotResponse)
+		purchaseResponse.StatusApprove = mapStatusApprove[purchase.PurchaseCode]
+
+		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
+			if prePurchase, ok := mapPrePurchase[*purchase.DocRef]; ok {
+				purchaseResponse.RefBigLot = &prePurchase
+			}
+		}
+
+		items := make([]models.PurchaseItemResponse, 0, len(purchase.PurchaseItems))
+		for _, item := range purchase.PurchaseItems {
+			itemResp := MapPurchaseItemModelToPurchaseItemResponse(item)
+			if productDetail, ok := mapProduct[item.ProductCode]; ok {
+				itemResp.ProductName = productDetail.ProductName
+
+				// Set Product Group One
+				if len(productDetail.ProductGroups) == 1 {
+					groupCode := productDetail.ProductGroups[0].GroupValue
+					if group, ok := mapProductGroupOne[groupCode]; ok {
+						itemResp.ProductGroupOneCode = groupCode
+						itemResp.ProductGroupOneName = group
+					}
+				} else if len(productDetail.ProductGroups) > 1 {
+					itemResp.ProductGroupOneCode = "Multi"
+					itemResp.ProductGroupOneName = "Multi"
+				}
+			} else {
+				itemResp.ProductName = "Unknown"
+			}
+
+			items = append(items, itemResp)
+		}
+
+		purchaseResponse.Items = items
+		result.DataList = append(result.DataList, purchaseResponse)
 	}
 
 	return result, nil

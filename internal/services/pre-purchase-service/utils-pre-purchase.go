@@ -1,9 +1,13 @@
-package purchaseService
+package prePurchaseService
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"prime-erp-core/internal/models"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
@@ -37,6 +41,7 @@ func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotIte
 			UnitUOM:              item.UnitUOM,
 			TotalCost:            item.TotalCost,
 			TotalDiscountPercent: item.TotalDiscountPercent,
+			DiscountType:         item.DiscountType,
 			TotalVat:             item.TotalVat,
 			SubtotalExclVat:      item.SubtotalExclVat,
 			WeightUnit:           item.WeightUnit,
@@ -104,6 +109,8 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 			UnitUOM:              item.UnitUOM,
 			TotalCost:            item.TotalCost,
 			TotalDiscountPercent: item.TotalDiscountPercent,
+			DiscountType:         item.DiscountType,
+			SubtotalExclVat:      item.SubtotalExclVat,
 			TotalVat:             item.TotalVat,
 			WeightUnit:           item.WeightUnit,
 			TotalWeight:          item.TotalWeight,
@@ -172,6 +179,7 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 			UnitUOM:              reqItem.UnitUOM,
 			TotalCost:            reqItem.TotalCost,
 			TotalDiscountPercent: reqItem.TotalDiscountPercent,
+			DiscountType:         reqItem.DiscountType,
 			TotalVat:             reqItem.TotalVat,
 			SubtotalExclVat:      reqItem.SubtotalExclVat,
 			WeightUnit:           reqItem.WeightUnit,
@@ -202,6 +210,8 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 		SubtotalExclVat: req.SubtotalExclVat,
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
+		DeliveryAddress: req.DeliveryAddress,
+		Remark:          req.Remark,
 		UpdateBy:        user,
 		UpdateDtm:       now,
 	}
@@ -243,11 +253,11 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 	return nil
 }
 
-func GetBigLotToApproval(ctx *gin.Context, prePurchaseCodes []string) ([]models.Approval, error) {
+func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error) {
 	approvalReq := approvalService.GetApprovalRequest{
-		DocumentCode: prePurchaseCodes,
+		DocumentCode: POcodes,
 		Page:         1,
-		PageSize:     len(prePurchaseCodes),
+		PageSize:     len(POcodes),
 	}
 
 	approvalReqJson, err := json.Marshal(approvalReq)
@@ -271,7 +281,6 @@ func GetBigLotToApproval(ctx *gin.Context, prePurchaseCodes []string) ([]models.
 }
 
 func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
-	fmt.Println("KAO")
 	prePurchaseCodes := []string{}
 	mapUpdateList := make(map[string]models.Approval)
 
@@ -283,7 +292,7 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 		}
 	}
 
-	approvalList, err := GetBigLotToApproval(ctx, prePurchaseCodes)
+	approvalList, err := GetPOApproval(ctx, prePurchaseCodes)
 	if err != nil {
 		return errors.New("failed get approvals")
 	}
@@ -364,4 +373,48 @@ func ConvertConfigToLatestPrePurchaseNumber(prePurchaseConfig models.SystemConfi
 	}
 
 	return result, nil
+}
+
+// Supplier actions
+func GetSupplierByCode(supplierReq models.GetSupplierListRequest) (map[string]models.Supplier, error) {
+	jsonData, err := json.Marshal(supplierReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
+	}
+
+	getSuppliers, err := http.NewRequest("POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, errors.New("failed to create HTTP request: " + err.Error())
+	}
+
+	getSuppliers.Header.Set("Content-Type", "application/json")
+
+	// Create a client and execute the request
+	client := &http.Client{}
+	resp, err := client.Do(getSuppliers)
+	if err != nil {
+		return nil, errors.New("failed to execute HTTP request: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
+	}
+
+	supplierBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.New("failed to read response body: " + err.Error())
+	}
+
+	supplierResponse := models.GetSupplierListResponse{}
+	if err := json.Unmarshal(supplierBody, &supplierResponse); err != nil {
+		return nil, errors.New("failed to decode JSON response: " + err.Error())
+	}
+
+	mapSupplier := map[string]models.Supplier{}
+	for _, suppliers := range supplierResponse.Supplier {
+		mapSupplier[suppliers.SupplierCode] = suppliers
+	}
+
+	return mapSupplier, nil
 }
