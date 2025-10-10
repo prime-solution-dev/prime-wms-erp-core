@@ -274,6 +274,8 @@ type UpdatePOBigLotItemRequest struct {
 	TotalWeight          float64    `json:"total_weight"`
 	Status               string     `json:"status"`
 	Remark               string     `json:"remark"`
+	CreateBy             string     `json:"create_by"`
+	CreateDtm            time.Time  `json:"create_dtm"`
 }
 
 type UpdatePOBigLotRequest struct {
@@ -346,6 +348,8 @@ type PurchaseItemFormRequest struct {
 	TotalWeight          float64    `json:"total_weight"`
 	Status               string     `json:"status"`
 	Remark               string     `json:"remark"`
+	CreateBy             *string    `json:"create_by"`
+	CreateDtm            *time.Time `json:"create_dtm"`
 }
 
 type PurchaseFormRequest struct {
@@ -354,7 +358,7 @@ type PurchaseFormRequest struct {
 	PurchaseType    string                    `json:"purchase_type"`
 	DocRefType      *string                   `json:"doc_ref_type"`
 	DocRef          *string                   `json:"doc_ref"`
-	SupplierCode    string                    `json:"supplier_code"`
+	SupplierCode    *string                   `json:"supplier_code"`
 	DeliveryDate    *time.Time                `json:"delivery_date"`
 	DeliveryAddress string                    `json:"delivery_address"`
 	Status          string                    `json:"status"`
