@@ -19,17 +19,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type PurchaseItemFormRequest struct {
-	// Add fields according to your requirements, for example:
-	ID        int
-	Name      string
-	Quantity  int
-	UnitPrice float64
-}
-
 func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest) models.PurchaseItem {
 	now := time.Now().UTC()
 	return models.PurchaseItem{
+		PurchaseItem:         req.PurchaseItem,
 		ProductCode:          req.ProductCode,
 		Qty:                  req.Qty,
 		Unit:                 req.Unit,
@@ -97,6 +90,7 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 	return models.PurchaseItemResponse{
 		ID:                   item.ID.String(),
 		PurchaseID:           item.PurchaseID.String(),
+		PurchaseItem:         item.PurchaseItem,
 		ProductCode:          item.ProductCode,
 		Qty:                  item.Qty,
 		Unit:                 item.Unit,

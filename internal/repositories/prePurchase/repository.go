@@ -5,6 +5,8 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Create
@@ -15,24 +17,12 @@ func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 	}
 	defer db.CloseGORM(gormx)
 
-	tx := gormx.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		} else if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit().Error
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&prePurchases).Error; err != nil {
+			return err
 		}
-	}()
-
-	result := tx.Create(&prePurchases)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // Get
