@@ -144,5 +144,14 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	return gin.H{"status": "success", "message": "Create delivery successfully"}, nil
+	// Return the delivery codes of the created deliveries
+	deliveryCodes := make([]string, len(deliveryToAdd))
+	for i, d := range deliveryToAdd {
+		deliveryCodes[i] = d.DeliveryCode
+	}
+	return gin.H{
+		"status":        "success",
+		"message":       "Create delivery successfully",
+		"delivery_code": deliveryCodes,
+	}, nil
 }
