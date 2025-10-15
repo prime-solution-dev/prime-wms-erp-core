@@ -14,9 +14,11 @@ import (
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 
+	deliveryService "prime-erp-core/internal/services/delivery-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
 	saleService "prime-erp-core/internal/services/sale-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
+	timeService "prime-erp-core/internal/services/time-service"
 	unitService "prime-erp-core/internal/services/unit-service"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
@@ -102,6 +104,20 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	sale.POST("/UpdateStatusApproveSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateStatusApproveSale)
+	})
+	//delivery
+	delivery := ctx.Group("/delivery")
+	delivery.POST("/CreateDelivery", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.CreateDelivery)
+	})
+	delivery.POST("/GetDelivery", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.GetDelivery)
+	})
+
+	//time
+	time := ctx.Group("/time")
+	time.POST("/GetTime", func(c *gin.Context) {
+		utils.ProcessRequest(c, timeService.GetTime)
 	})
 	//deposit
 	deposit := ctx.Group("/deposit")
