@@ -22,7 +22,6 @@ type CreateDeliveryRequest struct {
 	ShipToAddress    string                       `json:"ship_to_address"`
 	DeliveryDate     *time.Time                   `json:"delivery_date"`
 	DeliveryTimeCode string                       `json:"delivery_time_code"`
-	BookingDate      *time.Time                   `json:"booking_date"`
 	LicensePlate     string                       `json:"license_plate"`
 	ContactName      string                       `json:"contact_name"`
 	Tel              string                       `json:"tel"`
@@ -85,13 +84,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			deliveryDateOnly = &dateOnly
 		}
 
-		// แปลง BookingDate เป็น date-only format
-		var bookingDateOnly *time.Time
-		if deliveryReq.BookingDate != nil {
-			dateOnly := time.Date(deliveryReq.BookingDate.Year(), deliveryReq.BookingDate.Month(), deliveryReq.BookingDate.Day(), 0, 0, 0, 0, deliveryReq.BookingDate.Location())
-			bookingDateOnly = &dateOnly
-		}
-
 		newDelivery := models.Delivery{
 			ID:               deliveryId,
 			DeliveryCode:     "DELIVERY-" + time.Now().Format("20060102150405") + fmt.Sprintf("%d", num),
@@ -103,7 +95,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ShipToAddress:    deliveryReq.ShipToAddress,
 			DeliveryDate:     deliveryDateOnly, // ใช้ date-only
 			DeliveryTimeCode: deliveryReq.DeliveryTimeCode,
-			BookingDate:      bookingDateOnly, // ใช้ date-only
 			LicensePlate:     deliveryReq.LicensePlate,
 			ContactName:      deliveryReq.ContactName,
 			Tel:              deliveryReq.Tel,

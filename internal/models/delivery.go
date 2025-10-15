@@ -17,7 +17,6 @@ type Delivery struct {
 	ShipToAddress    string     `json:"ship_to_address"`
 	DeliveryDate     *time.Time `json:"delivery_date"`
 	DeliveryTimeCode string     `json:"delivery_time_code"`
-	BookingDate      *time.Time `json:"booking_date"`
 	LicensePlate     string     `json:"license_plate"`
 	ContactName      string     `json:"contact_name"`
 	Tel              string     `json:"tel"`
