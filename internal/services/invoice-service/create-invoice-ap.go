@@ -69,19 +69,28 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		tolerance = floatVal
 	}
-
+	errData := map[string]interface{}{}
 	for _, invoice := range req {
-		for _, invoiceItem := range invoice.InvoiceItem {
+		for i, invoiceItem := range invoice.InvoiceItem {
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
 				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
-					return nil, errors.New("Invoice Qty over PO Qty : " + invoiceItem.InvoiceCode + " Item : " + invoiceItem.InvoiceItem)
+					errData[strconv.Itoa(i)] = map[string]interface{}{
+						"index":   i,
+						"status":  "error",
+						"message": "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
+					}
+
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.Weight {
-						return nil, errors.New("Invoice Weight over PO Weight : " + invoiceItem.InvoiceCode + " Item : " + invoiceItem.InvoiceItem)
+						errData[strconv.Itoa(i)] = map[string]interface{}{
+							"index":   i,
+							"status":  "error",
+							"message": "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
+						}
 					}
 				}
 			}
@@ -91,5 +100,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if errCreateInvoice != nil {
 		return nil, errCreateInvoice
 	}
-	return nil, nil
+
+	return errData, nil
 }
