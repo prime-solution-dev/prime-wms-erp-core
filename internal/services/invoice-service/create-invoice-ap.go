@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	models "prime-erp-core/internal/models"
+	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,12 +52,31 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 
+	topicCodes := []string{"INVOICE"}
+	configCodes := []string{"AP"}
+
+	invoiceConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	if err != nil {
+		return nil, err
+	}
+	invoiceConfigsMap := make(map[string]models.SystemConfig)
+	tolerance := 0.0
+	for _, invoiceConfigsValue := range invoiceConfigs {
+		invoiceConfigsMap[fmt.Sprintf("%s|%s", invoiceConfigsValue.TopicCode, invoiceConfigsValue.ConfigCode)] = invoiceConfigsValue
+		floatVal, err := strconv.ParseFloat(invoiceConfigsValue.Value, 64)
+		if err != nil {
+			log.Fatalf("Invalid float value: %v", err)
+		}
+		tolerance = floatVal
+	}
+
 	for _, invoice := range req {
 		for _, invoiceItem := range invoice.InvoiceItem {
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
-				if invoiceItem.Qty > poQTYMapResult.QTY {
+				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
+				if invoiceItem.Qty > poQTY {
 					return nil, errors.New("Invoice Qty over PO Qty : " + invoiceItem.InvoiceCode + " Item : " + invoiceItem.InvoiceItem)
 				}
 				if invoiceItem.TotalWeight > 0 {
