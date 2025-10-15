@@ -20,6 +20,7 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
+	// Get purchase code config
 	purchaseConfig, err := GetPurchaseCodeConfig()
 	if err != nil {
 		return nil, errors.New("failed to get purchase code config: " + err.Error())
@@ -38,6 +39,11 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, p := range req.Purchases {
 		mappedPurchase := MapPurchaseFormRequestToPurchaseModel(p)
 
+		if p.SupplierCode == nil {
+			return nil, errors.New("supplier code is required")
+		}
+
+		// Generate purchase code
 		config, ok := purchaseConfigMap[p.PurchaseType]
 		if !ok {
 			return nil, errors.New("failed to get purchase config: config not found for purchase type " + p.PurchaseType)
@@ -81,9 +87,21 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mappedPurchase.PurchaseCode = purchaseCode
 		mappedPurchase.CompanyCode = req.CompanyCode
 		mappedPurchase.SiteCode = req.SiteCode
+		mappedPurchase.SupplierCode = *p.SupplierCode
 		mappedPurchase.ID = uuid.New()
-		mappedPurchase.CreateBy = "system"
-		mappedPurchase.CreateDtm = time.Now().UTC()
+
+		docRefType := ""
+		if p.DocRefType != nil {
+			docRefType = *p.DocRefType
+		}
+
+		docRef := ""
+		if p.DocRef != nil {
+			docRef = *p.DocRef
+		}
+
+		mappedPurchase.DocRefType = &docRefType
+		mappedPurchase.DocRef = &docRef
 
 		purchaseItems := []models.PurchaseItem{}
 		for _, item := range p.Items {
@@ -100,14 +118,17 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		purchase = append(purchase, mappedPurchase)
 	}
 
+	// Create purchase
 	if err := purchaseRepository.CreatePurchase(purchase); err != nil {
 		return nil, errors.New("failed to create purchase: " + err.Error())
 	}
 
+	// Create purchase approval
 	if err := CreatePurchaseApproval(ctx, purchase); err != nil {
 		return nil, errors.New("failed to create purchase approval: " + err.Error())
 	}
 
+	// Update purchase code config
 	updateSystemConfigReq := []models.SystemConfig{}
 	for _, config := range purchaseConfigMap {
 		updateSystemConfigReq = append(updateSystemConfigReq, config)

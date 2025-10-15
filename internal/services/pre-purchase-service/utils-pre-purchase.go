@@ -38,7 +38,7 @@ func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotIte
 			PriceUnit:            item.PriceUnit,
 			TotalDiscount:        item.TotalDiscount,
 			TotalAmount:          item.TotalAmount,
-			UnitUOM:              item.UnitUOM,
+			UnitUom:              item.UnitUom,
 			TotalCost:            item.TotalCost,
 			TotalDiscountPercent: item.TotalDiscountPercent,
 			DiscountType:         item.DiscountType,
@@ -107,7 +107,7 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 			PriceUnit:            item.PriceUnit,
 			TotalDiscount:        item.TotalDiscount,
 			TotalAmount:          item.TotalAmount,
-			UnitUOM:              item.UnitUOM,
+			UnitUom:              item.UnitUom,
 			TotalCost:            item.TotalCost,
 			TotalDiscountPercent: item.TotalDiscountPercent,
 			DiscountType:         item.DiscountType,
@@ -177,7 +177,7 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 			PriceUnit:            reqItem.PriceUnit,
 			TotalDiscount:        reqItem.TotalDiscount,
 			TotalAmount:          reqItem.TotalAmount,
-			UnitUOM:              reqItem.UnitUOM,
+			UnitUom:              reqItem.UnitUom,
 			TotalCost:            reqItem.TotalCost,
 			TotalDiscountPercent: reqItem.TotalDiscountPercent,
 			DiscountType:         reqItem.DiscountType,
@@ -187,6 +187,8 @@ func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRe
 			TotalWeight:          reqItem.TotalWeight,
 			Status:               reqItem.Status,
 			Remark:               reqItem.Remark,
+			CreateBy:             reqItem.CreateBy,
+			CreateDtm:            reqItem.CreateDtm,
 			UpdateBy:             user,
 			UpdateDtm:            now,
 		}
@@ -281,30 +283,22 @@ func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error
 	return approvalResp.ApprovalRes, nil
 }
 
-func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
-	prePurchaseCodes := []string{}
-	mapUpdateList := make(map[string]models.Approval)
-
-	for _, req := range updateReqs {
-		prePurchaseCodes = append(prePurchaseCodes, req.PrePurchaseCode)
-		mapUpdateList[req.PrePurchaseCode] = models.Approval{
-			DocumentCode: req.PrePurchaseCode,
-			Status:       req.StatusApprove,
-		}
-	}
-
-	approvalList, err := GetPOApproval(ctx, prePurchaseCodes)
+func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map[string]models.Approval) error {
+	approvalList, err := GetPOApproval(ctx, docCodes)
 	if err != nil {
-		return errors.New("failed get approvals")
+		return errors.New("failed get approvals: " + err.Error())
 	}
 
 	updateApprovalReq := []models.Approval{}
-
 	for _, approval := range approvalList {
-		updateApprovalReq = append(updateApprovalReq, models.Approval{
-			ID:     approval.ID,
-			Status: mapUpdateList[approval.DocumentCode].Status,
-		})
+		if mapped, ok := mappedApprovalReq[approval.DocumentCode]; ok {
+			updateApprovalReq = append(updateApprovalReq, models.Approval{
+				ID:     approval.ID,
+				Status: mapped.Status,
+			})
+		} else {
+			return fmt.Errorf("approval request for document code %s not found", approval.DocumentCode)
+		}
 	}
 
 	approvalReqJson, err := json.Marshal(updateApprovalReq)
@@ -318,6 +312,25 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 	}
 
 	fmt.Println("updated approval: ", resp)
+
+	return nil
+}
+
+func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
+	prePurchaseCodes := []string{}
+	mapUpdateList := make(map[string]models.Approval)
+
+	for _, req := range updateReqs {
+		prePurchaseCodes = append(prePurchaseCodes, req.PrePurchaseCode)
+		mapUpdateList[req.PrePurchaseCode] = models.Approval{
+			DocumentCode: req.PrePurchaseCode,
+			Status:       req.StatusApprove,
+		}
+	}
+
+	if err := UpdatePOApproval(ctx, prePurchaseCodes, mapUpdateList); err != nil {
+		return errors.New("failed update approvals")
+	}
 
 	return nil
 }

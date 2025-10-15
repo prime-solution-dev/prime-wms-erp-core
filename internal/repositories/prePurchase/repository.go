@@ -116,7 +116,6 @@ func UpdatePOBigLot(prePurchases []models.PrePurchase) (err error) {
 	return
 }
 
-// Update
 func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigLotRequest) (err error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {

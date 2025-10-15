@@ -21,6 +21,17 @@ import (
 
 func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest) models.PurchaseItem {
 	now := time.Now().UTC()
+
+	createBy := "system"
+	if req.CreateBy != nil {
+		createBy = *req.CreateBy
+	}
+
+	createDtm := now
+	if req.CreateDtm != nil {
+		createDtm = *req.CreateDtm
+	}
+
 	return models.PurchaseItem{
 		PurchaseItem:         req.PurchaseItem,
 		ProductCode:          req.ProductCode,
@@ -32,7 +43,7 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		PriceUnit:            req.PriceUnit,
 		TotalDiscount:        req.TotalDiscount,
 		TotalAmount:          req.TotalAmount,
-		UnitUOM:              req.UnitUOM,
+		UnitUom:              req.UnitUom,
 		TotalCost:            req.TotalCost,
 		TotalDiscountPercent: req.TotalDiscountPercent,
 		DiscountType:         req.DiscountType,
@@ -42,6 +53,8 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		TotalWeight:          req.TotalWeight,
 		Status:               req.Status,
 		Remark:               req.Remark,
+		CreateBy:             createBy,
+		CreateDtm:            createDtm,
 		UpdateDtm:            now,
 		UpdateBy:             "system",
 	}
@@ -55,21 +68,8 @@ func MapPurchaseFormRequestToPurchaseModel(req models.PurchaseFormRequest) model
 		deliveryDate = &utcDate
 	}
 
-	docRefType := ""
-	if req.DocRefType != nil {
-		docRefType = *req.DocRefType
-	}
-
-	docRef := ""
-	if req.DocRef != nil {
-		docRef = *req.DocRef
-	}
-
 	return models.Purchase{
 		PurchaseType:    req.PurchaseType,
-		DocRefType:      &docRefType,
-		DocRef:          &docRef,
-		SupplierCode:    req.SupplierCode,
 		DeliveryDate:    deliveryDate,
 		DeliveryAddress: req.DeliveryAddress,
 		Status:          req.Status,
@@ -100,7 +100,7 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 		PriceUnit:            item.PriceUnit,
 		TotalDiscount:        item.TotalDiscount,
 		TotalAmount:          item.TotalAmount,
-		UnitUOM:              item.UnitUOM,
+		UnitUom:              item.UnitUom,
 		TotalCost:            item.TotalCost,
 		TotalDiscountPercent: item.TotalDiscountPercent,
 		DiscountType:         item.DiscountType,
@@ -235,6 +235,25 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 	}
 
 	fmt.Println("approvalIDs:", approvalIDs)
+	return nil
+}
+
+func UpdatePOToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePurchaseRequest) error {
+	purchaseCodes := []string{}
+	mapUpdateList := make(map[string]models.Approval)
+
+	for _, req := range updateReqs {
+		purchaseCodes = append(purchaseCodes, req.PurchaseCode)
+		mapUpdateList[req.PurchaseCode] = models.Approval{
+			DocumentCode: req.PurchaseCode,
+			Status:       req.StatusApprove,
+		}
+	}
+
+	if err := prePurchaseService.UpdatePOApproval(ctx, purchaseCodes, mapUpdateList); err != nil {
+		return errors.New("failed update approvals: " + err.Error())
+	}
+
 	return nil
 }
 

@@ -51,7 +51,7 @@ type PrePurchaseItem struct {
 	PriceUnit            float64   `json:"price_unit"`         // ราคาต่อชิ้น => cost
 	TotalDiscount        float64   `json:"total_discount"`
 	TotalAmount          float64   `json:"total_amount"` // ราคารวม => total_cost - total_discount + total_vat
-	UnitUOM              string    `json:"unit_uom"`     // UOM มีสองแบบคือ KG, PC  unit_uom field uom_code
+	UnitUom              string    `json:"unit_uom"`     // UOM มีสองแบบคือ KG, PC  unit_uom field uom_code
 	TotalCost            float64   `json:"total_cost"`   // QTY * price_unit
 	TotalDiscountPercent float64   `json:"total_discount_percent"`
 	DiscountType         string    `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -116,7 +116,7 @@ type PurchaseItem struct {
 	PriceUnit            float64   `json:"price_unit"`         // ราคาต่อชิ้น => cost
 	TotalDiscount        float64   `json:"total_discount"`
 	TotalAmount          float64   `json:"total_amount"` // ราคารวม => total_cost - total_discount + total_vat
-	UnitUOM              string    `json:"unit_uom"`     // UOM มีสองแบบคือ KG, PC  unit_uom field uom_code
+	UnitUom              string    `json:"unit_uom"`     // UOM มีสองแบบคือ KG, PC  unit_uom field uom_code
 	TotalCost            float64   `json:"total_cost"`   // QTY * price_unit
 	TotalDiscountPercent float64   `json:"total_discount_percent"`
 	DiscountType         string    `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -150,7 +150,7 @@ type CreatePOBigLotItemRequest struct {
 	PriceUnit            float64 `json:"price_unit"`
 	TotalDiscount        float64 `json:"total_discount"`
 	TotalAmount          float64 `json:"total_amount"`
-	UnitUOM              string  `json:"unit_uom"`
+	UnitUom              string  `json:"unit_uom"`
 	TotalCost            float64 `json:"total_cost"`
 	TotalDiscountPercent float64 `json:"total_discount_percent"`
 	DiscountType         string  `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -202,7 +202,7 @@ type GetPOBigLotItemResponse struct {
 	PriceUnit            float64 `json:"price_unit"`
 	TotalDiscount        float64 `json:"total_discount"`
 	TotalAmount          float64 `json:"total_amount"`
-	UnitUOM              string  `json:"unit_uom"`
+	UnitUom              string  `json:"unit_uom"`
 	TotalCost            float64 `json:"total_cost"`
 	TotalDiscountPercent float64 `json:"total_discount_percent"`
 	DiscountType         string  `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -264,7 +264,7 @@ type UpdatePOBigLotItemRequest struct {
 	PriceUnit            float64    `json:"price_unit"`
 	TotalDiscount        float64    `json:"total_discount"`
 	TotalAmount          float64    `json:"total_amount"`
-	UnitUOM              string     `json:"unit_uom"`
+	UnitUom              string     `json:"unit_uom"`
 	TotalCost            float64    `json:"total_cost"`
 	TotalDiscountPercent float64    `json:"total_discount_percent"`
 	DiscountType         string     `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -274,6 +274,8 @@ type UpdatePOBigLotItemRequest struct {
 	TotalWeight          float64    `json:"total_weight"`
 	Status               string     `json:"status"`
 	Remark               string     `json:"remark"`
+	CreateBy             string     `json:"create_by"`
+	CreateDtm            time.Time  `json:"create_dtm"`
 }
 
 type UpdatePOBigLotRequest struct {
@@ -336,7 +338,7 @@ type PurchaseItemFormRequest struct {
 	PriceUnit            float64    `json:"price_unit"`
 	TotalDiscount        float64    `json:"total_discount"`
 	TotalAmount          float64    `json:"total_amount"`
-	UnitUOM              string     `json:"unit_uom"`
+	UnitUom              string     `json:"unit_uom"`
 	TotalCost            float64    `json:"total_cost"`
 	TotalDiscountPercent float64    `json:"total_discount_percent"`
 	DiscountType         string     `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
@@ -346,6 +348,8 @@ type PurchaseItemFormRequest struct {
 	TotalWeight          float64    `json:"total_weight"`
 	Status               string     `json:"status"`
 	Remark               string     `json:"remark"`
+	CreateBy             *string    `json:"create_by"`
+	CreateDtm            *time.Time `json:"create_dtm"`
 }
 
 type PurchaseFormRequest struct {
@@ -354,7 +358,7 @@ type PurchaseFormRequest struct {
 	PurchaseType    string                    `json:"purchase_type"`
 	DocRefType      *string                   `json:"doc_ref_type"`
 	DocRef          *string                   `json:"doc_ref"`
-	SupplierCode    string                    `json:"supplier_code"`
+	SupplierCode    *string                   `json:"supplier_code"`
 	DeliveryDate    *time.Time                `json:"delivery_date"`
 	DeliveryAddress string                    `json:"delivery_address"`
 	Status          string                    `json:"status"`
@@ -399,7 +403,7 @@ type PurchaseItemResponse struct {
 	PriceUnit            float64 `json:"price_unit"`
 	TotalDiscount        float64 `json:"total_discount"`
 	TotalAmount          float64 `json:"total_amount"`
-	UnitUOM              string  `json:"unit_uom"`
+	UnitUom              string  `json:"unit_uom"`
 	TotalCost            float64 `json:"total_cost"`
 	TotalDiscountPercent float64 `json:"total_discount_percent"`
 	DiscountType         string  `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
