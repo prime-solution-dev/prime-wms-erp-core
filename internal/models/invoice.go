@@ -59,7 +59,8 @@ type InvoiceItem struct {
 	UnitUom               string    `json:"unit_uom"`
 	WeightUnit            float64   `json:"weight_unit"`
 	Avg_weightUnit        float64   `json:"avg_weight_unit"`
-	TotalWeight           float64   `json:"total_weight"`
+	InvoiceWeight         float64   `json:"invoice_weight"`
+	Weight                float64   `json:"weight"`
 	TotalDiscount         float64   `json:"total_discount"`
 	TotalDiscount_percent float64   `json:"total_discount_percent"`
 	DocumentRefType       string    `json:"document_ref_type"`

@@ -79,8 +79,8 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				if invoiceItem.Qty > poQTY {
 					return nil, errors.New("Invoice Qty over PO Qty : " + invoiceItem.InvoiceCode + " Item : " + invoiceItem.InvoiceItem)
 				}
-				if invoiceItem.TotalWeight > 0 {
-					if invoiceItem.TotalWeight > poQTYMapResult.Weight {
+				if invoiceItem.Weight > 0 {
+					if invoiceItem.Weight > poQTYMapResult.Weight {
 						return nil, errors.New("Invoice Weight over PO Weight : " + invoiceItem.InvoiceCode + " Item : " + invoiceItem.InvoiceItem)
 					}
 				}
