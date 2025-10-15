@@ -41,7 +41,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	poMap := map[string]POData{}
 	for _, poValue := range po.(models.GetPurchaseResponse).DataList {
 		for _, poItemsValue := range poValue.Items {
-			keyConvert := fmt.Sprintf("%s|%s", poValue.PurchaseCode, poItemsValue.PurchaseID)
+			keyConvert := fmt.Sprintf("%s|%d", poValue.PurchaseCode, poItemsValue.PurchaseItem)
 			poMap[keyConvert] = POData{
 				QTY:    poItemsValue.Qty,
 				Weight: poItemsValue.TotalWeight,

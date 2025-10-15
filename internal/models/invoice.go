@@ -20,6 +20,7 @@ type Invoice struct {
 	TaxInvoice      string           `json:"tax_invoice"`
 	PartyType       string           `json:"party_type"`
 	PartyCode       string           `json:"party_code"`
+	PartyName       string           `gorm:"-" json:"party_name"`
 	DueDate         *time.Time       `json:"due_date"`
 	TotalAmount     float64          `json:"total_amount"`
 	TotalVat        float64          `json:"total_vat"`
@@ -43,6 +44,8 @@ type InvoiceItem struct {
 	PurchaseItem          string    `gorm:"-" json:"purchase_item"`
 	DocRefItem            string    `json:"doc_ref_item"`
 	ProductCode           string    `json:"product_code"`
+	ProductName           string    `gorm:"-" json:"product_name"`
+	ProductGroup          string    `gorm:"-" json:"product_group"`
 	Qty                   float64   `json:"qty"`
 	UnitCode              string    `json:"unit_code"`
 	PriceUnit             float64   `json:"price_unit"`
