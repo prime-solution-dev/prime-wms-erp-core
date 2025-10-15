@@ -65,6 +65,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 		}
 	}
-
+	_, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
+	}
 	return nil, nil
 }
