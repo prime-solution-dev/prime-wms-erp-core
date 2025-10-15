@@ -37,7 +37,6 @@ type GetDeliveryResponse struct {
 	ShipToAddress    string                    `gorm:"type:varchar(255)" json:"ship_to_address"`
 	DeliveryDate     *time.Time                `gorm:"type:date" json:"delivery_date"`
 	DeliveryTimeCode string                    `gorm:"type:varchar(50)" json:"delivery_time_code"`
-	BookingDate      *time.Time                `gorm:"type:date" json:"booking_date"`
 	LicensePlate     string                    `gorm:"type:varchar(50)" json:"license_plate"`
 	ContactName      string                    `gorm:"type:varchar(100)" json:"contact_name"`
 	Tel              string                    `gorm:"type:varchar(20)" json:"tel"`
