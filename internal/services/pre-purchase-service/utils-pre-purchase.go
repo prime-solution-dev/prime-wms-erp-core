@@ -19,42 +19,37 @@ import (
 	"github.com/google/uuid"
 )
 
-func MapBigLotRequestToPrePurchaseItemsModel(reqItems []models.CreatePOBigLotItemRequest, prePurchaseID uuid.UUID, user string, now time.Time) []models.PrePurchaseItem {
-	items := make([]models.PrePurchaseItem, 0, len(reqItems))
-
-	for _, item := range reqItems {
-		items = append(items, models.PrePurchaseItem{
-			ID:                   uuid.New(),
-			PrePurchaseID:        prePurchaseID,
-			PreItem:              item.PreItem,
-			HierarchyType:        item.ProductGroupType,
-			HierarchyCode:        item.ProductGroupCode,
-			DocRefItem:           item.DocRefItem,
-			Qty:                  item.Qty,
-			Unit:                 item.Unit,
-			PurchaseQty:          item.PurchaseQty,
-			PurchaseUnit:         item.PurchaseUnit,
-			PurchaseUnitType:     item.PurchaseUnitType,
-			PriceUnit:            item.PriceUnit,
-			TotalDiscount:        item.TotalDiscount,
-			TotalAmount:          item.TotalAmount,
-			UnitUom:              item.UnitUom,
-			TotalCost:            item.TotalCost,
-			TotalDiscountPercent: item.TotalDiscountPercent,
-			DiscountType:         item.DiscountType,
-			TotalVat:             item.TotalVat,
-			SubtotalExclVat:      item.SubtotalExclVat,
-			WeightUnit:           item.WeightUnit,
-			TotalWeight:          item.TotalWeight,
-			Status:               item.Status,
-			Remark:               item.Remark,
-			CreateBy:             user,
-			CreateDtm:            now,
-			UpdateBy:             user,
-			UpdateDtm:            now,
-		})
+func MapBigLotRequestToPrePurchaseItemsModel(reqItems models.CreatePOBigLotItemRequest, prePurchaseID uuid.UUID, user string, now time.Time, preItem string) models.PrePurchaseItem {
+	return models.PrePurchaseItem{
+		ID:                   uuid.New(),
+		PrePurchaseID:        prePurchaseID,
+		PreItem:              preItem,
+		HierarchyType:        reqItems.ProductGroupType,
+		HierarchyCode:        reqItems.ProductGroupCode,
+		DocRefItem:           reqItems.DocRefItem,
+		Qty:                  reqItems.Qty,
+		Unit:                 reqItems.Unit,
+		PurchaseQty:          reqItems.PurchaseQty,
+		PurchaseUnit:         reqItems.PurchaseUnit,
+		PurchaseUnitType:     reqItems.PurchaseUnitType,
+		PriceUnit:            reqItems.PriceUnit,
+		TotalDiscount:        reqItems.TotalDiscount,
+		TotalAmount:          reqItems.TotalAmount,
+		UnitUom:              reqItems.UnitUom,
+		TotalCost:            reqItems.TotalCost,
+		TotalDiscountPercent: reqItems.TotalDiscountPercent,
+		DiscountType:         reqItems.DiscountType,
+		TotalVat:             reqItems.TotalVat,
+		SubtotalExclVat:      reqItems.SubtotalExclVat,
+		WeightUnit:           reqItems.WeightUnit,
+		TotalWeight:          reqItems.TotalWeight,
+		Status:               reqItems.Status,
+		Remark:               reqItems.Remark,
+		CreateBy:             user,
+		CreateDtm:            now,
+		UpdateBy:             user,
+		UpdateDtm:            now,
 	}
-	return items
 }
 
 func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models.PrePurchase {
@@ -83,8 +78,6 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 		UpdateBy:        user,
 		UpdateDtm:       now,
 	}
-
-	prePurchase.PrePurchaseItems = MapBigLotRequestToPrePurchaseItemsModel(req.Items, prePurchase.ID, user, now)
 
 	return prePurchase
 }
@@ -153,50 +146,44 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 	}
 }
 
-func MapUpdatePOBigLotRequestToPrePurchaseItem(req []models.UpdatePOBigLotItemRequest) []models.PrePurchaseItem {
-	results := []models.PrePurchaseItem{}
-	user := "system"
-	now := time.Now().UTC()
-
-	for _, reqItem := range req {
-		if reqItem.ID == nil || *reqItem.ID == uuid.Nil {
-			newID := uuid.New()
-			reqItem.ID = &newID
-		}
-
-		item := models.PrePurchaseItem{
-			ID:                   *reqItem.ID,
-			PrePurchaseID:        reqItem.PrePurchaseID,
-			HierarchyType:        reqItem.ProductGroupType,
-			HierarchyCode:        reqItem.ProductGroupCode,
-			Qty:                  reqItem.Qty,
-			Unit:                 reqItem.Unit,
-			PurchaseQty:          reqItem.PurchaseQty,
-			PurchaseUnit:         reqItem.PurchaseUnit,
-			PurchaseUnitType:     reqItem.PurchaseUnitType,
-			PriceUnit:            reqItem.PriceUnit,
-			TotalDiscount:        reqItem.TotalDiscount,
-			TotalAmount:          reqItem.TotalAmount,
-			UnitUom:              reqItem.UnitUom,
-			TotalCost:            reqItem.TotalCost,
-			TotalDiscountPercent: reqItem.TotalDiscountPercent,
-			DiscountType:         reqItem.DiscountType,
-			TotalVat:             reqItem.TotalVat,
-			SubtotalExclVat:      reqItem.SubtotalExclVat,
-			WeightUnit:           reqItem.WeightUnit,
-			TotalWeight:          reqItem.TotalWeight,
-			Status:               reqItem.Status,
-			Remark:               reqItem.Remark,
-			CreateBy:             reqItem.CreateBy,
-			CreateDtm:            reqItem.CreateDtm,
-			UpdateBy:             user,
-			UpdateDtm:            now,
-		}
-
-		results = append(results, item)
+func MapUpdatePOBigLotRequestToPrePurchaseItem(reqItem models.UpdatePOBigLotItemRequest, user string, now time.Time, prePurchaseCode string) models.PrePurchaseItem {
+	preItem := ""
+	if reqItem.PreItem == nil {
+		preItem = fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
+	} else {
+		preItem = *reqItem.PreItem
 	}
 
-	return results
+	return models.PrePurchaseItem{
+		ID:                   *reqItem.ID,
+		PreItem:              preItem,
+		PrePurchaseID:        reqItem.PrePurchaseID,
+		HierarchyType:        reqItem.ProductGroupType,
+		HierarchyCode:        reqItem.ProductGroupCode,
+		Qty:                  reqItem.Qty,
+		Unit:                 reqItem.Unit,
+		PurchaseQty:          reqItem.PurchaseQty,
+		PurchaseUnit:         reqItem.PurchaseUnit,
+		PurchaseUnitType:     reqItem.PurchaseUnitType,
+		PriceUnit:            reqItem.PriceUnit,
+		TotalDiscount:        reqItem.TotalDiscount,
+		TotalAmount:          reqItem.TotalAmount,
+		UnitUom:              reqItem.UnitUom,
+		TotalCost:            reqItem.TotalCost,
+		TotalDiscountPercent: reqItem.TotalDiscountPercent,
+		DiscountType:         reqItem.DiscountType,
+		TotalVat:             reqItem.TotalVat,
+		SubtotalExclVat:      reqItem.SubtotalExclVat,
+		WeightUnit:           reqItem.WeightUnit,
+		TotalWeight:          reqItem.TotalWeight,
+		Status:               reqItem.Status,
+		Remark:               reqItem.Remark,
+		CreateBy:             reqItem.CreateBy,
+		CreateDtm:            reqItem.CreateDtm,
+		UpdateBy:             user,
+		UpdateDtm:            now,
+	}
+
 }
 
 func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) models.PrePurchase {

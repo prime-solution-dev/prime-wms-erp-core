@@ -22,7 +22,6 @@ type CreateDeliveryRequest struct {
 	ShipToAddress    string                       `json:"ship_to_address"`
 	DeliveryDate     *time.Time                   `json:"delivery_date"`
 	DeliveryTimeCode string                       `json:"delivery_time_code"`
-	BookingDate      *time.Time                   `json:"booking_date"`
 	LicensePlate     string                       `json:"license_plate"`
 	ContactName      string                       `json:"contact_name"`
 	Tel              string                       `json:"tel"`
@@ -32,11 +31,12 @@ type CreateDeliveryRequest struct {
 }
 
 type CreateDeliveryItemsRequest struct {
-	ProductCode string  `json:"product_code"`
-	Qty         float64 `json:"qty"`
-	UnitCode    string  `json:"unit_code"`
-	Weight      float64 `json:"weight"`
-	WeightUnit  float64 `json:"weight_unit"`
+	ProductCode     string  `json:"product_code"`
+	Qty             float64 `json:"qty"`
+	UnitCode        string  `json:"unit_code"`
+	Weight          float64 `json:"weight"`
+	WeightUnit      float64 `json:"weight_unit"`
+	DocumentRefItem string  `json:"document_ref_item"`
 }
 
 func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -85,13 +85,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			deliveryDateOnly = &dateOnly
 		}
 
-		// แปลง BookingDate เป็น date-only format
-		var bookingDateOnly *time.Time
-		if deliveryReq.BookingDate != nil {
-			dateOnly := time.Date(deliveryReq.BookingDate.Year(), deliveryReq.BookingDate.Month(), deliveryReq.BookingDate.Day(), 0, 0, 0, 0, deliveryReq.BookingDate.Location())
-			bookingDateOnly = &dateOnly
-		}
-
 		newDelivery := models.Delivery{
 			ID:               deliveryId,
 			DeliveryCode:     "DELIVERY-" + time.Now().Format("20060102150405") + fmt.Sprintf("%d", num),
@@ -103,7 +96,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ShipToAddress:    deliveryReq.ShipToAddress,
 			DeliveryDate:     deliveryDateOnly, // ใช้ date-only
 			DeliveryTimeCode: deliveryReq.DeliveryTimeCode,
-			BookingDate:      bookingDateOnly, // ใช้ date-only
 			LicensePlate:     deliveryReq.LicensePlate,
 			ContactName:      deliveryReq.ContactName,
 			Tel:              deliveryReq.Tel,
@@ -122,19 +114,20 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			deliveryItemId := uuid.New()
 
 			newDeliveryItem := models.DeliveryItem{
-				ID:           deliveryItemId,
-				DeliveryItem: fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
-				DeliveryID:   deliveryId,
-				ProductCode:  deliveryItem.ProductCode,
-				Qty:          deliveryItem.Qty,
-				UnitCode:     deliveryItem.UnitCode,
-				Weight:       deliveryItem.Weight,
-				WeightUnit:   deliveryItem.WeightUnit,
-				Status:       "PENDING",
-				CreateDate:   nowDateOnly, // date-only format
-				CreateBy:     user,
-				UpdateDate:   nowDateOnly, // date-only format
-				UpdateBy:     user,
+				ID:              deliveryItemId,
+				DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
+				DeliveryID:      deliveryId,
+				ProductCode:     deliveryItem.ProductCode,
+				Qty:             deliveryItem.Qty,
+				UnitCode:        deliveryItem.UnitCode,
+				Weight:          deliveryItem.Weight,
+				WeightUnit:      deliveryItem.WeightUnit,
+				Status:          "PENDING",
+				DocumentRefItem: deliveryItem.DocumentRefItem,
+				CreateDate:      nowDateOnly, // date-only format
+				CreateBy:        user,
+				UpdateDate:      nowDateOnly, // date-only format
+				UpdateBy:        user,
 			}
 
 			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem)
@@ -153,5 +146,14 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	return gin.H{"status": "success", "message": "Create delivery successfully"}, nil
+	// Return the delivery codes of the created deliveries
+	deliveryCodes := make([]string, len(deliveryToAdd))
+	for i, d := range deliveryToAdd {
+		deliveryCodes[i] = d.DeliveryCode
+	}
+	return gin.H{
+		"status":        "success",
+		"message":       "Create delivery successfully",
+		"delivery_code": deliveryCodes,
+	}, nil
 }

@@ -39,7 +39,7 @@ func (PrePurchase) TableName() string {
 type PrePurchaseItem struct {
 	ID                   uuid.UUID `gorm:"primary_key;not null" json:"id"`
 	PrePurchaseID        uuid.UUID `json:"pre_purchase_id"`
-	PreItem              int       `json:"pre_item"`
+	PreItem              string    `json:"pre_item"`
 	HierarchyType        string    `json:"hierarchy_type"` // Product Group ex. Group1
 	HierarchyCode        string    `json:"hierarchy_code"` // Product Group Code ex. group 1 code
 	DocRefItem           string    `json:"doc_ref_item"`
@@ -105,7 +105,7 @@ func (Purchase) TableName() string {
 type PurchaseItem struct {
 	ID                   uuid.UUID `gorm:"primary_key;not null" json:"id"`
 	PurchaseID           uuid.UUID `json:"purchase_id"`
-	PurchaseItem         int       `json:"purchase_item"`
+	PurchaseItem         string    `json:"purchase_item"`
 	ProductCode          string    `json:"product_code"`
 	DocRefItem           string    `json:"doc_ref_item"`
 	Qty                  float64   `json:"qty"`
@@ -138,7 +138,6 @@ func (PurchaseItem) TableName() string {
 
 // Pre Purchase DTOs
 type CreatePOBigLotItemRequest struct {
-	PreItem              int     `json:"pre_item"`
 	ProductGroupType     string  `json:"product_group_type"`
 	ProductGroupCode     string  `json:"product_group_code"`
 	DocRefItem           string  `json:"doc_ref_item"`
@@ -189,7 +188,7 @@ type GetPOBigLotListRequest struct {
 
 type GetPOBigLotItemResponse struct {
 	ID                   string  `json:"id"`
-	PreItem              int     `json:"pre_item"`
+	PreItem              string  `json:"pre_item"`
 	PrePurchaseID        string  `json:"pre_purchase_id"`
 	ProductGroupType     string  `json:"product_group_type"`
 	ProductGroupCode     string  `json:"product_group_code"`
@@ -253,6 +252,7 @@ type GetPOBigLotListResponse struct {
 
 type UpdatePOBigLotItemRequest struct {
 	ID                   *uuid.UUID `json:"id"`
+	PreItem              *string    `json:"pre_item"`
 	PrePurchaseID        uuid.UUID  `json:"pre_purchase_id"`
 	ProductGroupType     string     `json:"product_group_type"`
 	ProductGroupCode     string     `json:"product_group_code"`
@@ -327,7 +327,7 @@ type Supplier struct {
 type PurchaseItemFormRequest struct {
 	ID                   *uuid.UUID `json:"id"`
 	PurchaseID           *uuid.UUID `json:"purchase_id"`
-	PurchaseItem         int        `json:"purchase_item"`
+	PurchaseItem         *string    `json:"purchase_item"`
 	ProductCode          string     `json:"product_code"`
 	DocRefItem           *string    `json:"doc_ref_item"`
 	Qty                  float64    `json:"qty"`
@@ -390,7 +390,7 @@ type GetPurchaseRequest struct {
 type PurchaseItemResponse struct {
 	ID                   string  `json:"id"`
 	PurchaseID           string  `json:"purchase_id"`
-	PurchaseItem         int     `json:"purchase_item"`
+	PurchaseItem         string  `json:"purchase_item"`
 	ProductCode          string  `json:"product_code"`
 	ProductName          string  `json:"product_name"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`

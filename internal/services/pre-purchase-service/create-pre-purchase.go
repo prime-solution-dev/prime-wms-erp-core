@@ -45,6 +45,13 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			saveValue,
 		)
 		prePurchase.PrePurchaseCode = prePurchaseCode
+
+		for _, itemReq := range r.Items {
+			preItem := fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
+			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, prePurchase.ID, prePurchase.CreateBy, time.Now().UTC(), preItem)
+			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
+		}
+
 		prePurchases = append(prePurchases, prePurchase)
 
 		if idx == len(req)-1 {

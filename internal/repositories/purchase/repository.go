@@ -26,7 +26,7 @@ func CreatePurchase(purchases []models.Purchase) error {
 }
 
 // Get
-func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page, pageSize int) ([]models.Purchase, int, int, int, int, error) {
+func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page int, pageSize int) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -49,17 +49,24 @@ func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page,
 		return nil, 0, 0, 0, 0, err
 	}
 
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
+	}
+
 	// Apply pagination
 	offset := (page - 1) * pageSize
 	if err := query.Preload("PurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
-		Find(&purchases).
-		Error; err != nil {
+		Find(&purchases).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+
+	if page == 0 {
+		page = 1
+	}
 
 	return purchases, int(totalRecords), page, pageSize, totalPages, nil
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"prime-erp-core/internal/models"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +21,12 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	for _, r := range req {
 		prePurchase := MapUpdatePOBigLotRequestToPrePurchase(r)
-		prePurchase.PrePurchaseItems = MapUpdatePOBigLotRequestToPrePurchaseItem(r.PrePurchaseItems)
+
+		for _, itemReq := range r.PrePurchaseItems {
+			item := MapUpdatePOBigLotRequestToPrePurchaseItem(itemReq, prePurchase.UpdateBy, time.Now().UTC(), prePurchase.PrePurchaseCode)
+			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
+		}
+
 		prePurchases = append(prePurchases, prePurchase)
 	}
 
