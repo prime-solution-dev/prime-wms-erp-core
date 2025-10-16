@@ -43,7 +43,7 @@ type InvoiceItem struct {
 	InvoiceID             uuid.UUID `json:"invoice_id"`
 	InvoiceItem           string    `json:"invoice_item"`
 	InvoiceCode           string    `gorm:"-" json:"invoice_code"`
-	PurchaseItem          int       `gorm:"-" json:"purchase_item"`
+	PurchaseItem          string    `gorm:"-" json:"purchase_item"`
 	DocRefItem            string    `json:"doc_ref_item"`
 	ProductCode           string    `json:"product_code"`
 	ProductName           string    `gorm:"-" json:"product_name"`

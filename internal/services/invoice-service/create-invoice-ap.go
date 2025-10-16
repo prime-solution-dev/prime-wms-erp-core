@@ -53,7 +53,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	poMap := map[string]POData{}
 	for _, poValue := range po.(models.GetPurchaseResponse).DataList {
 		for _, poItemsValue := range poValue.Items {
-			keyConvert := fmt.Sprintf("%s|%d", poValue.PurchaseCode, poItemsValue.PurchaseItem)
+			keyConvert := fmt.Sprintf("%s|%s", poValue.PurchaseCode, poItemsValue.PurchaseItem)
 			poMap[keyConvert] = POData{
 				QTY:    poItemsValue.Qty,
 				Weight: poItemsValue.TotalWeight,
@@ -102,13 +102,21 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						}
 					}
 				}
+			} else {
+				errData[strconv.Itoa(i)] = map[string]interface{}{
+					"index":   i,
+					"status":  "error",
+					"message": "ไม่มี PO นี้ในระบบ",
+				}
 			}
 		}
 	}
 	if len(errData) == 0 {
-		_, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
+		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
+		} else {
+			return createInvoiceReturn, nil
 		}
 	}
 
