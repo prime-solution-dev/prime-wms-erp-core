@@ -31,11 +31,12 @@ type CreateDeliveryRequest struct {
 }
 
 type CreateDeliveryItemsRequest struct {
-	ProductCode string  `json:"product_code"`
-	Qty         float64 `json:"qty"`
-	UnitCode    string  `json:"unit_code"`
-	Weight      float64 `json:"weight"`
-	WeightUnit  float64 `json:"weight_unit"`
+	ProductCode     string  `json:"product_code"`
+	Qty             float64 `json:"qty"`
+	UnitCode        string  `json:"unit_code"`
+	Weight          float64 `json:"weight"`
+	WeightUnit      float64 `json:"weight_unit"`
+	DocumentRefItem string  `json:"document_ref_item"`
 }
 
 func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -113,19 +114,20 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			deliveryItemId := uuid.New()
 
 			newDeliveryItem := models.DeliveryItem{
-				ID:           deliveryItemId,
-				DeliveryItem: fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
-				DeliveryID:   deliveryId,
-				ProductCode:  deliveryItem.ProductCode,
-				Qty:          deliveryItem.Qty,
-				UnitCode:     deliveryItem.UnitCode,
-				Weight:       deliveryItem.Weight,
-				WeightUnit:   deliveryItem.WeightUnit,
-				Status:       "PENDING",
-				CreateDate:   nowDateOnly, // date-only format
-				CreateBy:     user,
-				UpdateDate:   nowDateOnly, // date-only format
-				UpdateBy:     user,
+				ID:              deliveryItemId,
+				DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
+				DeliveryID:      deliveryId,
+				ProductCode:     deliveryItem.ProductCode,
+				Qty:             deliveryItem.Qty,
+				UnitCode:        deliveryItem.UnitCode,
+				Weight:          deliveryItem.Weight,
+				WeightUnit:      deliveryItem.WeightUnit,
+				Status:          "PENDING",
+				DocumentRefItem: deliveryItem.DocumentRefItem,
+				CreateDate:      nowDateOnly, // date-only format
+				CreateBy:        user,
+				UpdateDate:      nowDateOnly, // date-only format
+				UpdateBy:        user,
 			}
 
 			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem)
