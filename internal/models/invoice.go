@@ -32,6 +32,8 @@ type Invoice struct {
 	UpdateDTM       time.Time        `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 	InvoiceItem     []InvoiceItem    `json:"invoice_item"`
 	InvoiceDeposit  []InvoiceDeposit `json:"invoice_deposit"`
+	CompanyCode     string           `gorm:"-" json:"company_code"`
+	SiteCode        string           `gorm:"-" json:"site_code"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
@@ -41,7 +43,7 @@ type InvoiceItem struct {
 	InvoiceID             uuid.UUID `json:"invoice_id"`
 	InvoiceItem           string    `json:"invoice_item"`
 	InvoiceCode           string    `gorm:"-" json:"invoice_code"`
-	PurchaseItem          string    `gorm:"-" json:"purchase_item"`
+	PurchaseItem          int       `gorm:"-" json:"purchase_item"`
 	DocRefItem            string    `json:"doc_ref_item"`
 	ProductCode           string    `json:"product_code"`
 	ProductName           string    `gorm:"-" json:"product_name"`

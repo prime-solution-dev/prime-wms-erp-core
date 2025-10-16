@@ -26,11 +26,20 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 	poNumber := []string{}
+	companyCode := ""
+	siteCode := ""
 	for _, invoice := range req {
-		poNumber = append(poNumber, invoice.DocumentRef)
+		for _, invoiceItem := range invoice.InvoiceItem {
+			poNumber = append(poNumber, invoiceItem.DocumentRef)
+			companyCode = invoice.CompanyCode
+			siteCode = invoice.SiteCode
+		}
+
 	}
-	requestDataGetPO := map[string][]string{
+	requestDataGetPO := map[string]interface{}{
 		"purchase_codes": poNumber,
+		"company_code":   companyCode,
+		"site_code":      siteCode,
 	}
 
 	jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
@@ -96,9 +105,11 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 		}
 	}
-	_, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
+	if len(errData) == 0 {
+		_, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
+		if errCreateInvoice != nil {
+			return nil, errCreateInvoice
+		}
 	}
 
 	return errData, nil
