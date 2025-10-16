@@ -22,6 +22,7 @@ type ToleranceErrorItem struct {
 	Index   int    `json:"index"`
 	Message string `json:"message"`
 	Status  string `json:"status"`
+	Type    string `json:"type"`
 }
 
 type ToleranceErrorResponse struct {
@@ -101,6 +102,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						Index:   i,
 						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
 						Status:  "error",
+						Type:    "qty",
 					})
 
 				}
@@ -110,6 +112,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 							Index:   i,
 							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
 							Status:  "error",
+							Type:    "weight",
 						})
 					}
 				}
@@ -119,6 +122,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					Index:   i,
 					Message: "ไม่มี PO นี้ในระบบ",
 					Status:  "error",
+					Type:    "po",
 				})
 			}
 		}
