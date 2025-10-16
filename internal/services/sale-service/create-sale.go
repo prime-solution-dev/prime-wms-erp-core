@@ -110,6 +110,13 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for _, item := range saleReq.Items {
 			item.ID = uuid.New()
 			item.SaleID = tempSale.ID
+
+			saleItem := uuid.New().String()
+
+			if item.SaleItem == "" {
+				item.SaleItem = saleItem
+			}
+
 			item.CreateDate = &nowDateOnly
 			item.CreateBy = user
 			item.UpdateDate = &nowDateOnly
