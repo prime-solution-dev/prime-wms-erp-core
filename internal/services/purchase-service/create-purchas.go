@@ -102,14 +102,14 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		mappedPurchase.DocRefType = &docRefType
 		mappedPurchase.DocRef = &docRef
+		mappedPurchase.CreateBy = "system"
+		mappedPurchase.CreateDtm = time.Now().UTC()
 
 		purchaseItems := []models.PurchaseItem{}
 		for _, item := range p.Items {
-			mappedItem := MapPurchaseItemFormRequestToPurchaseItemModel(item)
+			mappedItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, mappedPurchase.PurchaseCode)
 			mappedItem.ID = uuid.New()
 			mappedItem.PurchaseID = mappedPurchase.ID
-			mappedItem.CreateBy = "system"
-			mappedItem.CreateDtm = time.Now().UTC()
 			purchaseItems = append(purchaseItems, mappedItem)
 		}
 
