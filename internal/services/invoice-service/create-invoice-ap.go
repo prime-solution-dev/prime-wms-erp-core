@@ -18,6 +18,16 @@ type POData struct {
 	Weight float64
 }
 
+type ToleranceErrorItem struct {
+	Index   int    `json:"index"`
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
+type ToleranceErrorResponse struct {
+	ToleranceError []ToleranceErrorItem `json:"tolerance_error"`
+}
+
 func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
@@ -78,7 +88,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		tolerance = floatVal
 	}
-	errData := map[string]interface{}{}
+	toleranceErrorResponse := ToleranceErrorResponse{}
 	for _, invoice := range req {
 		for i, invoiceItem := range invoice.InvoiceItem {
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
@@ -86,32 +96,34 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			if exist {
 				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
-					errData[strconv.Itoa(i)] = map[string]interface{}{
-						"index":   i,
-						"status":  "error",
-						"message": "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
-					}
+
+					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+						Index:   i,
+						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
+						Status:  "error",
+					})
 
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.Weight {
-						errData[strconv.Itoa(i)] = map[string]interface{}{
-							"index":   i,
-							"status":  "error",
-							"message": "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
-						}
+						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+							Index:   i,
+							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
+							Status:  "error",
+						})
 					}
 				}
 			} else {
-				errData[strconv.Itoa(i)] = map[string]interface{}{
-					"index":   i,
-					"status":  "error",
-					"message": "ไม่มี PO นี้ในระบบ",
-				}
+
+				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					Index:   i,
+					Message: "ไม่มี PO นี้ในระบบ",
+					Status:  "error",
+				})
 			}
 		}
 	}
-	if len(errData) == 0 {
+	if len(toleranceErrorResponse.ToleranceError) == 0 {
 		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
@@ -120,5 +132,5 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 
-	return errData, nil
+	return toleranceErrorResponse, nil
 }
