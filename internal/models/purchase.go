@@ -138,7 +138,6 @@ func (PurchaseItem) TableName() string {
 
 // Pre Purchase DTOs
 type CreatePOBigLotItemRequest struct {
-	PreItem              string  `json:"pre_item"`
 	ProductGroupType     string  `json:"product_group_type"`
 	ProductGroupCode     string  `json:"product_group_code"`
 	DocRefItem           string  `json:"doc_ref_item"`
@@ -253,6 +252,7 @@ type GetPOBigLotListResponse struct {
 
 type UpdatePOBigLotItemRequest struct {
 	ID                   *uuid.UUID `json:"id"`
+	PreItem              *string    `json:"pre_item"`
 	PrePurchaseID        uuid.UUID  `json:"pre_purchase_id"`
 	ProductGroupType     string     `json:"product_group_type"`
 	ProductGroupCode     string     `json:"product_group_code"`
@@ -327,7 +327,7 @@ type Supplier struct {
 type PurchaseItemFormRequest struct {
 	ID                   *uuid.UUID `json:"id"`
 	PurchaseID           *uuid.UUID `json:"purchase_id"`
-	PurchaseItem         string     `json:"purchase_item"`
+	PurchaseItem         *string    `json:"purchase_item"`
 	ProductCode          string     `json:"product_code"`
 	DocRefItem           *string    `json:"doc_ref_item"`
 	Qty                  float64    `json:"qty"`

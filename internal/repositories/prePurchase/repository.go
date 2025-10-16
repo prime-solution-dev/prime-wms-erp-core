@@ -26,7 +26,7 @@ func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 }
 
 // Get
-func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, page, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, page int, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -49,6 +49,10 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, pa
 		return nil, 0, 0, 0, 0, err
 	}
 
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
+	}
+
 	// Pagination
 	offset := (page - 1) * pageSize
 	if err := query.Preload("PrePurchaseItems").
@@ -59,6 +63,10 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, pa
 	}
 
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+
+	if page == 0 {
+		page = 1
+	}
 
 	return prePurchaseList, int(totalRecords), page, pageSize, totalPages, nil
 }

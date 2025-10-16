@@ -19,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest) models.PurchaseItem {
+func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest, purchaseCode string) models.PurchaseItem {
 	now := time.Now().UTC()
 
 	createBy := "system"
@@ -32,8 +32,15 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
+	purchaseItem := ""
+	if req.PurchaseItem == nil {
+		purchaseItem = fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
+	} else {
+		purchaseItem = *req.PurchaseItem
+	}
+
 	return models.PurchaseItem{
-		PurchaseItem:         req.PurchaseItem,
+		PurchaseItem:         purchaseItem,
 		ProductCode:          req.ProductCode,
 		Qty:                  req.Qty,
 		Unit:                 req.Unit,
