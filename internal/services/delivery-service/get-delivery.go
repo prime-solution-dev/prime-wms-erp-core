@@ -38,6 +38,7 @@ type GetDeliveryResponse struct {
 	ShipToAddress    string                    `gorm:"type:varchar(255)" json:"ship_to_address"`
 	DeliveryDate     *time.Time                `gorm:"type:date" json:"delivery_date"`
 	DeliveryTimeCode string                    `gorm:"type:varchar(50)" json:"delivery_time_code"`
+	DeliveryTimeName string                    `gorm:"type:varchar(100)" json:"delivery_time_name"`
 	LicensePlate     string                    `gorm:"type:varchar(50)" json:"license_plate"`
 	ContactName      string                    `gorm:"type:varchar(100)" json:"contact_name"`
 	Tel              string                    `gorm:"type:varchar(20)" json:"tel"`
@@ -98,7 +99,9 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	query := gormx.Preload("Items").
+	query := gormx.Select("delivery_booking.*, time.name as delivery_time_name").
+		Joins("LEFT JOIN time ON delivery_booking.delivery_time_code = time.code").
+		Preload("Items").
 		Preload("SaleOrder").
 		Preload("SaleOrder.SaleItem").
 		Order("delivery_booking.update_date DESC")
