@@ -70,6 +70,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// Only update timestamp and user for update
 		tempDelivery.UpdateDate = nowDateOnly
 		tempDelivery.UpdateBy = user
+		tempDelivery.Status = "PENDING"
 
 		updateDeliveries = append(updateDeliveries, tempDelivery)
 
@@ -78,6 +79,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			item.DeliveryID = tempDelivery.ID
 			item.UpdateDate = nowDateOnly
 			item.UpdateBy = user
+			item.Status = "PENDING"
 
 			updateDeliveryItems = append(updateDeliveryItems, item)
 		}
