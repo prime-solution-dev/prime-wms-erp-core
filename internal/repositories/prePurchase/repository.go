@@ -26,7 +26,16 @@ func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 }
 
 // Get
-func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, page int, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPOBigLotList(
+	prePurchaseCodes []string,
+	supplierCodes []string,
+	productGroupCodes []string,
+	statusApprove []string,
+	companyCode,
+	siteCode string,
+	page int,
+	pageSize int,
+) ([]models.PrePurchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -44,6 +53,23 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, pa
 		query = query.Where("pre_purchase_code IN ?", prePurchaseCodes)
 	}
 
+	if len(supplierCodes) > 0 {
+		query = query.Where("supplier_code IN ?", supplierCodes)
+	}
+
+	if len(statusApprove) > 0 {
+		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(productGroupCodes) > 0 {
+		sub := gormx.Model(&models.PrePurchaseItem{}).
+			Select("1").
+			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
+			Where("hierarchy_code IN ?", productGroupCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -55,7 +81,8 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, pa
 
 	// Pagination
 	offset := (page - 1) * pageSize
-	if err := query.Preload("PrePurchaseItems").
+	if err := query.
+		Preload("PrePurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&prePurchaseList).Error; err != nil {

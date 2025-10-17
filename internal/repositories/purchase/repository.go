@@ -26,7 +26,17 @@ func CreatePurchase(purchases []models.Purchase) error {
 }
 
 // Get
-func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page int, pageSize int) ([]models.Purchase, int, int, int, int, error) {
+func GetPurchaseList(
+	purchaseCodes []string,
+	supplierCodes []string,
+	statusApprove []string,
+	statusPayment []string,
+	productCodes []string,
+	companyCode string,
+	siteCode string,
+	page int,
+	pageSize int,
+) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -44,6 +54,27 @@ func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page 
 		query = query.Where("purchase_code IN ?", purchaseCodes)
 	}
 
+	if len(supplierCodes) > 0 {
+		query = query.Where("supplier_code IN ?", supplierCodes)
+	}
+
+	if len(statusApprove) > 0 {
+		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(statusPayment) > 0 {
+		query = query.Where("status_payment IN ?", statusPayment)
+	}
+
+	if len(productCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_code IN ?", productCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -55,7 +86,8 @@ func GetPurchaseList(purchaseCodes []string, companyCode, siteCode string, page 
 
 	// Apply pagination
 	offset := (page - 1) * pageSize
-	if err := query.Preload("PurchaseItems").
+	if err := query.
+		Preload("PurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&purchases).Error; err != nil {
@@ -124,6 +156,90 @@ func UpdatePurchaseStatusApprove(purchases []models.UpdateStatusApprovePurchaseR
 				err = result.Error
 			}
 		}
+		return nil
+	})
+}
+
+func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if len(purchaseCodes) > 0 {
+			var purchaseItemCodes []string
+			subQuery := tx.Model(&models.Purchase{}).
+				Select("id").
+				Where("purchase_code IN ?", purchaseCodes)
+
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id IN (?)", subQuery).
+				Pluck("purchase_item", &purchaseItemCodes).Error; err != nil {
+				return err
+			}
+
+			purchaseItems = append(purchaseItems, purchaseItemCodes...)
+		}
+
+		if len(purchaseItems) > 0 {
+			if result := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_item IN ?", purchaseItems).
+				Updates(map[string]interface{}{
+					"status_payment": "COMPLETED",
+					"update_dtm":     time.Now().UTC(),
+				}); result.Error != nil {
+				err = result.Error
+			}
+		}
+
+		var purchaseAutoCompleteCodes []string
+		subQueryCompletePurchaseItem := tx.Model(&models.PurchaseItem{}).
+			Select("purchase_id").
+			Where("status_payment = ?", "COMPLETED")
+
+		if err := tx.Model(&models.Purchase{}).
+			Where("id IN (?)", subQueryCompletePurchaseItem).
+			Pluck("purchase_code", &purchaseAutoCompleteCodes).Error; err != nil {
+			return err
+		}
+
+		purchaseCodes = append(purchaseCodes, purchaseAutoCompleteCodes...)
+
+		for _, code := range purchaseCodes {
+			var totalItems int64
+			var completedItems int64
+
+			queryPurchaseID := tx.Model(&models.Purchase{}).Select("id").Where("purchase_code = ?", code)
+
+			if err := tx.Model(&models.PurchaseItem{}).Where("purchase_id = (?)", queryPurchaseID).Count(&totalItems).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Model(&models.PurchaseItem{}).Where("purchase_id = (?) AND status_payment = ?", queryPurchaseID, "COMPLETED").Count(&completedItems).Error; err != nil {
+				return err
+			}
+
+			status := "PENDING"
+			if totalItems == 0 {
+				status = "COMPLETED"
+			}
+
+			if totalItems > 0 && totalItems == completedItems {
+				status = "COMPLETED"
+			}
+
+			if err := tx.Model(&models.Purchase{}).
+				Where("purchase_code = ?", code).
+				Updates(map[string]interface{}{
+					"status_payment": status,
+					"update_dtm":     time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
