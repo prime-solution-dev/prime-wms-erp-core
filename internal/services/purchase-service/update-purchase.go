@@ -72,3 +72,17 @@ func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, e
 
 	return nil, nil
 }
+
+func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompleteStatusPaymentPurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CompletePOPayment(req.PurchaseCodes, req.PurchaseItems); err != nil {
+		return nil, errors.New("failed to complete PO payment: " + err.Error())
+	}
+
+	return nil, nil
+}
