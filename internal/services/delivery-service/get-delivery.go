@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,7 @@ type GetDeliveryResponse struct {
 	CreateBy         string                    `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                `gorm:"type:date" json:"update_date"`
 	UpdateBy         string                    `gorm:"type:varchar(50)" json:"update_by"`
+	SaleOrder        models.Sale               `gorm:"foreignKey:DocumentRef;references:SaleCode" json:"sale_order"`
 	Items            []GetDeliveryItemResponse `gorm:"foreignKey:DeliveryID" json:"items"`
 }
 
@@ -97,6 +99,8 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	defer db.CloseGORM(gormx)
 
 	query := gormx.Preload("Items").
+		Preload("SaleOrder").
+		Preload("SaleOrder.SaleItem").
 		Order("delivery_booking.update_date DESC")
 
 	if len(req.ID) > 0 {
