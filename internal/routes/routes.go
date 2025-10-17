@@ -225,6 +225,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/CompleteStatusPaymentPO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompleteStatusPaymentPO)
 	})
+	purchase.POST("/CompletePO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePO)
+	})
 
 	///cronjob
 	cronjob := ctx.Group("/cronjob")

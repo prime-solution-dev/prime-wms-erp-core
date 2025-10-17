@@ -243,3 +243,23 @@ func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err erro
 		return nil
 	})
 }
+
+func CompletePO(purchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Purchase{}).
+			Where("purchase_code IN ?", purchaseCodes).
+			Updates(map[string]interface{}{
+				"status":     "COMPLETED",
+				"update_dtm": time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}

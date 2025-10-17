@@ -479,6 +479,10 @@ type CompleteStatusPaymentPurchaseRequest struct {
 	PurchaseItems []string `json:"purchase_items"`
 }
 
+type CompletePurchaseRequest struct {
+	PurchaseCodes []string `json:"purchase_codes"`
+}
+
 // Product DTOs
 type GetProductRequest struct {
 	ProductCode []string `json:"product_code"`
