@@ -385,15 +385,16 @@ type CreatePurchaseRequest struct {
 }
 
 type GetPurchaseRequest struct {
-	PurchaseCodes []string `json:"purchase_codes"`
-	SupplierCodes []string `json:"supplier_codes"`
-	StatusApprove []string `json:"status_approve"`
-	StatusPayment []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
-	ProductCodes  []string `json:"product_codes"`
-	CompanyCode   string   `json:"company_code"`
-	SiteCode      string   `json:"site_code"`
-	Page          int      `json:"page"`
-	PageSize      int      `json:"page_size"`
+	PurchaseCodes           []string `json:"purchase_codes"`
+	SupplierCodes           []string `json:"supplier_codes"`
+	StatusApprove           []string `json:"status_approve"`
+	StatusPayment           []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	StatusPaymentIncomplete bool     `json:"status_payment_incomplete"`
+	ProductCodes            []string `json:"product_codes"`
+	CompanyCode             string   `json:"company_code"`
+	SiteCode                string   `json:"site_code"`
+	Page                    int      `json:"page"`
+	PageSize                int      `json:"page_size"`
 }
 
 type PurchaseItemResponse struct {

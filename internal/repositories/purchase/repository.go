@@ -31,6 +31,7 @@ func GetPurchaseList(
 	supplierCodes []string,
 	statusApprove []string,
 	statusPayment []string,
+	statusPaymentIncomplete bool,
 	productCodes []string,
 	companyCode string,
 	siteCode string,
@@ -64,6 +65,10 @@ func GetPurchaseList(
 
 	if len(statusPayment) > 0 {
 		query = query.Where("status_payment IN ?", statusPayment)
+	}
+
+	if statusPaymentIncomplete {
+		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
 	}
 
 	if len(productCodes) > 0 {
