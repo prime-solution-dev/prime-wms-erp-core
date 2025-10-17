@@ -31,6 +31,7 @@ func GetPurchaseList(
 	supplierCodes []string,
 	statusApprove []string,
 	statusPayment []string,
+	statusPaymentIncomplete bool,
 	productCodes []string,
 	companyCode string,
 	siteCode string,
@@ -64,6 +65,10 @@ func GetPurchaseList(
 
 	if len(statusPayment) > 0 {
 		query = query.Where("status_payment IN ?", statusPayment)
+	}
+
+	if statusPaymentIncomplete {
+		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
 	}
 
 	if len(productCodes) > 0 {
@@ -240,6 +245,26 @@ func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err erro
 			}
 		}
 
+		return nil
+	})
+}
+
+func CompletePO(purchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Purchase{}).
+			Where("purchase_code IN ?", purchaseCodes).
+			Updates(map[string]interface{}{
+				"status":     "COMPLETED",
+				"update_dtm": time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 }
