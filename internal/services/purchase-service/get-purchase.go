@@ -17,7 +17,17 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseList(req.PurchaseCodes, req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
+	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseList(
+		req.PurchaseCodes, //
+		req.SupplierCodes,
+		req.StatusApprove,
+		req.StatusPayment,
+		req.ProductCodes,
+		req.CompanyCode,
+		req.SiteCode,
+		req.Page,
+		req.PageSize,
+	)
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())
 	}

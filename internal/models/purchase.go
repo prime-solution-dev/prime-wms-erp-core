@@ -91,6 +91,7 @@ type Purchase struct {
 	IsApproved      bool           `json:"is_approved"`
 	StatusApprove   string         `json:"status_approve"`
 	Remark          string         `json:"remark"`
+	StatusPayment   string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	CreateBy        string         `json:"create_by"`
 	CreateDtm       time.Time      `json:"create_dtm"`
 	UpdateBy        string         `json:"update_by"`
@@ -126,6 +127,7 @@ type PurchaseItem struct {
 	TotalWeight          float64   `json:"total_weight"`
 	Status               string    `json:"status"`
 	Remark               string    `json:"remark"`
+	StatusPayment        string    `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	CreateDtm            time.Time `json:"create_dtm"`
 	CreateBy             string    `json:"create_by"`
 	UpdateDtm            time.Time `json:"update_dtm"`
@@ -179,11 +181,14 @@ type CreatePOBigLotRequest struct {
 }
 
 type GetPOBigLotListRequest struct {
-	PrePurchaseCodes []string `json:"pre_purchase_codes"`
-	CompanyCode      string   `json:"company_code"`
-	SiteCode         string   `json:"site_code"`
-	Page             int      `json:"page"`
-	PageSize         int      `json:"page_size"`
+	PrePurchaseCodes  []string `json:"pre_purchase_codes"`
+	SupplierCodes     []string `json:"supplier_codes"`
+	ProductGroupCodes []string `json:"product_group_codes"`
+	StatusApprove     []string `json:"status_approve"`
+	CompanyCode       string   `json:"company_code"`
+	SiteCode          string   `json:"site_code"`
+	Page              int      `json:"page"`
+	PageSize          int      `json:"page_size"`
 }
 
 type GetPOBigLotItemResponse struct {
@@ -381,6 +386,10 @@ type CreatePurchaseRequest struct {
 
 type GetPurchaseRequest struct {
 	PurchaseCodes []string `json:"purchase_codes"`
+	SupplierCodes []string `json:"supplier_codes"`
+	StatusApprove []string `json:"status_approve"`
+	StatusPayment []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	ProductCodes  []string `json:"product_codes"`
 	CompanyCode   string   `json:"company_code"`
 	SiteCode      string   `json:"site_code"`
 	Page          int      `json:"page"`
@@ -412,6 +421,7 @@ type PurchaseItemResponse struct {
 	WeightUnit           float64 `json:"weight_unit"`
 	TotalWeight          float64 `json:"total_weight"`
 	Status               string  `json:"status"`
+	StatusPayment        string  `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	Remark               string  `json:"remark"`
 	CreateDtm            string  `json:"create_dtm"`
 	CreateBy             string  `json:"create_by"`
@@ -439,6 +449,7 @@ type PurchaseResponse struct {
 	SubtotalExclVat float64                `json:"subtotal_excl_vat"`
 	IsApproved      bool                   `json:"is_approved"`
 	StatusApprove   string                 `json:"status_approve"`
+	StatusPayment   string                 `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	Remark          string                 `json:"remark"`
 	CreateBy        string                 `json:"create_by"`
 	CreateDtm       string                 `json:"create_dtm"`
@@ -461,6 +472,11 @@ type UpdateStatusApprovePurchaseRequest struct {
 	PurchaseCode  string    `json:"purchase_code"`
 	IsApproved    bool      `json:"is_approved"`
 	StatusApprove string    `json:"status_approve"`
+}
+
+type CompleteStatusPaymentPurchaseRequest struct {
+	PurchaseCodes []string `json:"purchase_codes"`
+	PurchaseItems []string `json:"purchase_items"`
 }
 
 // Product DTOs
