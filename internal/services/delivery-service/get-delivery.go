@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +15,14 @@ import (
 )
 
 type GetDeliveryRequest struct {
-	ID           []string `json:"id"`
-	DeliveryCode []string `json:"delivery_code"`
-	SiteCode     []string `json:"site_code"`
-	CompanyCode  []string `json:"company_code"`
-	Page         int      `json:"page"`
-	PageSize     int      `json:"page_size"`
+	ID                []string `json:"id"`
+	DeliveryCode      []string `json:"delivery_code"`
+	NotInDeliveryCode []string `json:"not_in_delivery_code"`
+	SaleOrderCode     []string `json:"sale_order_code"`
+	SiteCode          []string `json:"site_code"`
+	CompanyCode       []string `json:"company_code"`
+	Page              int      `json:"page"`
+	PageSize          int      `json:"page_size"`
 }
 
 func (GetDeliveryResponse) TableName() string { return "delivery_booking" }
@@ -37,6 +40,7 @@ type GetDeliveryResponse struct {
 	ShipToAddress    string                    `gorm:"type:varchar(255)" json:"ship_to_address"`
 	DeliveryDate     *time.Time                `gorm:"type:date" json:"delivery_date"`
 	DeliveryTimeCode string                    `gorm:"type:varchar(50)" json:"delivery_time_code"`
+	DeliveryTimeName string                    `gorm:"type:varchar(100)" json:"delivery_time_name"`
 	LicensePlate     string                    `gorm:"type:varchar(50)" json:"license_plate"`
 	ContactName      string                    `gorm:"type:varchar(100)" json:"contact_name"`
 	Tel              string                    `gorm:"type:varchar(20)" json:"tel"`
@@ -47,6 +51,7 @@ type GetDeliveryResponse struct {
 	CreateBy         string                    `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                `gorm:"type:date" json:"update_date"`
 	UpdateBy         string                    `gorm:"type:varchar(50)" json:"update_by"`
+	SaleOrder        models.Sale               `gorm:"foreignKey:DocumentRef;references:SaleCode" json:"sale_order"`
 	Items            []GetDeliveryItemResponse `gorm:"foreignKey:DeliveryID" json:"items"`
 }
 
@@ -85,6 +90,7 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var req GetDeliveryRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
@@ -96,7 +102,11 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	query := gormx.Preload("Items").
+	query := gormx.Select("delivery_booking.*, time.name as delivery_time_name").
+		Joins("LEFT JOIN time ON delivery_booking.delivery_time_code = time.code").
+		Preload("Items").
+		Preload("SaleOrder").
+		Preload("SaleOrder.SaleItem").
 		Order("delivery_booking.update_date DESC")
 
 	if len(req.ID) > 0 {
@@ -107,6 +117,14 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("delivery_code IN ?", req.DeliveryCode)
 	}
 
+	if len(req.NotInDeliveryCode) > 0 {
+		query = query.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.SaleOrderCode) > 0 {
+		query = query.Where("document_ref IN ?", req.SaleOrderCode)
+	}
+
 	if len(req.SiteCode) > 0 {
 		query = query.Where("site_code IN ?", req.SiteCode)
 	}
@@ -115,8 +133,35 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	// Build base query for counting
+	countQuery := gormx.Model(&GetDeliveryResponse{})
+
+	if len(req.ID) > 0 {
+		countQuery = countQuery.Where("id IN ?", req.ID)
+	}
+
+	if len(req.DeliveryCode) > 0 {
+		countQuery = countQuery.Where("delivery_code IN ?", req.DeliveryCode)
+	}
+
+	if len(req.NotInDeliveryCode) > 0 {
+		countQuery = countQuery.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.SaleOrderCode) > 0 {
+		countQuery = countQuery.Where("document_ref IN ?", req.SaleOrderCode)
+	}
+
+	if len(req.SiteCode) > 0 {
+		countQuery = countQuery.Where("site_code IN ?", req.SiteCode)
+	}
+
+	if len(req.CompanyCode) > 0 {
+		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+	}
+
 	var count int64
-	gormx.Model(&GetDeliveryResponse{}).Count(&count)
+	countQuery.Count(&count)
 
 	totalRecords := count
 	totalPages := 0

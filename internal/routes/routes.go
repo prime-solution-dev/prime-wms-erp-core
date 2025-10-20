@@ -122,6 +122,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	delivery.POST("/GetDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.GetDelivery)
 	})
+	delivery.POST("/UpdateDelivery", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.UpdateDelivery)
+	})
 
 	//time
 	time := ctx.Group("/time")
@@ -227,6 +230,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/UpdateStatusApprovePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdateStatusApprovePO)
+	})
+	purchase.POST("/CompleteStatusPaymentPO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompleteStatusPaymentPO)
+	})
+	purchase.POST("/CompletePO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePO)
 	})
 
 	///cronjob

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
@@ -14,20 +15,28 @@ import (
 )
 
 type CreateDeliveryRequest struct {
-	CompanyCode      string                       `json:"company_code"`
-	SiteCode         string                       `json:"site_code"`
-	DeliveryMethod   string                       `json:"delivery_method"`
-	DocumentRef      string                       `json:"document_ref"`
-	CustomerCode     string                       `json:"customer_code"`
-	ShipToAddress    string                       `json:"ship_to_address"`
-	DeliveryDate     *time.Time                   `json:"delivery_date"`
-	DeliveryTimeCode string                       `json:"delivery_time_code"`
-	LicensePlate     string                       `json:"license_plate"`
-	ContactName      string                       `json:"contact_name"`
-	Tel              string                       `json:"tel"`
-	TotalWeight      float64                      `json:"total_weight"`
-	Remark           string                       `json:"remark"`
-	DeliveryItems    []CreateDeliveryItemsRequest `json:"delivery_items"`
+	IsDraft           bool                         `json:"is_draft"`
+	CompanyCode       string                       `json:"company_code"`
+	SiteCode          string                       `json:"site_code"`
+	DeliveryMethod    string                       `json:"delivery_method"`
+	DocumentRef       string                       `json:"document_ref"`
+	CustomerCode      string                       `json:"customer_code"`
+	SoldToCode        string                       `json:"sold_to_code"`
+	ShipToCode        string                       `json:"ship_to_code"`
+	BillToCode        string                       `json:"bill_to_code"`
+	InterfaceQty      float64                      `json:"interface_qty"`
+	InterfaceUnitCode string                       `json:"interface_unit_code"`
+	Qty               float64                      `json:"qty"`
+	UnitCode          string                       `json:"unit_code"`
+	ShipToAddress     string                       `json:"ship_to_address"`
+	DeliveryDate      *time.Time                   `json:"delivery_date"`
+	DeliveryTimeCode  string                       `json:"delivery_time_code"`
+	LicensePlate      string                       `json:"license_plate"`
+	ContactName       string                       `json:"contact_name"`
+	Tel               string                       `json:"tel"`
+	TotalWeight       float64                      `json:"total_weight"`
+	Remark            string                       `json:"remark"`
+	DeliveryItems     []CreateDeliveryItemsRequest `json:"delivery_items"`
 }
 
 type CreateDeliveryItemsRequest struct {
@@ -37,6 +46,8 @@ type CreateDeliveryItemsRequest struct {
 	Weight          float64 `json:"weight"`
 	WeightUnit      float64 `json:"weight_unit"`
 	DocumentRefItem string  `json:"document_ref_item"`
+	SaleUnitCode    string  `json:"sale_unit_code"`
+	SaleMethod      string  `json:"sale_method"`
 }
 
 func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -101,11 +112,16 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Tel:              deliveryReq.Tel,
 			TotalWeight:      deliveryReq.TotalWeight,
 			Remark:           deliveryReq.Remark,
-			Status:           "PENDING",
-			CreateBy:         user,
-			CreateDate:       nowDateOnly, // date-only format
-			UpdateBy:         user,
-			UpdateDate:       nowDateOnly, // date-only format
+			Status: func() string {
+				if deliveryReq.IsDraft {
+					return "TEMP"
+				}
+				return "PENDING"
+			}(),
+			CreateBy:   user,
+			CreateDate: nowDateOnly, // date-only format
+			UpdateBy:   user,
+			UpdateDate: nowDateOnly, // date-only format
 		}
 
 		deliveryToAdd = append(deliveryToAdd, newDelivery)
@@ -146,14 +162,126 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// Check if any delivery is not a draft before calling external service
+	hasNonDraftDelivery := false
+	for _, deliveryReq := range req {
+		if !deliveryReq.IsDraft {
+			hasNonDraftDelivery = true
+			break
+		}
+	}
+
+	var orderRes orderExternalService.CreateOrderResponse
+	// Only call external service if there are non-draft deliveries
+	if hasNonDraftDelivery {
+		orderRes, err = CreateOrder(req, deliveryToAdd, deliveryItemToAdd)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Return the delivery codes of the created deliveries
 	deliveryCodes := make([]string, len(deliveryToAdd))
 	for i, d := range deliveryToAdd {
 		deliveryCodes[i] = d.DeliveryCode
 	}
-	return gin.H{
+
+	response := gin.H{
 		"status":        "success",
 		"message":       "Create delivery successfully",
 		"delivery_code": deliveryCodes,
-	}, nil
+	}
+
+	// Only include order_code if external service was called
+	if hasNonDraftDelivery {
+		response["order_code"] = orderRes.OrderCode
+	}
+
+	return response, nil
+}
+
+func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+	createOrderRequest := orderExternalService.CreateOrderRequest{}
+	createOrderdetail := []orderExternalService.CreateOrderDetail{}
+	for _, deliveryReq := range req {
+		createOrderItemDetail := []orderExternalService.CreateOrderItemDetail{}
+		for _, item := range deliveryReq.DeliveryItems {
+			// find corresponding DeliveryItem from deliveryItemToAdd (match by DocumentRefItem + ProductCode)
+			var srcItem *models.DeliveryItem
+			for i := range deliveryItemToAdd {
+				di := &deliveryItemToAdd[i]
+				if di.DocumentRefItem == item.DocumentRefItem && di.ProductCode == item.ProductCode {
+					srcItem = di
+					break
+				}
+			}
+
+			newOrderItemDetail := orderExternalService.CreateOrderItemDetail{
+				OrderItem:         "",
+				DocumentRefItem:   srcItem.DeliveryItem,
+				ProductCode:       item.ProductCode,
+				ProductType:       "normal",
+				InterfaceOrderQty: item.Qty,
+				Qty:               item.Qty,
+				UnitCode:          item.UnitCode,
+				IsFocGwp:          false,
+				WarehouseCode:     "",
+				BatchNo:           "",
+				SerialCode:        "",
+				SaleUnitCode:      item.SaleUnitCode,
+				SaleMethod:        item.SaleMethod,
+				Weight:            item.Weight,
+				WeightUnit:        item.WeightUnit,
+				Remark:            "",
+				Status:            "PENDING",
+			}
+			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
+		}
+
+		deliveryCode := ""
+		for _, d := range deliveryToAdd {
+			if d.DocumentRef == deliveryReq.DocumentRef {
+				deliveryCode = d.DeliveryCode
+				break
+			}
+		}
+
+		newOrderDetail := orderExternalService.CreateOrderDetail{
+			Action:              "X",
+			OrderID:             uuid.New(),
+			OrderCode:           "",
+			OrderType:           "DELIVERY",
+			OrderDate:           time.Now(),
+			TenantID:            nil,
+			CustomerCode:        deliveryReq.CustomerCode,
+			SoldToCode:          deliveryReq.SoldToCode,
+			ShipToCode:          deliveryReq.ShipToCode,
+			BillToCode:          deliveryReq.BillToCode,
+			TransportZone:       "BKK",
+			InterfaceQty:        deliveryReq.InterfaceQty,
+			InterfaceUnitCode:   deliveryReq.InterfaceUnitCode,
+			Qty:                 deliveryReq.Qty,
+			UnitCode:            deliveryReq.UnitCode,
+			EstimatePickingDate: nil,
+			DeliveryDate:        deliveryReq.DeliveryDate,
+			SubmitDate:          nil,
+			Status:              "PENDING",
+			DocumentRefType:     "DELIVERY",
+			DocumentRef:         deliveryCode,
+			Remark:              deliveryReq.Remark,
+			OrderItem:           createOrderItemDetail,
+		}
+
+		createOrderdetail = append(createOrderdetail, newOrderDetail)
+	}
+	createOrderRequest.Orders = createOrderdetail
+
+	fmt.Println("createOrderRequest : ", createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	if err != nil {
+		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
+	}
+	fmt.Println("createOrderResponse : ", createOrderResponse)
+
+	return createOrderResponse, nil
 }
