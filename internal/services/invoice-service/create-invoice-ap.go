@@ -7,6 +7,7 @@ import (
 	"log"
 	models "prime-erp-core/internal/models"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"strconv"
 
@@ -131,9 +132,35 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
-		} else {
-			return createInvoiceReturn, nil
 		}
+		requestData := map[string]interface{}{
+			"module":    []string{"INVOICE"},
+			"topic":     []string{"AP"},
+			"sub_topic": []string{"CREATE"},
+		}
+
+		hookConfig, err := interfaceService.GetHookConfig(requestData)
+		if err != nil {
+			return nil, err
+		}
+		if len(hookConfig) > 0 {
+			urlProduct := ""
+			for _, hookConfigValue := range hookConfig {
+				urlProduct = hookConfigValue.HookUrl
+			}
+
+			requestDataCreateHook := interfaceService.HookInterfaceRequest{
+				RequestData: req,
+				UrlHook:     urlProduct,
+			}
+			_, err := interfaceService.HookInterface(requestDataCreateHook)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return createInvoiceReturn, nil
+
 	}
 
 	return toleranceErrorResponse, nil
