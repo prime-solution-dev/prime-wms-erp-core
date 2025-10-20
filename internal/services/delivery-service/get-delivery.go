@@ -15,12 +15,14 @@ import (
 )
 
 type GetDeliveryRequest struct {
-	ID           []string `json:"id"`
-	DeliveryCode []string `json:"delivery_code"`
-	SiteCode     []string `json:"site_code"`
-	CompanyCode  []string `json:"company_code"`
-	Page         int      `json:"page"`
-	PageSize     int      `json:"page_size"`
+	ID                []string `json:"id"`
+	DeliveryCode      []string `json:"delivery_code"`
+	NotInDeliveryCode []string `json:"not_in_delivery_code"`
+	SaleOrderCode     []string `json:"sale_order_code"`
+	SiteCode          []string `json:"site_code"`
+	CompanyCode       []string `json:"company_code"`
+	Page              int      `json:"page"`
+	PageSize          int      `json:"page_size"`
 }
 
 func (GetDeliveryResponse) TableName() string { return "delivery_booking" }
@@ -114,6 +116,14 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("delivery_code IN ?", req.DeliveryCode)
 	}
 
+	if len(req.NotInDeliveryCode) > 0 {
+		query = query.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.SaleOrderCode) > 0 {
+		query = query.Where("document_ref IN ?", req.SaleOrderCode)
+	}
+
 	if len(req.SiteCode) > 0 {
 		query = query.Where("site_code IN ?", req.SiteCode)
 	}
@@ -122,8 +132,35 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	// Build base query for counting
+	countQuery := gormx.Model(&GetDeliveryResponse{})
+
+	if len(req.ID) > 0 {
+		countQuery = countQuery.Where("id IN ?", req.ID)
+	}
+
+	if len(req.DeliveryCode) > 0 {
+		countQuery = countQuery.Where("delivery_code IN ?", req.DeliveryCode)
+	}
+
+	if len(req.NotInDeliveryCode) > 0 {
+		countQuery = countQuery.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.SaleOrderCode) > 0 {
+		countQuery = countQuery.Where("document_ref IN ?", req.SaleOrderCode)
+	}
+
+	if len(req.SiteCode) > 0 {
+		countQuery = countQuery.Where("site_code IN ?", req.SiteCode)
+	}
+
+	if len(req.CompanyCode) > 0 {
+		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+	}
+
 	var count int64
-	gormx.Model(&GetDeliveryResponse{}).Count(&count)
+	countQuery.Count(&count)
 
 	totalRecords := count
 	totalPages := 0
