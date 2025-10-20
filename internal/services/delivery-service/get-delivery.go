@@ -90,6 +90,7 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var req GetDeliveryRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
