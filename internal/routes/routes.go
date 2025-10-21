@@ -116,6 +116,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	delivery.POST("/UpdateDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateDelivery)
 	})
+	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
+	})
 
 	//time
 	time := ctx.Group("/time")
