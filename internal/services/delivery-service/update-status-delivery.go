@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
@@ -101,6 +102,15 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 			return nil, fmt.Errorf("failed to update delivery items for %s: %v", deliveryCode, result.Error)
 		}
 
+		// Call external CancelOrder service if status is CANCELED
+		if req.Status == "CANCELED" {
+			_, err := CancelOrder(delivery)
+			if err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to cancel order for delivery %s: %v", deliveryCode, err)
+			}
+		}
+
 		res = append(res, UpdateStatusDeliveryResponse{
 			DeliveryCode: deliveryCode,
 			Status:       "success",
@@ -113,4 +123,19 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	}
 
 	return res, nil
+}
+
+func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
+	cancelOrderRequest := orderExternalService.CancelOrderRequest{
+		DocumentRef: []string{delivery.DeliveryCode},
+	}
+
+	fmt.Println("cancelOrderRequest : ", cancelOrderRequest)
+	cancelOrderResponse, err := orderExternalService.CancelOrder(cancelOrderRequest)
+	if err != nil {
+		return orderExternalService.CancelOrderResponse{}, errors.New("Error cancel order : " + err.Error())
+	}
+	fmt.Println("cancelOrderResponse : ", cancelOrderResponse)
+
+	return cancelOrderResponse, nil
 }
