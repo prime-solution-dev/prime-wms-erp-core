@@ -39,8 +39,14 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		purchaseItem = *req.PurchaseItem
 	}
 
+	docRefItem := ""
+	if req.DocRefItem != nil {
+		docRefItem = *req.DocRefItem
+	}
+
 	return models.PurchaseItem{
 		PurchaseItem:         purchaseItem,
+		DocRefItem:           docRefItem,
 		ProductCode:          req.ProductCode,
 		Qty:                  req.Qty,
 		Unit:                 req.Unit,
@@ -98,6 +104,7 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 		ID:                   item.ID.String(),
 		PurchaseID:           item.PurchaseID.String(),
 		PurchaseItem:         item.PurchaseItem,
+		DocRefItem:           item.DocRefItem,
 		ProductCode:          item.ProductCode,
 		Qty:                  item.Qty,
 		Unit:                 item.Unit,

@@ -403,6 +403,7 @@ type PurchaseItemResponse struct {
 	ID                   string  `json:"id"`
 	PurchaseID           string  `json:"purchase_id"`
 	PurchaseItem         string  `json:"purchase_item"`
+	DocRefItem           string  `json:"doc_ref_item"`
 	ProductCode          string  `json:"product_code"`
 	ProductName          string  `json:"product_name"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`
