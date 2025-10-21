@@ -81,10 +81,15 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 			return nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
 		}
 
+		var delivery models.Delivery
+		if err := gormx.Where("delivery_code = ?", deliveryCode).First(&delivery).Error; err != nil {
+			gormx.Rollback()
+			return nil, fmt.Errorf("delivery not found: %v", err)
+		}
+
 		// Update delivery items
 		result = tx.Model(&models.DeliveryItem{}).
-			Joins("JOIN delivery_booking ON delivery_booking_item.delivery_id = delivery_booking.id").
-			Where("delivery_booking.delivery_code = ?", deliveryCode).
+			Where("delivery_id = ?", delivery.ID).
 			Updates(map[string]interface{}{
 				"status":      req.Status,
 				"update_date": nowDateOnly,
