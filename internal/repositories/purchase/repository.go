@@ -33,6 +33,8 @@ func GetPurchaseList(
 	statusPayment []string,
 	statusPaymentIncomplete bool,
 	productCodes []string,
+	purchaseType []string,
+	docRef []string,
 	companyCode string,
 	siteCode string,
 	page int,
@@ -78,6 +80,14 @@ func GetPurchaseList(
 			Where("product_code IN ?", productCodes)
 
 		query = query.Where("EXISTS (?)", sub)
+	}
+
+	if len(purchaseType) > 0 {
+		query = query.Where("purchase_type IN ?", purchaseType)
+	}
+
+	if len(docRef) > 0 {
+		query = query.Where("doc_ref IN ?", docRef)
 	}
 
 	// Count total records (no preload needed)
