@@ -391,6 +391,8 @@ type GetPurchaseRequest struct {
 	StatusPayment           []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete bool     `json:"status_payment_incomplete"`
 	ProductCodes            []string `json:"product_codes"`
+	PurchaseType            []string `json:"purchase_type"`
+	DocRef                  []string `json:"doc_ref"`
 	CompanyCode             string   `json:"company_code"`
 	SiteCode                string   `json:"site_code"`
 	Page                    int      `json:"page"`
