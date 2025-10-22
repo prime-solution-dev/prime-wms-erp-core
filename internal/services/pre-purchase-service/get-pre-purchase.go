@@ -21,6 +21,18 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to get big lot list: " + err.Error())
 	}
 
+	result := models.GetPOBigLotListResponse{
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPage,
+	}
+
+	if len(prePurchaseList) == 0 {
+		result.BigLotList = []models.GetPOBigLotResponse{}
+		return result, nil
+	}
+
 	prePurchaseCodes := []string{}
 	supplierReq := models.GetSupplierListRequest{}
 	for _, prePurchase := range prePurchaseList {
@@ -42,13 +54,6 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	mapStatusApprove := map[string]string{}
 	for _, approval := range approvalsResp {
 		mapStatusApprove[approval.DocumentCode] = approval.Status
-	}
-
-	result := models.GetPOBigLotListResponse{
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPage,
 	}
 
 	for _, prePurchase := range prePurchaseList {
