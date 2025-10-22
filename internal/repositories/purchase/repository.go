@@ -33,6 +33,8 @@ func GetPurchaseList(
 	statusPayment []string,
 	statusPaymentIncomplete bool,
 	productCodes []string,
+	purchaseType []string,
+	docRef []string,
 	companyCode string,
 	siteCode string,
 	page int,
@@ -80,6 +82,14 @@ func GetPurchaseList(
 		query = query.Where("EXISTS (?)", sub)
 	}
 
+	if len(purchaseType) > 0 {
+		query = query.Where("purchase_type IN ?", purchaseType)
+	}
+
+	if len(docRef) > 0 {
+		query = query.Where("doc_ref IN ?", docRef)
+	}
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -99,7 +109,10 @@ func GetPurchaseList(
 		return nil, 0, 0, 0, 0, err
 	}
 
-	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	totalPages := 0
+	if totalRecords > 0 {
+		totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	}
 
 	if page == 0 {
 		page = 1

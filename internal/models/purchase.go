@@ -392,6 +392,8 @@ type GetPurchaseRequest struct {
 	StatusPayment           []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete bool     `json:"status_payment_incomplete"`
 	ProductCodes            []string `json:"product_codes"`
+	PurchaseType            []string `json:"purchase_type"`
+	DocRef                  []string `json:"doc_ref"`
 	CompanyCode             string   `json:"company_code"`
 	SiteCode                string   `json:"site_code"`
 	Page                    int      `json:"page"`
@@ -402,6 +404,7 @@ type PurchaseItemResponse struct {
 	ID                   string  `json:"id"`
 	PurchaseID           string  `json:"purchase_id"`
 	PurchaseItem         string  `json:"purchase_item"`
+	DocRefItem           string  `json:"doc_ref_item"`
 	ProductCode          string  `json:"product_code"`
 	ProductName          string  `json:"product_name"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`

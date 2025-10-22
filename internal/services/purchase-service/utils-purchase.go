@@ -17,10 +17,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest, purchaseCode string) models.PurchaseItem {
 	now := time.Now().UTC()
+
+	id := uuid.New()
+	if req.ID != nil {
+		id = *req.ID
+	}
 
 	createBy := "system"
 	if req.CreateBy != nil {
@@ -32,15 +38,20 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
-	purchaseItem := ""
-	if req.PurchaseItem == nil {
-		purchaseItem = fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
-	} else {
+	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
+	if req.PurchaseItem != nil && purchaseCode != "" {
 		purchaseItem = *req.PurchaseItem
 	}
 
+	docRefItem := ""
+	if req.DocRefItem != nil {
+		docRefItem = *req.DocRefItem
+	}
+
 	return models.PurchaseItem{
+		ID:                   id,
 		PurchaseItem:         purchaseItem,
+		DocRefItem:           docRefItem,
 		ProductCode:          req.ProductCode,
 		Qty:                  req.Qty,
 		Unit:                 req.Unit,
@@ -98,6 +109,7 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 		ID:                   item.ID.String(),
 		PurchaseID:           item.PurchaseID.String(),
 		PurchaseItem:         item.PurchaseItem,
+		DocRefItem:           item.DocRefItem,
 		ProductCode:          item.ProductCode,
 		Qty:                  item.Qty,
 		Unit:                 item.Unit,

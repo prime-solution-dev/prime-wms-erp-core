@@ -24,6 +24,8 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.StatusPayment,
 		req.StatusPaymentIncomplete,
 		req.ProductCodes,
+		req.PurchaseType,
+		req.DocRef,
 		req.CompanyCode,
 		req.SiteCode,
 		req.Page,
@@ -31,6 +33,18 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	)
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())
+	}
+
+	result := models.GetPurchaseResponse{
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPage,
+	}
+
+	if len(purchases) == 0 {
+		result.DataList = []models.PurchaseResponse{}
+		return result, nil
 	}
 
 	purchaseCodes := []string{}
@@ -104,13 +118,6 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Create Result
-	result := models.GetPurchaseResponse{
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: totalPage,
-	}
-
 	for _, purchase := range purchases {
 		purchaseResponse := MapPurchaseModelToPurchaseResponse(purchase)
 
