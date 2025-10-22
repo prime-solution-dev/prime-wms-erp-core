@@ -109,7 +109,10 @@ func GetPurchaseList(
 		return nil, 0, 0, 0, 0, err
 	}
 
-	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	totalPages := 0
+	if totalRecords > 0 {
+		totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	}
 
 	if page == 0 {
 		page = 1
