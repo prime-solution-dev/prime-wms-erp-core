@@ -31,6 +31,7 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		reqItems := []models.PurchaseItem{}
 		for _, item := range r.Items {
 			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, purchase.PurchaseCode)
+			purchaseItem.PurchaseID = purchase.ID
 
 			if item.ID == nil || item.PurchaseID == nil {
 				return nil, errors.New("purchase item ID and purchase ID are required for update")
