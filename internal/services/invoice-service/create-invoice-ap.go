@@ -8,6 +8,7 @@ import (
 	models "prime-erp-core/internal/models"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	interfaceService "prime-erp-core/internal/services/interface-service"
+	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"strconv"
 
@@ -40,13 +41,14 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	poNumber := []string{}
 	companyCode := ""
 	siteCode := ""
+	supplierReq := models.GetSupplierListRequest{}
 	for _, invoice := range req {
 		for _, invoiceItem := range invoice.InvoiceItem {
 			poNumber = append(poNumber, invoiceItem.DocumentRef)
 			companyCode = invoice.CompanyCode
 			siteCode = invoice.SiteCode
 		}
-
+		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoice.PartyCode)
 	}
 	requestDataGetPO := map[string]interface{}{
 		"purchase_codes": poNumber,
@@ -144,14 +146,26 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, err
 		}
 		if len(hookConfig) > 0 {
-			urlProduct := ""
+			urlHook := ""
 			for _, hookConfigValue := range hookConfig {
-				urlProduct = hookConfigValue.HookUrl
+				urlHook = hookConfigValue.HookUrl
+			}
+
+			mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+			if errGetSupplierByCode != nil {
+				return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
+			}
+
+			for i := range req {
+				if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
+					req[i].PartyName = supplier.SupplierName
+
+				}
 			}
 
 			requestDataCreateHook := interfaceService.HookInterfaceRequest{
 				RequestData: req,
-				UrlHook:     urlProduct,
+				UrlHook:     urlHook,
 			}
 			_, err := interfaceService.HookInterface(requestDataCreateHook)
 			if err != nil {

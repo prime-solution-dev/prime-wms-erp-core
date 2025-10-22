@@ -322,6 +322,7 @@ type Supplier struct {
 	ID           uuid.UUID `json:"id"`
 	SupplierCode string    `json:"supplier_code"`
 	SupplierName string    `json:"supplier_name"`
+	ExternalID   string    `json:"external_id"`
 	CreateBy     string    `json:"create_by"`
 	CreateDtm    time.Time `json:"create_dtm"`
 	UpdateBy     string    `json:"update_by"`
