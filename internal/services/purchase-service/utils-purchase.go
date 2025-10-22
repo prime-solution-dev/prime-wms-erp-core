@@ -38,10 +38,8 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
-	purchaseItem := ""
-	if req.PurchaseItem == nil {
-		purchaseItem = fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
-	} else {
+	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
+	if req.PurchaseItem != nil && purchaseCode != "" {
 		purchaseItem = *req.PurchaseItem
 	}
 
