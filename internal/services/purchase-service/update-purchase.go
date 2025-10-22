@@ -36,9 +36,6 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				return nil, errors.New("purchase item ID and purchase ID are required for update")
 			}
 
-			purchaseItem.ID = *item.ID
-			purchaseItem.PurchaseID = *item.PurchaseID
-
 			reqItems = append(reqItems, purchaseItem)
 		}
 
