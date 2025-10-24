@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	models "prime-erp-core/internal/models"
+	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type POData struct {
@@ -42,11 +44,14 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	companyCode := ""
 	siteCode := ""
 	supplierReq := models.GetSupplierListRequest{}
+	productCodes := []string{}
+
 	for _, invoice := range req {
 		for _, invoiceItem := range invoice.InvoiceItem {
 			poNumber = append(poNumber, invoiceItem.DocumentRef)
 			companyCode = invoice.CompanyCode
 			siteCode = invoice.SiteCode
+			productCodes = append(productCodes, invoiceItem.ProductCode)
 		}
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoice.PartyCode)
 	}
@@ -119,7 +124,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						})
 					}
 				}
-			} else {
+			} /*  else {
 
 				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 					Index:   i,
@@ -127,7 +132,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					Status:  "error",
 					Type:    "po",
 				})
-			}
+			} */
 		}
 	}
 	if len(toleranceErrorResponse.ToleranceError) == 0 {
@@ -135,6 +140,8 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
 		}
+		invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
+		idInvoice := invoiceMap["id"].([]uuid.UUID)
 		requestData := map[string]interface{}{
 			"module":    []string{"INVOICE"},
 			"topic":     []string{"AP"},
@@ -156,20 +163,54 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 			}
 
+			productReq := models.GetProductRequest{
+				ProductCode: productCodes,
+				SiteCode:    []string{siteCode},
+				CompanyCode: []string{companyCode},
+			}
+
+			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+			if errmapProduct != nil {
+				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+			}
+
 			for i := range req {
 				if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 					req[i].PartyName = supplier.SupplierName
-
+					req[i].PartyBranch = supplier.Branch
+					req[i].PartyAddress = supplier.Address
+					req[i].PartyEmail = supplier.Email
+					req[i].PartyTel = supplier.Phone
+					req[i].PartyTaxID = supplier.TaxID
+					req[i].PartyExternalID = supplier.ExternalID
 				}
+				for it := range req[i].InvoiceItem {
+					req[i].InvoiceItem[it].ProductName = mapProduct[req[i].InvoiceItem[it].ProductCode].ProductName
+				}
+
 			}
 
 			requestDataCreateHook := interfaceService.HookInterfaceRequest{
 				RequestData: req,
 				UrlHook:     urlHook,
 			}
-			_, err := interfaceService.HookInterface(requestDataCreateHook)
+			HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
 			if err != nil {
 				return nil, err
+			}
+			if HookInterfaceValue != nil {
+				str, _ := HookInterfaceValue.(string)
+
+				invoiceValue := []models.Invoice{}
+				invoiceValue = append(invoiceValue, models.Invoice{
+					ID:         idInvoice[0],
+					ExternalID: str,
+				})
+
+				_, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, []models.InvoiceItem{})
+				if errCreateApproval != nil {
+					return nil, errCreateApproval
+				}
 			}
 		}
 

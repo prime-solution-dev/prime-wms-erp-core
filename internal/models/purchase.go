@@ -322,7 +322,18 @@ type Supplier struct {
 	ID           uuid.UUID `json:"id"`
 	SupplierCode string    `json:"supplier_code"`
 	SupplierName string    `json:"supplier_name"`
+	PostCode     string    `json:"post_code"`
+	Province     string    `json:"province"`
+	Country      string    `json:"country"`
+	Contact      string    `json:"contact"`
+	Phone        string    `json:"phone"`
+	Email        string    `json:"email"`
+	Address      string    `json:"address"`
+	ActiveFlg    bool      `json:"active_flg"`
+	CreditTerm   int       `json:"credit_term"`
 	ExternalID   string    `json:"external_id"`
+	TaxID        string    `json:"tax_id"`
+	Branch       string    `json:"branch"`
 	CreateBy     string    `json:"create_by"`
 	CreateDtm    time.Time `json:"create_dtm"`
 	UpdateBy     string    `json:"update_by"`

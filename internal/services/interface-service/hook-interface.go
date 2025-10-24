@@ -47,7 +47,17 @@ func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
 		fmt.Println("Response Status:", err)
 	}
 
-	fmt.Println("Response Status:", resp.Status)
+	productMap, _ := products.(map[string]interface{})
+
+	if productMap != nil {
+		if idVal, exists := productMap["id"]; exists {
+			if idStr, ok := idVal.(string); ok && idStr != "" {
+				return productMap["id"].(string), nil
+			}
+		} else {
+			return nil, errors.New(productMap["message"].(string))
+		}
+	}
 
 	return products, nil
 

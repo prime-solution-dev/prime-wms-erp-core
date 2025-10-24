@@ -95,7 +95,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					if invoiceItem.Weight > poQTYMapResult.Weight {
 						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 							Index:   i,
-							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
+							Message: "เกินน้ำหนักสูงสุด :  " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
 						})
