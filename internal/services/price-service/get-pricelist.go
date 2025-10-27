@@ -21,7 +21,7 @@ type GetPriceListGroupRequest struct {
 	GroupCodes        []string   `json:"group_codes"`
 	EffectiveDateFrom *time.Time `json:"effective_date_from"`
 	EffectiveDateTo   *time.Time `json:"effective_date_to"`
-	SubGroupCodes     []string   `json:"sub_group_codes"`
+	SubGroupCodes     []string   `json:"sub_group_codes"` // TODO: อาจจะต้อง filter ละเอียดขึ้น หรือ แยกเส้น
 }
 
 type GetPriceListGroupResponse struct {
@@ -39,7 +39,6 @@ type PriceListGroup struct {
 	BeforePriceWeight float64               `json:"before_price_weight"`
 	Currency          string                `json:"currency"`
 	EffectiveDate     time.Time             `json:"effective_date"`
-	ExtraPattern      string                `json:"extra_pattern"`
 	Remark            string                `json:"remark"`
 	Terms             []PriceListGroupTerm  `json:"terms"`
 	Extras            []PriceListGroupExtra `json:"extras"`
@@ -213,6 +212,7 @@ func getTerms(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGro
 
 	query := fmt.Sprintf(`
 		select
+			plt.id,
 			plt.price_list_group_id,
 			plt.term_code,
 			plt.pdc,
@@ -231,6 +231,7 @@ func getTerms(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGro
 	for _, row := range rows {
 		groupID := toString(row["price_list_group_id"])
 		term := PriceListGroupTerm{
+			ID:         parseUUID(toString(row["id"])),
 			TermCode:   toString(row["term_code"]),
 			Pdc:        toFloat64(row["pdc"]),
 			PdcPercent: toFloat64(row["pdc_percent"]),
@@ -300,7 +301,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plg.before_price_weight, 0) AS group_before_price_weight,
 			COALESCE(plg.currency, '') AS currency,
 			plg.effective_date AS group_effective_date,
-			COALESCE(plg.extra_pattern, '') AS extra_pattern,
 			COALESCE(plg.remark, '') AS group_remark,
 
 			plsg.id as sub_id,
@@ -350,7 +350,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforePriceUnit:   toFloat64(row["group_before_price_unit"]),
 				BeforePriceWeight: toFloat64(row["group_before_price_weight"]),
 				Currency:          toString(row["currency"]),
-				ExtraPattern:      toString(row["extra_pattern"]),
 				Remark:            toString(row["group_remark"]),
 			}
 			if t := toTime(row["group_effective_date"]); t != nil {

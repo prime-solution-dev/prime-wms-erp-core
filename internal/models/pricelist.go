@@ -17,7 +17,6 @@ type PriceListGroup struct {
 	BeforePriceWeight float64    `json:"before_price_weight"`
 	Currency          string     `json:"currency"`
 	EffectiveDate     *time.Time `json:"effective_date"`
-	ExtraPattern      string     `json:"extra_pattern"`
 	Remark            string     `json:"remark"`
 	CreateBy          string     `json:"create_by"`
 	CreateDtm         *time.Time `json:"create_dtm"`
@@ -39,7 +38,6 @@ type PriceListGroupHistory struct {
 	Currency          string     `json:"currency"`
 	EffectiveDate     *time.Time `json:"effective_date"`
 	ExpiryDate        *time.Time `json:"expiry_date"`
-	ExtraPattern      string     `json:"extra_pattern"`
 	Remark            string     `json:"remark"`
 	CreateBy          string     `json:"create_by"`
 	CreateDtm         *time.Time `json:"create_dtm"`
@@ -187,9 +185,13 @@ type PaymentTerm struct {
 
 func (PaymentTerm) TableName() string { return "payment_term" }
 
-type ExtraPattern struct {
-	PatternCode string `json:"pattern_code"`
-	PatternName string `json:"pattern_name"`
+// DTOs
+type UpdatePriceListBaseRequest struct {
+	ID            uuid.UUID            `json:"id"`
+	PriceUnit     float64              `json:"price_unit"`
+	PriceWeight   float64              `json:"price_weight"`
+	Currency      string               `json:"currency"`
+	EffectiveDate *time.Time           `json:"effective_date"`
+	Remark        string               `json:"remark"`
+	Terms         []PriceListGroupTerm `json:"terms"`
 }
-
-func (ExtraPattern) TableName() string { return "extra_pattern" }
