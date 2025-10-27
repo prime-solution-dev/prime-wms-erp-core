@@ -9,6 +9,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// CreatePriceListGroup
+func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&priceListGroups).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
 // UpdatePriceListGroup
 func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 	gormx, err := db.ConnectGORM("prime_erp")

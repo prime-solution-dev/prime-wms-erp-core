@@ -39,6 +39,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.CreatePriceListBase)
+	})
 	price.POST("/UpdatePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.UpdatePriceListBase)
 	})
@@ -46,7 +49,6 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, priceService.DeletePriceListBase)
 	})
 	// config extra get[3] create[2] update delete
-	// price list group create update/ delete(hard delete เก็บใน history) // [1]
 	// extra create update delete [4]
 
 	//quotation
