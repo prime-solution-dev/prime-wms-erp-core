@@ -136,6 +136,7 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
+	defer db.CloseGORM(gormx)
 
 	query := gormx.Preload("Items").
 		Order("quotation.update_date DESC")

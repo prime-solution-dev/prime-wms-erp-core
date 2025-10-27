@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
-	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +18,7 @@ type GetHistoryReq struct {
 }
 type GetHistoryRes struct {
 	ID                  uuid.UUID  `json:"id"`
+	RequestCode         string     `json:"request_code"`
 	CreditLimit         float64    `json:"credit_limit"`
 	IncreaseCreditLimit float64    `json:"increase_credit_limit"`
 	StartDateTime       *time.Time `json:"start_date_time"`
@@ -43,7 +43,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -55,6 +55,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "EXTRA" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					RequestCode:         creditValue.RequestCode,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -67,6 +68,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "BASE" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					RequestCode:         creditValue.RequestCode,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -80,6 +82,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "EXTRA" {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
+					RequestCode:         creditValue.RequestCode,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -92,6 +95,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "BASE" {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
+					RequestCode:         creditValue.RequestCode,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -120,9 +124,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
-		isActive := "Inactive"
+		isActive := "INACTIVE"
 		if creditValue.IsActive {
-			isActive = "Active"
+			isActive = "ACTIVE"
 		}
 
 		for _, creditExtraValue := range creditValue.CreditExtra {
@@ -150,21 +154,21 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	requestApprovalData := map[string]interface{}{
-		"document_code": reqCode,
+		"transaction_code": reqCode,
 	}
 	jsonBytesGetApproval, err := json.Marshal(requestApprovalData)
 	if err != nil {
 		return nil, err
 	}
 
-	approvalRes, errGetApproval := approvalService.GetApproval(ctx, string(jsonBytesGetApproval))
+	approvalRes, errGetApproval := GetTransaction(ctx, string(jsonBytesGetApproval))
 	if errGetApproval != nil {
 		return nil, errGetApproval
 	}
 
-	for _, approvalValue := range approvalRes.(approvalService.ResultApproval).ApprovalRes {
+	for _, approvalValue := range approvalRes.(ResultCreditTransaction).CreditTransaction {
 
-		reqCodeAmountMap, exist := reqCodeAmount[approvalValue.DocumentCode]
+		reqCodeAmountMap, exist := reqCodeAmount[approvalValue.TransactionCode]
 		if exist {
 			historyRes = append(historyRes, GetHistoryRes{
 				ID:                  approvalValue.ID,

@@ -77,11 +77,14 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 		return nil, fmt.Errorf("invalid status: %s", req.Status)
 	}
 
+	now := time.Now()
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
 	updateFields := map[string]interface{}{
 		"status":          quotationStatus,
 		"status_approve":  quotationStatusApprove,
 		"remark_approval": req.Remark,
-		"update_date":     gormx.NowFunc(),
+		"update_date":     nowDateOnly,
 	}
 	if req.Status == "COMPLETED" {
 		// Query existing quotation to check expire_price_date
@@ -113,9 +116,10 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 				return nil, errors.New("failed to convert expiry days to int64: " + err.Error())
 			}
 
-			expiryDate := time.Now().AddDate(0, 0, int(expiryDays))
+			expiryDateTemp := time.Now().AddDate(0, 0, int(expiryDays))
+			expiryDate := time.Date(expiryDateTemp.Year(), expiryDateTemp.Month(), expiryDateTemp.Day(), 0, 0, 0, 0, expiryDateTemp.Location())
 
-			updateFields["effective_date_price"] = gormx.NowFunc()
+			updateFields["effective_date_price"] = nowDateOnly
 			updateFields["expire_price_day"] = int(expiryDays)
 			updateFields["expire_price_date"] = &expiryDate
 		}
@@ -134,7 +138,7 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 			Where("quotation_id = ?", req.ID).
 			Updates(map[string]interface{}{
 				"status":      "CANCELED",
-				"update_date": gormx.NowFunc(),
+				"update_date": nowDateOnly,
 			}).Error; err != nil {
 			return nil, fmt.Errorf("failed to update quotation items status: %v", err)
 		}

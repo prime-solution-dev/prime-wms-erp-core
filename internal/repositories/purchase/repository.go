@@ -5,53 +5,89 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Create
-func CreatePOBigLot(prePurchases []models.PrePurchase) error {
+func CreatePurchase(purchases []models.Purchase) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
 	}
 	defer db.CloseGORM(gormx)
 
-	tx := gormx.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		} else if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit().Error
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&purchases).Error; err != nil {
+			return err
 		}
-	}()
-
-	result := tx.Create(&prePurchases)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // Get
-func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, page, pageSize int) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPurchaseList(
+	purchaseCodes []string,
+	supplierCodes []string,
+	statusApprove []string,
+	statusPayment []string,
+	statusPaymentIncomplete bool,
+	productCodes []string,
+	purchaseType []string,
+	docRef []string,
+	companyCode string,
+	siteCode string,
+	page int,
+	pageSize int,
+) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 	defer db.CloseGORM(gormx)
 
-	var prePurchaseList []models.PrePurchase
+	var purchases []models.Purchase
 	var totalRecords int64
 
 	// Build base query
-	query := gormx.Model(&models.PrePurchase{}).
+	query := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
 
-	if len(prePurchaseCodes) > 0 {
-		query = query.Where("pre_purchase_code IN ?", prePurchaseCodes)
+	if len(purchaseCodes) > 0 {
+		query = query.Where("purchase_code IN ?", purchaseCodes)
+	}
+
+	if len(supplierCodes) > 0 {
+		query = query.Where("supplier_code IN ?", supplierCodes)
+	}
+
+	if len(statusApprove) > 0 {
+		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(statusPayment) > 0 {
+		query = query.Where("status_payment IN ?", statusPayment)
+	}
+
+	if statusPaymentIncomplete {
+		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
+	}
+
+	if len(productCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_code IN ?", productCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
+	if len(purchaseType) > 0 {
+		query = query.Where("purchase_type IN ?", purchaseType)
+	}
+
+	if len(docRef) > 0 {
+		query = query.Where("doc_ref IN ?", docRef)
 	}
 
 	// Count total records (no preload needed)
@@ -59,105 +95,189 @@ func GetPOBigLotList(prePurchaseCodes []string, companyCode, siteCode string, pa
 		return nil, 0, 0, 0, 0, err
 	}
 
-	// Pagination
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
+	}
+
+	// Apply pagination
 	offset := (page - 1) * pageSize
-	if err := query.Preload("PrePurchaseItems").
+	if err := query.
+		Preload("PurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
-		Find(&prePurchaseList).Error; err != nil {
+		Find(&purchases).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 
-	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	totalPages := 0
+	if totalRecords > 0 {
+		totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	}
 
-	return prePurchaseList, int(totalRecords), page, pageSize, totalPages, nil
+	if page == 0 {
+		page = 1
+	}
+
+	return purchases, int(totalRecords), page, pageSize, totalPages, nil
 }
 
 // Update
-func UpdatePOBigLot(prePurchases []models.PrePurchase) (err error) {
+func UpdatePurchase(purchases []models.Purchase) (err error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
 	}
 	defer db.CloseGORM(gormx)
 
-	tx := gormx.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		} else if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit().Error
-		}
-	}()
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		for _, purchase := range purchases {
+			// Update purchase
+			if err := tx.Model(&models.Purchase{}).
+				Where("id = ?", purchase.ID).
+				Updates(purchase).Error; err != nil {
+				return err
+			}
 
-	for _, prePurchase := range prePurchases {
-		// update pre_purchase
-		if result := tx.Model(&models.PrePurchase{}).
-			Where("id = ?", prePurchase.ID).
-			Updates(prePurchase); result.Error != nil {
-			err = result.Error
-			return
-		}
+			// Delete old items
+			if result := tx.Where("purchase_id = ?", purchase.ID).Delete(&models.PurchaseItem{}); result.Error != nil {
+				return result.Error
+			}
 
-		// delete old items
-		if result := tx.Where("pre_purchase_id = ?", prePurchase.ID).
-			Delete(&models.PrePurchaseItem{}); result.Error != nil {
-			err = result.Error
-			return
-		}
-
-		for i := range prePurchase.PrePurchaseItems {
-			prePurchase.PrePurchaseItems[i].PrePurchaseID = prePurchase.ID
-			prePurchase.PrePurchaseItems[i].Status = prePurchase.Status
-		}
-
-		// insert new items
-		if len(prePurchase.PrePurchaseItems) > 0 {
-			if result := tx.Create(&prePurchase.PrePurchaseItems); result.Error != nil {
-				err = result.Error
-				return
+			// Insert new items
+			for _, item := range purchase.PurchaseItems {
+				item.PurchaseID = purchase.ID // Ensure foreign key is set
+				if err := tx.Create(&item).Error; err != nil {
+					return err
+				}
 			}
 		}
-	}
-
-	return
+		return nil
+	})
 }
 
-// Update
-func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigLotRequest) (err error) {
+func UpdatePurchaseStatusApprove(purchases []models.UpdateStatusApprovePurchaseRequest) (err error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
 	}
 	defer db.CloseGORM(gormx)
 
-	tx := gormx.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		} else if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit().Error
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		for _, purchase := range purchases {
+			if result := tx.Model(&models.Purchase{}).
+				Where("id = ?", purchase.ID).
+				Updates(map[string]interface{}{
+					"status_approve": purchase.StatusApprove,
+					"is_approved":    purchase.IsApproved,
+					"update_dtm":     time.Now().UTC(),
+				}); result.Error != nil {
+				err = result.Error
+			}
 		}
-	}()
+		return nil
+	})
+}
 
-	for _, prePurchase := range prePurchases {
-		// update pre_purchase
-		if result := tx.Model(&models.PrePurchase{}).
-			Where("id = ?", prePurchase.ID).Updates(map[string]interface{}{
-			"status_approve": prePurchase.StatusApprove,
-			"is_approved":    prePurchase.IsApproved,
-			"update_date":    time.Now(),
-		}); result.Error != nil {
-			err = result.Error
-			return
-		}
+func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
 	}
+	defer db.CloseGORM(gormx)
 
-	return
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if len(purchaseCodes) > 0 {
+			var purchaseItemCodes []string
+			subQuery := tx.Model(&models.Purchase{}).
+				Select("id").
+				Where("purchase_code IN ?", purchaseCodes)
+
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id IN (?)", subQuery).
+				Pluck("purchase_item", &purchaseItemCodes).Error; err != nil {
+				return err
+			}
+
+			purchaseItems = append(purchaseItems, purchaseItemCodes...)
+		}
+
+		if len(purchaseItems) > 0 {
+			if result := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_item IN ?", purchaseItems).
+				Updates(map[string]interface{}{
+					"status_payment": "COMPLETED",
+					"update_dtm":     time.Now().UTC(),
+				}); result.Error != nil {
+				err = result.Error
+			}
+		}
+
+		var purchaseAutoCompleteCodes []string
+		subQueryCompletePurchaseItem := tx.Model(&models.PurchaseItem{}).
+			Select("purchase_id").
+			Where("status_payment = ?", "COMPLETED")
+
+		if err := tx.Model(&models.Purchase{}).
+			Where("id IN (?)", subQueryCompletePurchaseItem).
+			Pluck("purchase_code", &purchaseAutoCompleteCodes).Error; err != nil {
+			return err
+		}
+
+		purchaseCodes = append(purchaseCodes, purchaseAutoCompleteCodes...)
+
+		for _, code := range purchaseCodes {
+			var totalItems int64
+			var completedItems int64
+
+			queryPurchaseID := tx.Model(&models.Purchase{}).Select("id").Where("purchase_code = ?", code)
+
+			if err := tx.Model(&models.PurchaseItem{}).Where("purchase_id = (?)", queryPurchaseID).Count(&totalItems).Error; err != nil {
+				return err
+			}
+
+			if err := tx.Model(&models.PurchaseItem{}).Where("purchase_id = (?) AND status_payment = ?", queryPurchaseID, "COMPLETED").Count(&completedItems).Error; err != nil {
+				return err
+			}
+
+			status := "PENDING"
+			if totalItems == 0 {
+				status = "COMPLETED"
+			}
+
+			if totalItems > 0 && totalItems == completedItems {
+				status = "COMPLETED"
+			}
+
+			if err := tx.Model(&models.Purchase{}).
+				Where("purchase_code = ?", code).
+				Updates(map[string]interface{}{
+					"status_payment": status,
+					"update_dtm":     time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func CompletePO(purchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Purchase{}).
+			Where("purchase_code IN ?", purchaseCodes).
+			Updates(map[string]interface{}{
+				"status":     "COMPLETED",
+				"update_dtm": time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }

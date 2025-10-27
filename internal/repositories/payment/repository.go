@@ -1,6 +1,7 @@
 package paymentRepository
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"prime-erp-core/internal/db"
@@ -100,4 +101,37 @@ func GetPaymentPreload(id []uuid.UUID, customerCode []string, status []string, i
 	} else {
 		return nil, 0, 0, err
 	}
+}
+func CreatePayment(payment []models.Payment, paymentInvoice []models.PaymentInvoice) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+	tx := gormx.Begin()
+	defer func() {
+		if rc := recover(); rc != nil {
+			tx.Rollback()
+			err = errors.New("panic error cant't save approval")
+		}
+	}()
+	if err = tx.Error; err != nil {
+		return err
+	}
+	if len(payment) > 0 {
+		result := tx.Create(&payment)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+	if len(paymentInvoice) > 0 {
+		result := tx.Create(&paymentInvoice)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+	err = tx.Commit().Error
+	return err
 }

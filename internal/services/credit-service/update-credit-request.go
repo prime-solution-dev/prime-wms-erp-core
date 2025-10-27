@@ -22,7 +22,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	credit := []models.Credit{}
 
 	for i := range req {
-		if req[i].Status == "REJECT" {
+		/* if req[i].Status == "REJECT" {
 			creditTransaction = append(creditTransaction, models.CreditTransaction{
 				TransactionCode: req[i].RequestCode,
 				TransactionType: req[i].RequestType,
@@ -37,7 +37,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 				Reason:    "",
 			})
 
-		}
+		} */
 		if req[i].Status == "COMPLETED" {
 			creditExtra := []models.CreditExtra{}
 			CreditID := uuid.New()
@@ -69,6 +69,21 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 		req[i].IsAction = true
 		creditRequestValue = append(creditRequestValue, req[i])
+
+		creditTransaction = append(creditTransaction, models.CreditTransaction{
+			TransactionCode: req[i].RequestCode,
+			TransactionType: req[i].RequestType,
+			Amount:          req[i].Amount,
+			AdjustAmount:    0,
+			EffectiveDtm:    req[i].EffectiveDtm,
+			ExpireDtm:       req[i].ExpireDtm,
+			//ForceExpireDtm:  req[i].e,
+			//ApproveDate:     "",
+			IsApprove: false,
+			Status:    req[i].Status,
+			Reason:    "",
+		})
+
 	}
 	if len(creditTransaction) > 0 {
 		jsonByteserrCreditTransaction, err := json.Marshal(creditTransaction)
@@ -105,7 +120,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	} else {
 		return map[string]interface{}{
 			"status":  "success",
-			"message": "Approval Not Have Rows Affected",
+			"message": "Approval Not Have Rows Affected ",
 		}, nil
 	}
 }

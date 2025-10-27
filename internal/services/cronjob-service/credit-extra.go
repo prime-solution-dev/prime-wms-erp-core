@@ -71,65 +71,70 @@ func CreditExtra(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			creditExtraID = append(creditExtraID, creditExtraValue.ID)
 		}
 	}
+	if len(creditExtraID) > 0 {
+		jsonBytesDeleteCreditExtra, err := json.Marshal(creditExtraID)
+		if err != nil {
+			return nil, err
+		}
+		urlCreateDeleteCreditExtra := os.Getenv("base_url_erp") + "/credit/DeleteCreditExtra"
+		reqCreateDeleteCreditExtra, err := http.NewRequest("POST", urlCreateDeleteCreditExtra, bytes.NewBuffer(jsonBytesDeleteCreditExtra))
+		if err != nil {
+			return nil, errors.New("Error parsing DateTo: " + err.Error())
+		}
 
-	jsonBytesDeleteCreditExtra, err := json.Marshal(creditExtraID)
-	if err != nil {
-		return nil, err
-	}
-	urlCreateDeleteCreditExtra := os.Getenv("base_url_erp") + "/credit/DeleteCreditExtra"
-	reqCreateDeleteCreditExtra, err := http.NewRequest("POST", urlCreateDeleteCreditExtra, bytes.NewBuffer(jsonBytesDeleteCreditExtra))
-	if err != nil {
-		return nil, errors.New("Error parsing DateTo: " + err.Error())
-	}
+		reqCreateDeleteCreditExtra.Header.Set("Content-Type", "application/json")
 
-	reqCreateDeleteCreditExtra.Header.Set("Content-Type", "application/json")
+		// Create a client and execute the request
+		clientCreateDeleteCreditExtra := &http.Client{}
+		respCreateDeleteCreditExtra, errCreateDeleteCreditExtra := clientCreateDeleteCreditExtra.Do(reqCreateDeleteCreditExtra)
+		if errCreateDeleteCreditExtra != nil {
+			return nil, errors.New("Error parsing DateTo: " + errCreateDeleteCreditExtra.Error())
+		}
+		defer respCreateDeleteCreditExtra.Body.Close()
 
-	// Create a client and execute the request
-	clientCreateDeleteCreditExtra := &http.Client{}
-	respCreateDeleteCreditExtra, errCreateDeleteCreditExtra := clientCreateDeleteCreditExtra.Do(reqCreateDeleteCreditExtra)
-	if errCreateDeleteCreditExtra != nil {
-		return nil, errors.New("Error parsing DateTo: " + errCreateDeleteCreditExtra.Error())
-	}
-	defer respCreateDeleteCreditExtra.Body.Close()
-
-	bodyCreateDeleteCreditExtra, err := io.ReadAll(respCreateDeleteCreditExtra.Body)
-	if err != nil {
-		return nil, err
-	}
-	var convertCreateDeleteCreditExtra interface{}
-	err = json.Unmarshal(bodyCreateDeleteCreditExtra, &convertCreateDeleteCreditExtra)
-	if err != nil {
-		return nil, err
-	}
-
-	jsonBytesCreditTransaction, err := json.Marshal(creditTransaction)
-	if err != nil {
-		return nil, err
-	}
-	urlCreateCreditTransaction := os.Getenv("base_url_erp") + "/credit/CreateCreditTransaction"
-	reqCreateCreditTransaction, err := http.NewRequest("POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
-	if err != nil {
-		return nil, errors.New("Error parsing DateTo: " + err.Error())
+		bodyCreateDeleteCreditExtra, err := io.ReadAll(respCreateDeleteCreditExtra.Body)
+		if err != nil {
+			return nil, err
+		}
+		var convertCreateDeleteCreditExtra interface{}
+		err = json.Unmarshal(bodyCreateDeleteCreditExtra, &convertCreateDeleteCreditExtra)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	reqCreateCreditTransaction.Header.Set("Content-Type", "application/json")
+	if len(creditTransaction) > 0 {
 
-	// Create a client and execute the request
-	clientCreateCreditTransaction := &http.Client{}
-	respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
-	if errCreateCreditTransaction != nil {
-		return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())
-	}
-	defer respCreateCreditTransaction.Body.Close()
+		jsonBytesCreditTransaction, err := json.Marshal(creditTransaction)
+		if err != nil {
+			return nil, err
+		}
+		urlCreateCreditTransaction := os.Getenv("base_url_erp") + "/credit/CreateCreditTransaction"
+		reqCreateCreditTransaction, err := http.NewRequest("POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
+		if err != nil {
+			return nil, errors.New("Error parsing DateTo: " + err.Error())
+		}
 
-	bodyCreateCreditTransaction, err := io.ReadAll(respCreateCreditTransaction.Body)
-	if err != nil {
-		return nil, err
-	}
-	var convertCreateCreditTransaction interface{}
-	err = json.Unmarshal(bodyCreateCreditTransaction, &convertCreateCreditTransaction)
-	if err != nil {
-		return nil, err
+		reqCreateCreditTransaction.Header.Set("Content-Type", "application/json")
+
+		// Create a client and execute the request
+		clientCreateCreditTransaction := &http.Client{}
+		respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
+		if errCreateCreditTransaction != nil {
+			return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())
+		}
+		defer respCreateCreditTransaction.Body.Close()
+
+		bodyCreateCreditTransaction, err := io.ReadAll(respCreateCreditTransaction.Body)
+		if err != nil {
+			return nil, err
+		}
+		var convertCreateCreditTransaction interface{}
+		err = json.Unmarshal(bodyCreateCreditTransaction, &convertCreateCreditTransaction)
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return nil, nil

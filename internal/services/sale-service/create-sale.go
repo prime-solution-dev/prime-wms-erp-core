@@ -58,6 +58,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	user := `system` // TODO: get from ctx
 	now := time.Now()
 	nowTruc := now.Truncate(24 * time.Hour)
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	createSales := []models.Sale{}
 	createSaleItems := []models.SaleItem{}
@@ -73,9 +74,9 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			tempSale.SaleCode = saleCode
 		}
 
-		tempSale.CreateDate = &now
+		tempSale.CreateDate = &nowDateOnly
 		tempSale.CreateBy = user
-		tempSale.UpdateDate = &now
+		tempSale.UpdateDate = &nowDateOnly
 		tempSale.UpdateBy = user
 		tempSale.StatusApprove = "COMPLETED"
 		tempSale.IsApproved = true
@@ -109,9 +110,16 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for _, item := range saleReq.Items {
 			item.ID = uuid.New()
 			item.SaleID = tempSale.ID
-			item.CreateDate = &now
+
+			saleItem := uuid.New().String()
+
+			if item.SaleItem == "" {
+				item.SaleItem = saleItem
+			}
+
+			item.CreateDate = &nowDateOnly
 			item.CreateBy = user
-			item.UpdateDate = &now
+			item.UpdateDate = &nowDateOnly
 			item.UpdateBy = user
 
 			createSaleItems = append(createSaleItems, item)

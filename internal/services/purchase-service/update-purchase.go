@@ -5,52 +5,91 @@ import (
 	"errors"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
-	req := []models.UpdatePOBigLotRequest{}
+func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := []models.PurchaseFormRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	user := "system"
-	now := time.Now()
-
-	prePurchases := []models.PrePurchase{}
-
+	purchases := []models.Purchase{}
 	for _, r := range req {
-		prePurchase := MapUpdatePOBigLotRequestToPrePurchase(r)
-		prePurchase.UpdateDate = &now
-		prePurchase.UpdateBy = user
-		prePurchase.PrePurchaseItems = MapUpdatePOBigLotRequestToPrePurchaseItem(r.PrePurchaseItems)
-		prePurchases = append(prePurchases, prePurchase)
+		purchase := MapPurchaseFormRequestToPurchaseModel(r)
+
+		if r.ID == nil || r.PurchaseCode == nil {
+			return nil, errors.New("purchase ID and code are required for update")
+		}
+
+		purchase.ID = *r.ID
+		purchase.PurchaseCode = *r.PurchaseCode
+
+		// Map purchase items
+		reqItems := []models.PurchaseItem{}
+		for _, item := range r.Items {
+			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, purchase.PurchaseCode)
+			purchaseItem.PurchaseID = purchase.ID
+
+			reqItems = append(reqItems, purchaseItem)
+		}
+
+		purchase.PurchaseItems = reqItems
+
+		purchases = append(purchases, purchase)
 	}
 
-	if err := purchaseRepository.UpdatePOBigLot(prePurchases); err != nil {
-		return nil, errors.New("fail to update big lot: " + err.Error())
+	if err := purchaseRepository.UpdatePurchase(purchases); err != nil {
+		return nil, errors.New("fail to update purchase: " + err.Error())
 	}
 
 	return nil, nil
 }
 
-func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
-	req := []models.UpdateStatusApprovePOBigLotRequest{}
+func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := []models.UpdateStatusApprovePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
 	// Update approval status
-	if err := UpdateBigLotToApproval(ctx, req); err != nil {
+	if err := UpdatePOToApproval(ctx, req); err != nil {
 		return nil, err
 	}
 
-	if err := purchaseRepository.UpdateStatusApprovePOBigLot(req); err != nil {
-		return nil, errors.New("failed to update pre purchase status approve: " + err.Error())
+	if err := purchaseRepository.UpdatePurchaseStatusApprove(req); err != nil {
+		return nil, errors.New("failed to update purchase status approve: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompleteStatusPaymentPurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CompletePOPayment(req.PurchaseCodes, req.PurchaseItems); err != nil {
+		return nil, errors.New("failed to complete PO payment: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CompletePO(req.PurchaseCodes); err != nil {
+		return nil, errors.New("failed to complete PO: " + err.Error())
 	}
 
 	return nil, nil
