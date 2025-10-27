@@ -7,6 +7,8 @@ const (
 
 	// API Endpoints
 	GET_INVENTORY_ATP_ENDPOINT = WMS_API_BASE_URL + "/warehouse/Inventory/GetInventoryAtp"
+	CREATE_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CreateOrders"
+	CANCEL_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CancelOrders"
 )
 
 // HTTP Configuration

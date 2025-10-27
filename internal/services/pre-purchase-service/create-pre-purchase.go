@@ -1,0 +1,76 @@
+package prePurchaseService
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"prime-erp-core/internal/models"
+
+	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
+	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
+	"time"
+
+	"github.com/gin-gonic/gin"
+)
+
+func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := []models.CreatePOBigLotRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	prePurchases := []models.PrePurchase{}
+	prePurchaseConfig, err := GetPrePurchaseCodeConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	latestNum, err := ConvertConfigToLatestPrePurchaseNumber(*prePurchaseConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx, r := range req {
+		prePurchase := MapBigLotRequestToPrePurchaseModel(r)
+		saveValue := fmt.Sprintf(
+			"%s-%04d",
+			time.Now().Format("20060102"),
+			latestNum+idx+1,
+		)
+		prePurchaseCode := fmt.Sprintf(
+			"%s-%s%s",
+			prePurchaseConfig.TopicCode,
+			prePurchaseConfig.ConfigCode,
+			saveValue,
+		)
+		prePurchase.PrePurchaseCode = prePurchaseCode
+
+		for _, itemReq := range r.Items {
+			preItem := fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
+			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, prePurchase.ID, prePurchase.CreateBy, time.Now().UTC(), preItem)
+			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
+		}
+
+		prePurchases = append(prePurchases, prePurchase)
+
+		if idx == len(req)-1 {
+			prePurchaseConfig.Value = saveValue
+		}
+	}
+
+	if err := prePurchaseRepository.CreatePOBigLot(prePurchases); err != nil {
+		return nil, errors.New("failed to create big lot: " + err.Error())
+	}
+
+	if err := CreateBigLotToApproval(ctx, prePurchases); err != nil {
+		return nil, errors.New("failed to create approval: " + err.Error())
+	}
+
+	updateSystemConfigReq := []models.SystemConfig{}
+	updateSystemConfigReq = append(updateSystemConfigReq, *prePurchaseConfig)
+	if err := systemConfigRepository.UpdateSystemConfig(updateSystemConfigReq); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
