@@ -17,10 +17,6 @@ type GetDeliverySORequest struct {
 	DeliveryCode []string `json:"delivery_code"`
 }
 
-type ResultDeliverySOResponse struct {
-	Deliveries []GetDeliverySOResponse `json:"deliveries"`
-}
-
 func (GetDeliverySOResponse) TableName() string { return "delivery_booking" }
 
 func (GetDeliveryItemSOResponse) TableName() string { return "delivery_booking_item" }
@@ -135,9 +131,5 @@ func GetDeliverySO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	resultDelivery := ResultDeliverySOResponse{
-		Deliveries: res,
-	}
-
-	return resultDelivery, nil
+	return res, nil
 }
