@@ -87,6 +87,15 @@ pipeline {
                 }
             }
         }
+        stage('Clean Up Repository') {
+    steps {
+        script {
+            echo 'Cleaning up cloned repository on remote...'
+            sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+            "rm -rf ${REPO_NAME}" """
+        }
+    }
+}        
     } 
     post {
         success {
