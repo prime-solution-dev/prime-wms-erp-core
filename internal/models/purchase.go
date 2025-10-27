@@ -7,29 +7,30 @@ import (
 )
 
 type PrePurchase struct {
-	ID               uuid.UUID         `gorm:"primary_key;not null" json:"id"`
-	PrePurchaseCode  string            `gorm:"unique;not null" json:"pre_purchase_code"`
-	PurchaseType     string            `json:"purchase_type"`
-	CompanyCode      string            `json:"company_code"`
-	SiteCode         string            `json:"site_code"`
-	DocRefType       string            `json:"doc_ref_type"`
-	DocRef           string            `json:"doc_ref"`
-	SupplierCode     string            `json:"supplier_code"`
-	DeliveryAddress  string            `json:"delivery_address"`
-	Status           string            `json:"status"`
-	TotalAmount      float64           `json:"total_amount"`
-	TotalWeight      float64           `json:"total_weight"`
-	TotalDiscount    float64           `json:"total_discount"`
-	TotalVat         float64           `json:"total_vat"`
-	SubtotalExclVat  float64           `json:"subtotal_excl_vat"`
-	IsApproved       bool              `json:"is_approved"`
-	StatusApprove    string            `json:"status_approve"`
-	Remark           string            `json:"remark"`
-	CreateBy         string            `json:"create_by"`
-	CreateDtm        time.Time         `json:"create_dtm"`
-	UpdateBy         string            `json:"update_by"`
-	UpdateDtm        time.Time         `json:"update_dtm"`
-	PrePurchaseItems []PrePurchaseItem `gorm:"foreignKey:PrePurchaseID;references:ID" json:"pre_purchase_items"`
+	ID                          uuid.UUID         `gorm:"primary_key;not null" json:"id"`
+	PrePurchaseCode             string            `gorm:"unique;not null" json:"pre_purchase_code"`
+	PurchaseType                string            `json:"purchase_type"`
+	CompanyCode                 string            `json:"company_code"`
+	SiteCode                    string            `json:"site_code"`
+	DocRefType                  string            `json:"doc_ref_type"`
+	DocRef                      string            `json:"doc_ref"`
+	SupplierCode                string            `json:"supplier_code"`
+	DeliveryAddress             string            `json:"delivery_address"`
+	Status                      string            `json:"status"`
+	TotalAmount                 float64           `json:"total_amount"`
+	TotalWeight                 float64           `json:"total_weight"`
+	TotalDiscount               float64           `json:"total_discount"`
+	TotalVat                    float64           `json:"total_vat"`
+	SubtotalExclVat             float64           `json:"subtotal_excl_vat"`
+	SubtotalExclDiscountExclVat float64           `json:"subtotal_excl_discount_excl_vat"`
+	IsApproved                  bool              `json:"is_approved"`
+	StatusApprove               string            `json:"status_approve"`
+	Remark                      string            `json:"remark"`
+	CreateBy                    string            `json:"create_by"`
+	CreateDtm                   time.Time         `json:"create_dtm"`
+	UpdateBy                    string            `json:"update_by"`
+	UpdateDtm                   time.Time         `json:"update_dtm"`
+	PrePurchaseItems            []PrePurchaseItem `gorm:"foreignKey:PrePurchaseID;references:ID" json:"pre_purchase_items"`
 }
 
 func (PrePurchase) TableName() string {
@@ -72,31 +73,32 @@ func (PrePurchaseItem) TableName() string {
 }
 
 type Purchase struct {
-	ID              uuid.UUID      `gorm:"primary_key;not null" json:"id"`
-	PurchaseCode    string         `gorm:"unique;not null" json:"purchase_code"`
-	PurchaseType    string         `json:"purchase_type"`
-	CompanyCode     string         `json:"company_code"`
-	SiteCode        string         `json:"site_code"`
-	DocRefType      *string        `json:"doc_ref_type"`
-	DocRef          *string        `json:"doc_ref"`
-	SupplierCode    string         `json:"supplier_code"`
-	DeliveryDate    *time.Time     `json:"delivery_date"`
-	DeliveryAddress string         `json:"delivery_address"`
-	Status          string         `json:"status"`
-	TotalAmount     float64        `json:"total_amount"`
-	TotalWeight     float64        `json:"total_weight"`
-	TotalDiscount   float64        `json:"total_discount"`
-	TotalVat        float64        `json:"total_vat"`
-	SubtotalExclVat float64        `json:"subtotal_excl_vat"`
-	IsApproved      bool           `json:"is_approved"`
-	StatusApprove   string         `json:"status_approve"`
-	Remark          string         `json:"remark"`
-	StatusPayment   string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
-	CreateBy        string         `json:"create_by"`
-	CreateDtm       time.Time      `json:"create_dtm"`
-	UpdateBy        string         `json:"update_by"`
-	UpdateDtm       time.Time      `json:"update_dtm"`
-	PurchaseItems   []PurchaseItem `gorm:"foreignKey:PurchaseID;references:ID" json:"purchase_items"`
+	ID                          uuid.UUID      `gorm:"primary_key;not null" json:"id"`
+	PurchaseCode                string         `gorm:"unique;not null" json:"purchase_code"`
+	PurchaseType                string         `json:"purchase_type"`
+	CompanyCode                 string         `json:"company_code"`
+	SiteCode                    string         `json:"site_code"`
+	DocRefType                  *string        `json:"doc_ref_type"`
+	DocRef                      *string        `json:"doc_ref"`
+	SupplierCode                string         `json:"supplier_code"`
+	DeliveryDate                *time.Time     `json:"delivery_date"`
+	DeliveryAddress             string         `json:"delivery_address"`
+	Status                      string         `json:"status"`
+	TotalAmount                 float64        `json:"total_amount"`
+	TotalWeight                 float64        `json:"total_weight"`
+	TotalDiscount               float64        `json:"total_discount"`
+	TotalVat                    float64        `json:"total_vat"`
+	SubtotalExclVat             float64        `json:"subtotal_excl_vat"`
+	SubtotalExclDiscountExclVat float64        `json:"subtotal_excl_discount_excl_vat"`
+	IsApproved                  bool           `json:"is_approved"`
+	StatusApprove               string         `json:"status_approve"`
+	Remark                      string         `json:"remark"`
+	StatusPayment               string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	CreateBy                    string         `json:"create_by"`
+	CreateDtm                   time.Time      `json:"create_dtm"`
+	UpdateBy                    string         `json:"update_by"`
+	UpdateDtm                   time.Time      `json:"update_dtm"`
+	PurchaseItems               []PurchaseItem `gorm:"foreignKey:PurchaseID;references:ID" json:"purchase_items"`
 }
 
 func (Purchase) TableName() string {
@@ -223,28 +225,32 @@ type GetPOBigLotItemResponse struct {
 }
 
 type GetPOBigLotResponse struct {
-	ID               string                    `json:"id"`
-	PrePurchaseCode  string                    `json:"pre_purchase_code"`
-	PurchaseType     string                    `json:"purchase_type"`
-	CompanyCode      string                    `json:"company_code"`
-	SiteCode         string                    `json:"site_code"`
-	SupplierCode     string                    `json:"supplier_code"`
-	SupplierName     string                    `json:"supplier_name"`
-	DeliveryAddress  string                    `json:"delivery_address"`
-	Status           string                    `json:"status"`
-	TotalAmount      float64                   `json:"total_amount"`
-	TotalWeight      float64                   `json:"total_weight"`
-	TotalDiscount    float64                   `json:"total_discount"`
-	TotalVat         float64                   `json:"total_vat"`
-	SubtotalExclVat  float64                   `json:"subtotal_excl_vat"`
-	IsApproved       bool                      `json:"is_approved"`
-	StatusApprove    string                    `json:"status_approve"`
-	Remark           string                    `json:"remark"`
-	CreateBy         string                    `json:"create_by"`
-	CreateDtm        string                    `json:"create_dtm"`
-	UpdateBy         string                    `json:"update_by"`
-	UpdateDtm        string                    `json:"update_dtm"`
-	PrePurchaseItems []GetPOBigLotItemResponse `json:"pre_purchase_items"`
+	ID                          string                    `json:"id"`
+	PrePurchaseCode             string                    `json:"pre_purchase_code"`
+	PurchaseType                string                    `json:"purchase_type"`
+	CompanyCode                 string                    `json:"company_code"`
+	SiteCode                    string                    `json:"site_code"`
+	SupplierCode                string                    `json:"supplier_code"`
+	SupplierName                string                    `json:"supplier_name"`
+	SupplierAddress             string                    `json:"supplier_address"`
+	SupplierPhone               string                    `json:"supplier_phone"`
+	SupplierEmail               string                    `json:"supplier_email"`
+	DeliveryAddress             string                    `json:"delivery_address"`
+	Status                      string                    `json:"status"`
+	TotalAmount                 float64                   `json:"total_amount"`
+	TotalWeight                 float64                   `json:"total_weight"`
+	TotalDiscount               float64                   `json:"total_discount"`
+	TotalVat                    float64                   `json:"total_vat"`
+	SubtotalExclDiscountExclVat float64                   `json:"subtotal_excl_discount_excl_vat"`
+	SubtotalExclVat             float64                   `json:"subtotal_excl_vat"`
+	IsApproved                  bool                      `json:"is_approved"`
+	StatusApprove               string                    `json:"status_approve"`
+	Remark                      string                    `json:"remark"`
+	CreateBy                    string                    `json:"create_by"`
+	CreateDtm                   string                    `json:"create_dtm"`
+	UpdateBy                    string                    `json:"update_by"`
+	UpdateDtm                   string                    `json:"update_dtm"`
+	PrePurchaseItems            []GetPOBigLotItemResponse `json:"pre_purchase_items"`
 }
 
 type GetPOBigLotListResponse struct {
@@ -446,33 +452,37 @@ type PurchaseItemResponse struct {
 }
 
 type PurchaseResponse struct {
-	ID              string                 `json:"id"`
-	PurchaseCode    string                 `json:"purchase_code"`
-	PurchaseType    string                 `json:"purchase_type"`
-	CompanyCode     string                 `json:"company_code"`
-	SiteCode        string                 `json:"site_code"`
-	DocRefType      *string                `json:"doc_ref_type"`
-	DocRef          *string                `json:"doc_ref"`
-	SupplierCode    string                 `json:"supplier_code"`
-	SupplierName    string                 `json:"supplier_name"`
-	DeliveryDate    string                 `json:"delivery_date"`
-	DeliveryAddress string                 `json:"delivery_address"`
-	Status          string                 `json:"status"`
-	TotalAmount     float64                `json:"total_amount"`
-	TotalWeight     float64                `json:"total_weight"`
-	TotalDiscount   float64                `json:"total_discount"`
-	TotalVat        float64                `json:"total_vat"`
-	SubtotalExclVat float64                `json:"subtotal_excl_vat"`
-	IsApproved      bool                   `json:"is_approved"`
-	StatusApprove   string                 `json:"status_approve"`
-	StatusPayment   string                 `json:"status_payment"` // PENDING, COMPLETED for check invoice
-	Remark          string                 `json:"remark"`
-	CreateBy        string                 `json:"create_by"`
-	CreateDtm       string                 `json:"create_dtm"`
-	UpdateBy        string                 `json:"update_by"`
-	UpdateDtm       string                 `json:"update_dtm"`
-	Items           []PurchaseItemResponse `json:"items"`
-	RefBigLot       *GetPOBigLotResponse   `json:"ref_big_lot"`
+	ID                          string                 `json:"id"`
+	PurchaseCode                string                 `json:"purchase_code"`
+	PurchaseType                string                 `json:"purchase_type"`
+	CompanyCode                 string                 `json:"company_code"`
+	SiteCode                    string                 `json:"site_code"`
+	DocRefType                  *string                `json:"doc_ref_type"`
+	DocRef                      *string                `json:"doc_ref"`
+	SupplierCode                string                 `json:"supplier_code"`
+	SupplierName                string                 `json:"supplier_name"`
+	SupplierAddress             string                 `json:"supplier_address"`
+	SupplierPhone               string                 `json:"supplier_phone"`
+	SupplierEmail               string                 `json:"supplier_email"`
+	DeliveryDate                string                 `json:"delivery_date"`
+	DeliveryAddress             string                 `json:"delivery_address"`
+	Status                      string                 `json:"status"`
+	TotalAmount                 float64                `json:"total_amount"`
+	TotalWeight                 float64                `json:"total_weight"`
+	TotalDiscount               float64                `json:"total_discount"`
+	TotalVat                    float64                `json:"total_vat"`
+	SubtotalExclDiscountExclVat float64                `json:"subtotal_excl_discount_excl_vat"`
+	SubtotalExclVat             float64                `json:"subtotal_excl_vat"`
+	IsApproved                  bool                   `json:"is_approved"`
+	StatusApprove               string                 `json:"status_approve"`
+	StatusPayment               string                 `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	Remark                      string                 `json:"remark"`
+	CreateBy                    string                 `json:"create_by"`
+	CreateDtm                   string                 `json:"create_dtm"`
+	UpdateBy                    string                 `json:"update_by"`
+	UpdateDtm                   string                 `json:"update_dtm"`
+	Items                       []PurchaseItemResponse `json:"items"`
+	RefBigLot                   *GetPOBigLotResponse   `json:"ref_big_lot"`
 }
 
 type GetPurchaseResponse struct {
