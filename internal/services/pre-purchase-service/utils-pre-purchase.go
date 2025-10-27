@@ -82,8 +82,9 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 	return prePurchase
 }
 
-func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.PrePurchaseItem) []models.GetPOBigLotItemResponse {
+func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.PrePurchaseItem) ([]models.GetPOBigLotItemResponse, float64) {
 	items := []models.GetPOBigLotItemResponse{}
+	var sumSubTotalExclDiscountExclVat float64
 
 	for _, item := range prePurchaseItems {
 		items = append(items, models.GetPOBigLotItemResponse{
@@ -115,34 +116,39 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 			UpdateBy:             item.UpdateBy,
 			UpdateDtm:            item.UpdateDtm.Format(time.RFC3339),
 		})
+
+		sumSubTotalExclDiscountExclVat += item.TotalCost
 	}
 
-	return items
+	return items, sumSubTotalExclDiscountExclVat
 }
 
 func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) models.GetPOBigLotResponse {
+	items, sumSubTotalExclDiscountExclVat := MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems)
+
 	return models.GetPOBigLotResponse{
-		ID:               prePurchases.ID.String(),
-		PrePurchaseCode:  prePurchases.PrePurchaseCode,
-		PurchaseType:     prePurchases.PurchaseType,
-		CompanyCode:      prePurchases.CompanyCode,
-		SiteCode:         prePurchases.SiteCode,
-		SupplierCode:     prePurchases.SupplierCode,
-		DeliveryAddress:  prePurchases.DeliveryAddress,
-		Status:           prePurchases.Status,
-		TotalAmount:      prePurchases.TotalAmount,
-		TotalWeight:      prePurchases.TotalWeight,
-		TotalDiscount:    prePurchases.TotalDiscount,
-		TotalVat:         prePurchases.TotalVat,
-		SubtotalExclVat:  prePurchases.SubtotalExclVat,
-		IsApproved:       prePurchases.IsApproved,
-		StatusApprove:    prePurchases.StatusApprove,
-		Remark:           prePurchases.Remark,
-		CreateBy:         prePurchases.CreateBy,
-		CreateDtm:        prePurchases.CreateDtm.Format(time.RFC3339),
-		UpdateBy:         prePurchases.UpdateBy,
-		UpdateDtm:        prePurchases.UpdateDtm.Format(time.RFC3339),
-		PrePurchaseItems: MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems),
+		ID:                          prePurchases.ID.String(),
+		PrePurchaseCode:             prePurchases.PrePurchaseCode,
+		PurchaseType:                prePurchases.PurchaseType,
+		CompanyCode:                 prePurchases.CompanyCode,
+		SiteCode:                    prePurchases.SiteCode,
+		SupplierCode:                prePurchases.SupplierCode,
+		DeliveryAddress:             prePurchases.DeliveryAddress,
+		Status:                      prePurchases.Status,
+		TotalAmount:                 prePurchases.TotalAmount,
+		TotalWeight:                 prePurchases.TotalWeight,
+		TotalDiscount:               prePurchases.TotalDiscount,
+		TotalVat:                    prePurchases.TotalVat,
+		SubtotalExclDiscountExclVat: sumSubTotalExclDiscountExclVat,
+		SubtotalExclVat:             prePurchases.SubtotalExclVat,
+		IsApproved:                  prePurchases.IsApproved,
+		StatusApprove:               prePurchases.StatusApprove,
+		Remark:                      prePurchases.Remark,
+		CreateBy:                    prePurchases.CreateBy,
+		CreateDtm:                   prePurchases.CreateDtm.Format(time.RFC3339),
+		UpdateBy:                    prePurchases.UpdateBy,
+		UpdateDtm:                   prePurchases.UpdateDtm.Format(time.RFC3339),
+		PrePurchaseItems:            items,
 	}
 }
 

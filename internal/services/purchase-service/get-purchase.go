@@ -3,6 +3,7 @@ package purchaseService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -123,6 +124,9 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		if supplier, ok := mapSupplier[purchase.SupplierCode]; ok {
 			purchaseResponse.SupplierName = supplier.SupplierName
+			purchaseResponse.SupplierEmail = supplier.Email
+			purchaseResponse.SupplierPhone = supplier.Phone
+			purchaseResponse.SupplierAddress = fmt.Sprintf("%s %s %s %s", supplier.Address, supplier.Province, supplier.PostCode, supplier.Country)
 		}
 
 		purchaseResponse.StatusApprove = mapStatusApprove[purchase.PurchaseCode]
@@ -133,6 +137,7 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 		}
 
+		var subtotalExclDiscountExclVat float64
 		items := make([]models.PurchaseItemResponse, 0, len(purchase.PurchaseItems))
 		for _, item := range purchase.PurchaseItems {
 			itemResp := MapPurchaseItemModelToPurchaseItemResponse(item)
@@ -154,10 +159,12 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				itemResp.ProductName = "Unknown"
 			}
 
+			subtotalExclDiscountExclVat += item.TotalCost
 			items = append(items, itemResp)
 		}
 
 		purchaseResponse.Items = items
+		purchaseResponse.SubtotalExclDiscountExclVat = subtotalExclDiscountExclVat
 		result.DataList = append(result.DataList, purchaseResponse)
 	}
 
