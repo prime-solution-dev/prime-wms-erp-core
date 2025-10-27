@@ -7,22 +7,22 @@ import (
 )
 
 type PriceListGroup struct {
-	ID                uuid.UUID  `json:"id"`
-	CompanyCode       string     `json:"company_code"`
-	SiteCode          string     `json:"site_code"`
-	GroupCode         string     `json:"group_code"`
-	PriceUnit         float64    `json:"price_unit"`
-	PriceWeight       float64    `json:"price_weight"`
-	BeforePriceUnit   float64    `json:"before_price_unit"`
-	BeforePriceWeight float64    `json:"before_price_weight"`
-	Currency          string     `json:"currency"`
-	EffectiveDate     *time.Time `json:"effective_date"`
-	ExtraPattern      string     `json:"extra_pattern"`
-	Remark            string     `json:"remark"`
-	CreateBy          string     `json:"create_by"`
-	CreateDtm         *time.Time `json:"create_dtm"`
-	UpdateBy          string     `json:"update_by"`
-	UpdateDtm         *time.Time `json:"update_dtm"`
+	ID                uuid.UUID            `json:"id"`
+	CompanyCode       string               `json:"company_code"`
+	SiteCode          string               `json:"site_code"`
+	GroupCode         string               `json:"group_code"`
+	PriceUnit         float64              `json:"price_unit"`
+	PriceWeight       float64              `json:"price_weight"`
+	BeforePriceUnit   float64              `json:"before_price_unit"`
+	BeforePriceWeight float64              `json:"before_price_weight"`
+	Currency          string               `json:"currency"`
+	EffectiveDate     *time.Time           `json:"effective_date"`
+	Remark            string               `json:"remark"`
+	CreateBy          string               `json:"create_by"`
+	CreateDtm         *time.Time           `json:"create_dtm"`
+	UpdateBy          string               `json:"update_by"`
+	UpdateDtm         *time.Time           `json:"update_dtm"`
+	Terms             []PriceListGroupTerm `gorm:"foreignKey:PriceListGroupID;references:ID" json:"terms"`
 }
 
 func (PriceListGroup) TableName() string { return "price_list_group" }
@@ -39,7 +39,6 @@ type PriceListGroupHistory struct {
 	Currency          string     `json:"currency"`
 	EffectiveDate     *time.Time `json:"effective_date"`
 	ExpiryDate        *time.Time `json:"expiry_date"`
-	ExtraPattern      string     `json:"extra_pattern"`
 	Remark            string     `json:"remark"`
 	CreateBy          string     `json:"create_by"`
 	CreateDtm         *time.Time `json:"create_dtm"`
@@ -187,9 +186,37 @@ type PaymentTerm struct {
 
 func (PaymentTerm) TableName() string { return "payment_term" }
 
-type ExtraPattern struct {
-	PatternCode string `json:"pattern_code"`
-	PatternName string `json:"pattern_name"`
+// DTOs
+type CreatePriceListGroupTermRequest struct {
+	TermCode   string  `json:"term_code"`
+	Pdc        float64 `json:"pdc"`
+	PdcPercent int     `json:"pdc_percent"`
+	Due        float64 `json:"due"`
+	DuePercent int     `json:"due_percent"`
 }
 
-func (ExtraPattern) TableName() string { return "extra_pattern" }
+type CreatePriceListBaseRequest struct {
+	CompanyCode   string                            `json:"company_code"`
+	SiteCode      string                            `json:"site_code"`
+	GroupCode     string                            `json:"group_code"`
+	PriceUnit     float64                           `json:"price_unit"`
+	PriceWeight   float64                           `json:"price_weight"`
+	Currency      string                            `json:"currency"`
+	EffectiveDate *time.Time                        `json:"effective_date"`
+	Remark        string                            `json:"remark"`
+	Terms         []CreatePriceListGroupTermRequest `json:"terms"`
+}
+
+type UpdatePriceListBaseRequest struct {
+	ID            uuid.UUID            `json:"id"`
+	PriceUnit     float64              `json:"price_unit"`
+	PriceWeight   float64              `json:"price_weight"`
+	Currency      string               `json:"currency"`
+	EffectiveDate *time.Time           `json:"effective_date"`
+	Remark        string               `json:"remark"`
+	Terms         []PriceListGroupTerm `json:"terms"`
+}
+
+type DeletePriceListBaseRequest struct {
+	ID []string `json:"id"`
+}
