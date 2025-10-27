@@ -195,3 +195,7 @@ type UpdatePriceListBaseRequest struct {
 	Remark        string               `json:"remark"`
 	Terms         []PriceListGroupTerm `json:"terms"`
 }
+
+type DeletePriceListBaseRequest struct {
+	ID []string `json:"id"`
+}

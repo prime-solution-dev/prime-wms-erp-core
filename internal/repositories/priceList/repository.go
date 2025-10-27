@@ -5,6 +5,7 @@ import (
 	"prime-erp-core/internal/models"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -30,7 +31,7 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 			now := time.Now().UTC()
 
 			historyFormat := models.PriceListGroupHistory{
-				ID:                oldPriceListGroup.ID,
+				ID:                uuid.New(),
 				CompanyCode:       oldPriceListGroup.CompanyCode,
 				SiteCode:          oldPriceListGroup.SiteCode,
 				GroupCode:         oldPriceListGroup.GroupCode,
@@ -96,6 +97,62 @@ func UpdatePriceListTerm(priceListGroupTerms []models.PriceListGroupTerm) error 
 				return err
 			}
 		}
+		return nil
+	})
+}
+
+// DeletePriceListGroup
+func DeletePriceListBase(ids []string) error {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			oldPriceListGroup := models.PriceListGroup{}
+
+			if err := tx.Model(&models.PriceListGroup{}).
+				Where("id = ?", id).
+				Find(&oldPriceListGroup).
+				Error; err != nil {
+				return err
+			}
+
+			now := time.Now().UTC()
+
+			historyFormat := models.PriceListGroupHistory{
+				ID:                uuid.New(),
+				CompanyCode:       oldPriceListGroup.CompanyCode,
+				SiteCode:          oldPriceListGroup.SiteCode,
+				GroupCode:         oldPriceListGroup.GroupCode,
+				PriceUnit:         oldPriceListGroup.PriceUnit,
+				PriceWeight:       oldPriceListGroup.PriceWeight,
+				BeforePriceUnit:   oldPriceListGroup.BeforePriceUnit,
+				BeforePriceWeight: oldPriceListGroup.BeforePriceWeight,
+				Currency:          oldPriceListGroup.Currency,
+				EffectiveDate:     oldPriceListGroup.EffectiveDate,
+				ExpiryDate:        &now,
+				Remark:            oldPriceListGroup.Remark,
+				CreateBy:          oldPriceListGroup.CreateBy,
+				CreateDtm:         oldPriceListGroup.CreateDtm,
+				UpdateBy:          oldPriceListGroup.UpdateBy,
+				UpdateDtm:         oldPriceListGroup.UpdateDtm,
+			}
+
+			// Insert old record into history table
+			if err := tx.Model(&models.PriceListGroupHistory{}).Create(&historyFormat).Error; err != nil {
+				return err
+			}
+
+			// Delete from main table
+			if err := tx.Model(&models.PriceListGroup{}).
+				Where("id = ?", id).
+				Delete(&models.PriceListGroup{}).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
 }
