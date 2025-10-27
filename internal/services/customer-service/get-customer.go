@@ -39,27 +39,63 @@ type GetCustomerAddressResponse struct {
 	UpdateDate   time.Time `gorm:"type:timestamp" json:"update_date"`
 }
 type GetCustomerResponse struct {
-	ID                                uuid.UUID                    `gorm:"type:uuid;primary_key" json:"id"`
-	CustomerCode                      string                       `gorm:"type:varchar(50)" json:"customer_code"`
-	CustomerType                      string                       `gorm:"type:varchar(50)" json:"customer_type"`
-	CustomerName                      string                       `gorm:"type:varchar(50)" json:"customer_name"`
-	CreateBy                          string                       `gorm:"type:varchar(100)" json:"create_by"`
-	CreateDtm                         time.Time                    `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
-	UpdateBy                          string                       `gorm:"type:varchar(100)" json:"update_by"`
-	UpdateDTM                         time.Time                    `gorm:"autoUpdateTime;<-" json:"update_dtm"`
-	IsInternalCustomer                bool                         `json:"is_internal_customer"`
-	ConsignmentLogicalWarehouse       string                       `json:"consignment_logical_warehouse"`
-	DefaultWarehousePickingAllocation string                       `json:"default_warehouse_picking_allocation"`
-	MinimumShelfLife                  int                          `json:"minimum_shelf_life"`
-	BatchCannotReverse                bool                         `json:"batch_cannot_reverse"`
-	IsCreditHold                      bool                         `json:"is_credit_hold"`
-	CreditTerm                        int                          `json:"credit_term"`
-	SalesContactName                  string                       `json:"sales_contact_name"`
-	Phone                             string                       `json:"phone"`
-	Email                             string                       `json:"email"`
-	ActiveFlg                         bool                         `json:"active_flg"`
-	CustomerGroup                     []CustomerGroup              `gorm:"foreignKey:CustomerID;references:ID" json:"customer_group"`
-	Address                           []GetCustomerAddressResponse `gorm:"foreignKey:CustomerCode;references:CustomerCode" json:"address"`
+	ID                                uuid.UUID         `gorm:"type:uuid;primary_key" json:"id"`
+	CustomerCode                      string            `gorm:"type:varchar(50)" json:"customer_code"`
+	CustomerType                      string            `gorm:"type:varchar(50)" json:"customer_type"`
+	CustomerName                      string            `gorm:"type:varchar(50)" json:"customer_name"`
+	CreateBy                          string            `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm                         time.Time         `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy                          string            `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDTM                         time.Time         `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+	IsInternalCustomer                bool              `json:"is_internal_customer"`
+	ConsignmentLogicalWarehouse       string            `json:"consignment_logical_warehouse"`
+	DefaultWarehousePickingAllocation string            `json:"default_warehouse_picking_allocation"`
+	MinimumShelfLife                  int               `json:"minimum_shelf_life"`
+	MinimumShelfLifeFoc               int               `json:"minimum_shelf_life_foc"`
+	IsNeedNextExp                     bool              `json:"is_need_next_exp"`
+	BatchCannotReverse                bool              `json:"batch_cannot_reverse"`
+	IsCreditHold                      bool              `json:"is_credit_hold"`
+	CreditTerm                        int               `json:"credit_term"`
+	SalesContactName                  string            `json:"sales_contact_name"`
+	Phone                             string            `json:"phone"`
+	Email                             string            `json:"email"`
+	ActiveFlg                         bool              `json:"active_flg"`
+	ExternalID                        string            `gorm:"<-:create" json:"external_id"`
+	BranchName                        string            `json:"branch_name"`
+	CustomerGroup                     []CustomerGroup   `gorm:"foreignKey:CustomerID;references:ID" json:"customer_group"`
+	Address                           string            `gorm:"-" json:"address"`
+	TaxID                             string            `gorm:"-" json:"tax_id"`
+	Sold                              []GetSoldResponse `gorm:"foreignKey:CustomerID;references:ID" json:"sold"`
+}
+type GetSoldResponse struct {
+	ID           uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
+	CustomerID   uuid.UUID `json:"customer_id"`
+	CustomerCode string    `gorm:"type:varchar(50);<-:select" json:"customer_code"`
+	CustomerName string    `gorm:"type:varchar(50);<-:select" json:"customer_name"`
+	SoldCode     string    `gorm:"type:varchar(50)" json:"sold_code"`
+	Name         string    `json:"name"`
+	FirstName    string    `gorm:"type:varchar(50)" json:"first_name"`
+	LastName     string    `gorm:"type:varchar(50)" json:"last_name"`
+	IDCard       string    `gorm:"type:varchar(50)" json:"id_card"`
+	TaxID        string    `json:"tax_id"`
+	Address      string    `gorm:"type:varchar(50)" json:"address"`
+	Province     string    `gorm:"type:varchar(50)" json:"province"`
+	District     string    `gorm:"type:varchar(50)" json:"district"`
+	SubDistrict  string    `gorm:"type:varchar(50)" json:"sub_district"`
+	PostCode     string    `gorm:"type:varchar(50)" json:"post_code"`
+	Latitude     string    `gorm:"type:varchar(MAX)" json:"latitude"`
+	Longtitude   string    `gorm:"type:varchar(MAX)" json:"longtitude"`
+	Remark       string    `gorm:"type:varchar(50)" json:"remark"`
+	Contact      string    `gorm:"type:varchar(50)" json:"contact"`
+	Phone        string    `gorm:"type:varchar(50)" json:"phone"`
+	Email        string    `gorm:"type:varchar(50)" json:"email"`
+	Country      string    `json:"country"`
+	BranchID     string    `json:"branch_id"`
+	CreateBy     string    `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm    time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy     string    `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDTM    time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+	ActiveFlg    bool      `json:"active_flg"`
 }
 type ResultCustomerResponse struct {
 	Total      int                   `json:"total"`

@@ -98,8 +98,35 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		tolerance = floatVal
 	}
 	toleranceErrorResponse := ToleranceErrorResponse{}
-	for _, invoice := range req {
-		for i, invoiceItem := range invoice.InvoiceItem {
+
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	if errGetSupplierByCode != nil {
+		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
+	}
+
+	productReq := models.GetProductRequest{
+		ProductCode: productCodes,
+		SiteCode:    []string{siteCode},
+		CompanyCode: []string{companyCode},
+	}
+
+	mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+	if errmapProduct != nil {
+		return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+	}
+
+	for i, invoice := range req {
+		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
+			req[i].PartyName = supplier.SupplierName
+			req[i].PartyBranch = supplier.Branch
+			req[i].PartyAddress = supplier.Address
+			req[i].PartyEmail = supplier.Email
+			req[i].PartyTel = supplier.Phone
+			req[i].PartyTaxID = supplier.TaxID
+			req[i].PartyExternalID = supplier.ExternalID
+		}
+		for it, invoiceItem := range invoice.InvoiceItem {
+			req[i].InvoiceItem[it].ProductName = mapProduct[req[i].InvoiceItem[it].ProductCode].ProductName
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
@@ -107,7 +134,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				if invoiceItem.Qty > poQTY {
 
 					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
-						Index:   i,
+						Index:   it,
 						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
 						Status:  "error",
 						Type:    "qty",
@@ -117,7 +144,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.Weight {
 						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
-							Index:   i,
+							Index:   it,
 							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
@@ -134,9 +161,14 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				})
 			} */
 		}
+
 	}
 	if len(toleranceErrorResponse.ToleranceError) == 0 {
-		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, jsonPayload)
+		jsonBytesCreateInvoice, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
 		}
@@ -156,38 +188,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			urlHook := ""
 			for _, hookConfigValue := range hookConfig {
 				urlHook = hookConfigValue.HookUrl
-			}
-
-			mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
-			if errGetSupplierByCode != nil {
-				return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
-			}
-
-			productReq := models.GetProductRequest{
-				ProductCode: productCodes,
-				SiteCode:    []string{siteCode},
-				CompanyCode: []string{companyCode},
-			}
-
-			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
-			if errmapProduct != nil {
-				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
-			}
-
-			for i := range req {
-				if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
-					req[i].PartyName = supplier.SupplierName
-					req[i].PartyBranch = supplier.Branch
-					req[i].PartyAddress = supplier.Address
-					req[i].PartyEmail = supplier.Email
-					req[i].PartyTel = supplier.Phone
-					req[i].PartyTaxID = supplier.TaxID
-					req[i].PartyExternalID = supplier.ExternalID
-				}
-				for it := range req[i].InvoiceItem {
-					req[i].InvoiceItem[it].ProductName = mapProduct[req[i].InvoiceItem[it].ProductCode].ProductName
-				}
-
 			}
 
 			requestDataCreateHook := interfaceService.HookInterfaceRequest{
