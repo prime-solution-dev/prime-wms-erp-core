@@ -21,6 +21,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
 	invoiceIDForReturn := []uuid.UUID{}
+	invoiceCode := []string{}
 	for i, invoice := range req {
 		invoiceID := uuid.New()
 		req[i].ID = invoiceID
@@ -42,6 +43,32 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req[i].InvoiceItem = []models.InvoiceItem{}
 		req[i].InvoiceDeposit = []models.InvoiceDeposit{}
 		invoiceValue = append(invoiceValue, req[i])
+	}
+	for _, invoice := range req {
+		invoiceCode = append(invoiceCode, invoice.InvoiceCode)
+	}
+
+	requestGetInvoice := map[string][]string{
+		"invoice_code": invoiceCode,
+	}
+	jsonBytesGetInvoice, err := json.Marshal(requestGetInvoice)
+	if err != nil {
+		return nil, err
+	}
+	getInvoice, errWarehouse := GetInvoice(ctx, string(jsonBytesGetInvoice))
+	if errWarehouse != nil {
+		return nil, errWarehouse
+	}
+	resultInvoice := getInvoice.(ResultInvoice).Invoice
+	if len(resultInvoice) > 0 {
+		invoiceID := []uuid.UUID{}
+		for _, resultInvoiceValue := range resultInvoice {
+			invoiceID = append(invoiceID, resultInvoiceValue.ID)
+		}
+		errDeleteInvoice := repositoryInvoice.DeleteInvoice(invoiceID)
+		if errDeleteInvoice != nil {
+			return nil, errDeleteInvoice
+		}
 	}
 
 	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue)

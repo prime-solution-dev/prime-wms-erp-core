@@ -180,3 +180,23 @@ func UpdateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (
 
 	return rowsAffected, nil
 }
+func DeleteInvoice(id []uuid.UUID) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+
+	resultSuggest := gormx.Table("invoice").Where("id IN (?)", id).Delete(models.Invoice{})
+	if resultSuggest.Error != nil {
+		gormx.Rollback()
+		return resultSuggest.Error
+	}
+	resultBatch := gormx.Table("invoice_item").Where("invoice_id IN (?)", id).Delete(models.InvoiceItem{})
+	if resultBatch.Error != nil {
+		gormx.Rollback()
+		return resultBatch.Error
+	}
+
+	return
+}
