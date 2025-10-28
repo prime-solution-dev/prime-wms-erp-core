@@ -3,6 +3,7 @@ package prePurchaseService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"prime-erp-core/internal/models"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 
@@ -59,7 +60,12 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, prePurchase := range prePurchaseList {
 		bigLotResponse := MapPrePurchasesModelToBigLotsResponse(prePurchase)
 
-		bigLotResponse.SupplierName = mapSupplier[prePurchase.SupplierCode].SupplierName
+		if supplier, ok := mapSupplier[prePurchase.SupplierCode]; ok {
+			bigLotResponse.SupplierName = supplier.SupplierName
+			bigLotResponse.SupplierEmail = supplier.Email
+			bigLotResponse.SupplierPhone = supplier.Phone
+			bigLotResponse.SupplierAddress = fmt.Sprintf("%s %s %s %s", supplier.Address, supplier.Province, supplier.PostCode, supplier.Country)
+		}
 		bigLotResponse.StatusApprove = mapStatusApprove[prePurchase.PrePurchaseCode]
 
 		result.BigLotList = append(result.BigLotList, bigLotResponse)

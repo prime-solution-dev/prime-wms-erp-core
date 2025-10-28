@@ -39,6 +39,17 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.CreatePriceListBase)
+	})
+	price.POST("/UpdatePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.UpdatePriceListBase)
+	})
+	price.POST("/DeletePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.DeletePriceListBase)
+	})
+	// config extra get[3] create[2] update delete
+	// extra create update delete [4]
 
 	//quotation
 	quotation := ctx.Group("/quotation")
@@ -133,6 +144,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
+	})
+	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
 	})
 
 	//time
