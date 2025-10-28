@@ -84,6 +84,7 @@ type InvoiceItem struct {
 	TotalVat              float64   `json:"total_vat"`
 	Status                string    `json:"status"`
 	Remark                string    `json:"remark"`
+	ProductDescription    string    `json:"product_description"`
 }
 
 func (InvoiceItem) TableName() string { return "invoice_item" }
