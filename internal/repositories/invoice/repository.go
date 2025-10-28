@@ -120,7 +120,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		return nil, 0, 0, err
 	}
 }
-func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (err error) {
+func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem, deposit []models.InvoiceDeposit) (err error) {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
 	if err != nil {
@@ -145,6 +145,13 @@ func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (
 	}
 	if len(invoiceItem) > 0 {
 		result := tx.Create(&invoiceItem)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+	if len(deposit) > 0 {
+		result := tx.Create(&deposit)
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error

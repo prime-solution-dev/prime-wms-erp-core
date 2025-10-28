@@ -20,6 +20,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
+	invoiceDepositValue := []models.InvoiceDeposit{}
 	invoiceIDForReturn := []uuid.UUID{}
 	invoiceCode := []string{}
 	for i, invoice := range req {
@@ -38,6 +39,15 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			req[i].InvoiceItem[o].InvoiceID = invoiceID
 			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
+		}
+		for d := range invoice.InvoiceDeposit {
+			depositID := uuid.New()
+			if req[i].InvoiceDeposit[d].DepositCode == "" {
+				req[i].InvoiceDeposit[d].DepositCode = uuid.New().String()
+			}
+			req[i].InvoiceDeposit[d].ID = depositID
+			req[i].InvoiceDeposit[d].InvoiceID = invoiceID
+			invoiceDepositValue = append(invoiceDepositValue, req[i].InvoiceDeposit[d])
 		}
 
 		req[i].InvoiceItem = []models.InvoiceItem{}
@@ -71,7 +81,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue)
+	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue, invoiceDepositValue)
 	if errCreateApproval != nil {
 		return nil, errCreateApproval
 	}
