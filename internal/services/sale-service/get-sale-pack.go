@@ -293,6 +293,7 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 	packingRequest := externalService.GetPackingRequest{
 		DeliveryCodes:    deliveryCodes,
 		ExcludedPackCode: excludedPackCodes,
+		PackingCode:      req.PackingCode,
 		StatusPack:       req.StatusPack,
 		Page:             req.Page,
 		PageSize:         req.PageSize,
