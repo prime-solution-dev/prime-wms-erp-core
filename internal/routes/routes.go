@@ -163,6 +163,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
 		utils.ProcessRequest(c, depositService.GetDeposit)
 	})
+	deposit.POST("/CreateDepost", func(c *gin.Context) {
+		utils.ProcessRequest(c, depositService.CreateDepost)
+	})
 
 	//approval
 	approval := ctx.Group("/approval")
