@@ -255,6 +255,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPO)
 	})
+	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.GetPOItem)
+	})
 	purchase.POST("/UpdatePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdatePO)
 	})
@@ -266,6 +269,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/CompletePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePO)
+	})
+	purchase.POST("/CompletePOItem", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePOItem)
 	})
 
 	///cronjob
