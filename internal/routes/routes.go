@@ -39,6 +39,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/GetPriceTable", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceTable)
+	})
 	/* 	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
 	   		utils.ProcessRequest(c, priceService.CreatePriceListBase)
 	   	})

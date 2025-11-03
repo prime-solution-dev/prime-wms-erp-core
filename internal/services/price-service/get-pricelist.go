@@ -71,28 +71,29 @@ type GroupKey struct {
 }
 
 type SubGroup struct {
-	ID                        uuid.UUID  `json:"id"`
-	SubGroupKey               string     `json:"subgroup_key"`
-	IsTrading                 bool       `json:"is_trading"`
-	PriceUnit                 float64    `json:"price_unit"`
-	ExtraPriceUnit            float64    `json:"extra_price_unit"`
-	TermPriceUnit             float64    `json:"term_price_unit"`
-	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
-	PriceWeight               float64    `json:"price_weight"`
-	ExtraPriceWeight          float64    `json:"extra_price_weight"`
-	TermPriceWeight           float64    `json:"term_price_weight"`
-	TotalNetPriceWeight       float64    `json:"total_net_price_weight"`
-	BeforePriceUnit           float64    `json:"before_price_unit"`
-	BeforeExtraPriceUnit      float64    `json:"before_extra_price_unit"`
-	BeforeTermPriceUnit       float64    `json:"before_term_price_unit"`
-	BeforeTotalNetPriceUnit   float64    `json:"before_total_net_price_unit"`
-	BeforePriceWeight         float64    `json:"before_price_weight"`
-	BeforeExtraPriceWeight    float64    `json:"before_extra_price_weight"`
-	BeforeTermPriceWeight     float64    `json:"before_term_price_weight"`
-	BeforeTotalNetPriceWeight float64    `json:"before_total_net_price_weight"`
-	EffectiveDate             time.Time  `json:"effective_date"`
-	Remark                    string     `json:"remark"`
-	GroupKeys                 []GroupKey `json:"group_keys"`
+	ID                        uuid.UUID       `json:"id"`
+	SubGroupKey               string          `json:"subgroup_key"`
+	IsTrading                 bool            `json:"is_trading"`
+	PriceUnit                 float64         `json:"price_unit"`
+	ExtraPriceUnit            float64         `json:"extra_price_unit"`
+	TermPriceUnit             float64         `json:"term_price_unit"`
+	TotalNetPriceUnit         float64         `json:"total_net_price_unit"`
+	PriceWeight               float64         `json:"price_weight"`
+	ExtraPriceWeight          float64         `json:"extra_price_weight"`
+	TermPriceWeight           float64         `json:"term_price_weight"`
+	TotalNetPriceWeight       float64         `json:"total_net_price_weight"`
+	BeforePriceUnit           float64         `json:"before_price_unit"`
+	BeforeExtraPriceUnit      float64         `json:"before_extra_price_unit"`
+	BeforeTermPriceUnit       float64         `json:"before_term_price_unit"`
+	BeforeTotalNetPriceUnit   float64         `json:"before_total_net_price_unit"`
+	BeforePriceWeight         float64         `json:"before_price_weight"`
+	BeforeExtraPriceWeight    float64         `json:"before_extra_price_weight"`
+	BeforeTermPriceWeight     float64         `json:"before_term_price_weight"`
+	BeforeTotalNetPriceWeight float64         `json:"before_total_net_price_weight"`
+	EffectiveDate             time.Time       `json:"effective_date"`
+	Remark                    string          `json:"remark"`
+	UdfJson                   json.RawMessage `json:"udf_json"`
+	GroupKeys                 []GroupKey      `json:"group_keys"`
 }
 
 func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -381,6 +382,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforeTermPriceWeight:     toFloat64(row["before_term_price_weight"]),
 				BeforeTotalNetPriceWeight: toFloat64(row["before_total_net_price_weight"]),
 				Remark:                    toString(row["sub_remark"]),
+				// UdfJson:                   json.RawMessage(toString(row["udf_json"])),
 			}
 			if t := toTime(row["sub_effective_date"]); t != nil {
 				subGroup.EffectiveDate = *t
