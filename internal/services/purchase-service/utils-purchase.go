@@ -361,6 +361,8 @@ func GetProductGroup(productGroupReq models.GetGroupRequest) (map[string]string,
 		return nil, errors.New("failed to read response body: " + err.Error())
 	}
 
+	fmt.Println("productGroupBody: ", productGroupBody)
+
 	productGroupResponse := []models.GetGroupResponse{}
 	if err := json.Unmarshal(productGroupBody, &productGroupResponse); err != nil {
 		return nil, errors.New("failed to decode JSON response: " + err.Error())
