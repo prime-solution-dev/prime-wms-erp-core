@@ -18,6 +18,7 @@ import (
 type GetPackingRequest struct {
 	DeliveryCodes    []string `json:"delivery_codes"`
 	ExcludedPackCode []string `json:"excluded_pack_code"`
+	PackingCode      []string `json:"packing_code"`
 	StatusPack       []string `json:"status_pack"`
 	Page             int      `json:"page"`
 	PageSize         int      `json:"page_size"`

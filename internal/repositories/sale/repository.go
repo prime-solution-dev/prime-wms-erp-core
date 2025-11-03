@@ -182,18 +182,23 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 
 		// สร้าง InvoiceItem object
 		var invoiceItem models.InvoiceItem
-		idStr, _ := row["item_id"].(string)
-
-		id, _ := uuid.Parse(idStr)
+		id := uuid.Nil
+		if row["item_id"] != nil {
+			idStr, _ := row["item_id"].(string)
+			id, _ = uuid.Parse(idStr)
+		}
 
 		if id != uuid.Nil { // ถ้ามี invoice item จริง
-			invoiceItem = models.InvoiceItem{
-				ID:          id,
-				InvoiceCode: row["invoice_code"].(string),
-				DocumentRef: row["document_ref"].(string),
-				TotalAmount: row["invoice_total_amount"].(float64),
-			}
 			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
+			if row["invoice_code"] != nil {
+				invoiceItem = models.InvoiceItem{
+					ID:          id,
+					InvoiceCode: row["invoice_code"].(string),
+					DocumentRef: row["document_ref"].(string),
+					TotalAmount: row["invoice_total_amount"].(float64),
+				}
+			}
+
 		}
 
 		// group by sale_code

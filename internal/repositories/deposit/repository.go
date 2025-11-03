@@ -1,6 +1,7 @@
 package depositRepository
 
 import (
+	"errors"
 	"math"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
@@ -58,4 +59,45 @@ func GetDepositPreload(id []uuid.UUID, customerCode []string, status []string, p
 
 	return deposit, totalPages, int(totalRecords), err
 
+}
+func CreateDeposit(invoice []models.Deposit) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+	tx := gormx.Begin()
+	defer func() {
+		if rc := recover(); rc != nil {
+			tx.Rollback()
+			err = errors.New("panic error cant't save approval")
+		}
+	}()
+	if err = tx.Error; err != nil {
+		return err
+	}
+	if len(invoice) > 0 {
+		result := tx.Create(&invoice)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+	err = tx.Commit().Error
+	return err
+}
+func DeleteDeposit(id []uuid.UUID) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+
+	resultSuggest := gormx.Table("deposit").Where("id IN (?)", id).Delete(models.Deposit{})
+	if resultSuggest.Error != nil {
+		gormx.Rollback()
+		return resultSuggest.Error
+	}
+
+	return
 }

@@ -166,6 +166,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
 		utils.ProcessRequest(c, depositService.GetDeposit)
 	})
+	deposit.POST("/CreateDepost", func(c *gin.Context) {
+		utils.ProcessRequest(c, depositService.CreateDepost)
+	})
 
 	//approval
 	approval := ctx.Group("/approval")
@@ -255,6 +258,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPO)
 	})
+	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.GetPOItem)
+	})
 	purchase.POST("/UpdatePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdatePO)
 	})
@@ -266,6 +272,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/CompletePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePO)
+	})
+	purchase.POST("/CompletePOItem", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePOItem)
 	})
 
 	///cronjob
