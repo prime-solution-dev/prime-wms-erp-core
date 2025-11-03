@@ -1,4 +1,4 @@
-package productGroupService
+package groupService
 
 import (
 	"encoding/json"
