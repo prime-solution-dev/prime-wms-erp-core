@@ -21,6 +21,7 @@ type GetDeliveryRequest struct {
 	SaleOrderCode     []string `json:"sale_order_code"`
 	SiteCode          []string `json:"site_code"`
 	CompanyCode       []string `json:"company_code"`
+	Status            []string `json:"status"`
 	Page              int      `json:"page"`
 	PageSize          int      `json:"page_size"`
 }
@@ -133,6 +134,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	if len(req.Status) > 0 {
+		query = query.Where("status IN ?", req.Status)
+	}
+
 	// Build base query for counting
 	countQuery := gormx.Model(&GetDeliveryResponse{})
 
@@ -158,6 +163,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if len(req.CompanyCode) > 0 {
 		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+	}
+
+	if len(req.Status) > 0 {
+		countQuery = countQuery.Where("status IN ?", req.Status)
 	}
 
 	var count int64
