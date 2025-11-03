@@ -52,15 +52,35 @@ func GetGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, fmt.Errorf("failed to query items: %v", err)
 	}
 
-	itemMap := make(map[uuid.UUID][]models.GroupItem)
+	itemMap := make(map[uuid.UUID][]models.GetGroupItemResponse)
 	for _, it := range items {
-		itemMap[it.GroupID] = append(itemMap[it.GroupID], it)
+		itemMap[it.GroupID] = append(itemMap[it.GroupID], models.GetGroupItemResponse{
+			ID:        it.ID.String(),
+			ItemCode:  it.ItemCode,
+			GroupID:   it.GroupID.String(),
+			ItemName:  it.ItemName,
+			Value:     it.Value,
+			ValueInt:  it.ValueInt,
+			CreateDtm: it.CreateDtm.String(),
+			UpdateBy:  it.UpdateBy,
+			UpdateDtm: it.UpdateDtm.String(),
+			CreateBy:  it.CreateBy,
+		})
 	}
 
 	for _, g := range groups {
 		res = append(res, models.GetGroupResponse{
-			Group: g,
-			Items: itemMap[g.ID],
+			ID:        g.ID.String(),
+			GroupCode: g.GroupCode,
+			GroupName: g.GroupName,
+			Value:     g.Value,
+			ValueInt:  g.ValueInt,
+			Seq:       g.Seq,
+			CreateDtm: g.CreateDtm.String(),
+			UpdateBy:  g.UpdateBy,
+			UpdateDtm: g.UpdateDtm.String(),
+			CreateBy:  g.CreateBy,
+			Items:     itemMap[g.ID],
 		})
 	}
 

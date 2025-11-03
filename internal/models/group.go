@@ -13,10 +13,10 @@ type Group struct {
 	Value      string      `json:"value"`
 	ValueInt   int         `json:"value_int"`
 	Seq        int         `json:"seq"`
-	CreateDtm  string      `json:"create_dtm"`
-	UpdateBy   time.Time   `json:"update_by"`
-	UpdateDtm  string      `json:"update_dtm"`
-	CreateBy   time.Time   `json:"create_by"`
+	CreateDtm  time.Time   `json:"create_dtm"`
+	UpdateBy   string      `json:"update_by"`
+	UpdateDtm  time.Time   `json:"update_dtm"`
+	CreateBy   string      `json:"create_by"`
 	GroupItems []GroupItem `gorm:"foreignKey:GroupID;references:ID" json:"group_items"`
 }
 
@@ -31,10 +31,10 @@ type GroupItem struct {
 	ItemName  string    `json:"item_name"`
 	Value     string    `json:"value"`
 	ValueInt  int       `json:"value_int"`
-	CreateDtm string    `json:"create_dtm"`
-	UpdateBy  time.Time `json:"update_by"`
-	UpdateDtm string    `json:"update_dtm"`
-	CreateBy  time.Time `json:"create_by"`
+	CreateDtm time.Time `json:"create_dtm"`
+	UpdateBy  string    `json:"update_by"`
+	UpdateDtm time.Time `json:"update_dtm"`
+	CreateBy  string    `json:"create_by"`
 }
 
 func (GroupItem) TableName() string {
@@ -46,7 +46,29 @@ type GetGroupRequest struct {
 	ItemCodes  []string `json:"item_codes"`
 }
 
+type GetGroupItemResponse struct {
+	ID        string `json:"id"`
+	ItemCode  string `json:"item_code"`
+	GroupID   string `json:"group_id"`
+	ItemName  string `json:"item_name"`
+	Value     string `json:"value"`
+	ValueInt  int    `json:"value_int"`
+	CreateDtm string `json:"create_dtm"`
+	UpdateBy  string `json:"update_by"`
+	UpdateDtm string `json:"update_dtm"`
+	CreateBy  string `json:"create_by"`
+}
+
 type GetGroupResponse struct {
-	Group
-	Items []GroupItem `json:"items"`
+	ID        string                 `json:"id"`
+	GroupCode string                 `json:"group_code"`
+	GroupName string                 `json:"group_name"`
+	Value     string                 `json:"value"`
+	ValueInt  int                    `json:"value_int"`
+	Seq       int                    `json:"seq"`
+	CreateDtm string                 `json:"create_dtm"`
+	UpdateBy  string                 `json:"update_by"`
+	UpdateDtm string                 `json:"update_dtm"`
+	CreateBy  string                 `json:"create_by"`
+	Items     []GetGroupItemResponse `json:"items"`
 }
