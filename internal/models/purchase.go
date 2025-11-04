@@ -737,6 +737,8 @@ type GetPurchaseItemResponse struct {
 	UpdateDtm            string               `json:"update_dtm"`
 	UpdateBy             string               `json:"update_by"`
 	RefBigLot            *GetPOBigLotResponse `json:"ref_big_lot"`
+	RemainQty            float64              `json:"remain_qty"`
+	RemainWeight         float64              `json:"remain_weight"`
 }
 
 type GetPurchaseItemListResponse struct {
