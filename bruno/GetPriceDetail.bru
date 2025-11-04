@@ -1,0 +1,27 @@
+meta {
+  name: GetPriceDetail
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:9115/price/GetPriceTable
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "company_code": "7eb85b75-e708-4e5d-9010-4b43427c15be",
+    "site_codes": [
+      "PRM-00A"
+    ],
+    "group_codes": [],
+    "sub_group_codes": []
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
