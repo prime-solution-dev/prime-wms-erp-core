@@ -9,6 +9,33 @@ import (
 	"gorm.io/gorm"
 )
 
+// GetPriceListGroup
+func GetPriceListGroup(companyCode string, siteCode string, GroupKeys []string) ([]models.PriceListGroup, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	priceListGroups := []models.PriceListGroup{}
+	query := gormx.Model(&models.PriceListGroup{}).
+		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+
+	if len(GroupKeys) > 0 {
+		query = query.Where("group_key IN ?", GroupKeys)
+	}
+
+	if err := query.
+		Preload("PriceListGroupTerms").
+		Preload("PriceListGroupExtras").
+		Preload("PriceListSubGroups.PriceListSubGroupKeys").
+		Find(&priceListGroups).Error; err != nil {
+		return priceListGroups, err
+	}
+
+	return priceListGroups, nil
+}
+
 // CreatePriceListGroup
 func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
 	gormx, err := db.ConnectGORM("prime_erp")
