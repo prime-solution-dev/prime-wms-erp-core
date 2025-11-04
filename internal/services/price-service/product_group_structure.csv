@@ -1,0 +1,27 @@
+﻿หมวดหลัก,หมวดย่อย,,หมวดหลัก,หมวดย่อย,เกรด/รูปแบบ,ขนาด,ขนาดหน้ากว้าง,หนา,ความยาว,Other1,Other2
+หมวดเหล็กแผ่น,เหล็กแผ่น,,Yes,Yes,Yes,No,Yes,Yes,No,No,No
+,เหล็กแผ่น special,,Yes,Yes,No,Yes,Yes,No,Yes,No,No
+,แผ่นลาย,,Yes,No,No,Yes,Yes,No,No,No,No
+,Other/Special,,Yes,No,No,No,No,No,No,No,No
+หมวดตัวซี,-,,Yes,No,No,Yes,No,Yes,No,No,No
+หมวดเหล็กท่อ,ท่อเหลี่ยม,,Yes,Yes,Yes,Yes,No,Yes,No,No,No
+,ท่อแบน,,Yes,Yes,Yes,No,Yes,No,No,No,No
+,ท่อดำ,,Yes,Yes,Yes,No,Yes,No,No,No,No
+,ท่อแบน GI,,Yes,No,Yes,No,Yes,No,No,No,No
+,ท่อเหลี่ยม GI,,Yes,No,Yes,No,Yes,No,No,No,No
+,ท่อซี GI,,Yes,No,Yes,No,Yes,No,No,No,No
+หมวดเหล็กเส้น,เส้นกลม SR24,,Yes,Yes,Yes,No,No,Yes,Yes,No,No
+,ข้ออ้อย SD 40,,Yes,Yes,No,No,Yes,Yes,No,No,No
+,SD 50,,Yes,Yes,No,No,No,Yes,No,No,No
+หมวดฉาก รางน้ำ,เหล็กฉาก,,Yes,Yes,Yes,Yes,No,No,No,No,No
+,เหล็กรางน้ำ,,Yes,Yes,Yes,No,No,No,No,No,No
+หมวดเหล็กแบน,-,,Yes,No,Yes,No,Yes,Yes,No,No,No
+"หมวด HB, WF - Q",WF,,Yes,Yes,Yes,Yes,No,No,Yes,Yes,No
+,H-beams,,Yes,Yes,Yes,No,No,Yes,Yes,No,No
+"หมวด HB, WF - Q plus",WF,,Yes,Yes,Yes,Yes,No,No,Yes,Yes,No
+,H-beams,,Yes,Yes,Yes,No,No,Yes,Yes,No,No
+หมวด I-Beams,-,,Yes,No,Yes,Yes,No,No,Yes,No,No
+หมวดเหล็กสี่เหลี่ยมตัน,-,,Yes,No,Yes,Yes,No,No,No,No,No
+หมวดม้วน,ม้วนดำ,,Yes,Yes,Yes,No,Yes,Yes,No,Yes,No
+,ม้วนลาย,,Yes,Yes,No,Yes,Yes,No,Yes,No,No
+หมวดม้วน GI,-,,Yes,Yes,Yes,No,Yes,Yes,No,Yes,Yes
