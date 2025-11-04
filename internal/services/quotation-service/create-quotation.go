@@ -187,13 +187,15 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					QuotationCode: doc.DocRef,
 				})
 
-				for _, quotation := range createQuotations {
-					if !doc.IsPassPrice {
-						quotation.IsApproved = false
-						quotation.StatusApprove = "PENDING"
-					} else {
-						quotation.IsApproved = true
-						quotation.StatusApprove = "COMPLETED"
+				for i := range createQuotations {
+					if createQuotations[i].QuotationCode == doc.DocRef {
+						if !doc.IsPassPrice {
+							createQuotations[i].IsApproved = false
+							createQuotations[i].StatusApprove = "PENDING"
+						} else {
+							createQuotations[i].IsApproved = true
+							createQuotations[i].StatusApprove = "COMPLETED"
+						}
 					}
 				}
 			}
