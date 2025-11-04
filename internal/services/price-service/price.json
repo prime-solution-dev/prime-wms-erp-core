@@ -1,0 +1,155 @@
+[
+    {
+        "id": "5ed9008d-1e45-4664-bcd1-577fda93c547",
+        "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_1|GROUP_5_ITEM_1|GROUP_6_ITEM_1|GROUP_3_ITEM_1",
+        "is_trading": false,
+        "price_unit": 780,
+        "extra_price_unit": 0,
+        "term_price_unit": 0,
+        "total_net_price_unit": 780,
+        "price_weight": 26.9,
+        "extra_price_weight": 0,
+        "term_price_weight": 0,
+        "total_net_price_weight": 26.9,
+        "before_price_unit": 0,
+        "before_extra_price_unit": 0,
+        "before_term_price_unit": 0,
+        "before_total_net_price_unit": 0,
+        "before_price_weight": 0,
+        "before_extra_price_weight": 0,
+        "before_term_price_weight": 0,
+        "before_total_net_price_weight": 0,
+        "effective_date": "0001-01-01T00:00:00Z",
+        "remark": "",
+        "udf_json": null,
+        "group_keys": [
+          {
+            "code": "PRODUCT_GROUP1",
+            "value": "GROUP_1_ITEM_1",
+            "seq": 1
+          },
+          {
+            "code": "PRODUCT_GROUP2",
+            "value": "GROUP_2_ITEM_1",
+            "seq": 2
+          },
+          {
+            "code": "PRODUCT_GROUP5",
+            "value": "GROUP_5_ITEM_1",
+            "seq": 3
+          },
+          {
+            "code": "PRODUCT_GROUP6",
+            "value": "GROUP_6_ITEM_1",
+            "seq": 4
+          },
+          {
+            "code": "PRODUCT_GROUP3",
+            "value": "GROUP_3_ITEM_1",
+            "seq": 5
+          }
+        ]
+      },
+      {
+        "id": "35f9723f-b4bb-4a97-a2eb-4f0129d2527f",
+        "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_1|GROUP_5_ITEM_2|GROUP_6_ITEM_1|GROUP_3_ITEM_4",
+        "is_trading": false,
+        "price_unit": 780,
+        "extra_price_unit": 0,
+        "term_price_unit": 0,
+        "total_net_price_unit": 780,
+        "price_weight": 26.9,
+        "extra_price_weight": 0,
+        "term_price_weight": 0,
+        "total_net_price_weight": 26.9,
+        "before_price_unit": 0,
+        "before_extra_price_unit": 0,
+        "before_term_price_unit": 0,
+        "before_total_net_price_unit": 0,
+        "before_price_weight": 0,
+        "before_extra_price_weight": 0,
+        "before_term_price_weight": 0,
+        "before_total_net_price_weight": 0,
+        "effective_date": "0001-01-01T00:00:00Z",
+        "remark": "",
+        "udf_json": null,
+        "group_keys": [
+          {
+            "code": "PRODUCT_GROUP1",
+            "value": "GROUP_1_ITEM_1",
+            "seq": 1
+          },
+          {
+            "code": "PRODUCT_GROUP2",
+            "value": "GROUP_2_ITEM_1",
+            "seq": 2
+          },
+          {
+            "code": "PRODUCT_GROUP5",
+            "value": "GROUP_5_ITEM_2",
+            "seq": 3
+          },
+          {
+            "code": "PRODUCT_GROUP6",
+            "value": "GROUP_6_ITEM_1",
+            "seq": 4
+          },
+          {
+            "code": "PRODUCT_GROUP3",
+            "value": "GROUP_3_ITEM_4",
+            "seq": 5
+          }
+        ]
+      },
+      {
+        "id": "41deff54-51af-40b4-8cf3-4c399cabf915",
+        "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_1|GROUP_5_ITEM_3|GROUP_6_ITEM_1|GROUP_3_ITEM_1",
+        "is_trading": false,
+        "price_unit": 780,
+        "extra_price_unit": 0,
+        "term_price_unit": 0,
+        "total_net_price_unit": 780,
+        "price_weight": 26.9,
+        "extra_price_weight": 0,
+        "term_price_weight": 0,
+        "total_net_price_weight": 26.9,
+        "before_price_unit": 0,
+        "before_extra_price_unit": 0,
+        "before_term_price_unit": 0,
+        "before_total_net_price_unit": 0,
+        "before_price_weight": 0,
+        "before_extra_price_weight": 0,
+        "before_term_price_weight": 0,
+        "before_total_net_price_weight": 0,
+        "effective_date": "0001-01-01T00:00:00Z",
+        "remark": "",
+        "udf_json": null,
+        "group_keys": [
+          {
+            "code": "PRODUCT_GROUP1",
+            "value": "GROUP_1_ITEM_1",
+            "seq": 1
+          },
+          {
+            "code": "PRODUCT_GROUP2",
+            "value": "GROUP_2_ITEM_1",
+            "seq": 2
+          },
+          {
+            "code": "PRODUCT_GROUP5",
+            "value": "GROUP_5_ITEM_3",
+            "seq": 3
+          },
+          {
+            "code": "PRODUCT_GROUP6",
+            "value": "GROUP_6_ITEM_1",
+            "seq": 4
+          },
+          {
+            "code": "PRODUCT_GROUP3",
+            "value": "GROUP_3_ITEM_1",
+            "seq": 5
+          }
+        ]
+      }
+]

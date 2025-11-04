@@ -48,6 +48,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/DeletePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.DeletePriceListBase)
 	})
+	price.POST("/GetPriceTable", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceTable)
+	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
 

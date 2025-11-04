@@ -1,0 +1,130 @@
+{
+  "description": "Example output structure after grouping sample data from price.json",
+  "note": "Based on pattern: PRODUCT_GROUP6 | PRODUCT_GROUP3 | PRODUCT_GROUP5",
+  "data": [
+    {
+      "product_group_2": "GROUP_2_ITEM_2",
+      "pattern_groups": [
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_1|GROUP_5_ITEM_1",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_1",
+          "product_group_5": "GROUP_5_ITEM_1",
+          "sub_groups": [
+            {
+              "id": "5ed9008d-1e45-4664-bcd1-577fda93c547",
+              "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_2|GROUP_5_ITEM_1|GROUP_6_ITEM_1|GROUP_3_ITEM_1",
+              "price_unit": 780,
+              "price_weight": 26.9,
+              "group_keys": [
+                {"code": "PRODUCT_GROUP1", "value": "GROUP_1_ITEM_1", "seq": 1},
+                {"code": "PRODUCT_GROUP2", "value": "GROUP_2_ITEM_2", "seq": 2},
+                {"code": "PRODUCT_GROUP5", "value": "GROUP_5_ITEM_1", "seq": 3},
+                {"code": "PRODUCT_GROUP6", "value": "GROUP_6_ITEM_1", "seq": 4},
+                {"code": "PRODUCT_GROUP3", "value": "GROUP_3_ITEM_1", "seq": 5}
+              ]
+            }
+          ]
+        },
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_4|GROUP_5_ITEM_2",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_4",
+          "product_group_5": "GROUP_5_ITEM_2",
+          "sub_groups": [
+            {
+              "id": "35f9723f-b4bb-4a97-a2eb-4f0129d2527f",
+              "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_2|GROUP_5_ITEM_2|GROUP_6_ITEM_1|GROUP_3_ITEM_4",
+              "price_unit": 780,
+              "price_weight": 26.9,
+              "group_keys": [
+                {"code": "PRODUCT_GROUP1", "value": "GROUP_1_ITEM_1", "seq": 1},
+                {"code": "PRODUCT_GROUP2", "value": "GROUP_2_ITEM_2", "seq": 2},
+                {"code": "PRODUCT_GROUP5", "value": "GROUP_5_ITEM_2", "seq": 3},
+                {"code": "PRODUCT_GROUP6", "value": "GROUP_6_ITEM_1", "seq": 4},
+                {"code": "PRODUCT_GROUP3", "value": "GROUP_3_ITEM_4", "seq": 5}
+              ]
+            }
+          ]
+        },
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_1|GROUP_5_ITEM_3",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_1",
+          "product_group_5": "GROUP_5_ITEM_3",
+          "sub_groups": [
+            {
+              "id": "41deff54-51af-40b4-8cf3-4c399cabf915",
+              "subgroup_key": "GROUP_1_ITEM_1|GROUP_2_ITEM_2|GROUP_5_ITEM_3|GROUP_6_ITEM_1|GROUP_3_ITEM_1",
+              "price_unit": 780,
+              "price_weight": 26.9,
+              "group_keys": [
+                {"code": "PRODUCT_GROUP1", "value": "GROUP_1_ITEM_1", "seq": 1},
+                {"code": "PRODUCT_GROUP2", "value": "GROUP_2_ITEM_2", "seq": 2},
+                {"code": "PRODUCT_GROUP5", "value": "GROUP_5_ITEM_3", "seq": 3},
+                {"code": "PRODUCT_GROUP6", "value": "GROUP_6_ITEM_1", "seq": 4},
+                {"code": "PRODUCT_GROUP3", "value": "GROUP_3_ITEM_1", "seq": 5}
+              ]
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "total_patterns": 3,
+        "unique_product_group_5_values": 3,
+        "unique_product_group_3_values": 2,
+        "note": "3 unique PRODUCT_GROUP5 values: ITEM_1, ITEM_2, ITEM_3"
+      }
+    },
+    {
+      "product_group_2": "GROUP_2_ITEM_1",
+      "pattern_groups": [
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_1|GROUP_5_ITEM_1",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_1",
+          "product_group_5": "GROUP_5_ITEM_1",
+          "sub_groups": [
+            {
+              "note": "SubGroups nested in price.json starting from line 153"
+            }
+          ]
+        },
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_4|GROUP_5_ITEM_2",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_4",
+          "product_group_5": "GROUP_5_ITEM_2",
+          "sub_groups": [
+            {
+              "note": "SubGroups nested in price.json starting from line 204"
+            }
+          ]
+        },
+        {
+          "pattern": "GROUP_6_ITEM_1|GROUP_3_ITEM_1|GROUP_5_ITEM_3",
+          "product_group_6": "GROUP_6_ITEM_1",
+          "product_group_3": "GROUP_3_ITEM_1",
+          "product_group_5": "GROUP_5_ITEM_3",
+          "sub_groups": [
+            {
+              "note": "SubGroups nested in price.json starting from line 255"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "total_patterns": 3,
+        "unique_product_group_5_values": 3,
+        "unique_product_group_3_values": 2,
+        "note": "3 unique PRODUCT_GROUP5 values: ITEM_1, ITEM_2, ITEM_3"
+      }
+    }
+  ],
+  "summary": {
+    "total_sets": 2,
+    "unique_product_group_2_values": ["GROUP_2_ITEM_1", "GROUP_2_ITEM_2"],
+    "explanation": "The data is divided into 2 sets based on unique PRODUCT_GROUP2 values. Within each set, data is grouped by the pattern PRODUCT_GROUP6|PRODUCT_GROUP3|PRODUCT_GROUP5, with focus on unique PRODUCT_GROUP5 values."
+  }
+}
+
