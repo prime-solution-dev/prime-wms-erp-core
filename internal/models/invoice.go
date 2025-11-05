@@ -43,6 +43,9 @@ type Invoice struct {
 	ExternalID             string           `json:"external_id"`
 	SubtotalExclVat        float64          `json:"subtotal_excl_vat"`
 	SubtotalExclVatDeposit float64          `json:"subtotal_excl_vat_deposit"`
+	PaymentMethod          string           `json:"payment_method"`
+	OwnerName              string           `json:"owner_name"`
+	PartyDocumentRef       string           `json:"party_document_ref"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
@@ -87,6 +90,8 @@ type InvoiceItem struct {
 	ProductDescription     string    `json:"product_description"`
 	SubtotalExclVat        float64   `json:"subtotal_excl_vat"`
 	SubtotalExclVatDeposit float64   `json:"subtotal_excl_vat_deposit"`
+	ArticleCode            string    `json:"article_code"`
+	ProductDesc            string    `json:"product_desc"`
 }
 
 func (InvoiceItem) TableName() string { return "invoice_item" }
