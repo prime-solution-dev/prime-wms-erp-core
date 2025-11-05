@@ -8,6 +8,7 @@ import (
 	CronjobService "prime-erp-core/internal/services/cronjob-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	emailservice "prime-erp-core/internal/services/email-service"
+	groupService "prime-erp-core/internal/services/group-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -26,6 +27,12 @@ import (
 )
 
 func RegisterRoutes(ctx *gin.Engine) {
+	//group
+	group := ctx.Group("/group")
+
+	group.POST("/GetGroupMaster", func(c *gin.Context) {
+		utils.ProcessRequest(c, groupService.GetGroup)
+	})
 
 	//price
 	price := ctx.Group("/price")
@@ -39,6 +46,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/GetPriceList", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceList)
+	}) // for Base Price and price list feature
 	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.CreatePriceListBase)
 	})

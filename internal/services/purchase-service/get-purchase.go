@@ -209,6 +209,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	purchaseCodes := []string{}
+	purchaseItemCodes := []string{}
 	prePurchaseCodes := []string{}
 	supplierReq := models.GetSupplierListRequest{}
 	productCodes := []string{}
@@ -222,6 +223,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		for _, item := range purchase.PurchaseItems {
 			productCodes = append(productCodes, item.ProductCode)
+			purchaseItemCodes = append(purchaseItemCodes, item.PurchaseItem)
 		}
 	}
 
@@ -276,6 +278,12 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	mapProductGroupOne, err := GetProductGroup(productGroupOne)
 	if err != nil {
 		return nil, errors.New("failed to get product group one list: " + err.Error())
+	}
+
+	// Calculate Used Qty and Weight from Invoice
+	usedMap, err := GetUsedQtyAndWeight(req.CompanyCode, req.SiteCode, purchaseCodes, purchaseItemCodes)
+	if err != nil {
+		return nil, errors.New("failed to get used qty and weight from invoice: " + err.Error())
 	}
 
 	itemsResp := []models.GetPurchaseItemResponse{}
@@ -335,6 +343,8 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				UpdateDtm:            item.UpdateDtm.Format(time.RFC3339),
 				UpdateBy:             item.UpdateBy,
 				RefBigLot:            refBigLot,
+				RemainQty:            item.Qty,
+				RemainWeight:         item.TotalWeight,
 			}
 			if productDetail, ok := mapProduct[item.ProductCode]; ok {
 				itemResp.ProductName = productDetail.ProductName
@@ -352,6 +362,11 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 			} else {
 				itemResp.ProductName = "Unknown"
+			}
+
+			if used, ok := usedMap[item.PurchaseItem]; ok {
+				itemResp.RemainQty = item.Qty - used.Qty
+				itemResp.RemainWeight = item.TotalWeight - used.Weight
 			}
 
 			itemsResp = append(itemsResp, itemResp)

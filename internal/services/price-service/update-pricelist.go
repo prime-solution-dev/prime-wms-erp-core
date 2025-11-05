@@ -34,7 +34,7 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			EffectiveDate: &effectiveDate,
 			Remark:        r.Remark,
 			UpdateBy:      "system", // TODO: get user from auth
-			UpdateDtm:     &now,
+			UpdateDtm:     now,
 		})
 
 		if len(r.Terms) > 0 {
@@ -47,7 +47,7 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 					Due:        term.Due,
 					DuePercent: term.DuePercent,
 					UpdateBy:   "system", // TODO: get user from auth
-					UpdateDtm:  &termNow,
+					UpdateDtm:  termNow,
 				})
 			}
 		}

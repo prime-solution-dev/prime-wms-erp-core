@@ -673,37 +673,6 @@ type GetUnitsDetailBarcodeComponent struct {
 	Barcode string `json:"barcode"`
 }
 
-type GetGroupRequest struct {
-	GroupCodes []string `json:"group_codes"`
-}
-
-type GetGroupResponse struct {
-	ID        string      `json:"id"`
-	GroupCode string      `json:"group_code"`
-	GroupName string      `json:"group_name"`
-	Value     string      `json:"value"`
-	ValueInt  int         `json:"value_int"`
-	Seq       int         `json:"seq"`
-	CreateDtm string      `json:"create_dtm"`
-	UpdateBy  string      `json:"update_by"`
-	UpdateDtm string      `json:"update_dtm"`
-	CreateBy  string      `json:"create_by"`
-	Items     []GroupItem `json:"items"`
-}
-
-type GroupItem struct {
-	ID        string `json:"id"`
-	ItemCode  string `json:"item_code"`
-	GroupID   string `json:"group_id"`
-	ItemName  string `json:"item_name"`
-	Value     string `json:"value"`
-	ValueInt  int    `json:"value_int"`
-	CreateDtm string `json:"create_dtm"`
-	UpdateBy  string `json:"update_by"`
-	UpdateDtm string `json:"update_dtm"`
-	CreateBy  string `json:"create_by"`
-}
-
 // For GR or GR Plan DTOs
 type CompletePurchaseItemRequest struct {
 	PurchaseItemCodes []string `json:"purchase_item_codes"`
@@ -768,6 +737,8 @@ type GetPurchaseItemResponse struct {
 	UpdateDtm            string               `json:"update_dtm"`
 	UpdateBy             string               `json:"update_by"`
 	RefBigLot            *GetPOBigLotResponse `json:"ref_big_lot"`
+	RemainQty            float64              `json:"remain_qty"`
+	RemainWeight         float64              `json:"remain_weight"`
 }
 
 type GetPurchaseItemListResponse struct {
