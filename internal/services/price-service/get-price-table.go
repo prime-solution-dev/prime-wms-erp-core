@@ -845,6 +845,10 @@ func loadPriceData() ([]GetPriceListGroupResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group sub group: %w", err)
 	}
+	/*-- Auto-generated SQL script #202511051026
+INSERT INTO public.price_list_sub_group (price_list_group_id,subgroup_key,price_unit,extra_price_unit,total_net_price_unit)
+	VALUES ('9837db53-1a3c-49a9-a197-1fdfa38984bd'::uuid,'GROUP_1_ITEM_1|GROUP_2_ITEM_1|GROUP_5_ITEM_3|GROUP_6_ITEM_2|GROUP_3_ITEM_1',100,0,15);
+*/
 
 	// groupSubGroup is already []GetPriceListGroupResponse, so return it directly
 	return groupSubGroup, nil

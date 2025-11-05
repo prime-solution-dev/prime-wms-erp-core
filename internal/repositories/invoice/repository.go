@@ -120,6 +120,37 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		return nil, 0, 0, err
 	}
 }
+
+func GetInvoiceRelatedByPO(companyCode string, siteCode string, purchaseCodes []string, purchaseItemCodes []string, invoiceType []string, status []string) ([]models.Invoice, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	var invoices []models.Invoice
+
+	query := gormx.Model(&models.Invoice{}).
+		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+
+	preloadConditionsString := "document_ref IN ? AND document_ref_item IN ? AND status IN ?"
+
+	if len(invoiceType) > 0 {
+		query = query.Where("invoice_type IN ?", invoiceType)
+	}
+
+	if len(preloadConditionsString) != 0 {
+		query = query.Preload("InvoiceItem", preloadConditionsString, purchaseCodes, purchaseItemCodes, status)
+	}
+
+	err = query.Find(&invoices).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return invoices, nil
+}
+
 func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem, deposit []models.InvoiceDeposit) (err error) {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
