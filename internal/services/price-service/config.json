@@ -94,11 +94,11 @@
     {
       "id": "pattern_g6_g3_g5",
       "name": "PRODUCT_GROUP6 | PRODUCT_GROUP3 | PRODUCT_GROUP5",
-      "description": "Pattern for Steel Sheet Category - Rows by thickness+grade (G6+G3), Columns by size (G5)",
+      "description": "Pattern for Steel Sheet Category - Rows by thickness (G6), Columns by size (G5) with grade shown in cells",
       "enabled": true,
       "grouping": {
         "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6|PRODUCT_GROUP3",
+        "rows": "PRODUCT_GROUP6",
         "columnGroups": "PRODUCT_GROUP5"
       },
       "columns": [
@@ -182,14 +182,6 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
-        {
-          "field": "product_group_3",
-          "headerName": "เกรด",
-          "width": 100,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true
         }
       ],
       "applicableCategories": [
@@ -292,17 +284,6 @@
           "cellStyle": {
             "textAlign": "center",
             "fontWeight": "500"
-          }
-        },
-        {
-          "field": "product_group_6",
-          "headerName": "หนา",
-          "width": 100,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "cellStyle": {
-            "fontWeight": "600"
           }
         }
       ],

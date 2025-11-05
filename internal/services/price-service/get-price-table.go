@@ -1,21 +1,116 @@
 package priceService
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
+	groupService "prime-erp-core/internal/services/group-service"
 	"prime-erp-core/internal/utils"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
+
+// ============================================================================
+// Configuration Structures for config.json
+// ============================================================================
+
+// PatternConfig represents the configuration for a pricing table pattern
+type PatternConfig struct {
+	ID                   string             `json:"id"`
+	Name                 string             `json:"name"`
+	Description          string             `json:"description"`
+	Enabled              bool               `json:"enabled"`
+	Grouping             GroupingConfig     `json:"grouping"`
+	ColumnLevels         []ColumnLevel      `json:"columnLevels,omitempty"`
+	Columns              []ColumnConfigItem `json:"columns"`
+	FixedColumns         []ColumnConfigItem `json:"fixedColumns"`
+	ApplicableCategories []string           `json:"applicableCategories"`
+}
+
+// GroupingConfig defines how data should be grouped
+type GroupingConfig struct {
+	Tabs         string `json:"tabs"`
+	Rows         string `json:"rows"`
+	ColumnGroups string `json:"columnGroups"`
+}
+
+// ColumnLevel for multi-level nested columns
+type ColumnLevel struct {
+	Level    int      `json:"level"`
+	Field    string   `json:"field"`
+	Examples []string `json:"examples"`
+}
+
+// ColumnConfigItem defines a column configuration from config.json
+type ColumnConfigItem struct {
+	Field           string                 `json:"field"`
+	HeaderName      string                 `json:"headerName"`
+	Width           int                    `json:"width"`
+	Pinned          string                 `json:"pinned,omitempty"`
+	LockPosition    bool                   `json:"lockPosition,omitempty"`
+	SuppressMovable bool                   `json:"suppressMovable,omitempty"`
+	ValueGetter     string                 `json:"valueGetter,omitempty"`
+	CellRenderer    string                 `json:"cellRenderer,omitempty"`
+	CellStyle       map[string]interface{} `json:"cellStyle,omitempty"`
+	DataMapping     string                 `json:"dataMapping,omitempty"`
+}
+
+// TableConfigSettings from config.json
+type TableConfigSettings struct {
+	GroupHeaderHeight int               `json:"groupHeaderHeight"`
+	HeaderHeight      int               `json:"headerHeight"`
+	Pagination        bool              `json:"pagination"`
+	Toolbar           ToolbarConfig     `json:"toolbar"`
+	GridOptions       GridOptionsConfig `json:"gridOptions"`
+}
+
+// ToolbarConfig from config.json
+type ToolbarConfig struct {
+	Show             bool `json:"show"`
+	ShowSearch       bool `json:"showSearch"`
+	ShowRefresh      bool `json:"showRefresh"`
+	ShowColumnToggle bool `json:"showColumnToggle"`
+}
+
+// GridOptionsConfig from config.json
+type GridOptionsConfig struct {
+	SuppressMovableColumns bool `json:"suppressMovableColumns"`
+	SuppressMenuHide       bool `json:"suppressMenuHide"`
+}
+
+// PriceTableConfiguration represents the full config.json structure
+type PriceTableConfiguration struct {
+	Patterns       []PatternConfig     `json:"patterns"`
+	DefaultPattern string              `json:"defaultPattern"`
+	TableConfig    TableConfigSettings `json:"tableConfig"`
+}
+
+// ============================================================================
+// API Response Structures
+// ============================================================================
 
 // PriceListDetailApiResponse represents the main API response structure
 type PriceListDetailApiResponse struct {
 	Id   uuid.UUID                  `json:"id"`
 	Name string                     `json:"name"`
 	Tabs []PriceListDetailTabConfig `json:"tabs"`
+}
+
+// GetPriceTableRequest represents the request structure
+type GetPriceTableRequest struct {
+	CompanyCode       string     `json:"company_code"`
+	SiteCodes         []string   `json:"site_codes"`
+	GroupCodes        []string   `json:"group_codes"`
+	EffectiveDateFrom *time.Time `json:"effective_date_from"`
+	EffectiveDateTo   *time.Time `json:"effective_date_to"`
 }
 
 // PriceListDetailTabConfig represents a tab configuration with table config and data
@@ -116,7 +211,100 @@ type CellData struct {
 	SubGroupKey    string    `json:"subgroup_key"`
 }
 
-// Helper function to get group key value by code
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+// loadConfiguration loads and parses the config.json file
+func loadConfiguration() (*PriceTableConfiguration, error) {
+	// Get current working directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Construct path to config.json
+	configPath := filepath.Join(currentDir, "internal", "services", "price-service", "config.json")
+
+	// Read the JSON file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config.json: %w", err)
+	}
+
+	// Parse JSON data
+	var config PriceTableConfiguration
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config.json: %w", err)
+	}
+
+	return &config, nil
+}
+
+// getValueNameByGroupCode extracts value_name from sub_group_keys by group_code
+func getValueNameByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {
+	for _, sgk := range subGroupKeys {
+		if sgk.GroupCode == groupCode {
+			return sgk.ValueName
+		}
+	}
+	return ""
+}
+
+// getValueCodeByGroupCode extracts value_code from sub_group_keys by group_code
+func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {
+	for _, sgk := range subGroupKeys {
+		if sgk.GroupCode == groupCode {
+			return sgk.ValueCode
+		}
+	}
+	return ""
+}
+
+// buildCompositeKey builds a composite key from multiple group codes using value_name
+func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
+	parts := []string{}
+	for _, code := range groupCodes {
+		valueName := getValueNameByGroupCode(subGroupKeys, code)
+		if valueName != "" {
+			parts = append(parts, valueName)
+		}
+	}
+	return strings.Join(parts, "|")
+}
+
+// selectPatternForCategory finds the appropriate pattern configuration for a PRODUCT_GROUP2 value
+func selectPatternForCategory(config *PriceTableConfiguration, productGroup2ValueName string) *PatternConfig {
+	// Find pattern by matching applicableCategories
+	for _, pattern := range config.Patterns {
+		if !pattern.Enabled {
+			continue
+		}
+		for _, category := range pattern.ApplicableCategories {
+			if category == productGroup2ValueName {
+				return &pattern
+			}
+		}
+	}
+
+	// Return default pattern if no match found
+	for _, pattern := range config.Patterns {
+		if pattern.ID == config.DefaultPattern {
+			return &pattern
+		}
+	}
+
+	// Return first enabled pattern as fallback
+	for _, pattern := range config.Patterns {
+		if pattern.Enabled {
+			return &pattern
+		}
+	}
+
+	return nil
+}
+
+// Helper function to get group key value by code (legacy support)
 func getGroupKeyValue(groupKeys []GroupKey, code string) string {
 	for _, gk := range groupKeys {
 		if gk.Code == code {
@@ -147,111 +335,117 @@ func sanitizeFieldName(name string) string {
 	return strings.ToLower(name)
 }
 
-// buildAGGridColumnsWithGrade creates AG Grid column definitions with column groups INCLUDING grade
-// Structure: [#, PRODUCT_GROUP6, PRODUCT_GROUP5_1 (with children including grade), ...]
-// Used for pattern_g6_g3_g5
-func buildAGGridColumnsWithGrade(uniqueGroup5 []string) []ColumnDef {
+// convertGroupCodeToFieldName converts PRODUCT_GROUP codes to field names
+// e.g., "PRODUCT_GROUP6" -> "product_group_6"
+func convertGroupCodeToFieldName(groupCode string) string {
+	// Convert to lowercase
+	fieldName := strings.ToLower(groupCode)
+	// Insert underscore before the last digit(s)
+	// PRODUCT_GROUP6 -> product_group_6
+	// PRODUCT_GROUP10 -> product_group_10
+	re := regexp.MustCompile(`([a-z]+)(\d+)$`)
+	fieldName = re.ReplaceAllString(fieldName, "${1}_${2}")
+	return fieldName
+}
+
+// ============================================================================
+// Dynamic Grouping and Building Functions
+// ============================================================================
+
+// groupDataByProductGroup2 groups subgroups by PRODUCT_GROUP2 value_name
+func groupDataByProductGroup2(priceListData []models.GetPriceListResponse) map[string][]models.PriceListSubGroupResponse {
+	groupedData := make(map[string][]models.PriceListSubGroupResponse)
+
+	for _, priceList := range priceListData {
+		for _, subGroup := range priceList.SubGroups {
+			// Get PRODUCT_GROUP2 value_name
+			productGroup2 := getValueNameByGroupCode(subGroup.SubGroupKeys, "PRODUCT_GROUP2")
+			if productGroup2 == "" {
+				continue
+			}
+
+			// Add subgroup to the appropriate group
+			groupedData[productGroup2] = append(groupedData[productGroup2], subGroup)
+		}
+	}
+
+	return groupedData
+}
+
+// buildDynamicColumns builds AG Grid columns based on pattern configuration
+func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
 	columns := []ColumnDef{}
 
-	// Add row number column
-	columns = append(columns, ColumnDef{
-		Field:           "#",
-		HeaderName:      "#",
-		Width:           intPtr(60),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		ValueGetter:     "node.rowIndex + 1",
-		CellStyle: &CellStyle{
-			TextAlign:  "center",
-			FontWeight: "500",
-		},
-	})
+	// Add fixed columns from configuration
+	for _, fixedCol := range pattern.FixedColumns {
+		col := ColumnDef{
+			Field:           fixedCol.Field,
+			HeaderName:      fixedCol.HeaderName,
+			Width:           intPtr(fixedCol.Width),
+			Pinned:          fixedCol.Pinned,
+			LockPosition:    boolPtr(fixedCol.LockPosition),
+			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
+			ValueGetter:     fixedCol.ValueGetter,
+		}
 
-	// Add PRODUCT_GROUP6 column (sheet thickness)
-	columns = append(columns, ColumnDef{
-		Field:           "product_group_6",
-		HeaderName:      "แผ่น mm.", // Sheet mm.
-		Width:           intPtr(120),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		CellStyle: &CellStyle{
-			FontWeight: "600",
-		},
-	})
+		if fixedCol.CellStyle != nil {
+			col.CellStyle = convertCellStyle(fixedCol.CellStyle)
+		}
 
-	// Add column groups for each PRODUCT_GROUP5
-	for _, g5 := range uniqueGroup5 {
+		columns = append(columns, col)
+	}
+
+	// Build dynamic column groups based on pattern
+	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
+
+	if len(pattern.ColumnLevels) > 0 {
+		// Multi-level nested columns (e.g., G3 > G8 > G5)
+		columns = append(columns, buildMultiLevelColumns(pattern, subGroups, columnGroupFields)...)
+	} else {
+		// Single-level column groups (e.g., G5)
+		columns = append(columns, buildSingleLevelColumns(pattern, subGroups, columnGroupFields)...)
+	}
+
+	return columns
+}
+
+// buildSingleLevelColumns builds single-level column groups
+func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+	columns := []ColumnDef{}
+
+	// Collect unique values for column groups
+	uniqueValues := make(map[string]bool)
+	for _, sg := range subGroups {
+		key := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
+		if key != "" {
+			uniqueValues[key] = true
+		}
+	}
+
+	// Build column group for each unique value
+	for valueName := range uniqueValues {
 		columnGroup := ColumnDef{
-			HeaderName:    g5,
-			GroupID:       fmt.Sprintf("group_%s", g5),
+			HeaderName:    valueName,
+			GroupID:       fmt.Sprintf("group_%s", sanitizeFieldName(valueName)),
 			OpenByDefault: boolPtr(true),
 			Children:      []ColumnDef{},
 		}
 
-		// Add child columns for this group (7 columns including grade)
-		// 1. เกรด (Grade) - PRODUCT_GROUP3
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_grade", sanitizeFieldName(g5)),
-			HeaderName: "เกรด",
-			Width:      intPtr(80),
-		})
+		// Add child columns from configuration
+		for _, colConfig := range pattern.Columns {
+			childCol := ColumnDef{
+				Field:        fmt.Sprintf("%s_%s", sanitizeFieldName(valueName), colConfig.Field),
+				HeaderName:   colConfig.HeaderName,
+				Width:        intPtr(colConfig.Width),
+				CellRenderer: colConfig.CellRenderer,
+			}
 
-		// 2. Highlight สีฟ้า
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:        fmt.Sprintf("%s_highlight", sanitizeFieldName(g5)),
-			HeaderName:   "Highlight สีฟ้า",
-			Width:        intPtr(100),
-			CellRenderer: "checkboxRenderer",
-		})
+			if colConfig.CellStyle != nil {
+				childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
+			}
 
-		// 3. ราคาขาย (Pcs) before
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_price_before", sanitizeFieldName(g5)),
-			HeaderName: "ราคาขาย (Pcs) before",
-			Width:      intPtr(130),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 4. ราคาขาย (Pcs) After
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_price_after", sanitizeFieldName(g5)),
-			HeaderName: "ราคาขาย (Pcs) After",
-			Width:      intPtr(130),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 5. Extra (THB)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_extra", sanitizeFieldName(g5)),
-			HeaderName: "Extra (THB)",
-			Width:      intPtr(100),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 6. น.น. (Weight)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_weight", sanitizeFieldName(g5)),
-			HeaderName: "น.น.",
-			Width:      intPtr(80),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 7. หมายเหตุ (Remark)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_remark", sanitizeFieldName(g5)),
-			HeaderName: "หมายเหตุ",
-			Width:      intPtr(150),
-		})
+			columnGroup.Children = append(columnGroup.Children, childCol)
+		}
 
 		columns = append(columns, columnGroup)
 	}
@@ -259,408 +453,162 @@ func buildAGGridColumnsWithGrade(uniqueGroup5 []string) []ColumnDef {
 	return columns
 }
 
-// buildAGGridColumns creates AG Grid column definitions with column groups WITHOUT grade
-// Structure: [#, PRODUCT_GROUP6, PRODUCT_GROUP5_1 (with children), PRODUCT_GROUP5_2 (with children), ...]
-// Used for pattern_g6_g5
-func buildAGGridColumns(uniqueGroup5 []string) []ColumnDef {
+// buildMultiLevelColumns builds multi-level nested column groups
+func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+	// Build hierarchical structure based on columnLevels
+	hierarchy := make(map[string]map[string]map[string]bool) // L1 > L2 > L3
+
+	for _, sg := range subGroups {
+		level1 := ""
+		level2 := ""
+		level3 := ""
+
+		if len(pattern.ColumnLevels) > 0 {
+			level1 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[0].Field)
+		}
+		if len(pattern.ColumnLevels) > 1 {
+			level2 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[1].Field)
+		}
+		if len(pattern.ColumnLevels) > 2 {
+			level3 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[2].Field)
+		}
+
+		if hierarchy[level1] == nil {
+			hierarchy[level1] = make(map[string]map[string]bool)
+		}
+		if hierarchy[level1][level2] == nil {
+			hierarchy[level1][level2] = make(map[string]bool)
+		}
+		hierarchy[level1][level2][level3] = true
+	}
+
+	// Build nested column groups
 	columns := []ColumnDef{}
-
-	// Add row number column
-	columns = append(columns, ColumnDef{
-		Field:           "#",
-		HeaderName:      "#",
-		Width:           intPtr(60),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		ValueGetter:     "node.rowIndex + 1",
-		CellStyle: &CellStyle{
-			TextAlign:  "center",
-			FontWeight: "500",
-		},
-	})
-
-	// Add PRODUCT_GROUP6 column (sheet thickness)
-	columns = append(columns, ColumnDef{
-		Field:           "product_group_6",
-		HeaderName:      "แผ่น mm.", // Sheet mm.
-		Width:           intPtr(120),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		CellStyle: &CellStyle{
-			FontWeight: "600",
-		},
-	})
-
-	// Add column groups for each PRODUCT_GROUP5
-	for _, g5 := range uniqueGroup5 {
-		columnGroup := ColumnDef{
-			HeaderName:    g5,
-			GroupID:       fmt.Sprintf("group_%s", g5),
+	for l1, l2Map := range hierarchy {
+		l1Group := ColumnDef{
+			HeaderName:    l1,
+			GroupID:       fmt.Sprintf("group_l1_%s", sanitizeFieldName(l1)),
 			OpenByDefault: boolPtr(true),
 			Children:      []ColumnDef{},
 		}
 
-		// Add child columns for this group (6 columns based on image)
-		// 1. Highlight สีฟ้า
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:        fmt.Sprintf("%s_highlight", sanitizeFieldName(g5)),
-			HeaderName:   "Highlight สีฟ้า",
-			Width:        intPtr(100),
-			CellRenderer: "checkboxRenderer",
-		})
-
-		// 2. ราคาขาย (Pcs) before
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_price_before", sanitizeFieldName(g5)),
-			HeaderName: "ราคาขาย (Pcs) before",
-			Width:      intPtr(130),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 3. ราคาขาย (Pcs) After
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_price_after", sanitizeFieldName(g5)),
-			HeaderName: "ราคาขาย (Pcs) After",
-			Width:      intPtr(130),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 4. Extra (THB)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_extra", sanitizeFieldName(g5)),
-			HeaderName: "Extra (THB)",
-			Width:      intPtr(100),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 5. น.น. (Weight)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_weight", sanitizeFieldName(g5)),
-			HeaderName: "น.น.",
-			Width:      intPtr(80),
-			CellStyle: &CellStyle{
-				TextAlign: "right",
-			},
-		})
-
-		// 6. หมายเหตุ (Remark)
-		columnGroup.Children = append(columnGroup.Children, ColumnDef{
-			Field:      fmt.Sprintf("%s_remark", sanitizeFieldName(g5)),
-			HeaderName: "หมายเหตุ",
-			Width:      intPtr(150),
-		})
-
-		columns = append(columns, columnGroup)
-	}
-
-	return columns
-}
-
-// buildAGGridRowsWithGrade converts grouped data into AG Grid row format WITH grade
-// Each row represents one PRODUCT_GROUP6 value
-// Columns are flattened with naming: {g5}_grade, {g5}_highlight, {g5}_price_before, etc.
-// Pattern: PRODUCT_GROUP6 | PRODUCT_GROUP3 | PRODUCT_GROUP5 (same G6, different G3+G5)
-func buildAGGridRowsWithGrade(groupedData GroupedData) []AGGridRowData {
-	// Map to hold rows: key = PRODUCT_GROUP6
-	rowMap := make(map[string]AGGridRowData)
-
-	// Process each pattern group
-	for _, pattern := range groupedData.PatternGroups {
-		g6 := pattern.ProductGroup6
-		g3 := pattern.ProductGroup3
-		g5 := pattern.ProductGroup5
-
-		// Initialize row if not exists
-		if _, exists := rowMap[g6]; !exists {
-			rowMap[g6] = AGGridRowData{
-				"id":              uuid.New().String(),
-				"product_group_2": groupedData.ProductGroup2,
-				"product_group_6": g6,
-			}
-		}
-
-		// Add data for this G5 column group (including grade)
-		if len(pattern.SubGroups) > 0 {
-			subGroup := pattern.SubGroups[0]
-			g5Safe := sanitizeFieldName(g5)
-
-			// Set all child column values (7 columns including grade)
-			rowMap[g6][fmt.Sprintf("%s_grade", g5Safe)] = g3        // Include grade
-			rowMap[g6][fmt.Sprintf("%s_highlight", g5Safe)] = false // TODO: determine from data
-			rowMap[g6][fmt.Sprintf("%s_price_before", g5Safe)] = subGroup.PriceUnit
-			rowMap[g6][fmt.Sprintf("%s_price_after", g5Safe)] = subGroup.TotalNetPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_extra", g5Safe)] = subGroup.ExtraPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_weight", g5Safe)] = subGroup.PriceWeight
-			rowMap[g6][fmt.Sprintf("%s_remark", g5Safe)] = subGroup.Remark
-
-			// Store metadata
-			rowMap[g6][fmt.Sprintf("%s_subgroup_id", g5Safe)] = subGroup.ID.String()
-			rowMap[g6][fmt.Sprintf("%s_is_trading", g5Safe)] = subGroup.IsTrading
-			rowMap[g6][fmt.Sprintf("%s_product_group_3", g5Safe)] = g3 // Store G3 for reference
-		}
-	}
-
-	// Convert map to slice
-	rows := []AGGridRowData{}
-	for _, row := range rowMap {
-		rows = append(rows, row)
-	}
-
-	return rows
-}
-
-// buildAGGridRows converts grouped data into AG Grid row format WITHOUT grade
-// Each row represents one PRODUCT_GROUP6 value
-// Columns are flattened with naming: {g5}_highlight, {g5}_price_before, etc.
-// Pattern: PRODUCT_GROUP6 | PRODUCT_GROUP5 (same G6, different G5)
-func buildAGGridRows(groupedData GroupedData) []AGGridRowData {
-	// Map to hold rows: key = PRODUCT_GROUP6
-	rowMap := make(map[string]AGGridRowData)
-
-	// Process each pattern group
-	for _, pattern := range groupedData.PatternGroups {
-		g6 := pattern.ProductGroup6
-		g5 := pattern.ProductGroup5
-
-		// Initialize row if not exists
-		if _, exists := rowMap[g6]; !exists {
-			rowMap[g6] = AGGridRowData{
-				"id":              uuid.New().String(),
-				"product_group_2": groupedData.ProductGroup2,
-				"product_group_6": g6,
-			}
-		}
-
-		// Add data for this G5 column group
-		if len(pattern.SubGroups) > 0 {
-			subGroup := pattern.SubGroups[0]
-			g5Safe := sanitizeFieldName(g5)
-
-			// Set all child column values (6 columns)
-			rowMap[g6][fmt.Sprintf("%s_highlight", g5Safe)] = false // TODO: determine from data
-			rowMap[g6][fmt.Sprintf("%s_price_before", g5Safe)] = subGroup.PriceUnit
-			rowMap[g6][fmt.Sprintf("%s_price_after", g5Safe)] = subGroup.TotalNetPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_extra", g5Safe)] = subGroup.ExtraPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_weight", g5Safe)] = subGroup.PriceWeight
-			rowMap[g6][fmt.Sprintf("%s_remark", g5Safe)] = subGroup.Remark
-
-			// Store metadata
-			rowMap[g6][fmt.Sprintf("%s_subgroup_id", g5Safe)] = subGroup.ID.String()
-			rowMap[g6][fmt.Sprintf("%s_is_trading", g5Safe)] = subGroup.IsTrading
-		}
-	}
-
-	// Convert map to slice
-	rows := []AGGridRowData{}
-	for _, row := range rowMap {
-		rows = append(rows, row)
-	}
-
-	return rows
-}
-
-// buildAGGridColumnsMultiLevel creates AG Grid column definitions with 3-level nested groups
-// Structure: [#, PRODUCT_GROUP6, PRODUCT_GROUP3 > PRODUCT_GROUP8 > PRODUCT_GROUP5 > child columns]
-// Pattern: G3 | G8 | G5 (e.g., LT > Go 7 = YK > 3090 x 6096 > [thickness, highlight, price_before, ...])
-func buildAGGridColumnsMultiLevel(groupedData GroupedData) []ColumnDef {
-	columns := []ColumnDef{}
-
-	// Add row number column
-	columns = append(columns, ColumnDef{
-		Field:           "#",
-		HeaderName:      "#",
-		Width:           intPtr(60),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		ValueGetter:     "node.rowIndex + 1",
-		CellStyle: &CellStyle{
-			TextAlign:  "center",
-			FontWeight: "500",
-		},
-	})
-
-	// Add PRODUCT_GROUP6 column (thickness - row identifier)
-	columns = append(columns, ColumnDef{
-		Field:           "product_group_6",
-		HeaderName:      "หนา",
-		Width:           intPtr(100),
-		Pinned:          "left",
-		LockPosition:    boolPtr(true),
-		SuppressMovable: boolPtr(true),
-		CellStyle: &CellStyle{
-			FontWeight: "600",
-		},
-	})
-
-	// Build hierarchical structure: G3 > G8 > G5
-	g3Map := make(map[string]map[string]map[string]bool) // G3 > G8 > G5
-
-	for _, pattern := range groupedData.PatternGroups {
-		g3 := pattern.ProductGroup3
-		g8 := pattern.ProductGroup8
-		g5 := pattern.ProductGroup5
-
-		if g3Map[g3] == nil {
-			g3Map[g3] = make(map[string]map[string]bool)
-		}
-		if g3Map[g3][g8] == nil {
-			g3Map[g3][g8] = make(map[string]bool)
-		}
-		g3Map[g3][g8][g5] = true
-	}
-
-	// Build column groups
-	for g3, g8Map := range g3Map {
-		g3Group := ColumnDef{
-			HeaderName:    g3,
-			GroupID:       fmt.Sprintf("group_g3_%s", sanitizeFieldName(g3)),
-			OpenByDefault: boolPtr(true),
-			Children:      []ColumnDef{},
-		}
-
-		for g8, g5Map := range g8Map {
-			g8Group := ColumnDef{
-				HeaderName:    g8,
-				GroupID:       fmt.Sprintf("group_g8_%s_%s", sanitizeFieldName(g3), sanitizeFieldName(g8)),
+		for l2, l3Map := range l2Map {
+			l2Group := ColumnDef{
+				HeaderName:    l2,
+				GroupID:       fmt.Sprintf("group_l2_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2)),
 				OpenByDefault: boolPtr(true),
 				Children:      []ColumnDef{},
 			}
 
-			for g5 := range g5Map {
-				g5Group := ColumnDef{
-					HeaderName:    g5,
-					GroupID:       fmt.Sprintf("group_g5_%s_%s_%s", sanitizeFieldName(g3), sanitizeFieldName(g8), sanitizeFieldName(g5)),
+			for l3 := range l3Map {
+				l3Group := ColumnDef{
+					HeaderName:    l3,
+					GroupID:       fmt.Sprintf("group_l3_%s_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2), sanitizeFieldName(l3)),
 					OpenByDefault: boolPtr(true),
 					Children:      []ColumnDef{},
 				}
 
-				// Create unique field prefix
-				fieldPrefix := fmt.Sprintf("%s_%s_%s", sanitizeFieldName(g3), sanitizeFieldName(g8), sanitizeFieldName(g5))
+				// Add child columns from configuration
+				fieldPrefix := fmt.Sprintf("%s_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2), sanitizeFieldName(l3))
+				for _, colConfig := range pattern.Columns {
+					childCol := ColumnDef{
+						Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
+						HeaderName:   colConfig.HeaderName,
+						Width:        intPtr(colConfig.Width),
+						CellRenderer: colConfig.CellRenderer,
+					}
 
-				// Add child columns (7 columns)
-				// 1. หนา (Thickness) - This shows the PRODUCT_GROUP6 value in the cell
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_thickness", fieldPrefix),
-					HeaderName: "หนา",
-					Width:      intPtr(80),
-				})
+					if colConfig.CellStyle != nil {
+						childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
+					}
 
-				// 2. Highlight สีฟ้า
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:        fmt.Sprintf("%s_highlight", fieldPrefix),
-					HeaderName:   "Highlight สีฟ้า",
-					Width:        intPtr(100),
-					CellRenderer: "checkboxRenderer",
-				})
+					l3Group.Children = append(l3Group.Children, childCol)
+				}
 
-				// 3. ราคาขาย before
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_price_before", fieldPrefix),
-					HeaderName: "ราคาขาย before",
-					Width:      intPtr(130),
-					CellStyle: &CellStyle{
-						TextAlign: "right",
-					},
-				})
-
-				// 4. ราคาขาย After
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_price_after", fieldPrefix),
-					HeaderName: "ราคาขาย After",
-					Width:      intPtr(130),
-					CellStyle: &CellStyle{
-						TextAlign: "right",
-					},
-				})
-
-				// 5. Extra (THB)
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_extra", fieldPrefix),
-					HeaderName: "Extra (THB)",
-					Width:      intPtr(100),
-					CellStyle: &CellStyle{
-						TextAlign: "right",
-					},
-				})
-
-				// 6. น.น. (Weight)
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_weight", fieldPrefix),
-					HeaderName: "น.น.",
-					Width:      intPtr(80),
-					CellStyle: &CellStyle{
-						TextAlign: "right",
-					},
-				})
-
-				// 7. หมายเหตุ (Remark)
-				g5Group.Children = append(g5Group.Children, ColumnDef{
-					Field:      fmt.Sprintf("%s_remark", fieldPrefix),
-					HeaderName: "หมายเหตุ",
-					Width:      intPtr(150),
-				})
-
-				g8Group.Children = append(g8Group.Children, g5Group)
+				l2Group.Children = append(l2Group.Children, l3Group)
 			}
 
-			g3Group.Children = append(g3Group.Children, g8Group)
+			l1Group.Children = append(l1Group.Children, l2Group)
 		}
 
-		columns = append(columns, g3Group)
+		columns = append(columns, l1Group)
 	}
 
 	return columns
 }
 
-// buildAGGridRowsMultiLevel converts grouped data into AG Grid row format for multi-level pattern
-// Pattern: G3 | G8 | G5 (rows by G6)
-func buildAGGridRowsMultiLevel(groupedData GroupedData) []AGGridRowData {
-	// Map to hold rows: key = PRODUCT_GROUP6
+// buildDynamicRows builds AG Grid rows based on pattern configuration
+func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	rowMap := make(map[string]AGGridRowData)
 
-	// Process each pattern group
-	for _, pattern := range groupedData.PatternGroups {
-		g6 := pattern.ProductGroup6
-		g3 := pattern.ProductGroup3
-		g8 := pattern.ProductGroup8
-		g5 := pattern.ProductGroup5
+	// Get row identifier fields
+	rowFields := strings.Split(pattern.Grouping.Rows, "|")
+	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
+
+	for _, sg := range subGroups {
+		// Build row key
+		rowKey := buildCompositeKey(sg.SubGroupKeys, rowFields)
+		if rowKey == "" {
+			continue
+		}
 
 		// Initialize row if not exists
-		if _, exists := rowMap[g6]; !exists {
-			rowMap[g6] = AGGridRowData{
-				"id":              uuid.New().String(),
-				"product_group_2": groupedData.ProductGroup2,
-				"product_group_6": g6,
+		if _, exists := rowMap[rowKey]; !exists {
+			rowMap[rowKey] = AGGridRowData{
+				"id": uuid.New().String(),
+			}
+
+			// Set row identifier fields
+			for _, field := range rowFields {
+				valueName := getValueNameByGroupCode(sg.SubGroupKeys, field)
+				fieldName := convertGroupCodeToFieldName(field)
+				rowMap[rowKey][fieldName] = valueName
 			}
 		}
 
-		// Add data for this G3|G8|G5 combination
-		if len(pattern.SubGroups) > 0 {
-			subGroup := pattern.SubGroups[0]
-			fieldPrefix := fmt.Sprintf("%s_%s_%s", sanitizeFieldName(g3), sanitizeFieldName(g8), sanitizeFieldName(g5))
-
-			// Set all child column values (7 columns)
-			rowMap[g6][fmt.Sprintf("%s_thickness", fieldPrefix)] = g6
-			rowMap[g6][fmt.Sprintf("%s_highlight", fieldPrefix)] = false // TODO: determine from data
-			rowMap[g6][fmt.Sprintf("%s_price_before", fieldPrefix)] = subGroup.PriceUnit
-			rowMap[g6][fmt.Sprintf("%s_price_after", fieldPrefix)] = subGroup.TotalNetPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_extra", fieldPrefix)] = subGroup.ExtraPriceUnit
-			rowMap[g6][fmt.Sprintf("%s_weight", fieldPrefix)] = subGroup.PriceWeight
-			rowMap[g6][fmt.Sprintf("%s_remark", fieldPrefix)] = subGroup.Remark
-
-			// Store metadata
-			rowMap[g6][fmt.Sprintf("%s_subgroup_id", fieldPrefix)] = subGroup.ID.String()
-			rowMap[g6][fmt.Sprintf("%s_is_trading", fieldPrefix)] = subGroup.IsTrading
+		// Build column group key
+		var columnKey string
+		if len(pattern.ColumnLevels) > 0 {
+			// Multi-level: use sanitized composite key
+			parts := []string{}
+			for _, level := range pattern.ColumnLevels {
+				valueName := getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
+				parts = append(parts, sanitizeFieldName(valueName))
+			}
+			columnKey = strings.Join(parts, "_")
+		} else {
+			// Single level
+			columnKey = sanitizeFieldName(buildCompositeKey(sg.SubGroupKeys, columnGroupFields))
 		}
+
+		// Populate cell data based on dataMapping configuration
+		for _, colConfig := range pattern.Columns {
+			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
+
+			// Map data based on dataMapping
+			switch colConfig.DataMapping {
+			case "product_group_3":
+				rowMap[rowKey][fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+			case "product_group_6":
+				rowMap[rowKey][fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+			case "price_unit":
+				rowMap[rowKey][fieldName] = sg.PriceUnit
+			case "total_net_price_unit":
+				rowMap[rowKey][fieldName] = sg.TotalNetPriceUnit
+			case "extra_price_unit":
+				rowMap[rowKey][fieldName] = sg.ExtraPriceUnit
+			case "price_weight":
+				rowMap[rowKey][fieldName] = sg.PriceWeight
+			case "remark":
+				rowMap[rowKey][fieldName] = sg.Remark
+			case "highlight":
+				rowMap[rowKey][fieldName] = false // TODO: implement highlight logic
+			}
+		}
+
+		// Store metadata
+		rowMap[rowKey][fmt.Sprintf("%s_subgroup_id", columnKey)] = sg.ID
+		rowMap[rowKey][fmt.Sprintf("%s_is_trading", columnKey)] = sg.IsTrading
 	}
 
 	// Convert map to slice
@@ -672,261 +620,287 @@ func buildAGGridRowsMultiLevel(groupedData GroupedData) []AGGridRowData {
 	return rows
 }
 
-// detectPattern determines which pattern to use based on PRODUCT_GROUP2
-func detectPattern(productGroup2 string) string {
-	// Pattern 3: Multi-level nested (G3 | G8 | G5)
-	if productGroup2 == "เหล็กแผ่น special" {
-		return "pattern_g3_g8_g5"
+// convertCellStyle converts map[string]interface{} to CellStyle struct
+func convertCellStyle(styleMap map[string]interface{}) *CellStyle {
+	style := &CellStyle{}
+
+	if val, ok := styleMap["textAlign"].(string); ok {
+		style.TextAlign = val
+	}
+	if val, ok := styleMap["fontWeight"].(string); ok {
+		style.FontWeight = val
+	}
+	if val, ok := styleMap["fontSize"].(string); ok {
+		style.FontSize = val
+	}
+	if val, ok := styleMap["backgroundColor"].(string); ok {
+		style.BackgroundColor = val
 	}
 
-	// Pattern 2: Simple (G6 | G5)
-	if productGroup2 == "หมวดเหล็กแผ่นลาย" {
-		return "pattern_g6_g5"
-	}
-
-	// Pattern 1: Standard (G6 | G3 | G5)
-	return "pattern_g6_g3_g5"
+	return style
 }
 
-// printAGGridStructure prints the AG Grid structure in a readable format
-func printAGGridStructure(tabs []PriceListDetailTabConfig) {
-	fmt.Println("\n========== AG GRID STRUCTURE ==========")
+// getGroupAndItemMappings gets group and group item mappings for value name resolution
+func getGroupAndItemMappings(sqlx *sqlx.DB) (map[string]models.GetGroupResponse, map[string]models.GetGroupItemResponse, map[string]GetPaymentTermResponse, error) {
+	// Get groups using group service
+	groupReq := models.GetGroupRequest{
+		GroupCodes: []string{},
+		ItemCodes:  []string{},
+	}
 
-	for i, tab := range tabs {
-		fmt.Printf("\nTab %d - %s\n", i+1, tab.Label)
-		fmt.Printf("  Total Columns: %d\n", len(tab.TableConfig.Columns))
-		fmt.Printf("  Total Rows: %d\n", len(tab.TableData))
+	groupReqJson, err := json.Marshal(groupReq)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to marshal group request: %w", err)
+	}
 
-		// Print column structure
-		fmt.Println("\n  Column Structure:")
-		for j, col := range tab.TableConfig.Columns {
-			if len(col.Children) > 0 {
-				fmt.Printf("    %d. Column Group: %s (GroupID: %s)\n", j+1, col.HeaderName, col.GroupID)
-				fmt.Printf("       Children: %d columns\n", len(col.Children))
-				for k, child := range col.Children {
-					fmt.Printf("         %d.%d. %s (field: %s)\n", j+1, k+1, child.HeaderName, child.Field)
-				}
-			} else {
-				fmt.Printf("    %d. Column: %s (field: %s)\n", j+1, col.HeaderName, col.Field)
-			}
-		}
+	groupReqString := string(groupReqJson)
 
-		// Print sample row data
-		if len(tab.TableData) > 0 {
-			fmt.Println("\n  Sample Row Data:")
-			fmt.Printf("    %v\n", tab.TableData[0])
+	// Note: We need a gin.Context for this call, but we're in a helper function
+	// Let's create a minimal context or use nil if the function supports it
+	resp, err := groupService.GetGroup(nil, groupReqString)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get groups: %w", err)
+	}
+
+	groupResp, ok := resp.([]models.GetGroupResponse)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("failed to cast group response")
+	}
+
+	groupMap := map[string]models.GetGroupResponse{}
+	groupItemMap := map[string]models.GetGroupItemResponse{}
+	for _, g := range groupResp {
+		groupMap[g.GroupCode] = g
+		for _, item := range g.Items {
+			groupItemMap[item.ItemCode] = item
 		}
 	}
-	fmt.Println("\n=======================================")
-}
 
-// printGroupingSummary prints a summary of the grouped data
-func printGroupingSummary(groupedData []GroupedData) {
-	fmt.Println("\n========== DATA GROUPING SUMMARY ==========")
-	fmt.Printf("Total unique PRODUCT_GROUP2 sets: %d\n\n", len(groupedData))
-
-	for i, group := range groupedData {
-		fmt.Printf("Set %d - PRODUCT_GROUP2: %s\n", i+1, group.ProductGroup2)
-		fmt.Printf("  Unique patterns (PRODUCT_GROUP6|PRODUCT_GROUP3|PRODUCT_GROUP5): %d\n", len(group.PatternGroups))
-
-		// Count unique PRODUCT_GROUP5 values
-		uniqueGroup5 := make(map[string]bool)
-		for _, pattern := range group.PatternGroups {
-			uniqueGroup5[pattern.ProductGroup5] = true
-			fmt.Printf("    - Pattern: %s (SubGroups: %d)\n", pattern.Pattern, len(pattern.SubGroups))
-		}
-		fmt.Printf("  Unique PRODUCT_GROUP5 values: %d\n", len(uniqueGroup5))
-		fmt.Println()
+	// Get payment terms
+	termReq := GetPaymentTermRequest{
+		TermCode: []string{},
+		TermType: []string{},
 	}
-	fmt.Println("==========================================")
+
+	termReqJson, err := json.Marshal(termReq)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to marshal payment term request: %w", err)
+	}
+
+	termReqString := string(termReqJson)
+
+	termResp, err := GetPaymentTerm(nil, termReqString)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get payment terms: %w", err)
+	}
+
+	paymentTerms, ok := termResp.([]GetPaymentTermResponse)
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("failed to cast payment term response")
+	}
+
+	paymentTermMap := map[string]GetPaymentTermResponse{}
+	for _, pt := range paymentTerms {
+		paymentTermMap[pt.TermCode] = pt
+	}
+
+	return groupMap, groupItemMap, paymentTermMap, nil
 }
 
-// groupDataByPattern groups subgroups by PRODUCT_GROUP2, then by pattern PRODUCT_GROUP6|PRODUCT_GROUP3|PRODUCT_GROUP5|PRODUCT_GROUP8
-func groupDataByPattern(responses []GetPriceListGroupResponse) []GroupedData {
-	// Map to hold data grouped by PRODUCT_GROUP2
-	group2Map := make(map[string]map[string]*PatternGroup)
+// loadPriceData loads price list data from database using GetPriceList
+func loadPriceData(sqlx *sqlx.DB, req GetPriceTableRequest) ([]models.GetPriceListResponse, error) {
+	// Build GetPriceListGroupRequest from GetPriceTableRequest
+	priceListReq := GetPriceListGroupRequest{
+		CompanyCode:       req.CompanyCode,
+		SiteCodes:         req.SiteCodes,
+		GroupCodes:        req.GroupCodes,
+		EffectiveDateFrom: req.EffectiveDateFrom,
+		EffectiveDateTo:   req.EffectiveDateTo,
+	}
 
-	// Loop through all responses and their subgroups
+	// Get price list groups with subgroups
+	groupSubGroup, err := getGroupSubGroup(sqlx, priceListReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group sub group: %w", err)
+	}
+
+	// Get terms
+	groupSubGroup, err = getTerms(sqlx, groupSubGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get terms: %w", err)
+	}
+
+	// Get extras
+	groupSubGroup, err = getExtras(sqlx, groupSubGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get extras: %w", err)
+	}
+
+	// Transform to GetPriceListResponse format (same as GetPriceList API)
+	result, err := transformToGetPriceListResponse(sqlx, groupSubGroup)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform response: %w", err)
+	}
+
+	return result, nil
+}
+
+// transformToGetPriceListResponse transforms internal response to API response format
+func transformToGetPriceListResponse(sqlx *sqlx.DB, responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
+	// Get group and group item mappings
+	groupMap, groupItemMap, _, err := getGroupAndItemMappings(sqlx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mappings: %w", err)
+	}
+
+	result := []models.GetPriceListResponse{}
 	for _, resp := range responses {
-		for _, subGroup := range resp.SubGroups {
-			// Extract group values
-			group2 := getGroupKeyValue(subGroup.GroupKeys, "PRODUCT_GROUP2")
-			group3 := getGroupKeyValue(subGroup.GroupKeys, "PRODUCT_GROUP3")
-			group5 := getGroupKeyValue(subGroup.GroupKeys, "PRODUCT_GROUP5")
-			group6 := getGroupKeyValue(subGroup.GroupKeys, "PRODUCT_GROUP6")
-			group8 := getGroupKeyValue(subGroup.GroupKeys, "PRODUCT_GROUP8")
+		priceListResp := models.GetPriceListResponse{
+			ID:                resp.ID.String(),
+			CompanyCode:       resp.CompanyCode,
+			SiteCode:          resp.SiteCode,
+			GroupCode:         resp.GroupCode,
+			PriceUnit:         resp.PriceUnit,
+			PriceWeight:       resp.PriceWeight,
+			BeforePriceUnit:   resp.BeforePriceUnit,
+			BeforePriceWeight: resp.BeforePriceWeight,
+			Currency:          resp.Currency,
+			Remark:            resp.Remark,
+		}
 
-			// Create pattern: PRODUCT_GROUP6|PRODUCT_GROUP3|PRODUCT_GROUP5|PRODUCT_GROUP8
-			pattern := fmt.Sprintf("%s|%s|%s|%s", group6, group3, group5, group8)
+		// Format effective date
+		if !resp.EffectiveDate.IsZero() {
+			priceListResp.EffectiveDate = resp.EffectiveDate.Format(time.RFC3339)
+		}
 
-			// Initialize map for PRODUCT_GROUP2 if not exists
-			if _, exists := group2Map[group2]; !exists {
-				group2Map[group2] = make(map[string]*PatternGroup)
+		// Transform subgroups
+		subGroups := []models.PriceListSubGroupResponse{}
+		for _, sg := range resp.SubGroups {
+			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
+			for _, sgk := range sg.GroupKeys {
+				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
+					ID:         uuid.New().String(),
+					SubGroupID: sg.ID.String(),
+					GroupCode:  sgk.Code,
+					GroupName:  groupMap[sgk.Code].GroupName,
+					ValueCode:  sgk.Value,
+					ValueName:  groupItemMap[sgk.Value].ItemName,
+					Seq:        sgk.Seq,
+				})
 			}
 
-			// Initialize PatternGroup if not exists
-			if _, exists := group2Map[group2][pattern]; !exists {
-				group2Map[group2][pattern] = &PatternGroup{
-					Pattern:       pattern,
-					ProductGroup6: group6,
-					ProductGroup3: group3,
-					ProductGroup5: group5,
-					ProductGroup8: group8,
-					SubGroups:     []SubGroup{},
-				}
+			sgEffectiveDate := ""
+			if !sg.EffectiveDate.IsZero() {
+				sgEffectiveDate = sg.EffectiveDate.Format(time.RFC3339)
 			}
 
-			// Add subgroup to the pattern group
-			group2Map[group2][pattern].SubGroups = append(group2Map[group2][pattern].SubGroups, subGroup)
+			subGroups = append(subGroups, models.PriceListSubGroupResponse{
+				ID:                        sg.ID.String(),
+				PriceListGroupID:          resp.ID.String(),
+				SubgroupKey:               sg.SubGroupKey,
+				IsTrading:                 sg.IsTrading,
+				PriceUnit:                 sg.PriceUnit,
+				ExtraPriceUnit:            sg.ExtraPriceUnit,
+				TermPriceUnit:             sg.TermPriceUnit,
+				TotalNetPriceUnit:         sg.TotalNetPriceUnit,
+				PriceWeight:               sg.PriceWeight,
+				ExtraPriceWeight:          sg.ExtraPriceWeight,
+				TermPriceWeight:           sg.TermPriceWeight,
+				TotalNetPriceWeight:       sg.TotalNetPriceWeight,
+				BeforePriceUnit:           sg.BeforePriceUnit,
+				BeforeExtraPriceUnit:      sg.BeforeExtraPriceUnit,
+				BeforeTermPriceUnit:       sg.BeforeTermPriceUnit,
+				BeforeTotalNetPriceUnit:   sg.BeforeTotalNetPriceUnit,
+				BeforePriceWeight:         sg.BeforePriceWeight,
+				BeforeExtraPriceWeight:    sg.BeforeExtraPriceWeight,
+				BeforeTermPriceWeight:     sg.BeforeTermPriceWeight,
+				BeforeTotalNetPriceWeight: sg.BeforeTotalNetPriceWeight,
+				EffectiveDate:             sgEffectiveDate,
+				Remark:                    sg.Remark,
+				SubGroupKeys:              subGroupKeys,
+			})
 		}
+
+		priceListResp.SubGroups = subGroups
+		result = append(result, priceListResp)
 	}
 
-	// Convert map to slice
-	result := []GroupedData{}
-	for group2Val, patternMap := range group2Map {
-		groupedData := GroupedData{
-			ProductGroup2: group2Val,
-			PatternGroups: []PatternGroup{},
-		}
-
-		// Add all pattern groups
-		for _, patternGroup := range patternMap {
-			groupedData.PatternGroups = append(groupedData.PatternGroups, *patternGroup)
-		}
-
-		result = append(result, groupedData)
-	}
-
-	return result
+	return result, nil
 }
 
-// loadPriceData loads and parses the price.json file
-func loadPriceData() ([]GetPriceListGroupResponse, error) {
-	// Get the current working directory
-	// currentDir, err := os.Getwd()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get current directory: %w", err)
-	// }
+func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	// Parse request
+	var req GetPriceTableRequest
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal request JSON: %w", err)
+	}
 
-	// // Construct path to price.json
-	// jsonPath := filepath.Join(currentDir, "internal", "services", "price-service", "price.json")
+	// Validate required fields
+	if req.CompanyCode == "" {
+		return nil, fmt.Errorf("company_code is required")
+	}
+	if len(req.SiteCodes) == 0 {
+		return nil, fmt.Errorf("site_codes is required")
+	}
+	if len(req.GroupCodes) == 0 {
+		return nil, fmt.Errorf("group_codes is required")
+	}
 
-	// // Read the JSON file
-	// data, err := os.ReadFile(jsonPath)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to read price.json: %w", err)
-	// }
+	// Load configuration
+	config, err := loadConfiguration()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load configuration: %w", err)
+	}
 
-	// // Parse JSON data into SubGroup array
-	// var subGroups []SubGroup
-	// if err := json.Unmarshal(data, &subGroups); err != nil {
-	// 	return nil, fmt.Errorf("failed to unmarshal price.json: %w", err)
-	// }
-
-	// // Wrap subgroups in GetPriceListGroupResponse structure
-	// // Since the JSON contains a flat array of subgroups, we wrap them in one response
-	// response := GetPriceListGroupResponse{
-	// 	PriceListGroup: PriceListGroup{
-	// 		SubGroups: subGroups,
-	// 	},
-	// }
-	// return []GetPriceListGroupResponse{response}, nil
+	// Connect to database
 	sqlx, err := db.ConnectSqlx(`prime_erp`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer sqlx.Close()
 
-	groupSubGroup, err := getGroupSubGroup(sqlx, GetPriceListGroupRequest{
-		CompanyCode: "7eb85b75-e708-4e5d-9010-4b43427c15be",
-		SiteCodes:   []string{"PRM-00A"},
-		GroupCodes:  []string{"GROUP_1_ITEM_1"},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get group sub group: %w", err)
-	}
-	/*-- Auto-generated SQL script #202511051026
-INSERT INTO public.price_list_sub_group (price_list_group_id,subgroup_key,price_unit,extra_price_unit,total_net_price_unit)
-	VALUES ('9837db53-1a3c-49a9-a197-1fdfa38984bd'::uuid,'GROUP_1_ITEM_1|GROUP_2_ITEM_1|GROUP_5_ITEM_3|GROUP_6_ITEM_2|GROUP_3_ITEM_1',100,0,15);
-*/
-
-	// groupSubGroup is already []GetPriceListGroupResponse, so return it directly
-	return groupSubGroup, nil
-}
-
-func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
-	// Load data from price.json
-	res, err := loadPriceData()
+	// Load price data
+	priceListData, err := loadPriceData(sqlx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load price data: %w", err)
 	}
 
-	fmt.Println("\n========== LOADED DATA ==========")
-	fmt.Printf("Total responses: %d\n", len(res))
-	for i, resp := range res {
-		fmt.Printf("Response %d: %d subgroups\n", i+1, len(resp.SubGroups))
+	if len(priceListData) == 0 {
+		return PriceListDetailApiResponse{
+			Id:   uuid.New(),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}, nil
 	}
 
-	// Group data according to pattern
-	groupedData := groupDataByPattern(res)
+	fmt.Println("\n========== LOADED DATA ==========")
+	fmt.Printf("Total price lists: %d\n", len(priceListData))
+	for i, pl := range priceListData {
+		fmt.Printf("Price List %d: %d subgroups\n", i+1, len(pl.SubGroups))
+	}
 
-	// Print summary statistics
-	printGroupingSummary(groupedData)
+	// Group data by PRODUCT_GROUP2 (tabs)
+	groupedData := groupDataByProductGroup2(priceListData)
+
+	fmt.Println("\n========== GROUPED DATA ==========")
+	fmt.Printf("Total PRODUCT_GROUP2 groups: %d\n", len(groupedData))
 
 	// Build AG Grid response with tabs
 	tabs := []PriceListDetailTabConfig{}
 
-	for _, group := range groupedData {
-		// Detect which pattern to use
-		patternType := detectPattern(group.ProductGroup2)
-
-		var columns []ColumnDef
-		var rowData []AGGridRowData
-
-		switch patternType {
-		case "pattern_g3_g8_g5":
-			// Multi-level nested pattern (G3 > G8 > G5)
-			columns = buildAGGridColumnsMultiLevel(group)
-			rowData = buildAGGridRowsMultiLevel(group)
-		case "pattern_g6_g3_g5":
-			// Pattern with grade (G6 | G3 | G5)
-			// Collect unique PRODUCT_GROUP5 values for columns
-			uniqueGroup5Map := make(map[string]bool)
-			for _, pattern := range group.PatternGroups {
-				uniqueGroup5Map[pattern.ProductGroup5] = true
-			}
-
-			// Convert to sorted slice
-			uniqueGroup5 := []string{}
-			for g5 := range uniqueGroup5Map {
-				uniqueGroup5 = append(uniqueGroup5, g5)
-			}
-
-			// Build column definitions with grade
-			columns = buildAGGridColumnsWithGrade(uniqueGroup5)
-
-			// Build row data with grade
-			rowData = buildAGGridRowsWithGrade(group)
-		default:
-			// Simple pattern (G6 | G5) - without grade
-			// Collect unique PRODUCT_GROUP5 values for columns
-			uniqueGroup5Map := make(map[string]bool)
-			for _, pattern := range group.PatternGroups {
-				uniqueGroup5Map[pattern.ProductGroup5] = true
-			}
-
-			// Convert to sorted slice
-			uniqueGroup5 := []string{}
-			for g5 := range uniqueGroup5Map {
-				uniqueGroup5 = append(uniqueGroup5, g5)
-			}
-
-			// Build column definitions without grade
-			columns = buildAGGridColumns(uniqueGroup5)
-
-			// Build row data without grade
-			rowData = buildAGGridRows(group)
+	for productGroup2, subGroups := range groupedData {
+		// Select pattern for this category
+		pattern := selectPatternForCategory(config, productGroup2)
+		if pattern == nil {
+			fmt.Printf("Warning: No pattern found for category '%s', skipping\n", productGroup2)
+			continue
 		}
+
+		fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
+
+		// Build columns and rows using configuration
+		columns := buildDynamicColumns(pattern, subGroups)
+		rowData := buildDynamicRows(pattern, subGroups)
 
 		// Convert AGGridRowData to []map[string]interface{}
 		tableData := make([]map[string]interface{}, len(rowData))
@@ -937,21 +911,21 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// Create tab configuration
 		tab := PriceListDetailTabConfig{
 			ID:    uuid.New(),
-			Label: group.ProductGroup2,
+			Label: productGroup2,
 			TableConfig: TableConfig{
-				Title:             group.ProductGroup2,
-				GroupHeaderHeight: intPtr(40),
-				HeaderHeight:      intPtr(50),
-				Pagination:        boolPtr(false),
+				Title:             productGroup2,
+				GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+				HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+				Pagination:        boolPtr(config.TableConfig.Pagination),
 				Toolbar: &Toolbar{
-					Show:             boolPtr(true),
-					ShowSearch:       boolPtr(true),
-					ShowRefresh:      boolPtr(true),
-					ShowColumnToggle: boolPtr(true),
+					Show:             boolPtr(config.TableConfig.Toolbar.Show),
+					ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+					ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+					ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
 				},
 				GridOptions: &GridOptions{
-					SuppressMovableColumns: boolPtr(false),
-					SuppressMenuHide:       boolPtr(false),
+					SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+					SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
 				},
 				Columns: columns,
 			},
@@ -963,13 +937,10 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// Create final response
 	response := PriceListDetailApiResponse{
-		Id:   res[0].ID,
+		Id:   uuid.MustParse(priceListData[0].ID),
 		Name: "Price List Detail",
 		Tabs: tabs,
 	}
-
-	// Print AG Grid structure
-	printAGGridStructure(tabs)
 
 	// Print JSON output
 	fmt.Println("\n========== JSON OUTPUT ==========")
