@@ -118,7 +118,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						})
 					}
 				}
-			} else {
+			} /*  else {
 
 				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 					Index:   it,
@@ -126,7 +126,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					Status:  "error",
 					Type:    "po",
 				})
-			}
+			} */
 		}
 	}
 	if len(toleranceErrorResponse.ToleranceError) == 0 {

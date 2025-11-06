@@ -150,7 +150,7 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		i.invoice_code 
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and i.invoice_type = 'AR'
+	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR' or i.invoice_type = 'CN' or i.invoice_type = 'DN')
 		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
 		%s
 		 ORDER BY s.sale_code
@@ -182,18 +182,23 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 
 		// สร้าง InvoiceItem object
 		var invoiceItem models.InvoiceItem
-		idStr, _ := row["item_id"].(string)
-
-		id, _ := uuid.Parse(idStr)
+		id := uuid.Nil
+		if row["item_id"] != nil {
+			idStr, _ := row["item_id"].(string)
+			id, _ = uuid.Parse(idStr)
+		}
 
 		if id != uuid.Nil { // ถ้ามี invoice item จริง
-			invoiceItem = models.InvoiceItem{
-				ID:          id,
-				InvoiceCode: row["invoice_code"].(string),
-				DocumentRef: row["document_ref"].(string),
-				TotalAmount: row["invoice_total_amount"].(float64),
-			}
 			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
+			if row["invoice_code"] != nil {
+				invoiceItem = models.InvoiceItem{
+					ID:          id,
+					InvoiceCode: row["invoice_code"].(string),
+					DocumentRef: row["document_ref"].(string),
+					TotalAmount: row["invoice_total_amount"].(float64),
+				}
+			}
+
 		}
 
 		// group by sale_code

@@ -8,6 +8,7 @@ import (
 	CronjobService "prime-erp-core/internal/services/cronjob-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	emailservice "prime-erp-core/internal/services/email-service"
+	groupService "prime-erp-core/internal/services/group-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -26,6 +27,12 @@ import (
 )
 
 func RegisterRoutes(ctx *gin.Engine) {
+	//group
+	group := ctx.Group("/group")
+
+	group.POST("/GetGroupMaster", func(c *gin.Context) {
+		utils.ProcessRequest(c, groupService.GetGroup)
+	})
 
 	//price
 	price := ctx.Group("/price")
@@ -39,6 +46,20 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/GetPriceList", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceList)
+	}) // for Base Price and price list feature
+	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.CreatePriceListBase)
+	})
+	price.POST("/UpdatePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.UpdatePriceListBase)
+	})
+	price.POST("/DeletePriceListGroupBase", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.DeletePriceListBase)
+	})
+	// config extra get[3] create[2] update delete
+	// extra create update delete [4]
 
 	//quotation
 	quotation := ctx.Group("/quotation")
@@ -92,10 +113,14 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, invoiceService.UpdateInvoiceCN)
 	})
 	//payment
-	payment := ctx.Group("/GetPayment")
+	payment := ctx.Group("/payment")
 	payment.POST("/GetPayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, paymentService.GetPayment)
 	})
+	payment.POST("/CreatePayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.CreatePayment)
+	})
+
 	//sale
 	sale := ctx.Group("/sale")
 	sale.POST("/CreateSale", func(c *gin.Context) {
@@ -120,6 +145,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/UpdateStatusApproveSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateStatusApproveSale)
 	})
+
+	sale.POST("/GetSalePack", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.GetSalePack)
+	})
 	//delivery
 	delivery := ctx.Group("/delivery")
 	delivery.POST("/CreateDelivery", func(c *gin.Context) {
@@ -134,10 +163,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
 	})
-	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
-	})
-
+	/* 	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
+	   		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
+	   	})
+	*/
 	//time
 	time := ctx.Group("/time")
 	time.POST("/GetTime", func(c *gin.Context) {
@@ -147,6 +176,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	deposit := ctx.Group("/deposit")
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
 		utils.ProcessRequest(c, depositService.GetDeposit)
+	})
+	deposit.POST("/CreateDepost", func(c *gin.Context) {
+		utils.ProcessRequest(c, depositService.CreateDepost)
 	})
 
 	//approval
@@ -237,6 +269,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPO)
 	})
+	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.GetPOItem)
+	})
 	purchase.POST("/UpdatePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdatePO)
 	})
@@ -248,6 +283,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/CompletePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePO)
+	})
+	purchase.POST("/CompletePOItem", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePOItem)
 	})
 
 	///cronjob
