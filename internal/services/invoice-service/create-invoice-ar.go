@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
+	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -105,6 +107,46 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			if errCreateApproval != nil {
 				return nil, errCreateApproval
 			}
+
+			depositMapResult, err := interfaceService.GetDeposit(str)
+			if err != nil {
+				return nil, err
+			}
+			if len(depositMapResult) > 0 {
+				var deposit []models.Deposit
+
+				for _, v := range depositMapResult {
+					depMap, _ := v.(map[string]interface{})
+
+					totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
+					if err != nil {
+						totalFloat = 0
+					}
+					drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
+					if err != nil {
+						totalFloat = 0
+					}
+					crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
+					if err != nil {
+						totalFloat = 0
+					}
+
+					deposit = append(deposit, models.Deposit{
+						DepositCode:  depMap["anchor"].(string),
+						CustomerCode: req[0].PartyCode,
+						AmountTotal:  totalFloat,
+						AmountUsed:   drFloat,
+						AmountRemain: crFloat,
+						Status:       "PENDING",
+					})
+				}
+				errDeposit := repositoryDeposit.CreateDeposit(deposit)
+				if errDeposit != nil {
+					return nil, errDeposit
+				}
+
+			}
+
 		}
 	}
 

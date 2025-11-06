@@ -247,15 +247,20 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 		}
 
 		newOrderDetail := orderExternalService.CreateOrderDetail{
-			Action:              "X",
-			OrderID:             uuid.New(),
-			OrderCode:           "",
-			OrderType:           "DELIVERY",
-			OrderDate:           time.Now(),
-			TenantID:            nil,
-			CustomerCode:        deliveryReq.CustomerCode,
-			SoldToCode:          deliveryReq.SoldToCode,
-			ShipToCode:          deliveryReq.ShipToCode,
+			Action:       "X",
+			OrderID:      uuid.New(),
+			OrderCode:    "",
+			OrderType:    "DELIVERY",
+			OrderDate:    time.Now(),
+			TenantID:     nil,
+			CustomerCode: deliveryReq.CustomerCode,
+			SoldToCode:   deliveryReq.SoldToCode,
+			ShipToCode: func() string {
+				if deliveryReq.ShipToCode == "" {
+					return deliveryReq.ShipToAddress
+				}
+				return deliveryReq.ShipToCode
+			}(),
 			BillToCode:          deliveryReq.BillToCode,
 			TransportZone:       "BKK",
 			InterfaceQty:        deliveryReq.InterfaceQty,

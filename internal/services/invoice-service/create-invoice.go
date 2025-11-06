@@ -20,7 +20,9 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
+	invoiceDepositValue := []models.InvoiceDeposit{}
 	invoiceIDForReturn := []uuid.UUID{}
+	invoiceCode := []string{}
 	for i, invoice := range req {
 		invoiceID := uuid.New()
 		req[i].ID = invoiceID
@@ -38,13 +40,48 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
+		for d := range invoice.InvoiceDeposit {
+			depositID := uuid.New()
+			if req[i].InvoiceDeposit[d].DepositCode == "" {
+				req[i].InvoiceDeposit[d].DepositCode = uuid.New().String()
+			}
+			req[i].InvoiceDeposit[d].ID = depositID
+			req[i].InvoiceDeposit[d].InvoiceID = invoiceID
+			invoiceDepositValue = append(invoiceDepositValue, req[i].InvoiceDeposit[d])
+		}
 
 		req[i].InvoiceItem = []models.InvoiceItem{}
 		req[i].InvoiceDeposit = []models.InvoiceDeposit{}
 		invoiceValue = append(invoiceValue, req[i])
 	}
+	for _, invoice := range req {
+		invoiceCode = append(invoiceCode, invoice.InvoiceCode)
+	}
 
-	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue)
+	requestGetInvoice := map[string][]string{
+		"invoice_code": invoiceCode,
+	}
+	jsonBytesGetInvoice, err := json.Marshal(requestGetInvoice)
+	if err != nil {
+		return nil, err
+	}
+	getInvoice, errWarehouse := GetInvoice(ctx, string(jsonBytesGetInvoice))
+	if errWarehouse != nil {
+		return nil, errWarehouse
+	}
+	resultInvoice := getInvoice.(ResultInvoice).Invoice
+	if len(resultInvoice) > 0 {
+		invoiceID := []uuid.UUID{}
+		for _, resultInvoiceValue := range resultInvoice {
+			invoiceID = append(invoiceID, resultInvoiceValue.ID)
+		}
+		errDeleteInvoice := repositoryInvoice.DeleteInvoice(invoiceID)
+		if errDeleteInvoice != nil {
+			return nil, errDeleteInvoice
+		}
+	}
+
+	errCreateApproval := repositoryInvoice.CreateInvoice(invoiceValue, invoiceItemValue, invoiceDepositValue)
 	if errCreateApproval != nil {
 		return nil, errCreateApproval
 	}

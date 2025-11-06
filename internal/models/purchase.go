@@ -673,33 +673,78 @@ type GetUnitsDetailBarcodeComponent struct {
 	Barcode string `json:"barcode"`
 }
 
-type GetGroupRequest struct {
-	GroupCodes []string `json:"group_codes"`
+// For GR or GR Plan DTOs
+type CompletePurchaseItemRequest struct {
+	PurchaseItemCodes []string `json:"purchase_item_codes"`
 }
 
-type GetGroupResponse struct {
-	ID        string      `json:"id"`
-	GroupCode string      `json:"group_code"`
-	GroupName string      `json:"group_name"`
-	Value     string      `json:"value"`
-	ValueInt  int         `json:"value_int"`
-	Seq       int         `json:"seq"`
-	CreateDtm string      `json:"create_dtm"`
-	UpdateBy  string      `json:"update_by"`
-	UpdateDtm string      `json:"update_dtm"`
-	CreateBy  string      `json:"create_by"`
-	Items     []GroupItem `json:"items"`
+type ExceptPurchaseAndPurchaseItemRequest struct {
+	PurchaseCode      string   `json:"purchase_code"`
+	PurchaseItemCodes []string `json:"purchase_item_codes"`
 }
 
-type GroupItem struct {
-	ID        string `json:"id"`
-	ItemCode  string `json:"item_code"`
-	GroupID   string `json:"group_id"`
-	ItemName  string `json:"item_name"`
-	Value     string `json:"value"`
-	ValueInt  int    `json:"value_int"`
-	CreateDtm string `json:"create_dtm"`
-	UpdateBy  string `json:"update_by"`
-	UpdateDtm string `json:"update_dtm"`
-	CreateBy  string `json:"create_by"`
+type GetPurchaseItemRequest struct {
+	NotItems        []ExceptPurchaseAndPurchaseItemRequest `json:"not_items"`
+	SupplierCodes   []string                               `json:"supplier_codes"`
+	POStatusApprove []string                               `json:"po_status_approve"`
+	POItemStatus    []string                               `json:"po_item_status"`
+	ProductCodes    []string                               `json:"product_codes"`
+	CompanyCode     string                                 `json:"company_code"`
+	SiteCode        string                                 `json:"site_code"`
+	Page            int                                    `json:"page"`
+	PageSize        int                                    `json:"page_size"`
+}
+
+type GetPurchaseItemResponse struct {
+	ID                   string               `json:"id"`
+	PurchaseCode         string               `json:"purchase_code"`
+	PurchaseType         string               `json:"purchase_type"`
+	CompanyCode          string               `json:"company_code"`
+	SiteCode             string               `json:"site_code"`
+	DocRefType           *string              `json:"doc_ref_type"`
+	DocRef               *string              `json:"doc_ref"`
+	SupplierCode         string               `json:"supplier_code"`
+	SupplierName         string               `json:"supplier_name"`
+	PurchaseItem         string               `json:"purchase_item"`
+	DocRefItem           string               `json:"doc_ref_item"`
+	ProductCode          string               `json:"product_code"`
+	ProductName          string               `json:"product_name"`
+	ProductGroupOneCode  string               `json:"product_group_one_code"`
+	ProductGroupOneName  string               `json:"product_group_one_name"`
+	Qty                  float64              `json:"qty"`
+	Unit                 string               `json:"unit"`
+	PurchaseQty          float64              `json:"purchase_qty"`
+	PurchaseUnit         string               `json:"purchase_unit"`
+	PurchaseUnitType     string               `json:"purchase_unit_type"`
+	PriceUnit            float64              `json:"price_unit"`
+	TotalDiscount        float64              `json:"total_discount"`
+	TotalAmount          float64              `json:"total_amount"`
+	UnitUom              string               `json:"unit_uom"`
+	TotalCost            float64              `json:"total_cost"`
+	TotalDiscountPercent float64              `json:"total_discount_percent"`
+	DiscountType         string               `json:"discount_type"` // PERCENTAGE, FIXED_AMOUNT
+	TotalVat             float64              `json:"total_vat"`
+	SubtotalExclVat      float64              `json:"subtotal_excl_vat"`
+	WeightUnit           float64              `json:"weight_unit"`
+	TotalWeight          float64              `json:"total_weight"`
+	Status               string               `json:"status"`
+	StatusPayment        string               `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	IsApproved           bool                 `json:"is_approved"`
+	StatusApprove        string               `json:"status_approve"`
+	Remark               string               `json:"remark"`
+	CreateDtm            string               `json:"create_dtm"`
+	CreateBy             string               `json:"create_by"`
+	UpdateDtm            string               `json:"update_dtm"`
+	UpdateBy             string               `json:"update_by"`
+	RefBigLot            *GetPOBigLotResponse `json:"ref_big_lot"`
+	RemainQty            float64              `json:"remain_qty"`
+	RemainWeight         float64              `json:"remain_weight"`
+}
+
+type GetPurchaseItemListResponse struct {
+	Total      int                       `json:"total"`
+	Page       int                       `json:"page"`
+	PageSize   int                       `json:"page_size"`
+	TotalPages int                       `json:"total_pages"`
+	DataList   []GetPurchaseItemResponse `json:"data_list"`
 }

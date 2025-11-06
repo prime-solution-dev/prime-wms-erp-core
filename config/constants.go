@@ -9,6 +9,7 @@ const (
 	GET_INVENTORY_ATP_ENDPOINT = WMS_API_BASE_URL + "/warehouse/Inventory/GetInventoryAtp"
 	CREATE_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CreateOrders"
 	CANCEL_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CancelOrders"
+	GET_PACK_SO_ENDPOINT       = WMS_API_BASE_URL + "/packing/packing/get-packing-so"
 )
 
 // HTTP Configuration

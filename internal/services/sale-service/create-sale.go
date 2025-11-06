@@ -14,10 +14,11 @@ import (
 )
 
 type CreateSaleRequest struct {
-	IsVerifyPrice      bool `json:"is_verify_price"`       // true = verify, if not verified can't create
-	IsVerifyCredit     bool `json:"is_verify_credit"`      // true = verify, if not verified can't create
-	IsVerifyExpiryDate bool `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
-	IsVerifyInventory  bool `json:"is_verify_inventory"`
+	IsVerifyPrice      bool   `json:"is_verify_price"`       // true = verify, if not verified can't create
+	IsVerifyCredit     bool   `json:"is_verify_credit"`      // true = verify, if not verified can't create
+	IsVerifyExpiryDate bool   `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
+	IsVerifyInventory  bool   `json:"is_verify_inventory"`
+	QuotationID        string `json:"quotation_id"`
 	Sales              []SaleDocument
 }
 
@@ -246,6 +247,40 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if err := tx.Create(&createSaleItems).Error; err != nil {
 			tx.Rollback()
 			return nil, err
+		}
+	}
+
+	// Update quotation status to COMPLETED if QuotationID is provided
+	if req.QuotationID != "" {
+		// Parse QuotationID to UUID
+		quotationUUID, err := uuid.Parse(req.QuotationID)
+		if err != nil {
+			tx.Rollback()
+			return nil, errors.New("invalid quotation_id format: " + err.Error())
+		}
+
+		// Update quotation status
+		if err := tx.Model(&models.Quotation{}).
+			Where("id = ?", quotationUUID).
+			Updates(map[string]interface{}{
+				"status":      "COMPLETED",
+				"update_date": &nowDateOnly,
+				"update_by":   user,
+			}).Error; err != nil {
+			tx.Rollback()
+			return nil, errors.New("failed to update quotation status: " + err.Error())
+		}
+
+		// Update quotation items status
+		if err := tx.Model(&models.QuotationItem{}).
+			Where("quotation_id = ?", quotationUUID).
+			Updates(map[string]interface{}{
+				"status":      "COMPLETED",
+				"update_date": &nowDateOnly,
+				"update_by":   user,
+			}).Error; err != nil {
+			tx.Rollback()
+			return nil, errors.New("failed to update quotation items status: " + err.Error())
 		}
 	}
 
