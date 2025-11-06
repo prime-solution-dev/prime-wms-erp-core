@@ -15,7 +15,7 @@
           "field": "highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 100,
-          "cellRenderer": "checkboxRenderer",
+          "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "highlight"
         },
         {
@@ -112,7 +112,7 @@
           "field": "highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 100,
-          "cellRenderer": "checkboxRenderer",
+          "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "highlight"
         },
         {
@@ -226,7 +226,7 @@
           "field": "highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 100,
-          "cellRenderer": "checkboxRenderer",
+          "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "highlight"
         },
         {
@@ -299,9 +299,9 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
-      "showColumnToggle": true
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
     },
     "gridOptions": {
       "suppressMovableColumns": false,
@@ -314,3 +314,4 @@
     "description": "Configuration for price table patterns - supports multiple patterns for different product categories including multi-level nested column groups"
   }
 }
+

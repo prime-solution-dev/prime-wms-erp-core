@@ -327,7 +327,8 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plsg.before_term_price_weight, 0) AS before_term_price_weight,
 			COALESCE(plsg.before_total_net_price_weight, 0) AS before_total_net_price_weight,
 			plsg.effective_date AS sub_effective_date,
-			COALESCE(plsg.remark, '') AS sub_remark
+			COALESCE(plsg.remark, '') AS sub_remark,
+			plsg.udf_json AS udf_json
 		FROM price_list_group plg
 		LEFT JOIN price_list_sub_group plsg ON plg.id = plsg.price_list_group_id
 		WHERE 1=1 %s
@@ -385,7 +386,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforeTermPriceWeight:     toFloat64(row["before_term_price_weight"]),
 				BeforeTotalNetPriceWeight: toFloat64(row["before_total_net_price_weight"]),
 				Remark:                    toString(row["sub_remark"]),
-				// UdfJson:                   json.RawMessage(toString(row["udf_json"])),
+				UdfJson:                   toJsonRawMessage(row["udf_json"]),
 			}
 			if t := toTime(row["sub_effective_date"]); t != nil {
 				subGroup.EffectiveDate = *t
@@ -502,6 +503,32 @@ func parseUUID(s string) uuid.UUID {
 		return uuid.Nil
 	}
 	return id
+}
+
+func toJsonRawMessage(v interface{}) json.RawMessage {
+	if v == nil {
+		return nil
+	}
+
+	// If it's already a byte slice, return it
+	if b, ok := v.([]byte); ok {
+		return json.RawMessage(b)
+	}
+
+	// If it's a string, convert to bytes
+	if s, ok := v.(string); ok {
+		if s == "" {
+			return nil
+		}
+		return json.RawMessage(s)
+	}
+
+	// Try to marshal to JSON
+	if data, err := json.Marshal(v); err == nil {
+		return json.RawMessage(data)
+	}
+
+	return nil
 }
 
 func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {

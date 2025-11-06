@@ -215,27 +215,43 @@ type CellData struct {
 // Helper Functions
 // ============================================================================
 
-// loadConfiguration loads and parses the config.json file
-func loadConfiguration() (*PriceTableConfiguration, error) {
+// loadConfiguration loads and parses the pattern configuration file based on GroupKey
+// If GroupKey is empty or pattern file doesn't exist, falls back to GROUP_1_ITEM_1_PATTERN.json
+func loadConfiguration(groupKey string) (*PriceTableConfiguration, error) {
 	// Get current working directory
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	// Construct path to config.json
-	configPath := filepath.Join(currentDir, "internal", "services", "price-service", "config.json")
+	// Default to GROUP_1_ITEM_1 if groupKey is empty
+	if groupKey == "" {
+		groupKey = "GROUP_1_ITEM_1"
+	}
 
-	// Read the JSON file
+	// Construct path to pattern file: {GroupKey}_PATTERN.json
+	patternFileName := fmt.Sprintf("%s_PATTERN.json", groupKey)
+	configPath := filepath.Join(currentDir, "internal", "services", "price-service", patternFileName)
+
+	// Try to read the pattern file
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config.json: %w", err)
+		// Fallback to GROUP_1_ITEM_1_PATTERN.json if pattern file doesn't exist
+		if groupKey != "GROUP_1_ITEM_1" {
+			fallbackPath := filepath.Join(currentDir, "internal", "services", "price-service", "GROUP_1_ITEM_1_PATTERN.json")
+			data, err = os.ReadFile(fallbackPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read pattern file %s and fallback GROUP_1_ITEM_1_PATTERN.json: %w", patternFileName, err)
+			}
+		} else {
+			return nil, fmt.Errorf("failed to read pattern file %s: %w", patternFileName, err)
+		}
 	}
 
 	// Parse JSON data
 	var config PriceTableConfiguration
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config.json: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal pattern file %s: %w", patternFileName, err)
 	}
 
 	return &config, nil
@@ -271,6 +287,19 @@ func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, group
 		}
 	}
 	return strings.Join(parts, "|")
+}
+
+// extractGroupKey extracts the GroupKey (first part) from subgroup_key
+// Example: "GROUP_1_ITEM_1|GROUP_2_ITEM_2|..." returns "GROUP_1_ITEM_1"
+func extractGroupKey(subgroupKey string) string {
+	if subgroupKey == "" {
+		return ""
+	}
+	parts := strings.Split(subgroupKey, "|")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return ""
 }
 
 // selectPatternForCategory finds the appropriate pattern configuration for a PRODUCT_GROUP2 value
@@ -366,6 +395,45 @@ func groupDataByProductGroup2(priceListData []models.GetPriceListResponse) map[s
 
 			// Add subgroup to the appropriate group
 			groupedData[productGroup2] = append(groupedData[productGroup2], subGroup)
+		}
+	}
+
+	return groupedData
+}
+
+// groupDataByGroupKeyAndProductGroup2 groups subgroups by GroupKey first, then by PRODUCT_GROUP2
+// Uses GroupKey from GetPriceListResponse instead of extracting from subgroup_key
+// Returns: map[groupKey]map[productGroup2][]subGroups
+func groupDataByGroupKeyAndProductGroup2(priceListData []models.GetPriceListResponse) map[string]map[string][]models.PriceListSubGroupResponse {
+	groupedData := make(map[string]map[string][]models.PriceListSubGroupResponse)
+
+	for _, priceList := range priceListData {
+		// Use GroupKey from GetPriceListResponse
+		groupKey := priceList.GroupKey
+		if groupKey == "" {
+			// Fallback: extract from first subgroup if GroupKey is not set
+			if len(priceList.SubGroups) > 0 {
+				groupKey = extractGroupKey(priceList.SubGroups[0].SubgroupKey)
+			}
+			if groupKey == "" {
+				continue
+			}
+		}
+
+		for _, subGroup := range priceList.SubGroups {
+			// Get PRODUCT_GROUP2 value_name
+			productGroup2 := getValueNameByGroupCode(subGroup.SubGroupKeys, "PRODUCT_GROUP2")
+			if productGroup2 == "" {
+				continue
+			}
+
+			// Initialize nested map if needed
+			if groupedData[groupKey] == nil {
+				groupedData[groupKey] = make(map[string][]models.PriceListSubGroupResponse)
+			}
+
+			// Add subgroup to the appropriate group
+			groupedData[groupKey][productGroup2] = append(groupedData[groupKey][productGroup2], subGroup)
 		}
 	}
 
@@ -581,6 +649,24 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			columnKey = sanitizeFieldName(buildCompositeKey(sg.SubGroupKeys, columnGroupFields))
 		}
 
+		// Parse udf_json if present
+		udfData := make(map[string]interface{})
+		highlightValue := false
+		if len(sg.UdfJson) > 0 {
+			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Extract highlight value if present
+				if h, ok := udfData["highlight"].(bool); ok {
+					highlightValue = h
+				}
+				// Merge additional udf_json fields into row data (with prefix to avoid conflicts)
+				for key, value := range udfData {
+					if key != "highlight" {
+						rowMap[rowKey][fmt.Sprintf("%s_udf_%s", columnKey, sanitizeFieldName(key))] = value
+					}
+				}
+			}
+		}
+
 		// Populate cell data based on dataMapping configuration
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
@@ -602,7 +688,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			case "remark":
 				rowMap[rowKey][fieldName] = sg.Remark
 			case "highlight":
-				rowMap[rowKey][fieldName] = false // TODO: implement highlight logic
+				rowMap[rowKey][fieldName] = highlightValue
 			}
 		}
 
@@ -755,6 +841,21 @@ func transformToGetPriceListResponse(sqlx *sqlx.DB, responses []GetPriceListGrou
 
 	result := []models.GetPriceListResponse{}
 	for _, resp := range responses {
+		// Extract GroupKey from first subgroup's subgroup_key (first part before "|")
+		groupKey := ""
+		groupKeyName := ""
+		if len(resp.SubGroups) > 0 && resp.SubGroups[0].SubGroupKey != "" {
+			groupKey = extractGroupKey(resp.SubGroups[0].SubGroupKey)
+			// Get GroupKeyName from group item map using the last part of group_key
+			if groupKey != "" {
+				// Extract the last part (e.g., "GROUP_1_ITEM_1" -> "GROUP_1_ITEM_1")
+				// Actually, groupKey is already the first part, so we can use it directly
+				if item, ok := groupItemMap[groupKey]; ok {
+					groupKeyName = item.ItemName
+				}
+			}
+		}
+
 		priceListResp := models.GetPriceListResponse{
 			ID:                resp.ID.String(),
 			CompanyCode:       resp.CompanyCode,
@@ -766,6 +867,8 @@ func transformToGetPriceListResponse(sqlx *sqlx.DB, responses []GetPriceListGrou
 			BeforePriceWeight: resp.BeforePriceWeight,
 			Currency:          resp.Currency,
 			Remark:            resp.Remark,
+			GroupKey:          groupKey,
+			GroupKeyName:      groupKeyName,
 		}
 
 		// Format effective date
@@ -817,6 +920,7 @@ func transformToGetPriceListResponse(sqlx *sqlx.DB, responses []GetPriceListGrou
 				BeforeTotalNetPriceWeight: sg.BeforeTotalNetPriceWeight,
 				EffectiveDate:             sgEffectiveDate,
 				Remark:                    sg.Remark,
+				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,
 			})
 		}
@@ -846,12 +950,6 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, fmt.Errorf("group_codes is required")
 	}
 
-	// Load configuration
-	config, err := loadConfiguration()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration: %w", err)
-	}
-
 	// Connect to database
 	sqlx, err := db.ConnectSqlx(`prime_erp`)
 	if err != nil {
@@ -879,60 +977,73 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		fmt.Printf("Price List %d: %d subgroups\n", i+1, len(pl.SubGroups))
 	}
 
-	// Group data by PRODUCT_GROUP2 (tabs)
-	groupedData := groupDataByProductGroup2(priceListData)
+	// Group data by GroupKey first, then by PRODUCT_GROUP2
+	groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 
 	fmt.Println("\n========== GROUPED DATA ==========")
-	fmt.Printf("Total PRODUCT_GROUP2 groups: %d\n", len(groupedData))
+	fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
 
 	// Build AG Grid response with tabs
 	tabs := []PriceListDetailTabConfig{}
 
-	for productGroup2, subGroups := range groupedData {
-		// Select pattern for this category
-		pattern := selectPatternForCategory(config, productGroup2)
-		if pattern == nil {
-			fmt.Printf("Warning: No pattern found for category '%s', skipping\n", productGroup2)
+	// Iterate over each GroupKey
+	for groupKey, productGroup2Map := range groupedData {
+		// Load configuration for this GroupKey
+		config, err := loadConfiguration(groupKey)
+		if err != nil {
+			fmt.Printf("Warning: Failed to load configuration for GroupKey '%s': %v, skipping\n", groupKey, err)
 			continue
 		}
 
-		fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
+		fmt.Printf("\n========== Processing GroupKey: %s ==========\n", groupKey)
 
-		// Build columns and rows using configuration
-		columns := buildDynamicColumns(pattern, subGroups)
-		rowData := buildDynamicRows(pattern, subGroups)
+		// Iterate over PRODUCT_GROUP2 values for this GroupKey
+		for productGroup2, subGroups := range productGroup2Map {
+			// Select pattern for this category
+			pattern := selectPatternForCategory(config, productGroup2)
+			if pattern == nil {
+				fmt.Printf("Warning: No pattern found for GroupKey '%s' category '%s', skipping\n", groupKey, productGroup2)
+				continue
+			}
 
-		// Convert AGGridRowData to []map[string]interface{}
-		tableData := make([]map[string]interface{}, len(rowData))
-		for i, row := range rowData {
-			tableData[i] = map[string]interface{}(row)
-		}
+			fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
 
-		// Create tab configuration
-		tab := PriceListDetailTabConfig{
-			ID:    uuid.New(),
-			Label: productGroup2,
-			TableConfig: TableConfig{
-				Title:             productGroup2,
-				GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
-				HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
-				Pagination:        boolPtr(config.TableConfig.Pagination),
-				Toolbar: &Toolbar{
-					Show:             boolPtr(config.TableConfig.Toolbar.Show),
-					ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
-					ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
-					ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+			// Build columns and rows using configuration
+			columns := buildDynamicColumns(pattern, subGroups)
+			rowData := buildDynamicRows(pattern, subGroups)
+
+			// Convert AGGridRowData to []map[string]interface{}
+			tableData := make([]map[string]interface{}, len(rowData))
+			for i, row := range rowData {
+				tableData[i] = map[string]interface{}(row)
+			}
+
+			// Create tab configuration
+			tab := PriceListDetailTabConfig{
+				ID:    uuid.New(),
+				Label: productGroup2,
+				TableConfig: TableConfig{
+					Title:             productGroup2,
+					GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+					HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+					Pagination:        boolPtr(config.TableConfig.Pagination),
+					Toolbar: &Toolbar{
+						Show:             boolPtr(config.TableConfig.Toolbar.Show),
+						ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+						ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+						ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+					},
+					GridOptions: &GridOptions{
+						SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+						SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+					},
+					Columns: columns,
 				},
-				GridOptions: &GridOptions{
-					SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
-					SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
-				},
-				Columns: columns,
-			},
-			TableData: tableData,
-		}
+				TableData: tableData,
+			}
 
-		tabs = append(tabs, tab)
+			tabs = append(tabs, tab)
+		}
 	}
 
 	// Create final response

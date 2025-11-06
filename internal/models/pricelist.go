@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
+// ALTER TABLE public.price_list_sub_group ADD udf_json json NULL;
+
 type PriceListGroup struct {
 	ID                   uuid.UUID             `json:"id"`
 	CompanyCode          string                `json:"company_code"`
@@ -266,6 +268,7 @@ type PriceListSubGroupResponse struct {
 	CreateDtm                 string                         `json:"create_dtm"`
 	UpdateBy                  string                         `json:"update_by"`
 	UpdateDtm                 string                         `json:"update_dtm"`
+	UdfJson                   json.RawMessage                `json:"udf_json,omitempty"`
 	SubGroupKeys              []PriceListSubGroupKeyResponse `json:"sub_group_keys"`
 }
 
