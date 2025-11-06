@@ -203,7 +203,7 @@ func DeletePriceListBase(ids []string) error {
 
 // UpdatePriceListSubGroup updates a price_list_sub_group record by ID
 // It carefully merges udf_json to preserve existing keys while updating with new values
-func UpdatePriceListSubGroup(req models.UpdatePriceListSubGroupRequest) error {
+func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
@@ -211,144 +211,146 @@ func UpdatePriceListSubGroup(req models.UpdatePriceListSubGroupRequest) error {
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
-		// Retrieve existing sub_group record
-		oldSubGroup := models.PriceListSubGroup{}
-		if err := tx.Model(&models.PriceListSubGroup{}).
-			Where("id = ?", req.ID).
-			Preload("PriceListSubGroupKeys").
-			First(&oldSubGroup).Error; err != nil {
-			return err
-		}
+		for _, req := range reqs.Changes {
+			// Retrieve existing sub_group record
+			oldSubGroup := models.PriceListSubGroup{}
+			if err := tx.Model(&models.PriceListSubGroup{}).
+				Where("id = ?", req.SubGroupID).
+				Preload("PriceListSubGroupKeys").
+				First(&oldSubGroup).Error; err != nil {
+				return err
+			}
 
-		now := time.Now().UTC()
+			now := time.Now().UTC()
 
-		// Create history record from old data
-		historyRecord := models.PriceListSubGroupHistory{
-			ID:                        uuid.New(),
-			PriceListGroupID:          oldSubGroup.PriceListGroupID,
-			SubgroupKey:               oldSubGroup.SubgroupKey,
-			IsTrading:                 oldSubGroup.IsTrading,
-			PriceUnit:                 oldSubGroup.PriceUnit,
-			ExtraPriceUnit:            oldSubGroup.ExtraPriceUnit,
-			TermPriceUnit:             oldSubGroup.TermPriceUnit,
-			TotalNetPriceUnit:         oldSubGroup.TotalNetPriceUnit,
-			PriceWeight:               oldSubGroup.PriceWeight,
-			ExtraPriceWeight:          oldSubGroup.ExtraPriceWeight,
-			TermPriceWeight:           oldSubGroup.TermPriceWeight,
-			TotalNetPriceWeight:       oldSubGroup.TotalNetPriceWeight,
-			BeforePriceUnit:           oldSubGroup.BeforePriceUnit,
-			BeforeExtraPriceUnit:      oldSubGroup.BeforeExtraPriceUnit,
-			BeforeTermPriceUnit:       oldSubGroup.BeforeTermPriceUnit,
-			BeforeTotalNetPriceUnit:   oldSubGroup.BeforeTotalNetPriceUnit,
-			BeforePriceWeight:         oldSubGroup.BeforePriceWeight,
-			BeforeExtraPriceWeight:    oldSubGroup.BeforeExtraPriceWeight,
-			BeforeTermPriceWeight:     oldSubGroup.BeforeTermPriceWeight,
-			BeforeTotalNetPriceWeight: oldSubGroup.BeforeTotalNetPriceWeight,
-			EffectiveDate:             oldSubGroup.EffectiveDate,
-			ExpiryDate:                &now,
-			Remark:                    oldSubGroup.Remark,
-			CreateBy:                  oldSubGroup.CreateBy,
-			CreateDtm:                 oldSubGroup.CreateDtm,
-			UpdateBy:                  oldSubGroup.UpdateBy,
-			UpdateDtm:                 oldSubGroup.UpdateDtm,
-		}
+			// Create history record from old data
+			historyRecord := models.PriceListSubGroupHistory{
+				ID:                        uuid.New(),
+				PriceListGroupID:          oldSubGroup.PriceListGroupID,
+				SubgroupKey:               oldSubGroup.SubgroupKey,
+				IsTrading:                 oldSubGroup.IsTrading,
+				PriceUnit:                 oldSubGroup.PriceUnit,
+				ExtraPriceUnit:            oldSubGroup.ExtraPriceUnit,
+				TermPriceUnit:             oldSubGroup.TermPriceUnit,
+				TotalNetPriceUnit:         oldSubGroup.TotalNetPriceUnit,
+				PriceWeight:               oldSubGroup.PriceWeight,
+				ExtraPriceWeight:          oldSubGroup.ExtraPriceWeight,
+				TermPriceWeight:           oldSubGroup.TermPriceWeight,
+				TotalNetPriceWeight:       oldSubGroup.TotalNetPriceWeight,
+				BeforePriceUnit:           oldSubGroup.BeforePriceUnit,
+				BeforeExtraPriceUnit:      oldSubGroup.BeforeExtraPriceUnit,
+				BeforeTermPriceUnit:       oldSubGroup.BeforeTermPriceUnit,
+				BeforeTotalNetPriceUnit:   oldSubGroup.BeforeTotalNetPriceUnit,
+				BeforePriceWeight:         oldSubGroup.BeforePriceWeight,
+				BeforeExtraPriceWeight:    oldSubGroup.BeforeExtraPriceWeight,
+				BeforeTermPriceWeight:     oldSubGroup.BeforeTermPriceWeight,
+				BeforeTotalNetPriceWeight: oldSubGroup.BeforeTotalNetPriceWeight,
+				EffectiveDate:             oldSubGroup.EffectiveDate,
+				ExpiryDate:                &now,
+				Remark:                    oldSubGroup.Remark,
+				CreateBy:                  oldSubGroup.CreateBy,
+				CreateDtm:                 oldSubGroup.CreateDtm,
+				UpdateBy:                  oldSubGroup.UpdateBy,
+				UpdateDtm:                 oldSubGroup.UpdateDtm,
+			}
 
-		// Insert old record into history table
-		if err := tx.Model(&models.PriceListSubGroupHistory{}).Create(&historyRecord).Error; err != nil {
-			return err
-		}
+			// Insert old record into history table
+			if err := tx.Model(&models.PriceListSubGroupHistory{}).Create(&historyRecord).Error; err != nil {
+				return err
+			}
 
-		// Prepare update map
-		updateMap := make(map[string]interface{})
+			// Prepare update map
+			updateMap := make(map[string]interface{})
 
-		// Handle udf_json merging
-		var mergedUdfJson json.RawMessage
-		if len(req.UdfJson) > 0 {
-			// Parse existing udf_json
-			existingUdfMap := make(map[string]interface{})
-			if len(oldSubGroup.UdfJson) > 0 {
-				if err := json.Unmarshal(oldSubGroup.UdfJson, &existingUdfMap); err != nil {
+			// Handle udf_json merging
+			var mergedUdfJson json.RawMessage
+			if len(req.UdfJson) > 0 {
+				// Parse existing udf_json
+				existingUdfMap := make(map[string]interface{})
+				if len(oldSubGroup.UdfJson) > 0 {
+					if err := json.Unmarshal(oldSubGroup.UdfJson, &existingUdfMap); err != nil {
+						return err
+					}
+				}
+
+				// Parse new udf_json
+				newUdfMap := make(map[string]interface{})
+				if err := json.Unmarshal(req.UdfJson, &newUdfMap); err != nil {
 					return err
 				}
+
+				// Merge: new values override existing, but preserve all existing keys
+				for key, value := range newUdfMap {
+					existingUdfMap[key] = value
+				}
+
+				// Marshal merged map back to json.RawMessage
+				mergedBytes, err := json.Marshal(existingUdfMap)
+				if err != nil {
+					return err
+				}
+				mergedUdfJson = json.RawMessage(mergedBytes)
+				updateMap["udf_json"] = mergedUdfJson
 			}
 
-			// Parse new udf_json
-			newUdfMap := make(map[string]interface{})
-			if err := json.Unmarshal(req.UdfJson, &newUdfMap); err != nil {
+			// Handle other field updates
+			if req.IsTrading != nil {
+				updateMap["is_trading"] = *req.IsTrading
+			}
+
+			// Handle price unit fields - update before fields with old values
+			if req.PriceUnit != nil {
+				updateMap["before_price_unit"] = oldSubGroup.PriceUnit
+				updateMap["price_unit"] = *req.PriceUnit
+			}
+			if req.ExtraPriceUnit != nil {
+				updateMap["before_extra_price_unit"] = oldSubGroup.ExtraPriceUnit
+				updateMap["extra_price_unit"] = *req.ExtraPriceUnit
+			}
+			if req.TermPriceUnit != nil {
+				updateMap["before_term_price_unit"] = oldSubGroup.TermPriceUnit
+				updateMap["term_price_unit"] = *req.TermPriceUnit
+			}
+			if req.TotalNetPriceUnit != nil {
+				updateMap["before_total_net_price_unit"] = oldSubGroup.TotalNetPriceUnit
+				updateMap["total_net_price_unit"] = *req.TotalNetPriceUnit
+			}
+
+			// Handle price weight fields - update before fields with old values
+			if req.PriceWeight != nil {
+				updateMap["before_price_weight"] = oldSubGroup.PriceWeight
+				updateMap["price_weight"] = *req.PriceWeight
+			}
+			if req.ExtraPriceWeight != nil {
+				updateMap["before_extra_price_weight"] = oldSubGroup.ExtraPriceWeight
+				updateMap["extra_price_weight"] = *req.ExtraPriceWeight
+			}
+			if req.TermPriceWeight != nil {
+				updateMap["before_term_price_weight"] = oldSubGroup.TermPriceWeight
+				updateMap["term_price_weight"] = *req.TermPriceWeight
+			}
+			if req.TotalNetPriceWeight != nil {
+				updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
+				updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
+			}
+
+			if req.EffectiveDate != nil {
+				updateMap["effective_date"] = req.EffectiveDate
+			}
+
+			if req.Remark != "" {
+				updateMap["remark"] = req.Remark
+			}
+
+			updateMap["update_by"] = "system" // TODO: get user from auth
+			updateMap["update_dtm"] = now
+
+			// Update the record
+			if err := tx.Model(&models.PriceListSubGroup{}).
+				Where("id = ?", req.SubGroupID).
+				Updates(updateMap).Error; err != nil {
 				return err
 			}
-
-			// Merge: new values override existing, but preserve all existing keys
-			for key, value := range newUdfMap {
-				existingUdfMap[key] = value
-			}
-
-			// Marshal merged map back to json.RawMessage
-			mergedBytes, err := json.Marshal(existingUdfMap)
-			if err != nil {
-				return err
-			}
-			mergedUdfJson = json.RawMessage(mergedBytes)
-			updateMap["udf_json"] = mergedUdfJson
-		}
-
-		// Handle other field updates
-		if req.IsTrading != nil {
-			updateMap["is_trading"] = *req.IsTrading
-		}
-
-		// Handle price unit fields - update before fields with old values
-		if req.PriceUnit != nil {
-			updateMap["before_price_unit"] = oldSubGroup.PriceUnit
-			updateMap["price_unit"] = *req.PriceUnit
-		}
-		if req.ExtraPriceUnit != nil {
-			updateMap["before_extra_price_unit"] = oldSubGroup.ExtraPriceUnit
-			updateMap["extra_price_unit"] = *req.ExtraPriceUnit
-		}
-		if req.TermPriceUnit != nil {
-			updateMap["before_term_price_unit"] = oldSubGroup.TermPriceUnit
-			updateMap["term_price_unit"] = *req.TermPriceUnit
-		}
-		if req.TotalNetPriceUnit != nil {
-			updateMap["before_total_net_price_unit"] = oldSubGroup.TotalNetPriceUnit
-			updateMap["total_net_price_unit"] = *req.TotalNetPriceUnit
-		}
-
-		// Handle price weight fields - update before fields with old values
-		if req.PriceWeight != nil {
-			updateMap["before_price_weight"] = oldSubGroup.PriceWeight
-			updateMap["price_weight"] = *req.PriceWeight
-		}
-		if req.ExtraPriceWeight != nil {
-			updateMap["before_extra_price_weight"] = oldSubGroup.ExtraPriceWeight
-			updateMap["extra_price_weight"] = *req.ExtraPriceWeight
-		}
-		if req.TermPriceWeight != nil {
-			updateMap["before_term_price_weight"] = oldSubGroup.TermPriceWeight
-			updateMap["term_price_weight"] = *req.TermPriceWeight
-		}
-		if req.TotalNetPriceWeight != nil {
-			updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
-			updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
-		}
-
-		if req.EffectiveDate != nil {
-			updateMap["effective_date"] = req.EffectiveDate
-		}
-
-		if req.Remark != "" {
-			updateMap["remark"] = req.Remark
-		}
-
-		updateMap["update_by"] = "system" // TODO: get user from auth
-		updateMap["update_dtm"] = now
-
-		// Update the record
-		if err := tx.Model(&models.PriceListSubGroup{}).
-			Where("id = ?", req.ID).
-			Updates(updateMap).Error; err != nil {
-			return err
 		}
 
 		return nil

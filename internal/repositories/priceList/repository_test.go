@@ -12,6 +12,7 @@ import (
 	"prime-erp-core/internal/models"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -52,11 +53,11 @@ func TestMain(m *testing.M) {
 	os.Setenv("database_gorm_url_prime_erp", dsn)
 
 	// Create minimal schema required for tests
-	if err := createSchema(); err != nil {
-		fmt.Printf("failed to create schema: %v\n", err)
-		_ = container.Terminate(ctx)
-		os.Exit(1)
-	}
+    if err := createSchema(); err != nil {
+        fmt.Printf("failed to create schema: %v\n", err)
+        _ = container.Terminate(ctx)
+        os.Exit(1)
+    }
 
 	code := m.Run()
 
@@ -188,9 +189,8 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 			UpdateBy:    "test",
 			UpdateDtm:   time.Now(),
 		}
-		if err := gormx.Create(&testGroup).Error; err != nil {
-			t.Fatalf("create group: %v", err)
-		}
+        err = gormx.Create(&testGroup).Error
+        assert.NoError(t, err, "create group")
 
 		testSubGroupID := uuid.New()
 		existingUdfJson := json.RawMessage(`{"highlight": false, "some_key": ""}`)
@@ -206,30 +206,25 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 			UpdateBy:         "test",
 			UpdateDtm:        time.Now(),
 		}
-		if err := gormx.Create(&testSubGroup).Error; err != nil {
-			t.Fatalf("create subgroup: %v", err)
-		}
+        err = gormx.Create(&testSubGroup).Error
+        assert.NoError(t, err, "create subgroup")
 
-		newUdfJson := json.RawMessage(`{"highlight": true}`)
-		req := models.UpdatePriceListSubGroupRequest{ID: testSubGroupID, UdfJson: newUdfJson}
-		if err := UpdatePriceListSubGroup(req); err != nil {
-			t.Fatalf("UpdatePriceListSubGroup: %v", err)
-		}
+        newUdfJson := json.RawMessage(`{"highlight": true}`)
+        req := models.UpdatePriceListSubGroupRequest{SiteCode: "TEST", Changes: []models.UpdatePriceListSubGroupItem{{SubGroupID: testSubGroupID, UdfJson: newUdfJson}}}
+        err = UpdatePriceListSubGroups(req)
+        assert.NoError(t, err, "UpdatePriceListSubGroup")
 
 		var updated models.PriceListSubGroup
-		if err := gormx.Where("id = ?", testSubGroupID).First(&updated).Error; err != nil {
-			t.Fatalf("get updated: %v", err)
-		}
+        err = gormx.Where("id = ?", testSubGroupID).First(&updated).Error
+        assert.NoError(t, err, "get updated")
 		merged := map[string]interface{}{}
 		if err := json.Unmarshal(updated.UdfJson, &merged); err != nil {
 			t.Fatalf("unmarshal merged: %v", err)
 		}
-		if v, ok := merged["highlight"].(bool); !ok || !v {
-			t.Errorf("highlight expected true, got %v", merged["highlight"])
-		}
-		if v, ok := merged["some_key"].(string); !ok || v != "" {
-			t.Errorf("some_key expected '', got %v", merged["some_key"])
-		}
+        v, ok := merged["highlight"].(bool)
+        assert.True(t, ok && v, "highlight expected true, got %v", merged["highlight"])
+        vs, ok := merged["some_key"].(string)
+        assert.True(t, ok && vs == "", "some_key expected '', got %v", merged["some_key"]) 
 	})
 
 	t.Run("Update price fields updates before fields", func(t *testing.T) {
@@ -240,7 +235,7 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 		defer db.CloseGORM(gormx)
 
 		testGroupID := uuid.New()
-		if err := gormx.Create(&models.PriceListGroup{
+        err = gormx.Create(&models.PriceListGroup{
 			ID:          testGroupID,
 			CompanyCode: "TEST",
 			SiteCode:    "TEST",
@@ -252,13 +247,12 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 			CreateDtm:   time.Now(),
 			UpdateBy:    "test",
 			UpdateDtm:   time.Now(),
-		}).Error; err != nil {
-			t.Fatalf("create group: %v", err)
-		}
+        }).Error
+        assert.NoError(t, err, "create group 2")
 
 		testSubGroupID := uuid.New()
 		oldPriceUnit := 100.0
-		if err := gormx.Create(&models.PriceListSubGroup{
+        err = gormx.Create(&models.PriceListSubGroup{
 			ID:               testSubGroupID,
 			PriceListGroupID: testGroupID,
 			SubgroupKey:      "TEST_KEY_2",
@@ -267,24 +261,17 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 			CreateDtm:        time.Now(),
 			UpdateBy:         "test",
 			UpdateDtm:        time.Now(),
-		}).Error; err != nil {
-			t.Fatalf("create subgroup: %v", err)
-		}
+        }).Error
+        assert.NoError(t, err, "create subgroup 2")
 
-		newPriceUnit := 200.0
-		if err := UpdatePriceListSubGroup(models.UpdatePriceListSubGroupRequest{ID: testSubGroupID, PriceUnit: &newPriceUnit}); err != nil {
-			t.Fatalf("UpdatePriceListSubGroup: %v", err)
-		}
+        newPriceUnit := 200.0
+        err = UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{SiteCode: "TEST", Changes: []models.UpdatePriceListSubGroupItem{{SubGroupID: testSubGroupID, PriceUnit: &newPriceUnit}}})
+        assert.NoError(t, err, "UpdatePriceListSubGroup 2")
 
 		var updated models.PriceListSubGroup
-		if err := gormx.Where("id = ?", testSubGroupID).First(&updated).Error; err != nil {
-			t.Fatalf("get updated: %v", err)
-		}
-		if updated.PriceUnit != newPriceUnit {
-			t.Errorf("price_unit expected %v got %v", newPriceUnit, updated.PriceUnit)
-		}
-		if updated.BeforePriceUnit != oldPriceUnit {
-			t.Errorf("before_price_unit expected %v got %v", oldPriceUnit, updated.BeforePriceUnit)
-		}
+        err = gormx.Where("id = ?", testSubGroupID).First(&updated).Error
+        assert.NoError(t, err, "get updated 2")
+        assert.Equal(t, newPriceUnit, updated.PriceUnit)
+        assert.Equal(t, oldPriceUnit, updated.BeforePriceUnit)
 	})
 }

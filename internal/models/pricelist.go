@@ -329,18 +329,25 @@ type DeletePriceListBaseRequest struct {
 	ID []string `json:"id"`
 }
 
+type UpdatePriceListSubGroupItem struct {
+	SubGroupID              uuid.UUID       `json:"subgroup_id" binding:"required"`
+	IsTrading               *bool           `json:"is_trading,omitempty"`
+	PriceUnit               *float64        `json:"price_unit,omitempty" binding:"omitempty,min=0"`
+	ExtraPriceUnit          *float64        `json:"extra_price_unit,omitempty" binding:"omitempty,min=0"`
+	TermPriceUnit           *float64        `json:"term_price_unit,omitempty" binding:"omitempty,min=0"`
+	TotalNetPriceUnit       *float64        `json:"total_net_price_unit,omitempty" binding:"omitempty,min=0"`
+	PriceWeight             *float64        `json:"price_weight,omitempty" binding:"omitempty,min=0"`
+	ExtraPriceWeight        *float64        `json:"extra_price_weight,omitempty" binding:"omitempty,min=0"`
+	TermPriceWeight         *float64        `json:"term_price_weight,omitempty" binding:"omitempty,min=0"`
+	TotalNetPriceWeight     *float64        `json:"total_net_price_weight,omitempty" binding:"omitempty,min=0"`
+	BeforeTotalNetPriceUnit *float64        `json:"before_total_net_price_unit,omitempty" binding:"omitempty,min=0"`
+	BeforeTermPriceWeight   *float64        `json:"before_term_price_weight,omitempty" binding:"omitempty,min=0"`
+	EffectiveDate           *time.Time      `json:"effective_date,omitempty"`
+	Remark                  string          `json:"remark,omitempty" binding:"max=500"`
+	UdfJson                 json.RawMessage `json:"udf_json,omitempty"`
+}
+
 type UpdatePriceListSubGroupRequest struct {
-	ID                  uuid.UUID       `json:"id" binding:"required"`
-	IsTrading           *bool           `json:"is_trading,omitempty"`
-	PriceUnit           *float64        `json:"price_unit,omitempty" binding:"omitempty,min=0"`
-	ExtraPriceUnit      *float64        `json:"extra_price_unit,omitempty" binding:"omitempty,min=0"`
-	TermPriceUnit       *float64        `json:"term_price_unit,omitempty" binding:"omitempty,min=0"`
-	TotalNetPriceUnit   *float64        `json:"total_net_price_unit,omitempty" binding:"omitempty,min=0"`
-	PriceWeight         *float64        `json:"price_weight,omitempty" binding:"omitempty,min=0"`
-	ExtraPriceWeight    *float64        `json:"extra_price_weight,omitempty" binding:"omitempty,min=0"`
-	TermPriceWeight     *float64        `json:"term_price_weight,omitempty" binding:"omitempty,min=0"`
-	TotalNetPriceWeight *float64        `json:"total_net_price_weight,omitempty" binding:"omitempty,min=0"`
-	EffectiveDate       *time.Time      `json:"effective_date,omitempty"`
-	Remark              string          `json:"remark,omitempty" binding:"max=500"`
-	UdfJson             json.RawMessage `json:"udf_json,omitempty"`
+    SiteCode string                        `json:"site_code"`
+    Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
 }

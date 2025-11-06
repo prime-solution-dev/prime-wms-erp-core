@@ -11,7 +11,7 @@ import (
 )
 
 // seam for unit testing: allow stubbing repository function
-var updateSubGroupFunc = priceListRepository.UpdatePriceListSubGroup
+var updateSubGroupFunc = priceListRepository.UpdatePriceListSubGroups
 
 // UpdatePriceListSubGroup updates a price_list_sub_group record using Gin binding and validation
 func UpdatePriceListSubGroup(ctx *gin.Context) (interface{}, error) {
@@ -34,7 +34,7 @@ func UpdatePriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 	}
 
-	// Call repository function
+	// Call repository function (batch)
 	if err := updateSubGroupFunc(req); err != nil {
 		return nil, fmt.Errorf("failed to update price list sub group: %w", err)
 	}
