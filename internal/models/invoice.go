@@ -92,6 +92,7 @@ type InvoiceItem struct {
 	SubtotalExclVatDeposit float64   `json:"subtotal_excl_vat_deposit"`
 	ArticleCode            string    `json:"article_code"`
 	ProductDesc            string    `json:"product_desc"`
+	InvoiceType            string    `gorm:"-" json:"invoice_type"`
 }
 
 func (InvoiceItem) TableName() string { return "invoice_item" }
