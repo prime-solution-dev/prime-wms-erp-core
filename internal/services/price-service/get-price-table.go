@@ -33,6 +33,7 @@ type PatternConfig struct {
 	Columns              []ColumnConfigItem `json:"columns"`
 	FixedColumns         []ColumnConfigItem `json:"fixedColumns"`
 	ApplicableCategories []string           `json:"applicableCategories"`
+	EditableSuffixes     []string           `json:"editable_suffixes,omitempty"`
 }
 
 // GroupingConfig defines how data should be grouped
@@ -61,6 +62,7 @@ type ColumnConfigItem struct {
 	CellRenderer    string                 `json:"cellRenderer,omitempty"`
 	CellStyle       map[string]interface{} `json:"cellStyle,omitempty"`
 	DataMapping     string                 `json:"dataMapping,omitempty"`
+	EnableTooltip   bool                   `json:"enableTooltip,omitempty"`
 }
 
 // TableConfigSettings from config.json
@@ -115,10 +117,11 @@ type GetPriceTableRequest struct {
 
 // PriceListDetailTabConfig represents a tab configuration with table config and data
 type PriceListDetailTabConfig struct {
-	ID          uuid.UUID                `json:"id"`
-	Label       string                   `json:"label"`
-	TableConfig TableConfig              `json:"tableConfig"`
-	TableData   []map[string]interface{} `json:"tableData"`
+	ID               uuid.UUID                `json:"id"`
+	Label            string                   `json:"label"`
+	TableConfig      TableConfig              `json:"tableConfig"`
+	TableData        []map[string]interface{} `json:"tableData"`
+	EditableSuffixes []string                 `json:"editable_suffixes,omitempty"`
 }
 
 // TableConfig contains the table configuration including columns, toolbar, and options
@@ -160,6 +163,7 @@ type ColumnDef struct {
 	CellRenderer    string     `json:"cellRenderer,omitempty"`
 	CellStyle       *CellStyle `json:"cellStyle,omitempty"`
 	HeaderClass     string     `json:"headerClass,omitempty"`
+	EnableTooltip   *bool      `json:"enableTooltip,omitempty"`
 
 	// Column group specific fields
 	GroupID       string      `json:"groupId,omitempty"`
@@ -206,8 +210,9 @@ type CellData struct {
 	PriceWeight    float64   `json:"price_weight"`     // น.น. (weight)
 	ExtraPrice     float64   `json:"extra_price"`      // Extra (THB)
 	IsTrading      bool      `json:"is_trading"`
-	Highlight      bool      `json:"highlight"` // Highlight สีฟ้า
-	Remark         string    `json:"remark"`    // หมายเหตุ
+	IsHighlight    bool      `json:"is_highlight"` // Highlight สีฟ้า
+	Inactive       bool      `json:"inactive"`
+	Remark         string    `json:"remark"` // หมายเหตุ
 	SubGroupKey    string    `json:"subgroup_key"`
 }
 
@@ -512,6 +517,10 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 				childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
 			}
 
+			if colConfig.EnableTooltip {
+				childCol.EnableTooltip = boolPtr(true)
+			}
+
 			columnGroup.Children = append(columnGroup.Children, childCol)
 		}
 
@@ -590,6 +599,10 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 						childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
 					}
 
+					if colConfig.EnableTooltip {
+						childCol.EnableTooltip = boolPtr(true)
+					}
+
 					l3Group.Children = append(l3Group.Children, childCol)
 				}
 
@@ -651,17 +664,49 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 
 		// Parse udf_json if present
 		udfData := make(map[string]interface{})
-		highlightValue := false
+		isHighlightValue := false
+		inactiveValue := false
+		hasInactiveValue := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
-				// Extract highlight value if present
-				if h, ok := udfData["highlight"].(bool); ok {
-					highlightValue = h
+				// Extract is_highlight value if present
+				if h, ok := udfData["is_highlight"].(bool); ok {
+					isHighlightValue = h
 				}
-				// Merge additional udf_json fields into row data (with prefix to avoid conflicts)
+				// Extract inactive value if present
+				if inactive, ok := udfData["inactive"].(bool); ok {
+					inactiveValue = inactive
+					hasInactiveValue = true
+				}
+				// Extract tooltips and merge additional udf_json fields into row data
 				for key, value := range udfData {
-					if key != "highlight" {
-						rowMap[rowKey][fmt.Sprintf("%s_udf_%s", columnKey, sanitizeFieldName(key))] = value
+					if key == "is_highlight" || key == "inactive" {
+						continue
+					}
+
+					// Check if this is a tooltip field (ends with _tooltip)
+					if strings.HasSuffix(key, "_tooltip") {
+						// Extract the base field name (e.g., "total_net_price_unit_tooltip" -> "total_net_price_unit")
+						baseField := strings.TrimSuffix(key, "_tooltip")
+						// Create tooltip object with text and optional icon
+						tooltipData := make(map[string]interface{})
+						if tooltipMap, ok := value.(map[string]interface{}); ok {
+							// If value is already an object, use it directly
+							if text, hasText := tooltipMap["text"]; hasText {
+								tooltipData["text"] = text
+							}
+							if icon, hasIcon := tooltipMap["icon"]; hasIcon {
+								tooltipData["icon"] = icon
+							}
+						} else {
+							// If value is a string, use it as text
+							tooltipData["text"] = value
+						}
+						// Add tooltip to row data with field name pattern: {columnKey}_{baseField}_tooltip
+						rowMap[rowKey][fmt.Sprintf("%s_%s_tooltip", columnKey, sanitizeFieldName(baseField))] = tooltipData
+					} else {
+						// Merge other udf_json fields into row data (with prefix to avoid conflicts)
+						rowMap[rowKey][fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName(key))] = value
 					}
 				}
 			}
@@ -725,8 +770,14 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				rowMap[rowKey][fieldName] = sg.UpdateBy
 			case "update_dtm":
 				rowMap[rowKey][fieldName] = sg.UpdateDtm
-			case "highlight":
-				rowMap[rowKey][fieldName] = highlightValue
+			case "is_highlight":
+				rowMap[rowKey][fieldName] = isHighlightValue
+			case "inactive":
+				if hasInactiveValue {
+					rowMap[rowKey][fieldName] = inactiveValue
+				} else {
+					rowMap[rowKey][fieldName] = false
+				}
 			}
 		}
 
@@ -1077,7 +1128,8 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					},
 					Columns: columns,
 				},
-				TableData: tableData,
+				TableData:        tableData,
+				EditableSuffixes: pattern.EditableSuffixes,
 			}
 
 			tabs = append(tabs, tab)

@@ -98,7 +98,7 @@ func TestUpdatePriceListSubGroup_Success_CallsRepository(t *testing.T) {
 		"changes": []map[string]interface{}{{
 			"subgroup_id": id.String(),
 			"price_unit":  123.45,
-			"udf_json":    map[string]interface{}{"highlight": true},
+			"udf_json":    map[string]interface{}{"is_highlight": true},
 		}},
 	}
 	body, _ := json.Marshal(payload)
