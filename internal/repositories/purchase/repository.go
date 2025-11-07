@@ -36,6 +36,7 @@ func GetPurchaseList(
 	productCodes []string,
 	purchaseType []string,
 	docRef []string,
+	tradingRef []string,
 	companyCode string,
 	siteCode string,
 	page int,
@@ -89,6 +90,10 @@ func GetPurchaseList(
 
 	if len(docRef) > 0 {
 		query = query.Where("doc_ref IN ?", docRef)
+	}
+
+	if len(tradingRef) > 0 {
+		query = query.Where("trading_ref IN ?", tradingRef)
 	}
 
 	// Count total records (no preload needed)

@@ -157,6 +157,7 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		SiteCode:        purchase.SiteCode,
 		DocRefType:      &docRefType,
 		DocRef:          &docRef,
+		TradingRef:      purchase.TradingRef,
 		SupplierCode:    purchase.SupplierCode,
 		DeliveryDate:    purchase.DeliveryDate.Format(time.RFC3339),
 		DeliveryAddress: purchase.DeliveryAddress,
