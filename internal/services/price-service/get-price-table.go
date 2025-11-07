@@ -677,16 +677,54 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				rowMap[rowKey][fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
 			case "product_group_6":
 				rowMap[rowKey][fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+			case "price_list_group_id":
+				rowMap[rowKey][fieldName] = sg.PriceListGroupID
+			case "subgroup_key":
+				rowMap[rowKey][fieldName] = sg.SubgroupKey
 			case "price_unit":
 				rowMap[rowKey][fieldName] = sg.PriceUnit
-			case "total_net_price_unit":
-				rowMap[rowKey][fieldName] = sg.TotalNetPriceUnit
 			case "extra_price_unit":
 				rowMap[rowKey][fieldName] = sg.ExtraPriceUnit
+			case "term_price_unit":
+				rowMap[rowKey][fieldName] = sg.TermPriceUnit
+			case "total_net_price_unit":
+				rowMap[rowKey][fieldName] = sg.TotalNetPriceUnit
 			case "price_weight":
 				rowMap[rowKey][fieldName] = sg.PriceWeight
+			case "extra_price_weight":
+				rowMap[rowKey][fieldName] = sg.ExtraPriceWeight
+			case "term_price_weight":
+				rowMap[rowKey][fieldName] = sg.TermPriceWeight
+			case "total_net_price_weight":
+				rowMap[rowKey][fieldName] = sg.TotalNetPriceWeight
+			case "before_price_unit":
+				rowMap[rowKey][fieldName] = sg.BeforePriceUnit
+			case "before_extra_price_unit":
+				rowMap[rowKey][fieldName] = sg.BeforeExtraPriceUnit
+			case "before_term_price_unit":
+				rowMap[rowKey][fieldName] = sg.BeforeTermPriceUnit
+			case "before_total_net_price_unit":
+				rowMap[rowKey][fieldName] = sg.BeforeTotalNetPriceUnit
+			case "before_price_weight":
+				rowMap[rowKey][fieldName] = sg.BeforePriceWeight
+			case "before_extra_price_weight":
+				rowMap[rowKey][fieldName] = sg.BeforeExtraPriceWeight
+			case "before_term_price_weight":
+				rowMap[rowKey][fieldName] = sg.BeforeTermPriceWeight
+			case "before_total_net_price_weight":
+				rowMap[rowKey][fieldName] = sg.BeforeTotalNetPriceWeight
+			case "effective_date":
+				rowMap[rowKey][fieldName] = sg.EffectiveDate
 			case "remark":
 				rowMap[rowKey][fieldName] = sg.Remark
+			case "create_by":
+				rowMap[rowKey][fieldName] = sg.CreateBy
+			case "create_dtm":
+				rowMap[rowKey][fieldName] = sg.CreateDtm
+			case "update_by":
+				rowMap[rowKey][fieldName] = sg.UpdateBy
+			case "update_dtm":
+				rowMap[rowKey][fieldName] = sg.UpdateDtm
 			case "highlight":
 				rowMap[rowKey][fieldName] = highlightValue
 			}
