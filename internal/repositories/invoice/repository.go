@@ -73,7 +73,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 			quotedStrings[i] = fmt.Sprintf("'%s'", s)
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
-		searchDocRef = fmt.Sprintf(` and invoice.doc_ref IN (%s)`, whereInClause)
+		searchDocRef = fmt.Sprintf(` and invoice.document_ref IN (%s)`, whereInClause)
 	}
 
 	var invoiceID []uuid.UUID

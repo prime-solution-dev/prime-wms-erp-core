@@ -9,30 +9,9 @@ import (
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
-type GetInvoiceRequest struct {
-	ID           []uuid.UUID `json:"id"`
-	InvoiceCode  []string    `json:"invoice_code"`
-	InvoiceType  []string    `json:"invoice_type"`
-	CustomerCode []string    `json:"customer_code"`
-	Status       []string    `json:"status"`
-	DocRef       []string    `json:"document_ref"`
-	CompanyCode  string      `json:"company_code"`
-	SiteCode     string      `json:"site_code"`
-	Page         int         `json:"page"`
-	PageSize     int         `json:"page_size"`
-}
-type ResultInvoice struct {
-	Total      int              `json:"total"`
-	Page       int              `json:"page"`
-	PageSize   int              `json:"page_size"`
-	TotalPages int              `json:"total_pages"`
-	Invoice    []models.Invoice `json:"invoice"`
-}
-
-func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func SaleAutoStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetInvoiceRequest
 

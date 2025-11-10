@@ -102,6 +102,7 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		mappedPurchase.DocRefType = &docRefType
 		mappedPurchase.DocRef = &docRef
+		mappedPurchase.TradingRef = p.TradingRef
 		mappedPurchase.CreateBy = "system"
 		mappedPurchase.CreateDtm = time.Now().UTC()
 
