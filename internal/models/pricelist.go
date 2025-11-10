@@ -310,14 +310,28 @@ type CreatePriceListBaseRequest struct {
 	Terms         []CreatePriceListGroupTermRequest `json:"terms"`
 }
 
+type UpdatePriceListGroupTermRequest struct {
+	ID               uuid.UUID  `json:"id"`
+	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
+	TermCode         string     `json:"term_code"`
+	Pdc              float64    `json:"pdc"`
+	PdcPercent       int        `json:"pdc_percent"`
+	Due              float64    `json:"due"`
+	DuePercent       int        `json:"due_percent"`
+	CreateBy         string     `json:"create_by"`
+	CreateDtm        *time.Time `json:"create_dtm"`
+	UpdateBy         string     `json:"update_by"`
+	UpdateDtm        *time.Time `json:"update_dtm"`
+}
+
 type UpdatePriceListBaseRequest struct {
-	ID            uuid.UUID            `json:"id"`
-	PriceUnit     float64              `json:"price_unit"`
-	PriceWeight   float64              `json:"price_weight"`
-	Currency      string               `json:"currency"`
-	EffectiveDate *time.Time           `json:"effective_date"`
-	Remark        string               `json:"remark"`
-	Terms         []PriceListGroupTerm `json:"terms"`
+	ID            uuid.UUID                         `json:"id"`
+	PriceUnit     float64                           `json:"price_unit"`
+	PriceWeight   float64                           `json:"price_weight"`
+	Currency      string                            `json:"currency"`
+	EffectiveDate *time.Time                        `json:"effective_date"`
+	Remark        string                            `json:"remark"`
+	Terms         []UpdatePriceListGroupTermRequest `json:"terms"`
 }
 
 type DeletePriceListBaseRequest struct {

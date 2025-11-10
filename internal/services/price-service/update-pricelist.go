@@ -32,7 +32,7 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 					Due:        term.Due,
 					DuePercent: term.DuePercent,
 					CreateBy:   term.CreateBy,
-					CreateDtm:  &termNow,
+					CreateDtm:  term.CreateDtm,
 					UpdateBy:   "system", // TODO: get user from auth
 					UpdateDtm:  &termNow,
 				})
