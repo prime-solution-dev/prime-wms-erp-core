@@ -50,9 +50,9 @@ func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 				Due:              t.Due,
 				DuePercent:       t.DuePercent,
 				CreateBy:         "system", // TODO: get user from auth
-				CreateDtm:        now,
+				CreateDtm:        &now,
 				UpdateBy:         "system", // TODO: get user from auth
-				UpdateDtm:        now,
+				UpdateDtm:        &now,
 			}
 			terms = append(terms, term)
 		}
