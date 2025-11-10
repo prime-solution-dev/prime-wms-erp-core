@@ -26,15 +26,17 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			termNow := time.Now().UTC()
 			for _, term := range r.Terms {
 				priceListGroupTerm = append(priceListGroupTerm, models.PriceListGroupTerm{
-					ID:         term.ID,
-					Pdc:        term.Pdc,
-					PdcPercent: term.PdcPercent,
-					Due:        term.Due,
-					DuePercent: term.DuePercent,
-					CreateBy:   term.CreateBy,
-					CreateDtm:  term.CreateDtm,
-					UpdateBy:   "system", // TODO: get user from auth
-					UpdateDtm:  &termNow,
+					ID:               term.ID,
+					PriceListGroupID: r.ID,
+					TermCode:         term.TermCode,
+					Pdc:              term.Pdc,
+					PdcPercent:       term.PdcPercent,
+					Due:              term.Due,
+					DuePercent:       term.DuePercent,
+					CreateBy:         term.CreateBy,
+					CreateDtm:        term.CreateDtm,
+					UpdateBy:         "system", // TODO: get user from auth
+					UpdateDtm:        &termNow,
 				})
 			}
 		}

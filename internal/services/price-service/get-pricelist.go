@@ -581,8 +581,6 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			effectiveDate = &formattedDate
 		}
 
-		fmt.Println(pl.CreateDtm)
-
 		priceListResp := models.GetPriceListResponse{
 			ID:                pl.ID.String(),
 			CompanyCode:       pl.CompanyCode,
@@ -605,11 +603,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		terms := []models.PriceListTermResponse{}
 		if len(pl.PriceListGroupTerms) > 0 {
 			for _, term := range pl.PriceListGroupTerms {
-				termData, ok := paymentTermMap[term.TermCode]
-				if !ok {
-					termData.TermName = ""
-					termData.TermType = ""
-				}
+				termData := paymentTermMap[term.TermCode]
 
 				createDtm := ""
 				if term.CreateDtm != nil {
