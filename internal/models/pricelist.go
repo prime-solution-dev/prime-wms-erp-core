@@ -343,11 +343,15 @@ type UpdatePriceListSubGroupItem struct {
 	BeforeTotalNetPriceUnit *float64        `json:"before_total_net_price_unit,omitempty" binding:"omitempty,min=0"`
 	BeforeTermPriceWeight   *float64        `json:"before_term_price_weight,omitempty" binding:"omitempty,min=0"`
 	EffectiveDate           *time.Time      `json:"effective_date,omitempty"`
-	Remark                  string          `json:"remark,omitempty" binding:"max=500"`
+	Remark                  *string         `json:"remark,omitempty"`
 	UdfJson                 json.RawMessage `json:"udf_json,omitempty"`
 }
 
 type UpdatePriceListSubGroupRequest struct {
-    SiteCode string                        `json:"site_code"`
-    Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
+	SiteCode string                        `json:"site_code"`
+	Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
+}
+
+type GetLatestPriceListSubGroupRequest struct {
+	SubGroupID string `json:"subgroup_id" binding:"required,uuid4"`
 }

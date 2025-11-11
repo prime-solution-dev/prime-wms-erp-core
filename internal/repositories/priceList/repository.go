@@ -2,6 +2,7 @@ package priceListRepository
 
 import (
 	"encoding/json"
+	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
@@ -35,6 +36,29 @@ func GetPriceListGroup(companyCode string, siteCode string, GroupKeys []string) 
 	}
 
 	return priceListGroups, nil
+}
+
+// GetPriceListSubGroupByID loads a price list sub group (with keys) by sub group ID.
+func GetPriceListSubGroupByID(subGroupID uuid.UUID) (*models.PriceListSubGroup, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroup := models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Where("id = ?", subGroupID).
+		Preload("PriceListSubGroupKeys").
+		First(&subGroup).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &subGroup, nil
 }
 
 // CreatePriceListGroup
@@ -338,8 +362,8 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["effective_date"] = req.EffectiveDate
 			}
 
-			if req.Remark != "" {
-				updateMap["remark"] = req.Remark
+			if req.Remark != nil {
+				updateMap["remark"] = *req.Remark
 			}
 
 			updateMap["update_by"] = "system" // TODO: get user from auth

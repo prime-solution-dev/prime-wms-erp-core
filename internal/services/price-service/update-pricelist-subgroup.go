@@ -34,6 +34,8 @@ func UpdatePriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 	}
 
+	utils.PrintJSON(req)
+
 	// Call repository function (batch)
 	if err := updateSubGroupFunc(req); err != nil {
 		return nil, fmt.Errorf("failed to update price list sub group: %w", err)
@@ -59,6 +61,8 @@ func getValidationErrorMessage(fieldError validator.FieldError) string {
 		return fmt.Sprintf("%s must be at most %s", field, fieldError.Param())
 	case "omitempty":
 		return fmt.Sprintf("%s is invalid", field)
+	case "uuid4":
+		return fmt.Sprintf("%s must be a valid UUID", field)
 	default:
 		return fmt.Sprintf("%s failed validation for tag '%s'", field, tag)
 	}

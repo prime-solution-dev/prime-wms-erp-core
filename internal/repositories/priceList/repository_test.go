@@ -275,3 +275,90 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 		assert.Equal(t, oldPriceUnit, updated.BeforePriceUnit)
 	})
 }
+
+func TestGetPriceListSubGroupByID(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatalf("db connect failed: %v", err)
+	}
+	defer db.CloseGORM(gormx)
+
+	groupID := uuid.New()
+	subGroupID := uuid.New()
+	now := time.Now()
+
+	// create base group (required for foreign key)
+	err = gormx.Create(&models.PriceListGroup{
+		ID:          groupID,
+		CompanyCode: "TEST",
+		SiteCode:    "TEST",
+		GroupCode:   "TEST_GROUP_FETCH",
+		PriceUnit:   10,
+		PriceWeight: 20,
+		Currency:    "THB",
+		CreateBy:    "tester",
+		CreateDtm:   now,
+		UpdateBy:    "tester",
+		UpdateDtm:   now,
+	}).Error
+	assert.NoError(t, err, "create price list group")
+
+	// create target sub group
+	err = gormx.Create(&models.PriceListSubGroup{
+		ID:                        subGroupID,
+		PriceListGroupID:          groupID,
+		SubgroupKey:               "SUB_1",
+		IsTrading:                 true,
+		PriceUnit:                 11,
+		ExtraPriceUnit:            1,
+		TermPriceUnit:             2,
+		TotalNetPriceUnit:         3,
+		PriceWeight:               21,
+		ExtraPriceWeight:          4,
+		TermPriceWeight:           5,
+		TotalNetPriceWeight:       6,
+		BeforePriceUnit:           9,
+		BeforeExtraPriceUnit:      8,
+		BeforeTermPriceUnit:       7,
+		BeforeTotalNetPriceUnit:   6,
+		BeforePriceWeight:         5,
+		BeforeExtraPriceWeight:    4,
+		BeforeTermPriceWeight:     3,
+		BeforeTotalNetPriceWeight: 2,
+		Remark:                    "target",
+		CreateBy:                  "tester",
+		CreateDtm:                 now,
+		UpdateBy:                  "tester",
+		UpdateDtm:                 now,
+	}).Error
+	assert.NoError(t, err, "create sub group")
+
+	// add key to target subgroup
+	err = gormx.Create(&models.PriceListSubGroupKey{
+		ID:         uuid.New(),
+		SubGroupID: subGroupID,
+		Code:       "CODE",
+		Value:      "VALUE",
+		Seq:        1,
+	}).Error
+	assert.NoError(t, err, "create subgroup key")
+
+	result, err := GetPriceListSubGroupByID(subGroupID)
+	assert.NoError(t, err, "repository fetch")
+	if assert.NotNil(t, result, "expected result") {
+		assert.Equal(t, subGroupID, result.ID)
+		assert.Equal(t, groupID, result.PriceListGroupID)
+		assert.Equal(t, "SUB_1", result.SubgroupKey)
+		assert.True(t, result.IsTrading)
+		assert.Equal(t, 11.0, result.PriceUnit)
+		assert.Len(t, result.PriceListSubGroupKeys, 1, "subgroup keys loaded")
+		assert.Equal(t, "CODE", result.PriceListSubGroupKeys[0].Code)
+		assert.Equal(t, "VALUE", result.PriceListSubGroupKeys[0].Value)
+	}
+
+	// ensure not found case returns nil
+	unknownID := uuid.New()
+	result, err = GetPriceListSubGroupByID(unknownID)
+	assert.NoError(t, err, "not found should not error")
+	assert.Nil(t, result, "not found result expected nil")
+}
