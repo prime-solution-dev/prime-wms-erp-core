@@ -36,6 +36,7 @@ type CreateDeliveryRequest struct {
 	Tel               string                       `json:"tel"`
 	TotalWeight       float64                      `json:"total_weight"`
 	Remark            string                       `json:"remark"`
+	BookingSlotType   string                       `json:"booking_slot_type"`
 	DeliveryItems     []CreateDeliveryItemsRequest `json:"delivery_items"`
 }
 
@@ -118,10 +119,11 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 				return "PENDING"
 			}(),
-			CreateBy:   user,
-			CreateDate: nowDateOnly, // date-only format
-			UpdateBy:   user,
-			UpdateDate: nowDateOnly, // date-only format
+			BookingSlotType: deliveryReq.BookingSlotType,
+			CreateBy:        user,
+			CreateDate:      nowDateOnly, // date-only format
+			UpdateBy:        user,
+			UpdateDate:      nowDateOnly, // date-only format
 		}
 
 		deliveryToAdd = append(deliveryToAdd, newDelivery)
