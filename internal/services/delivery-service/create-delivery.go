@@ -8,6 +8,7 @@ import (
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -87,6 +88,12 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	deliveryToAdd := []models.Delivery{}
 	deliveryItemToAdd := []models.DeliveryItem{}
 
+	// Generate all delivery codes first
+	deliveryCodes, err := generateDeliveryCodes(ctx, len(req))
+	if err != nil {
+		return nil, err
+	}
+
 	for num, deliveryReq := range req {
 		deliveryId := uuid.New()
 
@@ -99,7 +106,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		newDelivery := models.Delivery{
 			ID:               deliveryId,
-			DeliveryCode:     "DELIVERY-" + time.Now().Format("20060102150405") + fmt.Sprintf("%d", num),
+			DeliveryCode:     deliveryCodes[num], // Use pre-generated delivery code
 			CompanyCode:      deliveryReq.CompanyCode,
 			SiteCode:         deliveryReq.SiteCode,
 			DeliveryMethod:   deliveryReq.DeliveryMethod,
@@ -182,16 +189,22 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// Update running number after successful creation
+	if err := updateDeliveryRunningConfig(ctx, len(deliveryToAdd)); err != nil {
+		// Log error but don't fail the transaction as deliveries are already created
+		fmt.Printf("Warning: failed to update running config: %v\n", err)
+	}
+
 	// Return the delivery codes of the created deliveries
-	deliveryCodes := make([]string, len(deliveryToAdd))
+	finalDeliveryCodes := make([]string, len(deliveryToAdd))
 	for i, d := range deliveryToAdd {
-		deliveryCodes[i] = d.DeliveryCode
+		finalDeliveryCodes[i] = d.DeliveryCode
 	}
 
 	response := gin.H{
 		"status":        "success",
 		"message":       "Create delivery successfully",
-		"delivery_code": deliveryCodes,
+		"delivery_code": finalDeliveryCodes,
 	}
 
 	// Only include order_code if external service was called
@@ -291,4 +304,57 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
+}
+
+// updateDeliveryRunningConfig updates the running number configuration for deliveries
+func updateDeliveryRunningConfig(ctx *gin.Context, count int) error {
+	if count <= 0 {
+		return nil // No deliveries created, nothing to update
+	}
+
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_DBS",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	return nil
+}
+
+// generateDeliveryCodes generates delivery codes using system config
+func generateDeliveryCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No deliveries to generate codes for
+	}
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_DBS",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+	}
+
+	deliveryCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate delivery codes: %v", err)
+	}
+
+	deliveryResult, ok := deliveryCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(deliveryResult.Data) != count {
+		return nil, errors.New("failed to get correct number of delivery codes from system config")
+	}
+
+	return deliveryResult.Data, nil
 }

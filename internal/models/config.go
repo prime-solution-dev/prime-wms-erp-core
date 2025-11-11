@@ -12,8 +12,18 @@ type SystemConfig struct {
 	Value      string     `json:"value"`
 	Sequence   int        `json:"sequence"`
 	Remark     string     `json:"remark"`
+	JSON       string     `json:"json"`
 }
 
 func (SystemConfig) TableName() string {
 	return "system_config"
+}
+
+// RunningConfigJSON represents the JSON structure for running number configuration
+type RunningConfigJSON struct {
+	Year           string `json:"year"`
+	Month          string `json:"month"`
+	Prefix         string `json:"prefix"`
+	RunningDigit   int    `json:"running_digit"`
+	CurrentRunning int    `json:"current_running"`
 }
