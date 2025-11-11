@@ -46,6 +46,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/GetPriceList", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceList)
+	}) // for Base Price and price list feature
 	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.CreatePriceListBase)
 	})
@@ -108,6 +111,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	invoice.POST("/UpdateInvoiceCN", func(c *gin.Context) {
 		utils.ProcessRequest(c, invoiceService.UpdateInvoiceCN)
+	})
+	invoice.POST("/CreateInvoiceDN", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.CreateInvoiceDN)
+	})
+	invoice.POST("/UpdateInvoiceDN", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.UpdateInvoiceDN)
 	})
 	//payment
 	payment := ctx.Group("/payment")

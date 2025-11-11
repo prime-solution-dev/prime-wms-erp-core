@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
+	saleRepository "prime-erp-core/internal/repositories/invoice"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -156,6 +157,7 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		SiteCode:        purchase.SiteCode,
 		DocRefType:      &docRefType,
 		DocRef:          &docRef,
+		TradingRef:      purchase.TradingRef,
 		SupplierCode:    purchase.SupplierCode,
 		DeliveryDate:    purchase.DeliveryDate.Format(time.RFC3339),
 		DeliveryAddress: purchase.DeliveryAddress,
@@ -361,8 +363,6 @@ func GetProductGroup(productGroupReq models.GetGroupRequest) (map[string]string,
 		return nil, errors.New("failed to read response body: " + err.Error())
 	}
 
-	fmt.Println("productGroupBody: ", productGroupBody)
-
 	productGroupResponse := []models.GetGroupResponse{}
 	if err := json.Unmarshal(productGroupBody, &productGroupResponse); err != nil {
 		return nil, errors.New("failed to decode JSON response: " + err.Error())
@@ -404,4 +404,35 @@ func GetRelatedPrePurchase(ctx *gin.Context, req models.GetPOBigLotListRequest) 
 	}
 
 	return mapPrePurchase, nil
+}
+
+// Invoice actions
+type UsedPOByInvoice struct {
+	Qty    float64 `json:"qty"`
+	Weight float64 `json:"weight"`
+}
+
+func GetUsedQtyAndWeight(companyCode string, siteCode string, purchaseCodes []string, purchaseItemCodes []string) (map[string]UsedPOByInvoice, error) {
+	invoices, err := saleRepository.GetInvoiceRelatedByPO(companyCode, siteCode, purchaseCodes, purchaseItemCodes, []string{"AP"}, []string{"PENDING", "COMPLETED"})
+	if err != nil {
+		return nil, errors.New("failed to get related invoices: " + err.Error())
+	}
+
+	usedMap := make(map[string]UsedPOByInvoice)
+	for _, invoice := range invoices {
+		for _, invoiceItem := range invoice.InvoiceItem {
+			if val, exists := usedMap[invoiceItem.DocumentRefItem]; exists {
+				val.Qty += invoiceItem.Qty
+				val.Weight += invoiceItem.Weight
+				usedMap[invoiceItem.DocumentRefItem] = val
+			} else {
+				usedMap[invoiceItem.DocumentRefItem] = UsedPOByInvoice{
+					Qty:    invoiceItem.Qty,
+					Weight: invoiceItem.Weight,
+				}
+			}
+		}
+	}
+
+	return usedMap, nil
 }

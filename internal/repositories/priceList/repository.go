@@ -9,6 +9,33 @@ import (
 	"gorm.io/gorm"
 )
 
+// GetPriceListGroup
+func GetPriceListGroup(companyCode string, siteCode string, GroupKeys []string) ([]models.PriceListGroup, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	priceListGroups := []models.PriceListGroup{}
+	query := gormx.Model(&models.PriceListGroup{}).
+		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+
+	if len(GroupKeys) > 0 {
+		query = query.Where("group_key IN ?", GroupKeys)
+	}
+
+	if err := query.
+		Preload("PriceListGroupTerms").
+		Preload("PriceListGroupExtras").
+		Preload("PriceListSubGroups.PriceListSubGroupKeys").
+		Find(&priceListGroups).Error; err != nil {
+		return priceListGroups, err
+	}
+
+	return priceListGroups, nil
+}
+
 // CreatePriceListGroup
 func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
 	gormx, err := db.ConnectGORM("prime_erp")
@@ -70,6 +97,7 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 				return err
 			}
 
+			// Update main table
 			if err := tx.Model(&models.PriceListGroup{}).
 				Where("id = ?", group.ID).
 				Updates(map[string]interface{}{
@@ -85,34 +113,21 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 				}).Error; err != nil {
 				return err
 			}
-		}
 
-		return nil
-	})
-}
+			// Delete old Terms
+			if termResult := tx.Where("price_list_group_id = ?", group.ID).Delete(&models.PriceListGroupTerm{}); termResult.Error != nil {
+				return termResult.Error
+			}
 
-func UpdatePriceListTerm(priceListGroupTerms []models.PriceListGroupTerm) error {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return err
-	}
-	defer db.CloseGORM(gormx)
-
-	return gormx.Transaction(func(tx *gorm.DB) error {
-		for _, term := range priceListGroupTerms {
-			if err := tx.Model(&models.PriceListGroupTerm{}).
-				Where("id = ?", term.ID).
-				Updates(map[string]interface{}{
-					"pdc":         term.Pdc,
-					"pdc_percent": term.PdcPercent,
-					"due":         term.Due,
-					"due_percent": term.DuePercent,
-					"update_by":   term.UpdateBy,
-					"update_dtm":  term.UpdateDtm,
-				}).Error; err != nil {
-				return err
+			// Insert new Terms
+			for _, term := range group.PriceListGroupTerms {
+				term.PriceListGroupID = group.ID
+				if err := tx.Create(&term).Error; err != nil {
+					return err
+				}
 			}
 		}
+
 		return nil
 	})
 }

@@ -80,6 +80,7 @@ type Purchase struct {
 	SiteCode                    string         `json:"site_code"`
 	DocRefType                  *string        `json:"doc_ref_type"`
 	DocRef                      *string        `json:"doc_ref"`
+	TradingRef                  *string        `json:"trading_ref"`
 	SupplierCode                string         `json:"supplier_code"`
 	DeliveryDate                *time.Time     `json:"delivery_date"`
 	DeliveryAddress             string         `json:"delivery_address"`
@@ -381,6 +382,7 @@ type PurchaseFormRequest struct {
 	PurchaseType    string                    `json:"purchase_type"`
 	DocRefType      *string                   `json:"doc_ref_type"`
 	DocRef          *string                   `json:"doc_ref"`
+	TradingRef      *string                   `json:"trading_ref"`
 	SupplierCode    *string                   `json:"supplier_code"`
 	DeliveryDate    *time.Time                `json:"delivery_date"`
 	DeliveryAddress string                    `json:"delivery_address"`
@@ -411,6 +413,7 @@ type GetPurchaseRequest struct {
 	ProductCodes            []string `json:"product_codes"`
 	PurchaseType            []string `json:"purchase_type"`
 	DocRef                  []string `json:"doc_ref"`
+	TradingRef              []string `json:"trading_ref"`
 	CompanyCode             string   `json:"company_code"`
 	SiteCode                string   `json:"site_code"`
 	Page                    int      `json:"page"`
@@ -459,6 +462,7 @@ type PurchaseResponse struct {
 	SiteCode                    string                 `json:"site_code"`
 	DocRefType                  *string                `json:"doc_ref_type"`
 	DocRef                      *string                `json:"doc_ref"`
+	TradingRef                  *string                `json:"trading_ref"`
 	SupplierCode                string                 `json:"supplier_code"`
 	SupplierName                string                 `json:"supplier_name"`
 	SupplierAddress             string                 `json:"supplier_address"`
@@ -703,6 +707,7 @@ type GetPurchaseItemResponse struct {
 	SiteCode             string               `json:"site_code"`
 	DocRefType           *string              `json:"doc_ref_type"`
 	DocRef               *string              `json:"doc_ref"`
+	TradingRef           *string              `json:"trading_ref"`
 	SupplierCode         string               `json:"supplier_code"`
 	SupplierName         string               `json:"supplier_name"`
 	PurchaseItem         string               `json:"purchase_item"`
@@ -737,6 +742,8 @@ type GetPurchaseItemResponse struct {
 	UpdateDtm            string               `json:"update_dtm"`
 	UpdateBy             string               `json:"update_by"`
 	RefBigLot            *GetPOBigLotResponse `json:"ref_big_lot"`
+	RemainQty            float64              `json:"remain_qty"`
+	RemainWeight         float64              `json:"remain_weight"`
 }
 
 type GetPurchaseItemListResponse struct {
