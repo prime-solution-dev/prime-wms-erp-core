@@ -577,7 +577,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, pl := range priceLists {
 		var effectiveDate *string
 		if pl.EffectiveDate != nil {
-			formattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z07:00")
+			formattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
 			effectiveDate = &formattedDate
 		}
 
@@ -595,30 +595,24 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Remark:            pl.Remark,
 			GroupKey:          pl.GroupKey,
 			CreateBy:          pl.CreateBy,
-			CreateDtm:         pl.CreateDtm.Format("2006-01-02T15:04:05Z07:00"),
+			CreateDtm:         pl.CreateDtm.Format("2006-01-02T15:04:05Z"),
 			UpdateBy:          pl.UpdateBy,
-			UpdateDtm:         pl.UpdateDtm.Format("2006-01-02T15:04:05Z07:00"),
+			UpdateDtm:         pl.UpdateDtm.Format("2006-01-02T15:04:05Z"),
 		}
 
 		terms := []models.PriceListTermResponse{}
 		if len(pl.PriceListGroupTerms) > 0 {
 			for _, term := range pl.PriceListGroupTerms {
-				fmt.Println("term.TermCode: ", term.TermCode)
-				termData, ok := paymentTermMap[term.TermCode]
-				if !ok {
-					fmt.Println("error term.TermCode: ", term.TermCode)
-					termData.TermName = ""
-					termData.TermType = ""
-				}
+				termData := paymentTermMap[term.TermCode]
 
 				createDtm := ""
 				if term.CreateDtm != nil {
-					createDtm = term.CreateDtm.Format("2006-01-02T15:04:05Z07:00")
+					createDtm = term.CreateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
 				updateDtm := ""
 				if term.UpdateDtm != nil {
-					updateDtm = term.UpdateDtm.Format("2006-01-02T15:04:05Z07:00")
+					updateDtm = term.UpdateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
 				terms = append(terms, models.PriceListTermResponse{
@@ -644,12 +638,12 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for _, extra := range pl.PriceListGroupExtras {
 				createDtm := ""
 				if extra.CreateDtm != nil {
-					createDtm = extra.CreateDtm.Format("2006-01-02T15:04:05Z07:00")
+					createDtm = extra.CreateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
 				updateDtm := ""
 				if extra.UpdateDtm != nil {
-					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z07:00")
+					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
 				extras = append(extras, models.PriceListExtraResponse{
@@ -688,18 +682,18 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 				var sgEffectiveDate *string
 				if pl.EffectiveDate != nil {
-					sgFormattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z07:00")
+					sgFormattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
 					sgEffectiveDate = &sgFormattedDate
 				}
 
 				sgCreateDtm := ""
 				if pl.EffectiveDate != nil {
-					sgCreateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z07:00")
+					sgCreateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
 				}
 
 				sgUpdateDtm := ""
 				if pl.EffectiveDate != nil {
-					sgUpdateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z07:00")
+					sgUpdateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
 				}
 
 				subGroups = append(subGroups, models.PriceListSubGroupResponse{
