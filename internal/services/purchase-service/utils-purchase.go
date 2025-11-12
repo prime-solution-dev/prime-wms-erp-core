@@ -115,6 +115,9 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 		PurchaseItem:         item.PurchaseItem,
 		DocRefItem:           item.DocRefItem,
 		ProductCode:          item.ProductCode,
+		ProductDesc:          item.ProductDesc,
+		ProductGroupOneCode:  item.ProductGroupCode,
+		ProductGroupOneName:  item.ProductGroupName,
 		Qty:                  item.Qty,
 		Unit:                 item.Unit,
 		PurchaseQty:          item.PurchaseQty,
@@ -162,6 +165,10 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		DocRef:          &docRef,
 		TradingRef:      purchase.TradingRef,
 		SupplierCode:    purchase.SupplierCode,
+		SupplierName:    purchase.SupplierName,
+		SupplierAddress: purchase.SupplierAddress,
+		SupplierPhone:   purchase.SupplierPhone,
+		SupplierEmail:   purchase.SupplierEmail,
 		DeliveryDate:    purchase.DeliveryDate.Format(time.RFC3339),
 		DeliveryAddress: purchase.DeliveryAddress,
 		Status:          purchase.Status,
@@ -334,49 +341,6 @@ func GetProductByCode(productReq models.GetProductRequest) (map[string]models.Ge
 	}
 
 	return mapProduct, nil
-}
-
-func GetProductGroup(productGroupReq models.GetGroupRequest) (map[string]string, error) {
-	jsonData, err := json.Marshal(productGroupReq)
-	if err != nil {
-		return nil, errors.New("failed to marshal product group data to JSON: " + err.Error())
-	}
-
-	getProductGroups, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/GetGroup", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errors.New("failed to create HTTP request: " + err.Error())
-	}
-
-	getProductGroups.Header.Set("Content-Type", "application/json")
-
-	// Create a client and execute the request
-	client := &http.Client{}
-	resp, err := client.Do(getProductGroups)
-	if err != nil {
-		return nil, errors.New("failed to execute HTTP request: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
-	}
-
-	productGroupBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.New("failed to read response body: " + err.Error())
-	}
-
-	productGroupResponse := []models.GetGroupResponse{}
-	if err := json.Unmarshal(productGroupBody, &productGroupResponse); err != nil {
-		return nil, errors.New("failed to decode JSON response: " + err.Error())
-	}
-
-	mapProductGroupItem := map[string]string{}
-	for _, groupItem := range productGroupResponse[0].Items {
-		mapProductGroupItem[groupItem.ItemCode] = groupItem.ItemName
-	}
-
-	return mapProductGroupItem, nil
 }
 
 // PrePurchase actions

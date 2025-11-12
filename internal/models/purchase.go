@@ -440,7 +440,7 @@ type PurchaseItemResponse struct {
 	PurchaseItem         string  `json:"purchase_item"`
 	DocRefItem           string  `json:"doc_ref_item"`
 	ProductCode          string  `json:"product_code"`
-	ProductName          string  `json:"product_name"`
+	ProductDesc          string  `json:"product_desc"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`
 	ProductGroupOneName  string  `json:"product_group_one_name"`
 	Qty                  float64 `json:"qty"`
@@ -724,10 +724,13 @@ type GetPurchaseItemResponse struct {
 	TradingRef           *string              `json:"trading_ref"`
 	SupplierCode         string               `json:"supplier_code"`
 	SupplierName         string               `json:"supplier_name"`
+	SupplierAddress      string               `json:"supplier_address"`
+	SupplierPhone        string               `json:"supplier_phone"`
+	SupplierEmail        string               `json:"supplier_email"`
 	PurchaseItem         string               `json:"purchase_item"`
 	DocRefItem           string               `json:"doc_ref_item"`
 	ProductCode          string               `json:"product_code"`
-	ProductName          string               `json:"product_name"`
+	ProductDesc          string               `json:"product_desc"`
 	ProductGroupOneCode  string               `json:"product_group_one_code"`
 	ProductGroupOneName  string               `json:"product_group_one_name"`
 	Qty                  float64              `json:"qty"`
