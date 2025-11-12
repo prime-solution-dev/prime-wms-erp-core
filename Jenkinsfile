@@ -91,7 +91,7 @@ stage('Update .env with DB_PASSWORD') {
     steps {
         script {
             echo 'Updating .env file with DB_PASSWORD on remote...'
-            withCredentials([string(credentialsId: 'Jenkinskernaluatserver', variable: 'DB_PASSWORD')]) {
+            withCredentials([string(credentialsId: 'Jenkinsdemoserver', variable: 'DB_PASSWORD')]) {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                 "cd ${REPO_NAME} && \\
