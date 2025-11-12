@@ -82,6 +82,10 @@ type Purchase struct {
 	DocRef                      *string        `json:"doc_ref"`
 	TradingRef                  *string        `json:"trading_ref"`
 	SupplierCode                string         `json:"supplier_code"`
+	SupplierName                string         `json:"supplier_name"`
+	SupplierAddress             string         `json:"supplier_address"`
+	SupplierPhone               string         `json:"supplier_phone"`
+	SupplierEmail               string         `json:"supplier_email"`
 	DeliveryDate                *time.Time     `json:"delivery_date"`
 	DeliveryAddress             string         `json:"delivery_address"`
 	Status                      string         `json:"status"`
@@ -111,6 +115,9 @@ type PurchaseItem struct {
 	PurchaseID           uuid.UUID `json:"purchase_id"`
 	PurchaseItem         string    `json:"purchase_item"`
 	ProductCode          string    `json:"product_code"`
+	ProductDesc          string    `json:"product_desc"`
+	ProductGroupCode     string    `json:"product_group_code"`
+	ProductGroupName     string    `json:"product_group_name"`
 	DocRefItem           string    `json:"doc_ref_item"`
 	Qty                  float64   `json:"qty"`
 	Unit                 string    `json:"unit"`
@@ -353,6 +360,9 @@ type PurchaseItemFormRequest struct {
 	PurchaseID           *uuid.UUID `json:"purchase_id"`
 	PurchaseItem         *string    `json:"purchase_item"`
 	ProductCode          string     `json:"product_code"`
+	ProductDesc          string     `json:"product_desc"`
+	ProductGroupCode     string     `json:"product_group_code"`
+	ProductGroupName     string     `json:"product_group_name"`
 	DocRefItem           *string    `json:"doc_ref_item"`
 	Qty                  float64    `json:"qty"`
 	Unit                 string     `json:"unit"`
@@ -384,6 +394,10 @@ type PurchaseFormRequest struct {
 	DocRef          *string                   `json:"doc_ref"`
 	TradingRef      *string                   `json:"trading_ref"`
 	SupplierCode    *string                   `json:"supplier_code"`
+	SupplierName    *string                   `json:"supplier_name"`
+	SupplierAddress *string                   `json:"supplier_address"`
+	SupplierPhone   *string                   `json:"supplier_phone"`
+	SupplierEmail   *string                   `json:"supplier_email"`
 	DeliveryDate    *time.Time                `json:"delivery_date"`
 	DeliveryAddress string                    `json:"delivery_address"`
 	Status          string                    `json:"status"`

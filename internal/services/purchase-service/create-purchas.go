@@ -39,10 +39,6 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, p := range req.Purchases {
 		mappedPurchase := MapPurchaseFormRequestToPurchaseModel(p)
 
-		if p.SupplierCode == nil {
-			return nil, errors.New("supplier code is required")
-		}
-
 		// Generate purchase code
 		config, ok := purchaseConfigMap[p.PurchaseType]
 		if !ok {
@@ -88,6 +84,10 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mappedPurchase.CompanyCode = req.CompanyCode
 		mappedPurchase.SiteCode = req.SiteCode
 		mappedPurchase.SupplierCode = *p.SupplierCode
+		mappedPurchase.SupplierName = *p.SupplierName
+		mappedPurchase.SupplierAddress = *p.SupplierAddress
+		mappedPurchase.SupplierPhone = *p.SupplierPhone
+		mappedPurchase.SupplierEmail = *p.SupplierEmail
 		mappedPurchase.ID = uuid.New()
 
 		docRefType := ""
