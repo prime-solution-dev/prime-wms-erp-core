@@ -15,6 +15,10 @@ type PrePurchase struct {
 	DocRefType                  string            `json:"doc_ref_type"`
 	DocRef                      string            `json:"doc_ref"`
 	SupplierCode                string            `json:"supplier_code"`
+	SupplierName                string            `json:"supplier_name"`
+	SupplierAddress             string            `json:"supplier_address"`
+	SupplierPhone               string            `json:"supplier_phone"`
+	SupplierEmail               string            `json:"supplier_email"`
 	DeliveryAddress             string            `json:"delivery_address"`
 	Status                      string            `json:"status"`
 	TotalAmount                 float64           `json:"total_amount"`
@@ -177,6 +181,10 @@ type CreatePOBigLotRequest struct {
 	CompanyCode     string                      `json:"company_code"`
 	SiteCode        string                      `json:"site_code"`
 	SupplierCode    string                      `json:"supplier_code"`
+	SupplierName    string                      `json:"supplier_name"`
+	SupplierAddress string                      `json:"supplier_address"`
+	SupplierPhone   string                      `json:"supplier_phone"`
+	SupplierEmail   string                      `json:"supplier_email"`
 	DeliveryAddress string                      `json:"delivery_address"`
 	Status          string                      `json:"status"`
 	TotalAmount     float64                     `json:"total_amount"`

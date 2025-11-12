@@ -10,11 +10,9 @@ import (
 	"os"
 	"prime-erp-core/internal/models"
 	saleRepository "prime-erp-core/internal/repositories/invoice"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
-	"strconv"
-	"strings"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,9 +38,11 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 	}
 
 	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
-	if req.PurchaseItem != nil && purchaseCode != "" {
+	if req.PurchaseItem != nil {
 		purchaseItem = *req.PurchaseItem
 	}
+
+	fmt.Println(purchaseItem)
 
 	docRefItem := ""
 	if req.DocRefItem != nil {
@@ -188,51 +188,50 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 	}
 }
 
-// System Config
-// purchase_code ex. PO-PRE20250930-0001; value ex. 20250930-0001
-func GetPurchaseCodeConfig() ([]models.SystemConfig, error) {
-	topicCodes := []string{"PO"}
-	configCodes := []string{}
+// Running code actions
+func GeneratePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No purchases to generate codes for
+	}
 
-	purchaseConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	configCode := "RUNNING_PO"
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
 	}
 
-	return purchaseConfigs, nil
-}
-
-func ConvertConfigToLatestPurchaseNumber(value string) (int, error) {
-	if len(value) < 1 {
-		return 0, nil
-	}
-
-	result := 0
-
-	valueParts := strings.Split(value, "-")
-	latestDate := valueParts[0]
-	latestNo := valueParts[1]
-
-	t1, err := time.ParseInLocation("20060102", latestDate, time.Local)
+	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
 	if err != nil {
-		return result, err
+		return nil, fmt.Errorf("failed to generate purchase order codes: %v", err)
 	}
 
-	t2 := time.Now()
-
-	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
-	t2Day := time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, t2.Location())
-
-	if t1Day.Equal(t2Day) {
-		lastNum, err := strconv.Atoi(latestNo)
-		if err != nil {
-			return 0, err
-		}
-
-		result = lastNum
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
 	}
 
-	return result, nil
+	reqUpdateJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	purchaseCodeResult, ok := purchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(purchaseCodeResult.Data) != count {
+		return nil, errors.New("failed to get correct number of purchase order codes from system config")
+	}
+
+	return purchaseCodeResult.Data, nil
 }
 
 // Approval actions

@@ -9,10 +9,8 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
-	"strconv"
-	"strings"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,12 +55,15 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 	now := time.Now().UTC()
 
 	prePurchase := models.PrePurchase{
-		ID:              uuid.New(),
 		PurchaseType:    "LOT",
 		CompanyCode:     req.CompanyCode,
 		SiteCode:        req.SiteCode,
 		DocRefType:      "",
 		SupplierCode:    req.SupplierCode,
+		SupplierName:    req.SupplierName,
+		SupplierAddress: req.SupplierAddress,
+		SupplierPhone:   req.SupplierPhone,
+		SupplierEmail:   req.SupplierEmail,
 		DeliveryAddress: req.DeliveryAddress,
 		Status:          req.Status,
 		TotalAmount:     req.TotalAmount,
@@ -133,6 +134,10 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		CompanyCode:                 prePurchases.CompanyCode,
 		SiteCode:                    prePurchases.SiteCode,
 		SupplierCode:                prePurchases.SupplierCode,
+		SupplierName:                prePurchases.SupplierName,
+		SupplierAddress:             prePurchases.SupplierAddress,
+		SupplierPhone:               prePurchases.SupplierPhone,
+		SupplierEmail:               prePurchases.SupplierEmail,
 		DeliveryAddress:             prePurchases.DeliveryAddress,
 		Status:                      prePurchases.Status,
 		TotalAmount:                 prePurchases.TotalAmount,
@@ -328,58 +333,50 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 	return nil
 }
 
-// System Config
-// pre_purchase_code ex. PPO-LOT20250930-0001; value ex. 20250930-0001
-func GetPrePurchaseCodeConfig() (*models.SystemConfig, error) {
-	topicCodes := []string{"PPO"}
-	configCodes := []string{"LOT"}
+// Running code actions
+func GeneratePrePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No pre-purchase to generate codes for
+	}
 
-	prePurchaseConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	configCode := "RUNNING_POB"
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
 	}
 
-	prePurchaseConfigMap := make(map[string]models.SystemConfig)
-
-	for _, poRunConfig := range prePurchaseConfigs {
-		prePurchaseConfigMap[fmt.Sprintf("%s|%s", poRunConfig.TopicCode, poRunConfig.ConfigCode)] = poRunConfig
-	}
-
-	config := prePurchaseConfigMap["PPO|LOT"]
-	return &config, nil
-}
-
-func ConvertConfigToLatestPrePurchaseNumber(prePurchaseConfig models.SystemConfig) (int, error) {
-	result := 0
-
-	if len(prePurchaseConfig.Value) < 1 {
-		return result, nil
-	}
-
-	valueParts := strings.Split(prePurchaseConfig.Value, "-")
-	latestDate := valueParts[0]
-	latestNo := valueParts[1]
-
-	t1, err := time.ParseInLocation("20060102", latestDate, time.Local)
+	prePurchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
 	if err != nil {
-		return result, err
+		return nil, fmt.Errorf("failed to generate pre-purchase order codes: %v", err)
 	}
 
-	t2 := time.Now()
-
-	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
-	t2Day := time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, t2.Location())
-
-	if t1Day.Equal(t2Day) {
-		lastNum, err := strconv.Atoi(latestNo)
-		if err != nil {
-			return 0, err
-		}
-
-		result = lastNum
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
 	}
 
-	return result, nil
+	reqUpdateJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	prePurchaseCodeResult, ok := prePurchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(prePurchaseCodeResult.Data) != count {
+		return nil, errors.New("failed to get correct number of pre-purchase order codes from system config")
+	}
+
+	return prePurchaseCodeResult.Data, nil
 }
 
 // Supplier actions

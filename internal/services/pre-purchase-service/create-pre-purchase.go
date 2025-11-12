@@ -7,10 +7,10 @@ import (
 	"prime-erp-core/internal/models"
 
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -20,43 +20,28 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
+	prePurchaseCodeCount := len(req)
+	prePurchaseCodes, err := GeneratePrePurchaseCodes(ctx, prePurchaseCodeCount)
+	if err != nil {
+		return nil, errors.New("failed to generate pre-purchase order codes: " + err.Error())
+	}
+
 	prePurchases := []models.PrePurchase{}
-	prePurchaseConfig, err := GetPrePurchaseCodeConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	latestNum, err := ConvertConfigToLatestPrePurchaseNumber(*prePurchaseConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	for idx, r := range req {
+		id := uuid.New()
 		prePurchase := MapBigLotRequestToPrePurchaseModel(r)
-		saveValue := fmt.Sprintf(
-			"%s-%04d",
-			time.Now().Format("20060102"),
-			latestNum+idx+1,
-		)
-		prePurchaseCode := fmt.Sprintf(
-			"%s-%s%s",
-			prePurchaseConfig.TopicCode,
-			prePurchaseConfig.ConfigCode,
-			saveValue,
-		)
-		prePurchase.PrePurchaseCode = prePurchaseCode
+		prePurchase.PrePurchaseCode = prePurchaseCodes[idx]
+		prePurchase.ID = id
 
+		items := []models.PrePurchaseItem{}
 		for _, itemReq := range r.Items {
-			preItem := fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
-			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, prePurchase.ID, prePurchase.CreateBy, time.Now().UTC(), preItem)
-			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
+			preItem := fmt.Sprintf("%s-%s", prePurchaseCodes[idx], time.Now().Format("150405"))
+			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, id, prePurchase.CreateBy, time.Now().UTC(), preItem)
+			items = append(items, item)
 		}
 
+		prePurchase.PrePurchaseItems = items
 		prePurchases = append(prePurchases, prePurchase)
-
-		if idx == len(req)-1 {
-			prePurchaseConfig.Value = saveValue
-		}
 	}
 
 	if err := prePurchaseRepository.CreatePOBigLot(prePurchases); err != nil {
@@ -67,10 +52,5 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to create approval: " + err.Error())
 	}
 
-	updateSystemConfigReq := []models.SystemConfig{}
-	updateSystemConfigReq = append(updateSystemConfigReq, *prePurchaseConfig)
-	if err := systemConfigRepository.UpdateSystemConfig(updateSystemConfigReq); err != nil {
-		return nil, err
-	}
 	return nil, nil
 }
