@@ -52,5 +52,5 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to create approval: " + err.Error())
 	}
 
-	return nil, nil
+	return prePurchaseCodes, nil
 }
