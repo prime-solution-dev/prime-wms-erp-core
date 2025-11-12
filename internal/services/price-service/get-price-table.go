@@ -23,17 +23,18 @@ import (
 
 // PatternConfig represents the configuration for a pricing table pattern
 type PatternConfig struct {
-	ID                   string             `json:"id"`
-	Name                 string             `json:"name"`
-	Description          string             `json:"description"`
-	Enabled              bool               `json:"enabled"`
-	Grouping             GroupingConfig     `json:"grouping"`
-	ColumnLevels         []ColumnLevel      `json:"columnLevels,omitempty"`
-	Columns              []ColumnConfigItem `json:"columns"`
-	FixedColumns         []ColumnConfigItem `json:"fixedColumns"`
-	ApplicableCategories []string           `json:"applicableCategories"`
-	EditableSuffixes     []string           `json:"editable_suffixes,omitempty"`
-	FetchableSuffixes    []string           `json:"fetchable_suffixes,omitempty"`
+	ID                   string              `json:"id"`
+	Name                 string              `json:"name"`
+	Description          string              `json:"description"`
+	Enabled              bool                `json:"enabled"`
+	Grouping             GroupingConfig      `json:"grouping"`
+	ColumnLevels         []ColumnLevel       `json:"columnLevels,omitempty"`
+	Columns              []ColumnConfigItem  `json:"columns"`
+	FixedColumns         []ColumnConfigItem  `json:"fixedColumns"`
+	ColumnGroups         []ColumnGroupConfig `json:"columnGroups,omitempty"`
+	ApplicableCategories []string            `json:"applicableCategories"`
+	EditableSuffixes     []string            `json:"editable_suffixes,omitempty"`
+	FetchableSuffixes    []string            `json:"fetchable_suffixes,omitempty"`
 }
 
 // GroupingConfig defines how data should be grouped
@@ -63,6 +64,14 @@ type ColumnConfigItem struct {
 	CellStyle       map[string]interface{} `json:"cellStyle,omitempty"`
 	DataMapping     string                 `json:"dataMapping,omitempty"`
 	EnableTooltip   bool                   `json:"enableTooltip,omitempty"`
+}
+
+// ColumnGroupConfig defines a fixed column group configuration from config.json
+type ColumnGroupConfig struct {
+	HeaderName    string             `json:"headerName"`
+	GroupID       string             `json:"groupId"`
+	OpenByDefault bool               `json:"openByDefault,omitempty"`
+	Children      []ColumnConfigItem `json:"children"`
 }
 
 // TableConfigSettings from config.json
@@ -117,11 +126,11 @@ type GetPriceTableRequest struct {
 
 // PriceListDetailTabConfig represents a tab configuration with table config and data
 type PriceListDetailTabConfig struct {
-	ID               uuid.UUID                `json:"id"`
-	Label            string                   `json:"label"`
-	TableConfig      TableConfig              `json:"tableConfig"`
-	TableData        []map[string]interface{} `json:"tableData"`
-	EditableSuffixes []string                 `json:"editable_suffixes,omitempty"`
+	ID                uuid.UUID                `json:"id"`
+	Label             string                   `json:"label"`
+	TableConfig       TableConfig              `json:"tableConfig"`
+	TableData         []map[string]interface{} `json:"tableData"`
+	EditableSuffixes  []string                 `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes []string                 `json:"fetchable_suffixes,omitempty"`
 }
 
@@ -796,6 +805,185 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 	return rows
 }
 
+// buildDirectRows builds AG Grid rows directly from SubGroups without regrouping
+// Each SubGroup becomes one row
+func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	rows := []AGGridRowData{}
+
+	for _, sg := range subGroups {
+		row := AGGridRowData{
+			"id": uuid.New().String(),
+		}
+
+		// Parse udf_json if present
+		udfData := make(map[string]interface{})
+		isHighlightValue := false
+		if len(sg.UdfJson) > 0 {
+			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Extract is_highlight value if present
+				if h, ok := udfData["is_highlight"].(bool); ok {
+					isHighlightValue = h
+				}
+			}
+		}
+
+		// Build "Item" field by concatenating PRODUCT_GROUP1 + PRODUCT_GROUP4 + PRODUCT_GROUP6 + PRODUCT_GROUP7
+		itemParts := []string{}
+		for _, code := range []string{"PRODUCT_GROUP1", "PRODUCT_GROUP4", "PRODUCT_GROUP6", "PRODUCT_GROUP7"} {
+			valueName := getValueNameByGroupCode(sg.SubGroupKeys, code)
+			if valueName != "" {
+				itemParts = append(itemParts, valueName)
+			}
+		}
+		row["item"] = strings.Join(itemParts, "x")
+
+		// Map fixed columns
+		for _, fixedCol := range pattern.FixedColumns {
+			switch fixedCol.DataMapping {
+			case "item":
+				// Already set above
+			case "type":
+				// Placeholder - will be mapped later
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+			case "price_weight":
+				row[fixedCol.Field] = sg.PriceWeight
+			case "market_weight":
+				// Placeholder - will be mapped later
+				row[fixedCol.Field] = nil
+			case "total_net_price_weight":
+				row[fixedCol.Field] = sg.TotalNetPriceWeight
+			case "is_highlight":
+				row[fixedCol.Field] = isHighlightValue
+			}
+		}
+
+		// Map column group data
+		for _, colGroup := range pattern.ColumnGroups {
+			for _, childCol := range colGroup.Children {
+				switch childCol.DataMapping {
+				case "before_price_weight":
+					row[childCol.Field] = sg.BeforePriceWeight
+				case "total_net_price_weight":
+					row[childCol.Field] = sg.TotalNetPriceWeight
+				case "before_price_unit":
+					row[childCol.Field] = sg.BeforePriceUnit
+				case "total_net_price_unit":
+					row[childCol.Field] = sg.TotalNetPriceUnit
+				}
+			}
+		}
+
+		// Map additional columns
+		for _, colConfig := range pattern.Columns {
+			switch colConfig.DataMapping {
+			case "extra_price_unit":
+				row[colConfig.Field] = sg.ExtraPriceUnit
+			case "line_bundle":
+				// Placeholder - will be mapped later
+				row[colConfig.Field] = nil
+			case "remark":
+				row[colConfig.Field] = sg.Remark
+			}
+		}
+
+		// Store metadata
+		row["subgroup_id"] = sg.ID
+		row["is_trading"] = sg.IsTrading
+
+		rows = append(rows, row)
+	}
+
+	return rows
+}
+
+// buildFixedColumns builds AG Grid columns with fixed structure including column groups
+func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
+	columns := []ColumnDef{}
+
+	// Add fixed columns from configuration
+	for _, fixedCol := range pattern.FixedColumns {
+		col := ColumnDef{
+			Field:           fixedCol.Field,
+			HeaderName:      fixedCol.HeaderName,
+			Width:           intPtr(fixedCol.Width),
+			Pinned:          fixedCol.Pinned,
+			LockPosition:    boolPtr(fixedCol.LockPosition),
+			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
+			ValueGetter:     fixedCol.ValueGetter,
+		}
+
+		if fixedCol.CellStyle != nil {
+			col.CellStyle = convertCellStyle(fixedCol.CellStyle)
+		}
+
+		if fixedCol.CellRenderer != "" {
+			col.CellRenderer = fixedCol.CellRenderer
+		}
+
+		columns = append(columns, col)
+	}
+
+	// Add fixed column groups
+	for _, colGroupConfig := range pattern.ColumnGroups {
+		columnGroup := ColumnDef{
+			HeaderName:    colGroupConfig.HeaderName,
+			GroupID:       colGroupConfig.GroupID,
+			OpenByDefault: boolPtr(colGroupConfig.OpenByDefault),
+			Children:      []ColumnDef{},
+		}
+
+		// Add child columns
+		for _, childColConfig := range colGroupConfig.Children {
+			childCol := ColumnDef{
+				Field:      childColConfig.Field,
+				HeaderName: childColConfig.HeaderName,
+				Width:      intPtr(childColConfig.Width),
+			}
+
+			if childColConfig.CellStyle != nil {
+				childCol.CellStyle = convertCellStyle(childColConfig.CellStyle)
+			}
+
+			if childColConfig.CellRenderer != "" {
+				childCol.CellRenderer = childColConfig.CellRenderer
+			}
+
+			if childColConfig.EnableTooltip {
+				childCol.EnableTooltip = boolPtr(true)
+			}
+
+			columnGroup.Children = append(columnGroup.Children, childCol)
+		}
+
+		columns = append(columns, columnGroup)
+	}
+
+	// Add additional columns
+	for _, colConfig := range pattern.Columns {
+		col := ColumnDef{
+			Field:      colConfig.Field,
+			HeaderName: colConfig.HeaderName,
+			Width:      intPtr(colConfig.Width),
+		}
+
+		if colConfig.CellStyle != nil {
+			col.CellStyle = convertCellStyle(colConfig.CellStyle)
+		}
+
+		if colConfig.CellRenderer != "" {
+			col.CellRenderer = colConfig.CellRenderer
+		}
+
+		if colConfig.EnableTooltip {
+			col.EnableTooltip = boolPtr(true)
+		}
+
+		columns = append(columns, col)
+	}
+
+	return columns
+}
+
 // convertCellStyle converts map[string]interface{} to CellStyle struct
 func convertCellStyle(styleMap map[string]interface{}) *CellStyle {
 	style := &CellStyle{}
@@ -1082,8 +1270,8 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// Group data by GroupKey first, then by PRODUCT_GROUP2
 		groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 
-	fmt.Println("\n========== GROUPED DATA ==========")
-	fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
+		fmt.Println("\n========== GROUPED DATA ==========")
+		fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
 
 		// Build AG Grid response with tabs
 		tabs = []PriceListDetailTabConfig{}
@@ -1097,7 +1285,7 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				continue
 			}
 
-		fmt.Printf("\n========== Processing GroupKey: %s ==========\n", groupKey)
+			fmt.Printf("\n========== Processing GroupKey: %s ==========\n", groupKey)
 
 			// Iterate over PRODUCT_GROUP2 values for this GroupKey
 			for productGroup2, subGroups := range productGroup2Map {
@@ -1108,7 +1296,7 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					continue
 				}
 
-			fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
+				fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
 
 				// Build columns and rows using configuration
 				columns := buildDynamicColumns(pattern, subGroups)
@@ -1120,30 +1308,30 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					tableData[i] = map[string]interface{}(row)
 				}
 
-			// Create tab configuration
-			tab := PriceListDetailTabConfig{
-				ID:    uuid.New(),
-				Label: productGroup2,
-				TableConfig: TableConfig{
-					Title:             productGroup2,
-					GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
-					HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
-					Pagination:        boolPtr(config.TableConfig.Pagination),
-					Toolbar: &Toolbar{
-						Show:             boolPtr(config.TableConfig.Toolbar.Show),
-						ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
-						ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
-						ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+				// Create tab configuration
+				tab := PriceListDetailTabConfig{
+					ID:    uuid.New(),
+					Label: productGroup2,
+					TableConfig: TableConfig{
+						Title:             productGroup2,
+						GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+						HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+						Pagination:        boolPtr(config.TableConfig.Pagination),
+						Toolbar: &Toolbar{
+							Show:             boolPtr(config.TableConfig.Toolbar.Show),
+							ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+							ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+							ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+						},
+						GridOptions: &GridOptions{
+							SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+							SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+						},
+						Columns: columns,
 					},
-					GridOptions: &GridOptions{
-						SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
-						SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
-					},
-					Columns: columns,
-				},
-				TableData:        tableData,
-				EditableSuffixes: pattern.EditableSuffixes,
-			}
+					TableData:        tableData,
+					EditableSuffixes: pattern.EditableSuffixes,
+				}
 
 				tabs = append(tabs, tab)
 			}
@@ -1157,12 +1345,73 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	case "GROUP_1_ITEM_2":
-		// TODO: Implement GROUP_1_ITEM_2 specific operations
-		// Placeholder: return empty tabs structure
+		// Load configuration for GROUP_1_ITEM_2
+		config, err := loadConfiguration(groupKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load configuration for GroupKey '%s': %w", groupKey, err)
+		}
+
+		// Select the default pattern (should be the only one for GROUP_1_ITEM_2)
+		var pattern *PatternConfig
+		for _, p := range config.Patterns {
+			if p.ID == config.DefaultPattern && p.Enabled {
+				pattern = &p
+				break
+			}
+		}
+		if pattern == nil {
+			return nil, fmt.Errorf("no enabled pattern found for GroupKey '%s'", groupKey)
+		}
+
+		// Collect all SubGroups from all priceListData entries (flatten)
+		allSubGroups := []models.PriceListSubGroupResponse{}
+		for _, priceList := range priceListData {
+			allSubGroups = append(allSubGroups, priceList.SubGroups...)
+		}
+
+		// Build fixed columns
+		columns := buildFixedColumns(pattern)
+
+		// Build rows directly from SubGroups
+		rowData := buildDirectRows(pattern, allSubGroups)
+
+		// Convert AGGridRowData to []map[string]interface{}
+		tableData := make([]map[string]interface{}, len(rowData))
+		for i, row := range rowData {
+			tableData[i] = map[string]interface{}(row)
+		}
+
+		// Create single tab configuration
+		tab := PriceListDetailTabConfig{
+			ID:    uuid.New(),
+			Label: "Price List",
+			TableConfig: TableConfig{
+				Title:             "Price List",
+				GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+				HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+				Pagination:        boolPtr(config.TableConfig.Pagination),
+				Toolbar: &Toolbar{
+					Show:             boolPtr(config.TableConfig.Toolbar.Show),
+					ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+					ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+					ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+				},
+				GridOptions: &GridOptions{
+					SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+					SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+				},
+				Columns: columns,
+			},
+			TableData:         tableData,
+			EditableSuffixes:  pattern.EditableSuffixes,
+			FetchableSuffixes: pattern.FetchableSuffixes,
+		}
+
+		// Create final response with single tab
 		response = PriceListDetailApiResponse{
 			Id:   uuid.MustParse(priceListData[0].ID),
 			Name: "Price List Detail",
-			Tabs: []PriceListDetailTabConfig{},
+			Tabs: []PriceListDetailTabConfig{tab},
 		}
 
 	case "GROUP_1_ITEM_3":
