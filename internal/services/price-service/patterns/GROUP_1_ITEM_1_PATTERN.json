@@ -19,7 +19,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_before",
+          "field": "price_unit",
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
@@ -28,7 +28,7 @@
           "dataMapping": "price_unit"
         },
         {
-          "field": "price_after",
+          "field": "total_net_price_unit",
           "headerName": "ราคาขาย After",
           "width": 130,
           "cellStyle": {
@@ -53,6 +53,18 @@
             "textAlign": "right"
           },
           "dataMapping": "price_weight"
+        },
+        {
+          "field": "price_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "remark",
@@ -101,6 +113,11 @@
         "is_highlight",
         "total_net_price_unit",
         "remark"
+      ],
+      "fetchable_suffixes": [
+        "price_unit",
+        "total_net_price_unit",
+        "extra_price_unit"
       ]
     },
     {
@@ -128,7 +145,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_before",
+          "field": "price_unit",
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
@@ -137,7 +154,7 @@
           "dataMapping": "price_unit"
         },
         {
-          "field": "price_after",
+          "field": "total_net_price_unit",
           "headerName": "ราคาขาย After",
           "width": 130,
           "cellStyle": {
@@ -164,9 +181,21 @@
           "dataMapping": "price_weight"
         },
         {
+          "field": "price_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_net_price_weight"
+        },
+        {
           "field": "remark",
           "headerName": "หมายเหตุ",
-          "width": 150,
+          "width": 170,
           "dataMapping": "remark"
         },
         {
@@ -210,6 +239,11 @@
         "is_highlight",
         "total_net_price_unit",
         "remark"
+      ],
+      "fetchable_suffixes": [
+        "price_unit",
+        "total_net_price_unit",
+        "extra_price_unit"
       ]
     },
     {
@@ -254,7 +288,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_before",
+          "field": "price_unit",
           "headerName": "ราคาขาย before",
           "width": 130,
           "cellStyle": {
@@ -263,7 +297,7 @@
           "dataMapping": "price_unit"
         },
         {
-          "field": "price_after",
+          "field": "total_net_price_unit",
           "headerName": "ราคาขาย After",
           "width": 130,
           "enableTooltip": true,
@@ -289,6 +323,18 @@
             "textAlign": "right"
           },
           "dataMapping": "price_weight"
+        },
+        {
+          "field": "price_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "remark",
@@ -326,6 +372,11 @@
         "is_highlight",
         "total_net_price_unit",
         "remark"
+      ],
+      "fetchable_suffixes": [
+        "price_unit",
+        "total_net_price_unit",
+        "extra_price_unit"
       ]
     }
   ],

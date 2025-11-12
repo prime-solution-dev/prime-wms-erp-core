@@ -8,7 +8,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
-	"prime-erp-core/internal/utils"
 	"regexp"
 	"strings"
 	"time"
@@ -34,6 +33,7 @@ type PatternConfig struct {
 	FixedColumns         []ColumnConfigItem `json:"fixedColumns"`
 	ApplicableCategories []string           `json:"applicableCategories"`
 	EditableSuffixes     []string           `json:"editable_suffixes,omitempty"`
+	FetchableSuffixes    []string           `json:"fetchable_suffixes,omitempty"`
 }
 
 // GroupingConfig defines how data should be grouped
@@ -122,6 +122,7 @@ type PriceListDetailTabConfig struct {
 	TableConfig      TableConfig              `json:"tableConfig"`
 	TableData        []map[string]interface{} `json:"tableData"`
 	EditableSuffixes []string                 `json:"editable_suffixes,omitempty"`
+	FetchableSuffixes []string                 `json:"fetchable_suffixes,omitempty"`
 }
 
 // TableConfig contains the table configuration including columns, toolbar, and options
@@ -236,7 +237,7 @@ func loadConfiguration(groupKey string) (*PriceTableConfiguration, error) {
 
 	// Construct path to pattern file: {GroupKey}_PATTERN.json
 	patternFileName := fmt.Sprintf("%s_PATTERN.json", groupKey)
-	configPath := filepath.Join(currentDir, "internal", "services", "price-service", patternFileName)
+	configPath := filepath.Join(currentDir, "internal", "services", "price-service", "patterns", patternFileName)
 
 	// Try to read the pattern file
 	data, err := os.ReadFile(configPath)
@@ -1068,7 +1069,6 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	fmt.Println("\n========== LOADED DATA ==========")
 	fmt.Printf("Total price lists: %d\n", len(priceListData))
-	fmt.Printf("GroupKey: %s\n", groupKey)
 	for i, pl := range priceListData {
 		fmt.Printf("Price List %d: %d subgroups\n", i+1, len(pl.SubGroups))
 	}
@@ -1082,8 +1082,8 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// Group data by GroupKey first, then by PRODUCT_GROUP2
 		groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 
-		fmt.Println("\n========== GROUPED DATA ==========")
-		fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
+	fmt.Println("\n========== GROUPED DATA ==========")
+	fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
 
 		// Build AG Grid response with tabs
 		tabs = []PriceListDetailTabConfig{}
@@ -1097,7 +1097,7 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				continue
 			}
 
-			fmt.Printf("\n========== Processing GroupKey: %s ==========\n", gk)
+		fmt.Printf("\n========== Processing GroupKey: %s ==========\n", groupKey)
 
 			// Iterate over PRODUCT_GROUP2 values for this GroupKey
 			for productGroup2, subGroups := range productGroup2Map {
@@ -1108,7 +1108,7 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					continue
 				}
 
-				fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
+			fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
 
 				// Build columns and rows using configuration
 				columns := buildDynamicColumns(pattern, subGroups)
@@ -1120,30 +1120,30 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					tableData[i] = map[string]interface{}(row)
 				}
 
-				// Create tab configuration
-				tab := PriceListDetailTabConfig{
-					ID:    uuid.New(),
-					Label: productGroup2,
-					TableConfig: TableConfig{
-						Title:             productGroup2,
-						GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
-						HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
-						Pagination:        boolPtr(config.TableConfig.Pagination),
-						Toolbar: &Toolbar{
-							Show:             boolPtr(config.TableConfig.Toolbar.Show),
-							ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
-							ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
-							ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
-						},
-						GridOptions: &GridOptions{
-							SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
-							SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
-						},
-						Columns: columns,
+			// Create tab configuration
+			tab := PriceListDetailTabConfig{
+				ID:    uuid.New(),
+				Label: productGroup2,
+				TableConfig: TableConfig{
+					Title:             productGroup2,
+					GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+					HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+					Pagination:        boolPtr(config.TableConfig.Pagination),
+					Toolbar: &Toolbar{
+						Show:             boolPtr(config.TableConfig.Toolbar.Show),
+						ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+						ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+						ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
 					},
-					TableData:        tableData,
-					EditableSuffixes: pattern.EditableSuffixes,
-				}
+					GridOptions: &GridOptions{
+						SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+						SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+					},
+					Columns: columns,
+				},
+				TableData:        tableData,
+				EditableSuffixes: pattern.EditableSuffixes,
+			}
 
 				tabs = append(tabs, tab)
 			}
@@ -1188,8 +1188,8 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Print JSON output
-	fmt.Println("\n========== JSON OUTPUT ==========")
-	utils.PrintJSON(response)
+	// fmt.Println("\n========== JSON OUTPUT ==========")
+	// utils.PrintJSON(response)
 
 	return response, nil
 }
