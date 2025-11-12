@@ -1060,87 +1060,131 @@ func GetPriceTable(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}, nil
 	}
 
+	// Extract GroupKey from the first element
+	groupKey := priceListData[0].GroupKey
+	if groupKey == "" {
+		return nil, fmt.Errorf("GroupKey is missing in price list data")
+	}
+
 	fmt.Println("\n========== LOADED DATA ==========")
 	fmt.Printf("Total price lists: %d\n", len(priceListData))
+	fmt.Printf("GroupKey: %s\n", groupKey)
 	for i, pl := range priceListData {
 		fmt.Printf("Price List %d: %d subgroups\n", i+1, len(pl.SubGroups))
 	}
 
-	// Group data by GroupKey first, then by PRODUCT_GROUP2
-	groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
+	// Switch based on GroupKey to handle different operations
+	var tabs []PriceListDetailTabConfig
+	var response PriceListDetailApiResponse
 
-	fmt.Println("\n========== GROUPED DATA ==========")
-	fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
+	switch groupKey {
+	case "GROUP_1_ITEM_1":
+		// Group data by GroupKey first, then by PRODUCT_GROUP2
+		groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 
-	// Build AG Grid response with tabs
-	tabs := []PriceListDetailTabConfig{}
+		fmt.Println("\n========== GROUPED DATA ==========")
+		fmt.Printf("Total GroupKeys: %d\n", len(groupedData))
 
-	// Iterate over each GroupKey
-	for groupKey, productGroup2Map := range groupedData {
-		// Load configuration for this GroupKey
-		config, err := loadConfiguration(groupKey)
-		if err != nil {
-			fmt.Printf("Warning: Failed to load configuration for GroupKey '%s': %v, skipping\n", groupKey, err)
-			continue
-		}
+		// Build AG Grid response with tabs
+		tabs = []PriceListDetailTabConfig{}
 
-		fmt.Printf("\n========== Processing GroupKey: %s ==========\n", groupKey)
-
-		// Iterate over PRODUCT_GROUP2 values for this GroupKey
-		for productGroup2, subGroups := range productGroup2Map {
-			// Select pattern for this category
-			pattern := selectPatternForCategory(config, productGroup2)
-			if pattern == nil {
-				fmt.Printf("Warning: No pattern found for GroupKey '%s' category '%s', skipping\n", groupKey, productGroup2)
+		// Iterate over each GroupKey
+		for gk, productGroup2Map := range groupedData {
+			// Load configuration for this GroupKey
+			config, err := loadConfiguration(gk)
+			if err != nil {
+				fmt.Printf("Warning: Failed to load configuration for GroupKey '%s': %v, skipping\n", gk, err)
 				continue
 			}
 
-			fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
+			fmt.Printf("\n========== Processing GroupKey: %s ==========\n", gk)
 
-			// Build columns and rows using configuration
-			columns := buildDynamicColumns(pattern, subGroups)
-			rowData := buildDynamicRows(pattern, subGroups)
+			// Iterate over PRODUCT_GROUP2 values for this GroupKey
+			for productGroup2, subGroups := range productGroup2Map {
+				// Select pattern for this category
+				pattern := selectPatternForCategory(config, productGroup2)
+				if pattern == nil {
+					fmt.Printf("Warning: No pattern found for GroupKey '%s' category '%s', skipping\n", gk, productGroup2)
+					continue
+				}
 
-			// Convert AGGridRowData to []map[string]interface{}
-			tableData := make([]map[string]interface{}, len(rowData))
-			for i, row := range rowData {
-				tableData[i] = map[string]interface{}(row)
-			}
+				fmt.Printf("\nProcessing category: %s with pattern: %s\n", productGroup2, pattern.ID)
 
-			// Create tab configuration
-			tab := PriceListDetailTabConfig{
-				ID:    uuid.New(),
-				Label: productGroup2,
-				TableConfig: TableConfig{
-					Title:             productGroup2,
-					GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
-					HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
-					Pagination:        boolPtr(config.TableConfig.Pagination),
-					Toolbar: &Toolbar{
-						Show:             boolPtr(config.TableConfig.Toolbar.Show),
-						ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
-						ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
-						ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+				// Build columns and rows using configuration
+				columns := buildDynamicColumns(pattern, subGroups)
+				rowData := buildDynamicRows(pattern, subGroups)
+
+				// Convert AGGridRowData to []map[string]interface{}
+				tableData := make([]map[string]interface{}, len(rowData))
+				for i, row := range rowData {
+					tableData[i] = map[string]interface{}(row)
+				}
+
+				// Create tab configuration
+				tab := PriceListDetailTabConfig{
+					ID:    uuid.New(),
+					Label: productGroup2,
+					TableConfig: TableConfig{
+						Title:             productGroup2,
+						GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+						HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+						Pagination:        boolPtr(config.TableConfig.Pagination),
+						Toolbar: &Toolbar{
+							Show:             boolPtr(config.TableConfig.Toolbar.Show),
+							ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+							ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+							ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+						},
+						GridOptions: &GridOptions{
+							SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+							SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+						},
+						Columns: columns,
 					},
-					GridOptions: &GridOptions{
-						SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
-						SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
-					},
-					Columns: columns,
-				},
-				TableData:        tableData,
-				EditableSuffixes: pattern.EditableSuffixes,
-			}
+					TableData:        tableData,
+					EditableSuffixes: pattern.EditableSuffixes,
+				}
 
-			tabs = append(tabs, tab)
+				tabs = append(tabs, tab)
+			}
 		}
-	}
 
-	// Create final response
-	response := PriceListDetailApiResponse{
-		Id:   uuid.MustParse(priceListData[0].ID),
-		Name: "Price List Detail",
-		Tabs: tabs,
+		// Create final response
+		response = PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: tabs,
+		}
+
+	case "GROUP_1_ITEM_2":
+		// TODO: Implement GROUP_1_ITEM_2 specific operations
+		// Placeholder: return empty tabs structure
+		response = PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}
+
+	case "GROUP_1_ITEM_3":
+		// TODO: Implement GROUP_1_ITEM_3 specific operations
+		// Placeholder: return empty tabs structure
+		response = PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}
+
+	case "GROUP_1_ITEM_4":
+		// TODO: Implement GROUP_1_ITEM_4 specific operations
+		// Placeholder: return empty tabs structure
+		response = PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported GroupKey: %s", groupKey)
 	}
 
 	// Print JSON output
