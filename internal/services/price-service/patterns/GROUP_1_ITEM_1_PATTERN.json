@@ -1,126 +1,6 @@
 {
   "patterns": [
     {
-      "id": "pattern_g6_g5",
-      "name": "PRODUCT_GROUP6 | PRODUCT_GROUP5",
-      "description": "Pattern for Patterned Steel Sheet Category - Rows by thickness (G6), Columns by size (G5)",
-      "enabled": true,
-      "grouping": {
-        "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6",
-        "columnGroups": "PRODUCT_GROUP5"
-      },
-      "columns": [
-        {
-          "field": "is_highlight",
-          "headerName": "Highlight สีฟ้า",
-          "width": 100,
-          "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "is_highlight"
-        },
-        {
-          "field": "price_unit",
-          "headerName": "ราคาขาย Before",
-          "width": 130,
-          "cellStyle": {
-            "textAlign": "right"
-          },
-          "dataMapping": "price_unit"
-        },
-        {
-          "field": "total_net_price_unit",
-          "headerName": "ราคาขาย After",
-          "width": 130,
-          "cellStyle": {
-            "textAlign": "right"
-          },
-          "dataMapping": "total_net_price_unit"
-        },
-        {
-          "field": "extra",
-          "headerName": "Extra (THB)",
-          "width": 100,
-          "cellStyle": {
-            "textAlign": "right"
-          },
-          "dataMapping": "extra_price_unit"
-        },
-        {
-          "field": "weight",
-          "headerName": "น.น.",
-          "width": 80,
-          "cellStyle": {
-            "textAlign": "right"
-          },
-          "dataMapping": "price_weight"
-        },
-        {
-          "field": "price_weight",
-          "headerName": "Weight-spec",
-          "width": 170,
-          "dataMapping": "price_weight"
-        },
-        {
-          "field": "total_net_price_weight",
-          "headerName": "Avg.kg stock",
-          "width": 170,
-          "dataMapping": "total_net_price_weight"
-        },
-        {
-          "field": "remark",
-          "headerName": "หมายเหตุ",
-          "width": 150,
-          "dataMapping": "remark"
-        },
-        {
-          "field": "inactive",
-          "headerName": "Inactive",
-          "width": 110,
-          "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
-        }
-      ],
-      "fixedColumns": [
-        {
-          "field": "#",
-          "headerName": "#",
-          "width": 60,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "valueGetter": "node.rowIndex + 1",
-          "cellStyle": {
-            "textAlign": "center",
-            "fontWeight": "500"
-          }
-        },
-        {
-          "field": "product_group_6",
-          "headerName": "แผ่น mm.",
-          "width": 120,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "cellStyle": {
-            "fontWeight": "600"
-          }
-        }
-      ],
-      "applicableCategories": [
-        "หมวดเหล็กแผ่นลาย"
-      ],
-      "editable_suffixes": [
-        "is_highlight",
-        "total_net_price_unit",
-        "remark"
-      ],
-      "fetchable_suffixes": [
-        "price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
-      ]
-    },
-    {
       "id": "pattern_g6_g3_g5",
       "name": "PRODUCT_GROUP6 | PRODUCT_GROUP3 | PRODUCT_GROUP5",
       "description": "Pattern for Steel Sheet Category - Rows by thickness (G6), Columns by size (G5) with grade shown in cells",
@@ -232,14 +112,122 @@
           }
         }
       ],
-      "applicableCategories": [
-        "หมวดเหล็กแผ่น"
-      ],
-      "editable_suffixes": [
-        "is_highlight",
+      "applicableCategories": ["หมวดเหล็กแผ่น"],
+      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
+      "fetchable_suffixes": [
+        "price_unit",
         "total_net_price_unit",
-        "remark"
+        "extra_price_unit"
+      ]
+    },
+    {
+      "id": "pattern_g6_g5",
+      "name": "PRODUCT_GROUP6 | PRODUCT_GROUP5",
+      "description": "Pattern for Patterned Steel Sheet Category - Rows by thickness (G6), Columns by size (G5)",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PRODUCT_GROUP2",
+        "rows": "PRODUCT_GROUP6",
+        "columnGroups": "PRODUCT_GROUP5"
+      },
+      "columns": [
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 100,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "price_unit",
+          "headerName": "ราคาขาย Before",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "right"
+          },
+          "dataMapping": "price_unit"
+        },
+        {
+          "field": "total_net_price_unit",
+          "headerName": "ราคาขาย After",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "right"
+          },
+          "dataMapping": "total_net_price_unit"
+        },
+        {
+          "field": "extra",
+          "headerName": "Extra (THB)",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "right"
+          },
+          "dataMapping": "extra_price_unit"
+        },
+        {
+          "field": "weight",
+          "headerName": "น.น.",
+          "width": 80,
+          "cellStyle": {
+            "textAlign": "right"
+          },
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "price_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 150,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
+        }
       ],
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "product_group_6",
+          "headerName": "แผ่น mm.",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        }
+      ],
+      "applicableCategories": ["หมวดเหล็กแผ่นลาย"],
+      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
       "fetchable_suffixes": [
         "price_unit",
         "total_net_price_unit",
@@ -365,14 +353,8 @@
           }
         }
       ],
-      "applicableCategories": [
-        "เหล็กแผ่น special"
-      ],
-      "editable_suffixes": [
-        "is_highlight",
-        "total_net_price_unit",
-        "remark"
-      ],
+      "applicableCategories": ["เหล็กแผ่น special"],
+      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
       "fetchable_suffixes": [
         "price_unit",
         "total_net_price_unit",
@@ -402,4 +384,3 @@
     "description": "Configuration for price table patterns - supports multiple patterns for different product categories including multi-level nested column groups"
   }
 }
-

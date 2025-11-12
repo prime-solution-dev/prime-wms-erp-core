@@ -282,16 +282,6 @@ func getValueNameByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
-// getValueCodeByGroupCode extracts value_code from sub_group_keys by group_code
-func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {
-	for _, sgk := range subGroupKeys {
-		if sgk.GroupCode == groupCode {
-			return sgk.ValueCode
-		}
-	}
-	return ""
-}
-
 // buildCompositeKey builds a composite key from multiple group codes using value_name
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
 	parts := []string{}
@@ -348,16 +338,6 @@ func selectPatternForCategory(config *PriceTableConfiguration, productGroup2Valu
 	return nil
 }
 
-// Helper function to get group key value by code (legacy support)
-func getGroupKeyValue(groupKeys []GroupKey, code string) string {
-	for _, gk := range groupKeys {
-		if gk.Code == code {
-			return gk.Value
-		}
-	}
-	return ""
-}
-
 // Helper function to create int pointer
 func intPtr(i int) *int {
 	return &i
@@ -395,26 +375,6 @@ func convertGroupCodeToFieldName(groupCode string) string {
 // ============================================================================
 // Dynamic Grouping and Building Functions
 // ============================================================================
-
-// groupDataByProductGroup2 groups subgroups by PRODUCT_GROUP2 value_name
-func groupDataByProductGroup2(priceListData []models.GetPriceListResponse) map[string][]models.PriceListSubGroupResponse {
-	groupedData := make(map[string][]models.PriceListSubGroupResponse)
-
-	for _, priceList := range priceListData {
-		for _, subGroup := range priceList.SubGroups {
-			// Get PRODUCT_GROUP2 value_name
-			productGroup2 := getValueNameByGroupCode(subGroup.SubGroupKeys, "PRODUCT_GROUP2")
-			if productGroup2 == "" {
-				continue
-			}
-
-			// Add subgroup to the appropriate group
-			groupedData[productGroup2] = append(groupedData[productGroup2], subGroup)
-		}
-	}
-
-	return groupedData
-}
 
 // groupDataByGroupKeyAndProductGroup2 groups subgroups by GroupKey first, then by PRODUCT_GROUP2
 // Uses GroupKey from GetPriceListResponse instead of extracting from subgroup_key
