@@ -778,18 +778,31 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		// Parse udf_json if present
 		udfData := make(map[string]interface{})
 		isHighlightValue := false
+		inactiveValue := false
+		hasInactiveValue := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				// Extract is_highlight value if present
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
 				}
+				// Extract inactive value if present
+				if inactive, ok := udfData["inactive"].(bool); ok {
+					inactiveValue = inactive
+					hasInactiveValue = true
+				}
+
+				if key, ok := udfData["line_bundle"].(string); ok {
+					row["line_bundle"] = key
+				} else {
+					row["line_bundle"] = nil
+				}
 			}
 		}
 
 		// Build "Item" field by concatenating PRODUCT_GROUP1 + PRODUCT_GROUP4 + PRODUCT_GROUP6 + PRODUCT_GROUP7
 		itemParts := []string{}
-		for _, code := range []string{"PRODUCT_GROUP1", "PRODUCT_GROUP4", "PRODUCT_GROUP6", "PRODUCT_GROUP7"} {
+		for _, code := range []string{"PRODUCT_GROUP4", "PRODUCT_GROUP6", "PRODUCT_GROUP7"} {
 			valueName := getValueNameByGroupCode(sg.SubGroupKeys, code)
 			if valueName != "" {
 				itemParts = append(itemParts, valueName)
@@ -801,10 +814,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		for _, fixedCol := range pattern.FixedColumns {
 			switch fixedCol.DataMapping {
 			case "item":
-				// Already set above
 			case "type":
-				// Placeholder - will be mapped later
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
 			case "price_weight":
 				row[fixedCol.Field] = sg.PriceWeight
 			case "market_weight":
@@ -814,6 +825,12 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[fixedCol.Field] = sg.TotalNetPriceWeight
 			case "is_highlight":
 				row[fixedCol.Field] = isHighlightValue
+			case "inactive":
+				if hasInactiveValue {
+					row[fixedCol.Field] = inactiveValue
+				} else {
+					row[fixedCol.Field] = false
+				}
 			}
 		}
 

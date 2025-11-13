@@ -168,6 +168,13 @@
           "headerName": "หมายเหตุ",
           "width": 200,
           "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 200,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
         }
       ],
       "applicableCategories": [],
