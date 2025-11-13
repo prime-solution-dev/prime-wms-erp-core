@@ -100,7 +100,6 @@ type PriceListSubGroup struct {
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
 	ExtraPriceUnit            float64                `json:"extra_price_unit"`
-	TermPriceUnit             float64                `json:"term_price_unit"`
 	TotalNetPriceUnit         float64                `json:"total_net_price_unit"`
 	PriceWeight               float64                `json:"price_weight"`
 	ExtraPriceWeight          float64                `json:"extra_price_weight"`
@@ -142,7 +141,6 @@ type PriceListSubGroupHistory struct {
 	IsTrading                 bool       `json:"is_trading"`
 	PriceUnit                 float64    `json:"price_unit"`
 	ExtraPriceUnit            float64    `json:"extra_price_unit"`
-	TermPriceUnit             float64    `json:"term_price_unit"`
 	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
 	PriceWeight               float64    `json:"price_weight"`
 	ExtraPriceWeight          float64    `json:"extra_price_weight"`
@@ -244,7 +242,6 @@ type PriceListSubGroupResponse struct {
 	IsTrading                 bool                           `json:"is_trading"`
 	PriceUnit                 float64                        `json:"price_unit"`
 	ExtraPriceUnit            float64                        `json:"extra_price_unit"`
-	TermPriceUnit             float64                        `json:"term_price_unit"`
 	TotalNetPriceUnit         float64                        `json:"total_net_price_unit"`
 	PriceWeight               float64                        `json:"price_weight"`
 	ExtraPriceWeight          float64                        `json:"extra_price_weight"`
