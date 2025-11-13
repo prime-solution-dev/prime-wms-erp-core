@@ -105,9 +105,9 @@ func TestGetLatestPriceListSubGroup_Success(t *testing.T) {
 		IsTrading:        true,
 		PriceUnit:        100.0,
 		CreateBy:         "tester",
-		CreateDtm:        now,
+		CreateDtm:        &now,
 		UpdateBy:         "tester",
-		UpdateDtm:        now,
+		UpdateDtm:        &now,
 		PriceListSubGroupKeys: []models.PriceListSubGroupKey{
 			{
 				ID:         uuid.New(),

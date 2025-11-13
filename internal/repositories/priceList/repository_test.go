@@ -194,6 +194,7 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 
 		testSubGroupID := uuid.New()
 		existingUdfJson := json.RawMessage(`{"is_highlight": false, "some_key": ""}`)
+		now := time.Now()
 		testSubGroup := models.PriceListSubGroup{
 			ID:               testSubGroupID,
 			PriceListGroupID: testGroupID,
@@ -202,9 +203,9 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 			PriceUnit:        100.0,
 			UdfJson:          existingUdfJson,
 			CreateBy:         "test",
-			CreateDtm:        time.Now(),
+			CreateDtm:        &now,
 			UpdateBy:         "test",
-			UpdateDtm:        time.Now(),
+			UpdateDtm:        &now,
 		}
 		err = gormx.Create(&testSubGroup).Error
 		assert.NoError(t, err, "create subgroup")
@@ -252,15 +253,16 @@ func TestUpdatePriceListSubGroup_Integration(t *testing.T) {
 
 		testSubGroupID := uuid.New()
 		oldPriceUnit := 100.0
+		now := time.Now()
 		err = gormx.Create(&models.PriceListSubGroup{
 			ID:               testSubGroupID,
 			PriceListGroupID: testGroupID,
 			SubgroupKey:      "TEST_KEY_2",
 			PriceUnit:        oldPriceUnit,
 			CreateBy:         "test",
-			CreateDtm:        time.Now(),
+			CreateDtm:        &now,
 			UpdateBy:         "test",
-			UpdateDtm:        time.Now(),
+			UpdateDtm:        &now,
 		}).Error
 		assert.NoError(t, err, "create subgroup 2")
 
@@ -311,7 +313,6 @@ func TestGetPriceListSubGroupByID(t *testing.T) {
 		IsTrading:                 true,
 		PriceUnit:                 11,
 		ExtraPriceUnit:            1,
-		TermPriceUnit:             2,
 		TotalNetPriceUnit:         3,
 		PriceWeight:               21,
 		ExtraPriceWeight:          4,
@@ -327,9 +328,9 @@ func TestGetPriceListSubGroupByID(t *testing.T) {
 		BeforeTotalNetPriceWeight: 2,
 		Remark:                    "target",
 		CreateBy:                  "tester",
-		CreateDtm:                 now,
+		CreateDtm:                 &now,
 		UpdateBy:                  "tester",
-		UpdateDtm:                 now,
+		UpdateDtm:                 &now,
 	}).Error
 	assert.NoError(t, err, "create sub group")
 

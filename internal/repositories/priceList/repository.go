@@ -243,7 +243,6 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				IsTrading:                 oldSubGroup.IsTrading,
 				PriceUnit:                 oldSubGroup.PriceUnit,
 				ExtraPriceUnit:            oldSubGroup.ExtraPriceUnit,
-				TermPriceUnit:             oldSubGroup.TermPriceUnit,
 				TotalNetPriceUnit:         oldSubGroup.TotalNetPriceUnit,
 				PriceWeight:               oldSubGroup.PriceWeight,
 				ExtraPriceWeight:          oldSubGroup.ExtraPriceWeight,
@@ -318,10 +317,6 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 			if req.ExtraPriceUnit != nil {
 				updateMap["before_extra_price_unit"] = oldSubGroup.ExtraPriceUnit
 				updateMap["extra_price_unit"] = *req.ExtraPriceUnit
-			}
-			if req.TermPriceUnit != nil {
-				updateMap["before_term_price_unit"] = oldSubGroup.TermPriceUnit
-				updateMap["term_price_unit"] = *req.TermPriceUnit
 			}
 			if req.TotalNetPriceUnit != nil {
 				updateMap["before_total_net_price_unit"] = oldSubGroup.TotalNetPriceUnit
