@@ -79,7 +79,6 @@ type SubGroup struct {
 	IsTrading                 bool       `json:"is_trading"`
 	PriceUnit                 float64    `json:"price_unit"`
 	ExtraPriceUnit            float64    `json:"extra_price_unit"`
-	TermPriceUnit             float64    `json:"term_price_unit"`
 	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
 	PriceWeight               float64    `json:"price_weight"`
 	ExtraPriceWeight          float64    `json:"extra_price_weight"`
@@ -369,7 +368,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				IsTrading:                 toBool(row["is_trading"]),
 				PriceUnit:                 toFloat64(row["price_unit"]),
 				ExtraPriceUnit:            toFloat64(row["extra_price_unit"]),
-				TermPriceUnit:             toFloat64(row["term_price_unit"]),
 				TotalNetPriceUnit:         toFloat64(row["total_net_price_unit"]),
 				PriceWeight:               toFloat64(row["price_weight"]),
 				ExtraPriceWeight:          toFloat64(row["extra_price_weight"]),
@@ -703,7 +701,6 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					IsTrading:                 sg.IsTrading,
 					PriceUnit:                 sg.PriceUnit,
 					ExtraPriceUnit:            sg.ExtraPriceUnit,
-					TermPriceUnit:             sg.TermPriceUnit,
 					TotalNetPriceUnit:         sg.TotalNetPriceUnit,
 					PriceWeight:               sg.PriceWeight,
 					ExtraPriceWeight:          sg.ExtraPriceWeight,
