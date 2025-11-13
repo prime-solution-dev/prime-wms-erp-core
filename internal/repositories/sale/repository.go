@@ -147,11 +147,12 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
         it.id as item_id, 
         it.document_ref, 
         it.total_amount as invoice_total_amount,
-		i.invoice_code 
+		i.invoice_code,
+		i.invoice_type
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR' or i.invoice_type = 'CN' or i.invoice_type = 'DN')
-		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
+	LEFT JOIN invoice  i  ON i.id = it.invoice_id  
+		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true and (i.invoice_type = 'AR' or i.invoice_type = 'CN' or i.invoice_type = 'DN')
 		%s
 		 ORDER BY s.sale_code
 	`, searchCustomerCode)
@@ -175,7 +176,7 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		sale := models.Sale{
 			ID:            idSale,
 			SaleCode:      saleCode,
-			CompanyCode:   row["customer_code"].(string),
+			CustomerCode:  row["customer_code"].(string),
 			TotalAmount:   row["total_amount"].(float64),
 			StatusPayment: row["status_payment"].(string),
 		}
@@ -196,6 +197,7 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 					InvoiceCode: row["invoice_code"].(string),
 					DocumentRef: row["document_ref"].(string),
 					TotalAmount: row["invoice_total_amount"].(float64),
+					InvoiceType: row["invoice_type"].(string),
 				}
 			}
 

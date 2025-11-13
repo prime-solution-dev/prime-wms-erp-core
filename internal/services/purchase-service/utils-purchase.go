@@ -10,11 +10,9 @@ import (
 	"os"
 	"prime-erp-core/internal/models"
 	saleRepository "prime-erp-core/internal/repositories/invoice"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
-	"strconv"
-	"strings"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -40,9 +38,11 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 	}
 
 	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
-	if req.PurchaseItem != nil && purchaseCode != "" {
+	if req.PurchaseItem != nil {
 		purchaseItem = *req.PurchaseItem
 	}
+
+	fmt.Println(purchaseItem)
 
 	docRefItem := ""
 	if req.DocRefItem != nil {
@@ -54,6 +54,9 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		PurchaseItem:         purchaseItem,
 		DocRefItem:           docRefItem,
 		ProductCode:          req.ProductCode,
+		ProductDesc:          req.ProductDesc,
+		ProductGroupCode:     req.ProductGroupCode,
+		ProductGroupName:     req.ProductGroupName,
 		Qty:                  req.Qty,
 		Unit:                 req.Unit,
 		PurchaseQty:          req.PurchaseQty,
@@ -112,6 +115,9 @@ func MapPurchaseItemModelToPurchaseItemResponse(item models.PurchaseItem) models
 		PurchaseItem:         item.PurchaseItem,
 		DocRefItem:           item.DocRefItem,
 		ProductCode:          item.ProductCode,
+		ProductDesc:          item.ProductDesc,
+		ProductGroupOneCode:  item.ProductGroupCode,
+		ProductGroupOneName:  item.ProductGroupName,
 		Qty:                  item.Qty,
 		Unit:                 item.Unit,
 		PurchaseQty:          item.PurchaseQty,
@@ -157,7 +163,12 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		SiteCode:        purchase.SiteCode,
 		DocRefType:      &docRefType,
 		DocRef:          &docRef,
+		TradingRef:      purchase.TradingRef,
 		SupplierCode:    purchase.SupplierCode,
+		SupplierName:    purchase.SupplierName,
+		SupplierAddress: purchase.SupplierAddress,
+		SupplierPhone:   purchase.SupplierPhone,
+		SupplierEmail:   purchase.SupplierEmail,
 		DeliveryDate:    purchase.DeliveryDate.Format(time.RFC3339),
 		DeliveryAddress: purchase.DeliveryAddress,
 		Status:          purchase.Status,
@@ -177,51 +188,50 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 	}
 }
 
-// System Config
-// purchase_code ex. PO-PRE20250930-0001; value ex. 20250930-0001
-func GetPurchaseCodeConfig() ([]models.SystemConfig, error) {
-	topicCodes := []string{"PO"}
-	configCodes := []string{}
+// Running code actions
+func GeneratePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No purchases to generate codes for
+	}
 
-	purchaseConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
+	configCode := "RUNNING_PO"
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
 	}
 
-	return purchaseConfigs, nil
-}
-
-func ConvertConfigToLatestPurchaseNumber(value string) (int, error) {
-	if len(value) < 1 {
-		return 0, nil
-	}
-
-	result := 0
-
-	valueParts := strings.Split(value, "-")
-	latestDate := valueParts[0]
-	latestNo := valueParts[1]
-
-	t1, err := time.ParseInLocation("20060102", latestDate, time.Local)
+	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
 	if err != nil {
-		return result, err
+		return nil, fmt.Errorf("failed to generate purchase order codes: %v", err)
 	}
 
-	t2 := time.Now()
-
-	t1Day := time.Date(t1.Year(), t1.Month(), t1.Day(), 0, 0, 0, 0, t1.Location())
-	t2Day := time.Date(t2.Year(), t2.Month(), t2.Day(), 0, 0, 0, 0, t2.Location())
-
-	if t1Day.Equal(t2Day) {
-		lastNum, err := strconv.Atoi(latestNo)
-		if err != nil {
-			return 0, err
-		}
-
-		result = lastNum
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: configCode,
+		Count:      count,
 	}
 
-	return result, nil
+	reqUpdateJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	purchaseCodeResult, ok := purchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(purchaseCodeResult.Data) != count {
+		return nil, errors.New("failed to get correct number of purchase order codes from system config")
+	}
+
+	return purchaseCodeResult.Data, nil
 }
 
 // Approval actions
@@ -330,49 +340,6 @@ func GetProductByCode(productReq models.GetProductRequest) (map[string]models.Ge
 	}
 
 	return mapProduct, nil
-}
-
-func GetProductGroup(productGroupReq models.GetGroupRequest) (map[string]string, error) {
-	jsonData, err := json.Marshal(productGroupReq)
-	if err != nil {
-		return nil, errors.New("failed to marshal product group data to JSON: " + err.Error())
-	}
-
-	getProductGroups, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/GetGroup", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, errors.New("failed to create HTTP request: " + err.Error())
-	}
-
-	getProductGroups.Header.Set("Content-Type", "application/json")
-
-	// Create a client and execute the request
-	client := &http.Client{}
-	resp, err := client.Do(getProductGroups)
-	if err != nil {
-		return nil, errors.New("failed to execute HTTP request: " + err.Error())
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
-	}
-
-	productGroupBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.New("failed to read response body: " + err.Error())
-	}
-
-	productGroupResponse := []models.GetGroupResponse{}
-	if err := json.Unmarshal(productGroupBody, &productGroupResponse); err != nil {
-		return nil, errors.New("failed to decode JSON response: " + err.Error())
-	}
-
-	mapProductGroupItem := map[string]string{}
-	for _, groupItem := range productGroupResponse[0].Items {
-		mapProductGroupItem[groupItem.ItemCode] = groupItem.ItemName
-	}
-
-	return mapProductGroupItem, nil
 }
 
 // PrePurchase actions

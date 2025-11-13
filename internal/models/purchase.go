@@ -15,6 +15,10 @@ type PrePurchase struct {
 	DocRefType                  string            `json:"doc_ref_type"`
 	DocRef                      string            `json:"doc_ref"`
 	SupplierCode                string            `json:"supplier_code"`
+	SupplierName                string            `json:"supplier_name"`
+	SupplierAddress             string            `json:"supplier_address"`
+	SupplierPhone               string            `json:"supplier_phone"`
+	SupplierEmail               string            `json:"supplier_email"`
 	DeliveryAddress             string            `json:"delivery_address"`
 	Status                      string            `json:"status"`
 	TotalAmount                 float64           `json:"total_amount"`
@@ -80,7 +84,12 @@ type Purchase struct {
 	SiteCode                    string         `json:"site_code"`
 	DocRefType                  *string        `json:"doc_ref_type"`
 	DocRef                      *string        `json:"doc_ref"`
+	TradingRef                  *string        `json:"trading_ref"`
 	SupplierCode                string         `json:"supplier_code"`
+	SupplierName                string         `json:"supplier_name"`
+	SupplierAddress             string         `json:"supplier_address"`
+	SupplierPhone               string         `json:"supplier_phone"`
+	SupplierEmail               string         `json:"supplier_email"`
 	DeliveryDate                *time.Time     `json:"delivery_date"`
 	DeliveryAddress             string         `json:"delivery_address"`
 	Status                      string         `json:"status"`
@@ -110,6 +119,9 @@ type PurchaseItem struct {
 	PurchaseID           uuid.UUID `json:"purchase_id"`
 	PurchaseItem         string    `json:"purchase_item"`
 	ProductCode          string    `json:"product_code"`
+	ProductDesc          string    `json:"product_desc"`
+	ProductGroupCode     string    `json:"product_group_code"`
+	ProductGroupName     string    `json:"product_group_name"`
 	DocRefItem           string    `json:"doc_ref_item"`
 	Qty                  float64   `json:"qty"`
 	Unit                 string    `json:"unit"`
@@ -169,6 +181,10 @@ type CreatePOBigLotRequest struct {
 	CompanyCode     string                      `json:"company_code"`
 	SiteCode        string                      `json:"site_code"`
 	SupplierCode    string                      `json:"supplier_code"`
+	SupplierName    string                      `json:"supplier_name"`
+	SupplierAddress string                      `json:"supplier_address"`
+	SupplierPhone   string                      `json:"supplier_phone"`
+	SupplierEmail   string                      `json:"supplier_email"`
 	DeliveryAddress string                      `json:"delivery_address"`
 	Status          string                      `json:"status"`
 	TotalAmount     float64                     `json:"total_amount"`
@@ -352,6 +368,9 @@ type PurchaseItemFormRequest struct {
 	PurchaseID           *uuid.UUID `json:"purchase_id"`
 	PurchaseItem         *string    `json:"purchase_item"`
 	ProductCode          string     `json:"product_code"`
+	ProductDesc          string     `json:"product_desc"`
+	ProductGroupCode     string     `json:"product_group_code"`
+	ProductGroupName     string     `json:"product_group_name"`
 	DocRefItem           *string    `json:"doc_ref_item"`
 	Qty                  float64    `json:"qty"`
 	Unit                 string     `json:"unit"`
@@ -381,7 +400,12 @@ type PurchaseFormRequest struct {
 	PurchaseType    string                    `json:"purchase_type"`
 	DocRefType      *string                   `json:"doc_ref_type"`
 	DocRef          *string                   `json:"doc_ref"`
+	TradingRef      *string                   `json:"trading_ref"`
 	SupplierCode    *string                   `json:"supplier_code"`
+	SupplierName    *string                   `json:"supplier_name"`
+	SupplierAddress *string                   `json:"supplier_address"`
+	SupplierPhone   *string                   `json:"supplier_phone"`
+	SupplierEmail   *string                   `json:"supplier_email"`
 	DeliveryDate    *time.Time                `json:"delivery_date"`
 	DeliveryAddress string                    `json:"delivery_address"`
 	Status          string                    `json:"status"`
@@ -411,6 +435,7 @@ type GetPurchaseRequest struct {
 	ProductCodes            []string `json:"product_codes"`
 	PurchaseType            []string `json:"purchase_type"`
 	DocRef                  []string `json:"doc_ref"`
+	TradingRef              []string `json:"trading_ref"`
 	CompanyCode             string   `json:"company_code"`
 	SiteCode                string   `json:"site_code"`
 	Page                    int      `json:"page"`
@@ -423,7 +448,7 @@ type PurchaseItemResponse struct {
 	PurchaseItem         string  `json:"purchase_item"`
 	DocRefItem           string  `json:"doc_ref_item"`
 	ProductCode          string  `json:"product_code"`
-	ProductName          string  `json:"product_name"`
+	ProductDesc          string  `json:"product_desc"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`
 	ProductGroupOneName  string  `json:"product_group_one_name"`
 	Qty                  float64 `json:"qty"`
@@ -459,6 +484,7 @@ type PurchaseResponse struct {
 	SiteCode                    string                 `json:"site_code"`
 	DocRefType                  *string                `json:"doc_ref_type"`
 	DocRef                      *string                `json:"doc_ref"`
+	TradingRef                  *string                `json:"trading_ref"`
 	SupplierCode                string                 `json:"supplier_code"`
 	SupplierName                string                 `json:"supplier_name"`
 	SupplierAddress             string                 `json:"supplier_address"`
@@ -703,12 +729,16 @@ type GetPurchaseItemResponse struct {
 	SiteCode             string               `json:"site_code"`
 	DocRefType           *string              `json:"doc_ref_type"`
 	DocRef               *string              `json:"doc_ref"`
+	TradingRef           *string              `json:"trading_ref"`
 	SupplierCode         string               `json:"supplier_code"`
 	SupplierName         string               `json:"supplier_name"`
+	SupplierAddress      string               `json:"supplier_address"`
+	SupplierPhone        string               `json:"supplier_phone"`
+	SupplierEmail        string               `json:"supplier_email"`
 	PurchaseItem         string               `json:"purchase_item"`
 	DocRefItem           string               `json:"doc_ref_item"`
 	ProductCode          string               `json:"product_code"`
-	ProductName          string               `json:"product_name"`
+	ProductDesc          string               `json:"product_desc"`
 	ProductGroupOneCode  string               `json:"product_group_one_code"`
 	ProductGroupOneName  string               `json:"product_group_one_name"`
 	Qty                  float64              `json:"qty"`

@@ -74,29 +74,28 @@ type GroupKey struct {
 }
 
 type SubGroup struct {
-	ID                        uuid.UUID       `json:"id"`
-	SubGroupKey               string          `json:"subgroup_key"`
-	IsTrading                 bool            `json:"is_trading"`
-	PriceUnit                 float64         `json:"price_unit"`
-	ExtraPriceUnit            float64         `json:"extra_price_unit"`
-	TermPriceUnit             float64         `json:"term_price_unit"`
-	TotalNetPriceUnit         float64         `json:"total_net_price_unit"`
-	PriceWeight               float64         `json:"price_weight"`
-	ExtraPriceWeight          float64         `json:"extra_price_weight"`
-	TermPriceWeight           float64         `json:"term_price_weight"`
-	TotalNetPriceWeight       float64         `json:"total_net_price_weight"`
-	BeforePriceUnit           float64         `json:"before_price_unit"`
-	BeforeExtraPriceUnit      float64         `json:"before_extra_price_unit"`
-	BeforeTermPriceUnit       float64         `json:"before_term_price_unit"`
-	BeforeTotalNetPriceUnit   float64         `json:"before_total_net_price_unit"`
-	BeforePriceWeight         float64         `json:"before_price_weight"`
-	BeforeExtraPriceWeight    float64         `json:"before_extra_price_weight"`
-	BeforeTermPriceWeight     float64         `json:"before_term_price_weight"`
-	BeforeTotalNetPriceWeight float64         `json:"before_total_net_price_weight"`
-	EffectiveDate             time.Time       `json:"effective_date"`
-	Remark                    string          `json:"remark"`
-	UdfJson                   json.RawMessage `json:"udf_json"`
-	GroupKeys                 []GroupKey      `json:"group_keys"`
+	ID                        uuid.UUID  `json:"id"`
+	SubGroupKey               string     `json:"subgroup_key"`
+	IsTrading                 bool       `json:"is_trading"`
+	PriceUnit                 float64    `json:"price_unit"`
+	ExtraPriceUnit            float64    `json:"extra_price_unit"`
+	TermPriceUnit             float64    `json:"term_price_unit"`
+	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
+	PriceWeight               float64    `json:"price_weight"`
+	ExtraPriceWeight          float64    `json:"extra_price_weight"`
+	TermPriceWeight           float64    `json:"term_price_weight"`
+	TotalNetPriceWeight       float64    `json:"total_net_price_weight"`
+	BeforePriceUnit           float64    `json:"before_price_unit"`
+	BeforeExtraPriceUnit      float64    `json:"before_extra_price_unit"`
+	BeforeTermPriceUnit       float64    `json:"before_term_price_unit"`
+	BeforeTotalNetPriceUnit   float64    `json:"before_total_net_price_unit"`
+	BeforePriceWeight         float64    `json:"before_price_weight"`
+	BeforeExtraPriceWeight    float64    `json:"before_extra_price_weight"`
+	BeforeTermPriceWeight     float64    `json:"before_term_price_weight"`
+	BeforeTotalNetPriceWeight float64    `json:"before_total_net_price_weight"`
+	EffectiveDate             time.Time  `json:"effective_date"`
+	Remark                    string     `json:"remark"`
+	GroupKeys                 []GroupKey `json:"group_keys"`
 }
 
 func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -371,7 +370,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				IsTrading:                 toBool(row["is_trading"]),
 				PriceUnit:                 toFloat64(row["price_unit"]),
 				ExtraPriceUnit:            toFloat64(row["extra_price_unit"]),
-				TermPriceUnit:             toFloat64(row["term_price_unit"]),
 				TotalNetPriceUnit:         toFloat64(row["total_net_price_unit"]),
 				PriceWeight:               toFloat64(row["price_weight"]),
 				ExtraPriceWeight:          toFloat64(row["extra_price_weight"]),
@@ -604,9 +602,10 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	result := []models.GetPriceListResponse{}
 	for _, pl := range priceLists {
-		effectiveDate := ""
+		var effectiveDate *string
 		if pl.EffectiveDate != nil {
-			effectiveDate = pl.EffectiveDate.Format(time.RFC3339)
+			formattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+			effectiveDate = &formattedDate
 		}
 
 		priceListResp := models.GetPriceListResponse{
@@ -623,28 +622,40 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Remark:            pl.Remark,
 			GroupKey:          pl.GroupKey,
 			CreateBy:          pl.CreateBy,
-			CreateDtm:         pl.CreateDtm.Format(time.RFC3339),
+			CreateDtm:         pl.CreateDtm.Format("2006-01-02T15:04:05Z"),
 			UpdateBy:          pl.UpdateBy,
-			UpdateDtm:         pl.UpdateDtm.Format(time.RFC3339),
+			UpdateDtm:         pl.UpdateDtm.Format("2006-01-02T15:04:05Z"),
 		}
 
 		terms := []models.PriceListTermResponse{}
 		if len(pl.PriceListGroupTerms) > 0 {
 			for _, term := range pl.PriceListGroupTerms {
 				termData := paymentTermMap[term.TermCode]
+
+				createDtm := ""
+				if term.CreateDtm != nil {
+					createDtm = term.CreateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				updateDtm := ""
+				if term.UpdateDtm != nil {
+					updateDtm = term.UpdateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
 				terms = append(terms, models.PriceListTermResponse{
-					ID:         term.ID.String(),
-					TermCode:   term.TermCode,
-					TermName:   termData.TermName,
-					TermType:   termData.TermType,
-					Pdc:        term.Pdc,
-					PdcPercent: term.PdcPercent,
-					Due:        term.Due,
-					DuePercent: term.DuePercent,
-					CreateBy:   term.CreateBy,
-					CreateDtm:  term.CreateDtm.Format(time.RFC3339),
-					UpdateBy:   term.UpdateBy,
-					UpdateDtm:  term.UpdateDtm.Format(time.RFC3339),
+					ID:               term.ID.String(),
+					PriceListGroupID: term.PriceListGroupID.String(),
+					TermCode:         term.TermCode,
+					TermName:         termData.TermName,
+					TermType:         termData.TermType,
+					Pdc:              term.Pdc,
+					PdcPercent:       term.PdcPercent,
+					Due:              term.Due,
+					DuePercent:       term.DuePercent,
+					CreateBy:         term.CreateBy,
+					CreateDtm:        createDtm,
+					UpdateBy:         term.UpdateBy,
+					UpdateDtm:        updateDtm,
 				})
 			}
 		}
@@ -652,6 +663,16 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		extras := []models.PriceListExtraResponse{}
 		if len(pl.PriceListGroupExtras) > 0 {
 			for _, extra := range pl.PriceListGroupExtras {
+				createDtm := ""
+				if extra.CreateDtm != nil {
+					createDtm = extra.CreateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				updateDtm := ""
+				if extra.UpdateDtm != nil {
+					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
 				extras = append(extras, models.PriceListExtraResponse{
 					ID:               extra.ID.String(),
 					PriceListGroupID: extra.PriceListGroupID.String(),
@@ -661,9 +682,9 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					CondRangeMin:     extra.CondRangeMin,
 					CondRangeMax:     extra.CondRangeMax,
 					CreateBy:         extra.CreateBy,
-					CreateDtm:        extra.CreateDtm.Format(time.RFC3339),
+					CreateDtm:        createDtm,
 					UpdateBy:         extra.UpdateBy,
-					UpdateDtm:        extra.UpdateDtm.Format(time.RFC3339),
+					UpdateDtm:        updateDtm,
 				})
 			}
 		}
@@ -686,9 +707,20 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					}
 				}
 
-				sgEffectiveDate := ""
-				if sg.EffectiveDate != nil {
-					sgEffectiveDate = sg.EffectiveDate.Format(time.RFC3339)
+				var sgEffectiveDate *string
+				if pl.EffectiveDate != nil {
+					sgFormattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+					sgEffectiveDate = &sgFormattedDate
+				}
+
+				sgCreateDtm := ""
+				if pl.EffectiveDate != nil {
+					sgCreateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+				}
+
+				sgUpdateDtm := ""
+				if pl.EffectiveDate != nil {
+					sgUpdateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
 				}
 
 				subGroups = append(subGroups, models.PriceListSubGroupResponse{
@@ -698,7 +730,6 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					IsTrading:                 sg.IsTrading,
 					PriceUnit:                 sg.PriceUnit,
 					ExtraPriceUnit:            sg.ExtraPriceUnit,
-					TermPriceUnit:             sg.TermPriceUnit,
 					TotalNetPriceUnit:         sg.TotalNetPriceUnit,
 					PriceWeight:               sg.PriceWeight,
 					ExtraPriceWeight:          sg.ExtraPriceWeight,
@@ -715,9 +746,9 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDate:             sgEffectiveDate,
 					Remark:                    sg.Remark,
 					CreateBy:                  sg.CreateBy,
-					CreateDtm:                 sg.CreateDtm.Format(time.RFC3339),
+					CreateDtm:                 sgCreateDtm,
 					UpdateBy:                  sg.UpdateBy,
-					UpdateDtm:                 sg.UpdateDtm.Format(time.RFC3339),
+					UpdateDtm:                 sgUpdateDtm,
 					SubGroupKeys:              subGroupKeys,
 				})
 			}

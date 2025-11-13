@@ -1173,7 +1173,7 @@ func transformToGetPriceListResponse(sqlx *sqlx.DB, responses []GetPriceListGrou
 				BeforeExtraPriceWeight:    sg.BeforeExtraPriceWeight,
 				BeforeTermPriceWeight:     sg.BeforeTermPriceWeight,
 				BeforeTotalNetPriceWeight: sg.BeforeTotalNetPriceWeight,
-				EffectiveDate:             sgEffectiveDate,
+				EffectiveDate:             sg.EffectiveDate,
 				Remark:                    sg.Remark,
 				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,

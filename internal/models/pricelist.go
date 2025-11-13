@@ -55,33 +55,33 @@ type PriceListGroupHistory struct {
 func (PriceListGroupHistory) TableName() string { return "price_list_group_history" }
 
 type PriceListGroupTerm struct {
-	ID               uuid.UUID `json:"id"`
-	PriceListGroupID uuid.UUID `json:"price_list_group_id"`
-	TermCode         string    `json:"term_code"`
-	Pdc              float64   `json:"pdc"`
-	PdcPercent       int       `json:"pdc_percent"`
-	Due              float64   `json:"due"`
-	DuePercent       int       `json:"due_percent"`
-	CreateBy         string    `json:"create_by"`
-	CreateDtm        time.Time `json:"create_dtm"`
-	UpdateBy         string    `json:"update_by"`
-	UpdateDtm        time.Time `json:"update_dtm"`
+	ID               uuid.UUID  `json:"id"`
+	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
+	TermCode         string     `json:"term_code"`
+	Pdc              float64    `json:"pdc"`
+	PdcPercent       int        `json:"pdc_percent"`
+	Due              float64    `json:"due"`
+	DuePercent       int        `json:"due_percent"`
+	CreateBy         string     `json:"create_by"`
+	CreateDtm        *time.Time `json:"create_dtm"`
+	UpdateBy         string     `json:"update_by"`
+	UpdateDtm        *time.Time `json:"update_dtm"`
 }
 
 func (PriceListGroupTerm) TableName() string { return "price_list_group_term" }
 
 type PriceListGroupExtra struct {
-	ID               uuid.UUID `json:"id"`
-	PriceListGroupID uuid.UUID `json:"price_list_group_id"`
-	ExtraKey         string    `json:"extra_key"`
-	LengthExtraKey   int       `json:"length_extra_key"`
-	Operator         string    `json:"operator"`
-	CondRangeMin     float64   `json:"cond_range_min"`
-	CondRangeMax     float64   `json:"cond_range_max"`
-	CreateBy         string    `json:"create_by"`
-	CreateDtm        time.Time `json:"create_dtm"`
-	UpdateBy         string    `json:"update_by"`
-	UpdateDtm        time.Time `json:"update_dtm"`
+	ID               uuid.UUID  `json:"id"`
+	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
+	ExtraKey         string     `json:"extra_key"`
+	LengthExtraKey   int        `json:"length_extra_key"`
+	Operator         string     `json:"operator"`
+	CondRangeMin     float64    `json:"cond_range_min"`
+	CondRangeMax     float64    `json:"cond_range_max"`
+	CreateBy         string     `json:"create_by"`
+	CreateDtm        *time.Time `json:"create_dtm"`
+	UpdateBy         string     `json:"update_by"`
+	UpdateDtm        *time.Time `json:"update_dtm"`
 }
 
 func (PriceListGroupExtra) TableName() string { return "price_list_group_extra" }
@@ -103,7 +103,6 @@ type PriceListSubGroup struct {
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
 	ExtraPriceUnit            float64                `json:"extra_price_unit"`
-	TermPriceUnit             float64                `json:"term_price_unit"`
 	TotalNetPriceUnit         float64                `json:"total_net_price_unit"`
 	PriceWeight               float64                `json:"price_weight"`
 	ExtraPriceWeight          float64                `json:"extra_price_weight"`
@@ -120,9 +119,9 @@ type PriceListSubGroup struct {
 	EffectiveDate             *time.Time             `json:"effective_date"`
 	Remark                    string                 `json:"remark"`
 	CreateBy                  string                 `json:"create_by"`
-	CreateDtm                 time.Time              `json:"create_dtm"`
+	CreateDtm                 *time.Time             `json:"create_dtm"`
 	UpdateBy                  string                 `json:"update_by"`
-	UpdateDtm                 time.Time              `json:"update_dtm"`
+	UpdateDtm                 *time.Time             `json:"update_dtm"`
 	UdfJson                   json.RawMessage        `json:"udf_json"`
 	PriceListSubGroupKeys     []PriceListSubGroupKey `gorm:"foreignKey:SubGroupID;references:ID" json:"price_list_sub_group_keys"`
 }
@@ -146,7 +145,6 @@ type PriceListSubGroupHistory struct {
 	IsTrading                 bool       `json:"is_trading"`
 	PriceUnit                 float64    `json:"price_unit"`
 	ExtraPriceUnit            float64    `json:"extra_price_unit"`
-	TermPriceUnit             float64    `json:"term_price_unit"`
 	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
 	PriceWeight               float64    `json:"price_weight"`
 	ExtraPriceWeight          float64    `json:"extra_price_weight"`
@@ -164,9 +162,9 @@ type PriceListSubGroupHistory struct {
 	ExpiryDate                *time.Time `json:"expiry_date"`
 	Remark                    string     `json:"remark"`
 	CreateBy                  string     `json:"create_by"`
-	CreateDtm                 time.Time  `json:"create_dtm"`
+	CreateDtm                 *time.Time `json:"create_dtm"`
 	UpdateBy                  string     `json:"update_by"`
-	UpdateDtm                 time.Time  `json:"update_dtm"`
+	UpdateDtm                 *time.Time `json:"update_dtm"`
 }
 
 func (PriceListSubGroupHistory) TableName() string { return "price_list_sub_group_history" }
@@ -182,14 +180,14 @@ type PriceListSubGroupKeyHistory struct {
 func (PriceListSubGroupKeyHistory) TableName() string { return "price_list_sub_group_key_history" }
 
 type PaymentTerm struct {
-	ID        uuid.UUID `json:"id"`
-	TermCode  string    `json:"term_code"`
-	TermName  string    `json:"term_name"`
-	TermType  string    `json:"term_type"`
-	CreateBy  string    `json:"create_by"`
-	CreateDtm time.Time `json:"create_dtm"`
-	UpdateBy  string    `json:"update_by"`
-	UpdateDtm time.Time `json:"update_dtm"`
+	ID        uuid.UUID  `json:"id"`
+	TermCode  string     `json:"term_code"`
+	TermName  string     `json:"term_name"`
+	TermType  string     `json:"term_type"`
+	CreateBy  string     `json:"create_by"`
+	CreateDtm *time.Time `json:"create_dtm"`
+	UpdateBy  string     `json:"update_by"`
+	UpdateDtm *time.Time `json:"update_dtm"`
 }
 
 func (PaymentTerm) TableName() string { return "payment_term" }
@@ -248,7 +246,6 @@ type PriceListSubGroupResponse struct {
 	IsTrading                 bool                           `json:"is_trading"`
 	PriceUnit                 float64                        `json:"price_unit"`
 	ExtraPriceUnit            float64                        `json:"extra_price_unit"`
-	TermPriceUnit             float64                        `json:"term_price_unit"`
 	TotalNetPriceUnit         float64                        `json:"total_net_price_unit"`
 	PriceWeight               float64                        `json:"price_weight"`
 	ExtraPriceWeight          float64                        `json:"extra_price_weight"`
@@ -262,7 +259,7 @@ type PriceListSubGroupResponse struct {
 	BeforeExtraPriceWeight    float64                        `json:"before_extra_price_weight"`
 	BeforeTermPriceWeight     float64                        `json:"before_term_price_weight"`
 	BeforeTotalNetPriceWeight float64                        `json:"before_total_net_price_weight"`
-	EffectiveDate             string                         `json:"effective_date"`
+	EffectiveDate             *string                        `json:"effective_date"`
 	Remark                    string                         `json:"remark"`
 	CreateBy                  string                         `json:"create_by"`
 	CreateDtm                 string                         `json:"create_dtm"`
@@ -282,7 +279,7 @@ type GetPriceListResponse struct {
 	BeforePriceUnit   float64                     `json:"before_price_unit"`
 	BeforePriceWeight float64                     `json:"before_price_weight"`
 	Currency          string                      `json:"currency"`
-	EffectiveDate     string                      `json:"effective_date"`
+	EffectiveDate     *string                     `json:"effective_date"`
 	Remark            string                      `json:"remark"`
 	GroupKey          string                      `json:"group_key"`
 	GroupKeyName      string                      `json:"group_key_name"`
@@ -315,14 +312,28 @@ type CreatePriceListBaseRequest struct {
 	Terms         []CreatePriceListGroupTermRequest `json:"terms"`
 }
 
+type UpdatePriceListGroupTermRequest struct {
+	ID               uuid.UUID  `json:"id"`
+	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
+	TermCode         string     `json:"term_code"`
+	Pdc              float64    `json:"pdc"`
+	PdcPercent       int        `json:"pdc_percent"`
+	Due              float64    `json:"due"`
+	DuePercent       int        `json:"due_percent"`
+	CreateBy         string     `json:"create_by"`
+	CreateDtm        *time.Time `json:"create_dtm"`
+	UpdateBy         string     `json:"update_by"`
+	UpdateDtm        *time.Time `json:"update_dtm"`
+}
+
 type UpdatePriceListBaseRequest struct {
-	ID            uuid.UUID            `json:"id"`
-	PriceUnit     float64              `json:"price_unit"`
-	PriceWeight   float64              `json:"price_weight"`
-	Currency      string               `json:"currency"`
-	EffectiveDate *time.Time           `json:"effective_date"`
-	Remark        string               `json:"remark"`
-	Terms         []PriceListGroupTerm `json:"terms"`
+	ID            uuid.UUID                         `json:"id"`
+	PriceUnit     float64                           `json:"price_unit"`
+	PriceWeight   float64                           `json:"price_weight"`
+	Currency      string                            `json:"currency"`
+	EffectiveDate *time.Time                        `json:"effective_date"`
+	Remark        string                            `json:"remark"`
+	Terms         []UpdatePriceListGroupTermRequest `json:"terms"`
 }
 
 type DeletePriceListBaseRequest struct {

@@ -3,7 +3,6 @@ package prePurchaseService
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"prime-erp-core/internal/models"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 
@@ -35,15 +34,8 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	prePurchaseCodes := []string{}
-	supplierReq := models.GetSupplierListRequest{}
 	for _, prePurchase := range prePurchaseList {
-		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, prePurchase.SupplierCode)
 		prePurchaseCodes = append(prePurchaseCodes, prePurchase.PrePurchaseCode)
-	}
-
-	mapSupplier, err := GetSupplierByCode(supplierReq)
-	if err != nil {
-		return nil, err
 	}
 
 	// Get status approves
@@ -60,12 +52,6 @@ func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, prePurchase := range prePurchaseList {
 		bigLotResponse := MapPrePurchasesModelToBigLotsResponse(prePurchase)
 
-		if supplier, ok := mapSupplier[prePurchase.SupplierCode]; ok {
-			bigLotResponse.SupplierName = supplier.SupplierName
-			bigLotResponse.SupplierEmail = supplier.Email
-			bigLotResponse.SupplierPhone = supplier.Phone
-			bigLotResponse.SupplierAddress = fmt.Sprintf("%s %s %s %s", supplier.Address, supplier.Province, supplier.PostCode, supplier.Country)
-		}
 		bigLotResponse.StatusApprove = mapStatusApprove[prePurchase.PrePurchaseCode]
 
 		result.BigLotList = append(result.BigLotList, bigLotResponse)

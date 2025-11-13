@@ -39,6 +39,7 @@ type GetDeliverySOResponse struct {
 	TotalWeight      float64                     `gorm:"type:numeric" json:"total_weight"`
 	Status           string                      `gorm:"type:varchar(50)" json:"status"`
 	Remark           string                      `gorm:"type:varchar(255)" json:"remark"`
+	BookingSlotType  string                      `gorm:"type:varchar(50)" json:"booking_slot_type"`
 	CreateDate       *time.Time                  `gorm:"type:date" json:"create_date"`
 	CreateBy         string                      `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                  `gorm:"type:date" json:"update_date"`
