@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"prime-erp-core/internal/models"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -337,7 +338,14 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 		}
 	}
 
+	// Sort keys to ensure consistent column order
+	sortedKeys := make([]string, 0, len(uniqueValues))
 	for valueName := range uniqueValues {
+		sortedKeys = append(sortedKeys, valueName)
+	}
+	sort.Strings(sortedKeys)
+
+	for _, valueName := range sortedKeys {
 		columnGroup := ColumnDef{
 			HeaderName:    valueName,
 			GroupID:       fmt.Sprintf("group_%s", sanitizeFieldName(valueName)),
@@ -370,86 +378,129 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 	return columns
 }
 
-func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
-	hierarchy := make(map[string]map[string]map[string]bool)
+// buildHierarchyMap builds a dynamic nested map structure from subGroups based on columnLevels
+func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevels []ColumnLevel) map[string]interface{} {
+	hierarchy := make(map[string]interface{})
 
 	for _, sg := range subGroups {
-		level1 := ""
-		level2 := ""
-		level3 := ""
-
-		if len(pattern.ColumnLevels) > 0 {
-			level1 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[0].Field)
-		}
-		if len(pattern.ColumnLevels) > 1 {
-			level2 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[1].Field)
-		}
-		if len(pattern.ColumnLevels) > 2 {
-			level3 = getValueNameByGroupCode(sg.SubGroupKeys, pattern.ColumnLevels[2].Field)
+		// Extract level values dynamically
+		levelValues := make([]string, len(columnLevels))
+		for i, level := range columnLevels {
+			levelValues[i] = getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
 		}
 
-		if hierarchy[level1] == nil {
-			hierarchy[level1] = make(map[string]map[string]bool)
+		// Build nested map structure dynamically
+		current := hierarchy
+		for i, value := range levelValues {
+			if i == len(levelValues)-1 {
+				// Last level: mark as leaf
+				if current[value] == nil {
+					current[value] = true
+				}
+			} else {
+				// Intermediate level: create nested map if needed
+				if current[value] == nil {
+					current[value] = make(map[string]interface{})
+				}
+				current = current[value].(map[string]interface{})
+			}
 		}
-		if hierarchy[level1][level2] == nil {
-			hierarchy[level1][level2] = make(map[string]bool)
-		}
-		hierarchy[level1][level2][level3] = true
 	}
 
-	columns := []ColumnDef{}
-	for l1, l2Map := range hierarchy {
-		l1Group := ColumnDef{
-			HeaderName:    l1,
-			GroupID:       fmt.Sprintf("group_l1_%s", sanitizeFieldName(l1)),
-			OpenByDefault: boolPtr(true),
-			Children:      []ColumnDef{},
-		}
+	return hierarchy
+}
 
-		for l2, l3Map := range l2Map {
-			l2Group := ColumnDef{
-				HeaderName:    l2,
-				GroupID:       fmt.Sprintf("group_l2_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2)),
+// buildColumnGroupsRecursive recursively builds ColumnDef structures from hierarchy
+func buildColumnGroupsRecursive(
+	hierarchy map[string]interface{},
+	pattern *PatternConfig,
+	levelIndex int,
+	levelPath []string,
+) []ColumnDef {
+	columns := []ColumnDef{}
+
+	// Get sorted keys for current level
+	keys := make([]string, 0, len(hierarchy))
+	for key := range hierarchy {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value := hierarchy[key]
+		// Create a new slice to avoid modifying the shared levelPath
+		currentPath := make([]string, len(levelPath)+1)
+		copy(currentPath, levelPath)
+		currentPath[len(levelPath)] = key
+
+		// Build GroupID dynamically from level path
+		sanitizedPathParts := make([]string, len(currentPath))
+		for i, part := range currentPath {
+			sanitizedPathParts[i] = sanitizeFieldName(part)
+		}
+		groupID := fmt.Sprintf("group_l%d_%s", levelIndex+1, strings.Join(sanitizedPathParts, "_"))
+
+		// Check if this is a leaf node (final level)
+		if levelIndex == len(pattern.ColumnLevels)-1 {
+			// This is the final level - create column group with pattern.Columns as children
+			columnGroup := ColumnDef{
+				HeaderName:    key,
+				GroupID:       groupID,
 				OpenByDefault: boolPtr(true),
 				Children:      []ColumnDef{},
 			}
 
-			for l3 := range l3Map {
-				l3Group := ColumnDef{
-					HeaderName:    l3,
-					GroupID:       fmt.Sprintf("group_l3_%s_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2), sanitizeFieldName(l3)),
-					OpenByDefault: boolPtr(true),
-					Children:      []ColumnDef{},
+			// Build field prefix dynamically from all level values
+			fieldPrefix := strings.Join(sanitizedPathParts, "_")
+
+			// Add pattern columns as children
+			for _, colConfig := range pattern.Columns {
+				childCol := ColumnDef{
+					Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
+					HeaderName:   colConfig.HeaderName,
+					Width:        intPtr(colConfig.Width),
+					CellRenderer: colConfig.CellRenderer,
 				}
 
-				fieldPrefix := fmt.Sprintf("%s_%s_%s", sanitizeFieldName(l1), sanitizeFieldName(l2), sanitizeFieldName(l3))
-				for _, colConfig := range pattern.Columns {
-					childCol := ColumnDef{
-						Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
-						HeaderName:   colConfig.HeaderName,
-						Width:        intPtr(colConfig.Width),
-						CellRenderer: colConfig.CellRenderer,
-					}
-
-					if colConfig.CellStyle != nil {
-						childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
-					}
-
-					if colConfig.EnableTooltip {
-						childCol.EnableTooltip = boolPtr(true)
-					}
-
-					l3Group.Children = append(l3Group.Children, childCol)
+				if colConfig.CellStyle != nil {
+					childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
 				}
 
-				l2Group.Children = append(l2Group.Children, l3Group)
+				if colConfig.EnableTooltip {
+					childCol.EnableTooltip = boolPtr(true)
+				}
+
+				columnGroup.Children = append(columnGroup.Children, childCol)
 			}
 
-			l1Group.Children = append(l1Group.Children, l2Group)
+			columns = append(columns, columnGroup)
+		} else {
+			// This is an intermediate level - recurse into nested map
+			if nestedMap, ok := value.(map[string]interface{}); ok {
+				columnGroup := ColumnDef{
+					HeaderName:    key,
+					GroupID:       groupID,
+					OpenByDefault: boolPtr(true),
+					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentPath),
+				}
+				columns = append(columns, columnGroup)
+			}
 		}
-
-		columns = append(columns, l1Group)
 	}
+
+	return columns
+}
+
+func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+	if len(pattern.ColumnLevels) == 0 {
+		return []ColumnDef{}
+	}
+
+	// Build hierarchy dynamically based on number of columnLevels
+	hierarchy := buildHierarchyMap(subGroups, pattern.ColumnLevels)
+
+	// Build columns recursively
+	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{})
 
 	return columns
 }
@@ -617,6 +668,15 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		hasInactiveValue := false
 		var lineBundleValue *float64
 		var marketWeightValue *float64
+		var odValue interface{}
+		var stockValue interface{}
+		var importDateValue interface{}
+		var tonValue interface{}
+		var producerValue interface{}
+		fastValue := false
+		slowValue := false
+		hasFastValue := false
+		hasSlowValue := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -637,6 +697,29 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				} else if mw, ok := udfData["market_weight"].(int); ok {
 					mwFloat := float64(mw)
 					marketWeightValue = &mwFloat
+				}
+				if od, ok := udfData["od"]; ok {
+					odValue = od
+				}
+				if stock, ok := udfData["stock"]; ok {
+					stockValue = stock
+				}
+				if importDate, ok := udfData["import_date"]; ok {
+					importDateValue = importDate
+				}
+				if ton, ok := udfData["ton"]; ok {
+					tonValue = ton
+				}
+				if producer, ok := udfData["producer"]; ok {
+					producerValue = producer
+				}
+				if fast, ok := udfData["fast"].(bool); ok {
+					fastValue = fast
+					hasFastValue = true
+				}
+				if slow, ok := udfData["slow"].(bool); ok {
+					slowValue = slow
+					hasSlowValue = true
 				}
 			}
 		}
@@ -673,6 +756,14 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				} else {
 					row[fixedCol.Field] = false
 				}
+			case "od":
+				row[fixedCol.Field] = odValue
+			case "stock":
+				row[fixedCol.Field] = stockValue
+			case "extra_price_unit":
+				row[fixedCol.Field] = sg.ExtraPriceUnit
+			case "remark":
+				row[fixedCol.Field] = sg.Remark
 			}
 		}
 
@@ -687,6 +778,24 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[childCol.Field] = sg.BeforePriceUnit
 				case "total_net_price_unit":
 					row[childCol.Field] = sg.TotalNetPriceUnit
+				case "import_date":
+					row[childCol.Field] = importDateValue
+				case "ton":
+					row[childCol.Field] = tonValue
+				case "producer":
+					row[childCol.Field] = producerValue
+				case "fast":
+					if hasFastValue {
+						row[childCol.Field] = fastValue
+					} else {
+						row[childCol.Field] = false
+					}
+				case "slow":
+					if hasSlowValue {
+						row[childCol.Field] = slowValue
+					} else {
+						row[childCol.Field] = false
+					}
 				}
 			}
 		}
@@ -703,6 +812,28 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 			case "remark":
 				row[colConfig.Field] = sg.Remark
+			case "od":
+				row[colConfig.Field] = odValue
+			case "stock":
+				row[colConfig.Field] = stockValue
+			case "import_date":
+				row[colConfig.Field] = importDateValue
+			case "ton":
+				row[colConfig.Field] = tonValue
+			case "producer":
+				row[colConfig.Field] = producerValue
+			case "fast":
+				if hasFastValue {
+					row[colConfig.Field] = fastValue
+				} else {
+					row[colConfig.Field] = false
+				}
+			case "slow":
+				if hasSlowValue {
+					row[colConfig.Field] = slowValue
+				} else {
+					row[colConfig.Field] = false
+				}
 			}
 		}
 
