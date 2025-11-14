@@ -142,15 +142,15 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].Avg_weightUnit = poQTYMapResult.WeightUnit
 				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
 				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
-				priceUnit := 0.0
+				xxx := 0.0
 				if poQTYMapResult.UnitUom == "KG" {
-					priceUnit = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
+					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
-					priceUnit = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
+					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
 				}
-				req[i].InvoiceItem[it].SubtotalExclVat = priceUnit - req[i].InvoiceItem[it].TotalDiscount
-				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat + (req[i].InvoiceItem[it].SubtotalExclVat * 0.07)
-				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat - req[i].InvoiceItem[it].TotalVat
+				req[i].InvoiceItem[it].SubtotalExclVat = xxx - req[i].InvoiceItem[it].TotalDiscount
+				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
+				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
 
 				totalAmount += req[i].InvoiceItem[it].TotalAmount
 				totalVat += req[i].InvoiceItem[it].TotalVat
