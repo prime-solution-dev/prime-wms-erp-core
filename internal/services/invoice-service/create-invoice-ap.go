@@ -132,7 +132,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		totalDiscount := 0.0
 		for it, invoiceItem := range invoice.InvoiceItem {
 			req[i].InvoiceItem[it].ProductName = mapProduct[req[i].InvoiceItem[it].ProductCode].ProductName
-			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
+			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
 				req[i].InvoiceItem[it].PriceUnit = poQTYMapResult.PriceUnit
