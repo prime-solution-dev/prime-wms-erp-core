@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"fmt"
+	"sort"
 
 	"prime-erp-core/internal/models"
 
@@ -13,6 +14,15 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 	tabs := make([]PriceListDetailTabConfig, 0)
 	var loadErr error
 
+	// Create a map to store tabs with their pattern order for sorting
+	type tabWithOrder struct {
+		tab           PriceListDetailTabConfig
+		patternID     string
+		patternIdx    int
+		productGroup2 string
+	}
+	tabsWithOrder := []tabWithOrder{}
+
 	for groupKey, productGroup2Map := range groupedData {
 		config, err := loadConfiguration(groupKey)
 		if err != nil {
@@ -20,7 +30,15 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			continue
 		}
 
-		for productGroup2, subGroups := range productGroup2Map {
+		// Sort productGroup2 keys to ensure consistent iteration order
+		productGroup2Keys := make([]string, 0, len(productGroup2Map))
+		for pg2 := range productGroup2Map {
+			productGroup2Keys = append(productGroup2Keys, pg2)
+		}
+		sort.Strings(productGroup2Keys)
+
+		for _, productGroup2 := range productGroup2Keys {
+			subGroups := productGroup2Map[productGroup2]
 			pattern := selectPatternForCategory(config, productGroup2)
 			if pattern == nil {
 				continue
@@ -34,30 +52,57 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 				tableData[i] = map[string]interface{}(row)
 			}
 
-			tabs = append(tabs, PriceListDetailTabConfig{
-				ID:    uuid.New(),
-				Label: productGroup2,
-				TableConfig: TableConfig{
-					Title:             productGroup2,
-					GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
-					HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
-					Pagination:        boolPtr(config.TableConfig.Pagination),
-					Toolbar: &Toolbar{
-						Show:             boolPtr(config.TableConfig.Toolbar.Show),
-						ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
-						ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
-						ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+			// Find pattern index in config for sorting
+			patternIdx := -1
+			for i, p := range config.Patterns {
+				if p.ID == pattern.ID {
+					patternIdx = i
+					break
+				}
+			}
+
+			tabsWithOrder = append(tabsWithOrder, tabWithOrder{
+				tab: PriceListDetailTabConfig{
+					ID:    uuid.New(),
+					Label: productGroup2,
+					TableConfig: TableConfig{
+						Title:             productGroup2,
+						GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+						HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+						Pagination:        boolPtr(config.TableConfig.Pagination),
+						Toolbar: &Toolbar{
+							Show:             boolPtr(config.TableConfig.Toolbar.Show),
+							ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+							ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+							ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+						},
+						GridOptions: &GridOptions{
+							SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+							SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+						},
+						Columns: columns,
 					},
-					GridOptions: &GridOptions{
-						SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
-						SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
-					},
-					Columns: columns,
+					TableData:        tableData,
+					EditableSuffixes: pattern.EditableSuffixes,
 				},
-				TableData:        tableData,
-				EditableSuffixes: pattern.EditableSuffixes,
+				patternID:     pattern.ID,
+				patternIdx:    patternIdx,
+				productGroup2: productGroup2,
 			})
 		}
+	}
+
+	// Sort tabs by pattern order (patternIdx), then by productGroup2 name for same pattern
+	sort.Slice(tabsWithOrder, func(i, j int) bool {
+		if tabsWithOrder[i].patternIdx != tabsWithOrder[j].patternIdx {
+			return tabsWithOrder[i].patternIdx < tabsWithOrder[j].patternIdx
+		}
+		return tabsWithOrder[i].productGroup2 < tabsWithOrder[j].productGroup2
+	})
+
+	// Extract sorted tabs
+	for _, tw := range tabsWithOrder {
+		tabs = append(tabs, tw.tab)
 	}
 
 	response := PriceListDetailApiResponse{
