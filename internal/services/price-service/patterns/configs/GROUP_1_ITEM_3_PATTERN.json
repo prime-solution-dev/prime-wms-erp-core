@@ -62,7 +62,7 @@
         },
         {
           "field": "line_bundle",
-          "headerName": "Line/bundle",
+          "headerName": "เส้น/มัด",
           "width": 120,
           "pinned": "left",
           "lockPosition": true,
@@ -133,7 +133,7 @@
             },
             {
               "field": "waiting_production_ton",
-              "headerName": "ต้น",
+              "headerName": "ตัน",
               "width": 120,
               "cellStyle": {
                 "textAlign": "left"
