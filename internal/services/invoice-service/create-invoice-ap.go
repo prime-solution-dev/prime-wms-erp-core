@@ -144,9 +144,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
 				priceUnit := 0.0
 				if poQTYMapResult.UnitUom == "KG" {
-					priceUnit = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
-				} else {
 					priceUnit = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
+				} else {
+					priceUnit = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
 				}
 				req[i].InvoiceItem[it].SubtotalExclVat = priceUnit - req[i].InvoiceItem[it].TotalDiscount
 				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat + (req[i].InvoiceItem[it].SubtotalExclVat * 0.07)
