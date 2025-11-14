@@ -84,12 +84,13 @@ func ComparePrice(req GetComparePriceRequest) (GetComparePriceResponse, error) {
 	// ----- Initial calculation -----
 	for _, item := range req.Items {
 		newItem := item
+		lenItem := len(req.Items)
 
 		if req.TransportType == `INCL` {
-			newItem.TransportCostUnit = calculateTransportCost(item.TotalAmount, totalPriceAll, totalTransportCostAll, item.TransportCostUnit)
+			newItem.TransportCostUnit = calculateTransportCost(item.TotalAmount, totalPriceAll, totalTransportCostAll, item.TransportCostUnit, lenItem)
 			sumTransportUnit += float64Val(newItem.TransportCostUnit)
 
-			newItem.TransportCostUnitWeight = calculateTransportCost(item.TotalWeight, totalWeightAll, totalTransportCostAll, item.TransportCostUnitWeight)
+			newItem.TransportCostUnitWeight = calculateTransportCost(item.TotalWeight, totalWeightAll, totalTransportCostAll, item.TransportCostUnitWeight, lenItem)
 			sumTransportUnitWeight += float64Val(newItem.TransportCostUnitWeight)
 		} else {
 			newItem.TransportCostUnit = float64Ptr(0)
@@ -176,13 +177,15 @@ func ComparePrice(req GetComparePriceRequest) (GetComparePriceResponse, error) {
 	return res, nil
 }
 
-func calculateTransportCost(itemValue, totalValue, totalTransport float64, existing *float64) *float64 {
+func calculateTransportCost(itemValue, totalValue, totalTransport float64, existing *float64, lenItem int) *float64 {
 	if existing != nil && *existing > 0 {
 		return existing
 	}
 
 	if totalValue > 0 {
 		return float64Ptr(round2(itemValue / totalValue * totalTransport))
+	} else if lenItem > 0 {
+		return float64Ptr(round2(totalTransport / float64(lenItem)))
 	}
 
 	return float64Ptr(0)

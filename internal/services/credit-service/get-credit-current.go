@@ -168,11 +168,12 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 		Paid               float64
 	}
 
-	//Sale
+	//Sale Order
 	querySale := fmt.Sprintf(`
-		select s.sale_code ,s.customer_code, s.total_amount , s.total_transport_cost , s.transport_cost_type 
+		select s.sale_code ,s.customer_code, coalesce(s.total_amount, 0) total_amount , coalesce(s.total_transport_cost, 0)  total_transport_cost
+			, coalesce(s.transport_cost_type, '') transport_cost_type
 		from sale s 
-		where s.status = 'PENDDING' and s.is_approved = true 
+		where s.status = 'PENDING' and (s.is_approved = true or s.status_approve = 'COMPLETED')  
 			and s.customer_code in ('%s')
 	`, strings.Join(customerStrs, `','`))
 	rowsSale, err := db.ExecuteQuery(sqlx, querySale)
@@ -184,78 +185,198 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 		return res, nil
 	}
 
-	saleCodeStrs := []string{}
-	saleCodeStrsCheck := map[string]bool{}
+	saleCodes := []string{}
+	saleCodesMap := map[string]bool{}
 	custMap := map[string]customer{}
 	for _, row := range rowsSale {
 		saleCode := row["sale_code"].(string)
 		customerCode := row["customer_code"].(string)
-		totalPrice := row["total_amount"].(float64)
-		totalTransCost := row["total_transport_cost"].(float64)
-		transType := row["transport_cost_type"].(string)
+		totalAmount := row["total_amount"].(float64)
+		totalTransportCost := row["total_transport_cost"].(float64)
+		transportCostType := row["transport_cost_type"].(string)
+		transportCost := 0.0
 
-		if _, ok := saleCodeStrsCheck[saleCode]; !ok {
-			saleCodeStrs = append(saleCodeStrs, saleCode)
-			saleCodeStrsCheck[saleCode] = true
+		if transportCostType == "EXCL" {
+			transportCost = totalTransportCost
 		}
 
-		cust, existCust := custMap[customerCode]
-		if !existCust {
-			newCust := customer{
+		if _, ok := saleCodesMap[saleCode]; !ok {
+			saleCodes = append(saleCodes, saleCode)
+			saleCodesMap[saleCode] = true
+		}
+
+		cust, existsCust := custMap[customerCode]
+		if !existsCust {
+			cust = customer{
 				CustomerCode:       customerCode,
 				TotalPrice:         0,
 				TotalTransportCost: 0,
 				Paid:               0,
 			}
-
-			cust = newCust
 		}
 
-		cust.TotalPrice += totalPrice
-		if transType == `EXC` { //TODO: recheck logic from BA
-			cust.TotalTransportCost = totalTransCost
-		}
-
-		custMap[saleCode] = cust
-	}
-
-	if len(saleCodeStrs) == 0 {
-		return res, nil
-	}
-
-	//Paid
-	queryPaid := fmt.Sprintf(`
-		select i.customer_code, i.doc_ref as sale_code, pi2.amount paid_amount
-		from invoice i 
-		left join payment_invoice pi2 on i.invoice_code = pi2.invoice_code 
-		where i.customer_code in ('%s') and i.doc_ref in ('%s')
-	`, strings.Join(customerStrs, `','`), strings.Join(saleCodeStrs, `','`))
-	rowsPaid, err := db.ExecuteQuery(sqlx, queryPaid)
-	if err != nil {
-		return res, nil
-	}
-
-	for _, row := range rowsPaid {
-		customerCode := row["customer_code"].(string)
-		paid := row["paid_amount"].(float64)
-
-		cust, existCust := custMap[customerCode]
-
-		if !existCust {
-			continue
-		}
-
-		cust.Paid += paid
+		cust.TotalPrice += totalAmount
+		cust.TotalTransportCost += transportCost
 		custMap[customerCode] = cust
 	}
 
-	//Summary
-	for i, customer := range res.CreditCustomers {
-		if cust, existCust := custMap[customer.CustomerCode]; existCust {
-			customer.Used += cust.TotalPrice + cust.TotalTransportCost - cust.Paid
-			res.CreditCustomers[i] = customer
+	//Invoice
+	queryInv := fmt.Sprintf(`
+		select i.invoice_code, coalesce(i.party_code, '') customer_code, i.invoice_type 
+ 			, ii.invoice_item 
+ 			, coalesce(ii.document_ref, '') as sale_code, coalesce(ii.document_ref_item, '') as sale_item
+			, i.party_code as customer_code
+ 		from invoice i 
+ 		left join invoice_item ii on i.id = ii.invoice_id 
+ 		where i.status in ('PENDING', 'COMPLETED') and i.invoice_type = 'AR'
+			and i.party_code in ('%s')
+			and ii.document_ref in ('%s')
+	`, strings.Join(customerStrs, `','`), strings.Join(saleCodes, `','`))
+	rowsInv, err := db.ExecuteQuery(sqlx, queryInv)
+	if err != nil {
+		return res, err
+	}
+
+	if len(rowsInv) != 0 {
+		invoiceCodeMap := map[string]string{}
+		invoiceCodeItem := map[string]string{}
+		saleCodeItem := map[string]string{}
+		invoiceCustomerMap := map[string]string{}
+
+		for _, row := range rowsInv {
+			customerCode := row["customer_code"].(string)
+			invoiceCode := row["invoice_code"].(string)
+			invoiceItem := row["invoice_item"].(string)
+			saleCode := row["sale_code"].(string)
+			saleItem := row["sale_item"].(string)
+
+			if _, ok := invoiceCodeMap[invoiceCode]; !ok {
+				invoiceCodeMap[invoiceCode] = invoiceCode
+			}
+
+			invoiceCodeItemKey := invoiceCode + "|" + invoiceItem
+			if _, ok := invoiceCodeItem[invoiceCodeItemKey]; !ok {
+				invoiceCodeItem[invoiceCodeItemKey] = fmt.Sprintf(`('%s','%s')`, invoiceCode, invoiceItem)
+			}
+
+			saleCodeItemKey := saleCode + "|" + saleItem
+			if _, ok := saleCodeItem[saleCodeItemKey]; !ok {
+				saleCodeItem[saleCodeItemKey] = fmt.Sprintf(`('%s','%s')`, saleCode, saleItem)
+			}
+
+			if _, ok := invoiceCustomerMap[invoiceCode]; !ok {
+				invoiceCustomerMap[invoiceCode] = customerCode
+			}
+		}
+
+		//AR Payment
+		queryPayment := fmt.Sprintf(`
+			select t.invoice_code , coalesce(t.amount, 0) amount
+			from payment_invoice t 
+			where t.invoice_code in ('%s')
+		`, strings.Join(mapKeys(invoiceCodeMap), `','`))
+		rowsPayment, err := db.ExecuteQuery(sqlx, queryPayment)
+		if err != nil {
+			return res, err
+		}
+
+		for _, row := range rowsPayment {
+			invoiceCode := row["invoice_code"].(string)
+			amount := row["amount"].(float64)
+
+			customerCode := invoiceCustomerMap[invoiceCode]
+			cust := custMap[customerCode]
+			cust.Paid += amount
+			custMap[customerCode] = cust
+		}
+
+		//DN & CN
+		queryDN := fmt.Sprintf(`
+			select i.invoice_code, i.invoice_type
+				, ii.document_ref as invoice_ref, ii.document_ref_item as invoice_item_ref, coalesce(ii.total_amount, 0) as amount
+			from invoice i 
+			left join invoice_item ii on i.id = ii.invoice_id 
+			where i.status in ('PENDING', 'COMPLETED') and i.invoice_type in ('CN', 'DN')
+				and ii.document_ref <> '' and ii.document_ref_item != ''
+				and (ii.document_ref, ii.document_ref_item ) in (%s) 
+		`, strings.Join(mapKeys(invoiceCodeItem), `,`))
+		rowsDN, err := db.ExecuteQuery(sqlx, queryDN)
+		if err != nil {
+			return res, err
+		}
+
+		dnInvoiceCodeMap := map[string]string{}
+		for _, row := range rowsDN {
+			invoiceCode := row["invoice_code"].(string)
+			invoiceType := row["invoice_type"].(string)
+			invoiceRef := row["invoice_ref"].(string)
+			amount := row["amount"].(float64)
+
+			dnInvoiceCodeMap[invoiceCode] = invoiceCode
+
+			customerCode := invoiceCustomerMap[invoiceRef]
+			cust := custMap[customerCode]
+
+			//Adjust Total Price for CN
+			if invoiceType == "CN" {
+				cust.TotalPrice -= amount
+			}
+
+			//Adjust Total Price for DN && add for find payment
+			if invoiceType == "DN" {
+				cust.TotalPrice += amount
+				dnInvoiceCodeMap[invoiceCode] = invoiceCode
+			}
+
+			custMap[customerCode] = cust
+		}
+
+		//DN Payment
+		if len(dnInvoiceCodeMap) > 0 {
+			queryDNPayment := fmt.Sprintf(`
+				select t.invoice_code , coalesce(t.amount, 0) amount
+				from payment_invoice t 
+				where t.invoice_code in ('%s')
+			`, strings.Join(mapKeys(dnInvoiceCodeMap), `','`))
+			rowsDNPayment, err := db.ExecuteQuery(sqlx, queryDNPayment)
+			if err != nil {
+				return res, err
+			}
+
+			for _, row := range rowsDNPayment {
+				invoiceCode := row["invoice_code"].(string)
+				amount := row["amount"].(float64)
+
+				customerCode := invoiceCustomerMap[invoiceCode]
+				cust := custMap[customerCode]
+				cust.Paid += amount
+				custMap[customerCode] = cust
+			}
+
+		}
+	}
+
+	//Summarize Used
+	for _, cust := range custMap {
+		used := cust.TotalPrice + cust.TotalTransportCost - cust.Paid
+
+		for i, customer := range res.CreditCustomers {
+			if customer.CustomerCode == cust.CustomerCode {
+				customer.Used += used
+				res.CreditCustomers[i] = customer
+
+				break
+			}
 		}
 	}
 
 	return res, nil
+}
+
+func mapKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
