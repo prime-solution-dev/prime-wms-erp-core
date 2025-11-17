@@ -35,6 +35,7 @@ The Price List Detail service (`get-price-detail`) is a sophisticated pricing sy
 **Function**: `GetPriceDetail(ctx *gin.Context, jsonPayload string)`
 
 **Request Structure**:
+
 ```go
 type GetPriceDetailRequest struct {
     CompanyCode       string     `json:"company_code"`
@@ -46,6 +47,7 @@ type GetPriceDetailRequest struct {
 ```
 
 **Validation**:
+
 - `company_code` is required
 - `site_codes` must have at least one entry
 - `group_codes` must have at least one entry
@@ -82,6 +84,7 @@ After loading data, the system:
 ### Pattern Configuration Files
 
 Patterns are defined in JSON configuration files located in `patterns/configs/`:
+
 - `GROUP_1_ITEM_1_PATTERN.json`
 - `GROUP_1_ITEM_2_PATTERN.json`
 - `GROUP_1_ITEM_3_PATTERN.json`
@@ -128,6 +131,7 @@ Each configuration file contains:
 **Builder**: `BuildGroup1Item1Response()`
 
 **Characteristics**:
+
 - **Multi-tab layout**: Creates separate tabs for each `PRODUCT_GROUP2` value
 - **Dynamic columns**: Columns are generated based on unique values in `columnGroups` field
 - **Pattern selection**: Can select different patterns per tab based on `applicableCategories`
@@ -151,6 +155,7 @@ Each configuration file contains:
 **Builder**: `BuildGroup1Item2Response()`
 
 **Characteristics**:
+
 - **Single tab layout**: One tab with fixed label "หมวดเหล็กตัวซี"
 - **Fixed columns**: Uses `buildFixedColumns()` - columns defined in pattern config
 - **Direct rows**: Uses `buildDirectRows()` - one row per subgroup
@@ -171,6 +176,7 @@ Each configuration file contains:
 **Builder**: `BuildGroup1Item3Response()`
 
 **Characteristics**:
+
 - **Multi-tab layout**: Creates tabs grouped by `PRODUCT_GROUP4`
 - **Fixed columns**: Same column structure for all tabs
 - **Direct rows**: One row per subgroup
@@ -193,12 +199,14 @@ Each configuration file contains:
 ### Helper Functions
 
 #### `getGroupAndItemMappings()`
+
 - Fetches group and group item data from group service
 - Fetches payment terms
 - Creates lookup maps for resolving codes to names
 - Returns: `groupMap`, `groupItemMap`, `paymentTermMap`
 
 #### `transformToGetPriceListResponse()`
+
 - Transforms internal `GetPriceListGroupResponse` to API `GetPriceListResponse`
 - Resolves group codes to names using mappings
 - Extracts `GroupKey` from subgroup keys
@@ -208,6 +216,7 @@ Each configuration file contains:
 ### Column Building
 
 #### `buildDynamicColumns()`
+
 Builds columns based on pattern configuration:
 
 1. **Fixed Columns**: Always included, typically pinned left
@@ -232,7 +241,9 @@ Result: Nested column groups with hierarchy
 ```
 
 #### `buildFixedColumns()`
+
 Builds columns from pattern configuration:
+
 - Fixed columns (pinned, locked)
 - Column groups (static groups with children)
 - Regular columns
@@ -240,6 +251,7 @@ Builds columns from pattern configuration:
 ### Row Building
 
 #### `buildDynamicRows()`
+
 Creates rows for dynamic column layouts:
 
 1. **Row Key**: Composite key from `grouping.rows` fields
@@ -249,11 +261,13 @@ Creates rows for dynamic column layouts:
 5. **Tooltips**: Handles tooltip data with `_tooltip` suffix
 
 **Field Naming Convention**:
+
 - Row fields: `{sanitized_group_code}` (e.g., `product_group_6`)
 - Column fields: `{sanitized_column_key}_{field}` (e.g., `size_a_price_unit`)
 - Special fields: `{column_key}_subgroup_id`, `{column_key}_is_trading`
 
 #### `buildDirectRows()`
+
 Creates rows for fixed column layouts:
 
 1. **One row per subgroup**: Direct mapping
@@ -262,6 +276,7 @@ Creates rows for fixed column layouts:
 4. **Item construction**: Builds item string from PRODUCT_GROUP4, GROUP6, GROUP7
 
 **Data Mapping Types**:
+
 - `product_group_3`, `product_group_6`: Group value names
 - `price_unit`, `price_weight`, etc.: Direct price fields
 - `before_*`: Previous price values
@@ -316,17 +331,20 @@ The `subgroup_key` is a pipe-delimited string that identifies the product classi
 ### Group Keys
 
 Each subgroup has multiple `SubGroupKeys` that map to product classifications:
+
 - `code`: Group code (e.g., `PRODUCT_GROUP1`, `PRODUCT_GROUP2`)
 - `value`: Item code (e.g., `GROUP_1_ITEM_1`, `GROUP_2_ITEM_3`)
 - `seq`: Display order
 
 These are resolved to names using the group service:
+
 - `GroupCode` → `GroupName` (e.g., `PRODUCT_GROUP1` → "Product Category 1")
 - `ItemCode` → `ItemName` (e.g., `GROUP_1_ITEM_1` → "Steel Sheet")
 
 ### UDF JSON
 
 The `udf_json` field in subgroups stores custom, flexible data:
+
 ```json
 {
   "is_highlight": true,
@@ -377,6 +395,7 @@ type PriceListDetailTabConfig struct {
 ### TableConfig
 
 Contains AG Grid configuration:
+
 - Column definitions (with grouping, styling, renderers)
 - Toolbar settings
 - Pagination settings
@@ -491,11 +510,13 @@ The service handles errors at multiple levels:
 ### Adding New Patterns
 
 1. Create pattern builder function in `patterns/`:
+
    ```go
    func BuildGroup1Item4Response(...) (PriceListDetailApiResponse, error)
    ```
 
 2. Add handler in `get-price-detail.go`:
+
    ```go
    "GROUP_1_ITEM_4": pricePatterns.BuildGroup1Item4Response,
    ```
@@ -518,6 +539,7 @@ The service handles errors at multiple levels:
 ## Testing
 
 Test files are located in:
+
 - `get-latest-pricelist-subgroup_service_test.go`
 - `update-pricelist-subgroup_service_test.go`
 - `repository_test.go`
@@ -530,4 +552,3 @@ Test files are located in:
 - The first subgroup's GroupKey determines the entire response pattern
 - All dates are formatted as RFC3339 strings in responses
 - UDF JSON allows extensibility without schema changes
-
