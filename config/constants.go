@@ -3,7 +3,7 @@ package config
 // API Configuration Constants
 const (
 	// WMS_API_BASE_URL is the base URL for WMS API endpoints
-	WMS_API_BASE_URL = "https://wms-dev.prime-lab.cc/api"
+	WMS_API_BASE_URL = "https://wms-demo.prime-lab.cc/api"
 
 	// API Endpoints
 	GET_INVENTORY_ATP_ENDPOINT = WMS_API_BASE_URL + "/warehouse/Inventory/GetInventoryAtp"
