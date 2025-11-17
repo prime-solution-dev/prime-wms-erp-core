@@ -12,7 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"prime-erp-core/internal/db"
+
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type productGroupConfig struct {
@@ -75,6 +78,8 @@ func main() {
 		subgroupKeysCSV  = flag.String("subgroup-keys", "", "Comma-separated list of explicit subgroup_key values")
 		randomSeed       = flag.Int64("seed", time.Now().UnixNano(), "Seed for random generator")
 		outputPath       = flag.String("output", "", "Optional output file path (defaults to stdout)")
+		executeSeed      = flag.Bool("execute", false, "Execute generated statements against the configured database")
+		databaseName     = flag.String("database", "prime_erp", "Database name suffix (reads database_gorm_url_<name> from env)")
 	)
 
 	var repeatedKeys multiStringFlag
@@ -149,6 +154,13 @@ func main() {
 	}
 	for _, stmt := range result.SubGroupKeyStatements {
 		fmt.Fprintln(writer, stmt)
+	}
+
+	if *executeSeed {
+		if err := executeSeedStatements(*databaseName, result); err != nil {
+			exitWithError(err)
+		}
+		fmt.Fprintf(os.Stderr, "Executed seed statements against database %s\n", *databaseName)
 	}
 }
 
@@ -455,14 +467,140 @@ func parseGroupItems(raw string) (map[string][]string, error) {
 		raw = string(content)
 	}
 
-	var parsed map[string][]string
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	parsedMap := map[string][]string{}
+	if err := json.Unmarshal([]byte(raw), &parsedMap); err == nil {
+		return normalizeGroupItems(parsedMap), nil
+	}
+
+	arrayParsed, err := parseGroupItemsArray(raw)
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse group-items JSON: %w", err)
 	}
-	for key, values := range parsed {
-		parsed[key] = deduplicate(values)
+	return normalizeGroupItems(arrayParsed), nil
+}
+
+func executeSeedStatements(databaseName string, result SeedResult) error {
+	gormDB, err := db.ConnectGORM(databaseName)
+	if err != nil {
+		return fmt.Errorf("failed to connect database_gorm_url_%s: %w", databaseName, err)
 	}
-	return parsed, nil
+	defer db.CloseGORM(gormDB)
+
+	return ApplySeedStatements(gormDB, result)
+}
+
+// ApplySeedStatements persists generated statements inside a transaction.
+func ApplySeedStatements(gormDB *gorm.DB, result SeedResult) error {
+	if gormDB == nil {
+		return errors.New("gorm DB instance is nil")
+	}
+
+	tx := gormDB.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	if err := execStatements(tx, result.SubGroupStatements, "price_list_sub_group"); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := execStatements(tx, result.SubGroupKeyStatements, "price_list_sub_group_key"); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func execStatements(tx *gorm.DB, statements []string, label string) error {
+	for _, stmt := range statements {
+		if err := tx.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("failed to execute %s statement: %w", label, err)
+		}
+	}
+	return nil
+}
+
+func parseGroupItemsArray(raw string) (map[string][]string, error) {
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+		return nil, err
+	}
+
+	result := map[string][]string{}
+	for _, entry := range entries {
+		if len(entry) == 0 {
+			continue
+		}
+
+		if codeVal, ok := entry["code"]; ok {
+			code, ok := codeVal.(string)
+			if !ok || strings.TrimSpace(code) == "" {
+				return nil, fmt.Errorf("array entry missing valid code field")
+			}
+			itemsVal, ok := entry["items"]
+			if !ok {
+				return nil, fmt.Errorf("array entry for %s missing items field", code)
+			}
+			items, err := interfaceToStringSlice(itemsVal)
+			if err != nil {
+				return nil, fmt.Errorf("invalid items for %s: %w", code, err)
+			}
+			result[code] = append(result[code], items...)
+			continue
+		}
+
+		for code, values := range entry {
+			if strings.TrimSpace(code) == "" {
+				continue
+			}
+			items, err := interfaceToStringSlice(values)
+			if err != nil {
+				return nil, fmt.Errorf("invalid items for %s: %w", code, err)
+			}
+			result[code] = append(result[code], items...)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no group items found in array")
+	}
+
+	return result, nil
+}
+
+func interfaceToStringSlice(value interface{}) ([]string, error) {
+	list, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("expected array value")
+	}
+
+	result := make([]string, 0, len(list))
+	for _, item := range list {
+		str, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string value")
+		}
+		if trimmed := strings.TrimSpace(str); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result, nil
+}
+
+func normalizeGroupItems(items map[string][]string) map[string][]string {
+	normalized := make(map[string][]string, len(items))
+	for key, values := range items {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		normalized[key] = deduplicate(values)
+	}
+	return normalized
 }
 
 func splitAndTrim(raw string, sep string) []string {

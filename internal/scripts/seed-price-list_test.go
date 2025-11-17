@@ -183,12 +183,7 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 	require.Len(t, result.SubGroupStatements, 2)
 	require.Len(t, result.SubGroupKeyStatements, 6)
 
-	for _, stmt := range result.SubGroupStatements {
-		require.NoError(t, gormx.Exec(stmt).Error)
-	}
-	for _, stmt := range result.SubGroupKeyStatements {
-		require.NoError(t, gormx.Exec(stmt).Error)
-	}
+	require.NoError(t, ApplySeedStatements(gormx, result))
 
 	var subGroups []models.PriceListSubGroup
 	require.NoError(t, gormx.Find(&subGroups).Error)
@@ -208,4 +203,84 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 		require.Contains(t, []string{"PRODUCT_GROUP1", "PRODUCT_GROUP2", "PRODUCT_GROUP4"}, key.Code)
 		require.NotEmpty(t, key.Value)
 	}
+}
+
+func TestParseGroupItemsSupportsMapAndArray(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected map[string][]string
+	}{
+		{
+			name:  "map format with deduplication",
+			input: `{"PRODUCT_GROUP1":["GROUP_1_ITEM_1","GROUP_1_ITEM_1","GROUP_1_ITEM_2"]}`,
+			expected: map[string][]string{
+				"PRODUCT_GROUP1": []string{"GROUP_1_ITEM_1", "GROUP_1_ITEM_2"},
+			},
+		},
+		{
+			name: "array format with code/items",
+			input: `[
+				{"code":"PRODUCT_GROUP1","items":["GROUP_1_ITEM_1","GROUP_1_ITEM_2"]},
+				{"code":"PRODUCT_GROUP2","items":["GROUP_2_ITEM_3"]}
+			]`,
+			expected: map[string][]string{
+				"PRODUCT_GROUP1": []string{"GROUP_1_ITEM_1", "GROUP_1_ITEM_2"},
+				"PRODUCT_GROUP2": []string{"GROUP_2_ITEM_3"},
+			},
+		},
+		{
+			name: "array format with implicit codes",
+			input: `[
+				{"PRODUCT_GROUP1":["GROUP_1_ITEM_1"]},
+				{"PRODUCT_GROUP3":["GROUP_3_ITEM_9","GROUP_3_ITEM_9"]}
+			]`,
+			expected: map[string][]string{
+				"PRODUCT_GROUP1": []string{"GROUP_1_ITEM_1"},
+				"PRODUCT_GROUP3": []string{"GROUP_3_ITEM_9"},
+			},
+		},
+		{
+			name: "array format mixed entries",
+			input: `[
+				{"code":"PRODUCT_GROUP5","items":["GROUP_5_ITEM_10"]},
+				{"PRODUCT_GROUP6":["GROUP_6_ITEM_2","GROUP_6_ITEM_3"]}
+			]`,
+			expected: map[string][]string{
+				"PRODUCT_GROUP5": []string{"GROUP_5_ITEM_10"},
+				"PRODUCT_GROUP6": []string{"GROUP_6_ITEM_2", "GROUP_6_ITEM_3"},
+			},
+		},
+		{
+			name: "array entries containing multiple product groups",
+			input: `[
+				{
+					"PRODUCT_GROUP1":["GROUP_1_ITEM_4"],
+					"PRODUCT_GROUP2":["GROUP_2_ITEM_6"]
+				},
+				{
+					"PRODUCT_GROUP1":["GROUP_1_ITEM_5"],
+					"PRODUCT_GROUP2":["GROUP_2_ITEM_7"]
+				}
+			]`,
+			expected: map[string][]string{
+				"PRODUCT_GROUP1": []string{"GROUP_1_ITEM_4", "GROUP_1_ITEM_5"},
+				"PRODUCT_GROUP2": []string{"GROUP_2_ITEM_6", "GROUP_2_ITEM_7"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := parseGroupItems(tc.input)
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestApplySeedStatementsRequiresDB(t *testing.T) {
+	err := ApplySeedStatements(nil, SeedResult{})
+	require.Error(t, err)
 }
