@@ -31,3 +31,4 @@ cmd/.env
 # Editor/IDE
 # .idea/
 # .vscode/
+.cursor/
