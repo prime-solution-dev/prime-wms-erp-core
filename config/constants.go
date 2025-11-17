@@ -1,16 +1,28 @@
 package config
 
-// API Configuration Constants
-const (
-	// WMS_API_BASE_URL is the base URL for WMS API endpoints
-	WMS_API_BASE_URL = "https://wms-uat.prime-lab.cc/api"
+import "os"
 
-	// API Endpoints
-	GET_INVENTORY_ATP_ENDPOINT = WMS_API_BASE_URL + "/warehouse/Inventory/GetInventoryAtp"
-	CREATE_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CreateOrders"
-	CANCEL_ORDER_ENDPOINT      = WMS_API_BASE_URL + "/order/Order/CancelOrders"
-	GET_PACK_SO_ENDPOINT       = WMS_API_BASE_URL + "/packing/packing/get-packing-so"
+// GetBaseURL returns the base URL from environment variable with fallback
+func GetBaseURL() string {
+	if baseURL := os.Getenv("base_url"); baseURL != "" {
+		return baseURL
+	}
+	return ""
+}
+
+var (
+	GET_INVENTORY_ATP_ENDPOINT string
+	CREATE_ORDER_ENDPOINT      string
+	CANCEL_ORDER_ENDPOINT      string
+	GET_PACK_SO_ENDPOINT       string
 )
+
+func Initialize() {
+	GET_INVENTORY_ATP_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/GetInventoryAtp"
+	CREATE_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CreateOrders"
+	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrders"
+	GET_PACK_SO_ENDPOINT = GetBaseURL() + "/packing/packing/get-packing-so"
+}
 
 // HTTP Configuration
 const (
