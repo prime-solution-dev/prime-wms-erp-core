@@ -90,8 +90,9 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		CreditLimit:         creditLimit,
 		IncreaseCreditLimit: increaseCreditLimit,
 		TotalCreditLimit:    creditLimit + increaseCreditLimit,
-		//ConsumedCredit:      remainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice),
-		ConsumedCredit:     resultGetPaidInvoice.ConsumedCredit,
+		ConsumedCredit: remainDeposit - (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+			resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN),
+
 		BalanceCreditLimit: (creditLimit + increaseCreditLimit) - (remainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice)),
 	}
 

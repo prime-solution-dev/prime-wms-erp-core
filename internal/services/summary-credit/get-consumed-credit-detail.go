@@ -27,9 +27,13 @@ type ConsumedCreditInvoice struct {
 	ConsumedAmount    float64 `json:"consumed_amount"`
 }
 type ResultGetPaidInvoices struct {
-	TotalAmount    float64 `json:"total_Amount"`
-	ConsumedCredit float64 `json:"consumed_credit"`
-	PaidInvoice    float64 `json:"paid_invoice"`
+	TotalAmount             float64 `json:"total_Amount"`
+	SumInvoiceTotalAmountAR float64 `json:"sum_invoice_total_amount_ar"`
+	SumInvoiceTotalAmountCN float64 `json:"sum_invoice_total_amount_cn"`
+	SumInvoiceTotalAmountDN float64 `json:"sum_invoice_total_amount_dn"`
+	SumPaymentTotalAmountDN float64 `json:"sum_payment_total_amount_dn"`
+	SumPaymentTotalAmountAR float64 `json:"sum_payment_total_amount_ar"`
+	PaidInvoice             float64 `json:"paid_invoice"`
 }
 
 func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -40,7 +44,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	result, errGetSale := repositorySale.GetSalesWithInvoiceItems(req.CustomerCode)
+	result, errGetSale := repositorySale.GetSalesWithInvoiceItems(req.CustomerCode, "")
 	if errGetSale != nil {
 		return nil, errGetSale
 	}
@@ -86,6 +90,9 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	sumInvoiceTotalAmountAR := 0.00
 	sumInvoiceTotalAmountCN := 0.00
 	sumInvoiceTotalAmountDN := 0.00
+	sumPaymentTotalAmountDN := 0.00
+	sumPaymentTotalAmountAR := 0.00
+
 	for _, resultValue := range result {
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
@@ -100,9 +107,11 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 			if invoiceItemsValue.InvoiceType == "DN" {
 				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
+				sumPaymentTotalAmountDN += invoicePaidAmount
 			}
 			if invoiceItemsValue.InvoiceType == "AR" {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
+				sumPaymentTotalAmountAR += invoicePaidAmount
 			}
 
 			invoiceAmount := invoiceItemsValue.TotalAmount
@@ -131,9 +140,13 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	resultGetPaidInvoices := ResultGetPaidInvoices{
-		TotalAmount:    saleAmount,
-		ConsumedCredit: (saleAmount - sumInvoiceTotalAmountCN + sumInvoiceTotalAmountDN) + sumInvoiceTotalAmountAR,
-		PaidInvoice:    sumPaidInvoice,
+		TotalAmount:             saleAmount,
+		SumInvoiceTotalAmountAR: sumInvoiceTotalAmountAR,
+		SumInvoiceTotalAmountCN: sumInvoiceTotalAmountCN,
+		SumInvoiceTotalAmountDN: sumInvoiceTotalAmountDN,
+		SumPaymentTotalAmountDN: sumPaymentTotalAmountDN,
+		SumPaymentTotalAmountAR: sumPaymentTotalAmountAR,
+		PaidInvoice:             sumPaidInvoice,
 	}
 
 	if req.PaidInvoice {
