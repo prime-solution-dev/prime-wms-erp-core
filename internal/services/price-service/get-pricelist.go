@@ -156,7 +156,7 @@ func getExtras(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGr
 		where 1=1
 		and ple.price_list_group_id in ('%s')
 	`, strings.Join(groupIDs, `','`))
-	println(query)
+	// println(query)
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
 		return nil, fmt.Errorf("ExecuteQuery error: %w", err)

@@ -54,6 +54,7 @@ type ColumnConfigItem struct {
 	CellStyle       map[string]interface{} `json:"cellStyle,omitempty"`
 	DataMapping     string                 `json:"dataMapping,omitempty"`
 	EnableTooltip   bool                   `json:"enableTooltip,omitempty"`
+	SpanRows        bool                   `json:"spanRows,omitempty"`
 }
 
 type ColumnGroupConfig struct {
@@ -81,6 +82,7 @@ type ToolbarConfig struct {
 type GridOptionsConfig struct {
 	SuppressMovableColumns bool `json:"suppressMovableColumns"`
 	SuppressMenuHide       bool `json:"suppressMenuHide"`
+	EnableCellSpan         bool `json:"enableCellSpan,omitempty"`
 }
 
 type PriceTableConfiguration struct {
@@ -124,6 +126,7 @@ type Toolbar struct {
 type GridOptions struct {
 	SuppressMovableColumns *bool `json:"suppressMovableColumns,omitempty"`
 	SuppressMenuHide       *bool `json:"suppressMenuHide,omitempty"`
+	EnableCellSpan         *bool `json:"enableCellSpan,omitempty"`
 }
 
 type ColumnDef struct {
@@ -142,6 +145,7 @@ type ColumnDef struct {
 	GroupID         string      `json:"groupId,omitempty"`
 	OpenByDefault   *bool       `json:"openByDefault,omitempty"`
 	Children        []ColumnDef `json:"children,omitempty"`
+	SpanRows        *bool       `json:"spanRows,omitempty"`
 }
 
 type CellStyle struct {
@@ -725,6 +729,14 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			case "item":
 			case "type":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+			case "product_group_2":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+			case "product_group_3":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+			case "product_group_4":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+			case "product_group_6":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 			case "price_weight":
 				row[fixedCol.Field] = sg.PriceWeight
 			case "market_weight":
@@ -855,6 +867,10 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 			col.CellRenderer = fixedCol.CellRenderer
 		}
 
+		if fixedCol.SpanRows {
+			col.SpanRows = boolPtr(true)
+		}
+
 		columns = append(columns, col)
 	}
 
@@ -883,6 +899,10 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 
 			if childColConfig.EnableTooltip {
 				childCol.EnableTooltip = boolPtr(true)
+			}
+
+			if childColConfig.SpanRows {
+				childCol.SpanRows = boolPtr(true)
 			}
 
 			columnGroup.Children = append(columnGroup.Children, childCol)
