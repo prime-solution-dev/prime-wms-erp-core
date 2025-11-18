@@ -1,10 +1,9 @@
 package patterns
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"prime-erp-core/internal/models"
 	"regexp"
 	"sort"
@@ -12,6 +11,9 @@ import (
 
 	"github.com/google/uuid"
 )
+
+//go:embed configs/*.json
+var patternConfigs embed.FS
 
 type PatternConfig struct {
 	ID                   string              `json:"id"`
@@ -152,35 +154,20 @@ type CellStyle struct {
 type AGGridRowData map[string]interface{}
 
 func loadConfiguration(groupKey string) (*PriceTableConfiguration, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current directory: %w", err)
-	}
-
 	if groupKey == "" {
-		groupKey = "GROUP_1_ITEM_1"
+		return nil, fmt.Errorf("groupKey is required")
 	}
 
-	patternFileName := fmt.Sprintf("%s_PATTERN.json", groupKey)
-	configDir := filepath.Join(currentDir, "internal", "services", "price-service", "patterns", "configs")
-	configPath := filepath.Join(configDir, patternFileName)
+	configPath := fmt.Sprintf("configs/%s_PATTERN.json", groupKey)
 
-	data, err := os.ReadFile(configPath)
+	data, err := patternConfigs.ReadFile(configPath)
 	if err != nil {
-		if groupKey != "GROUP_1_ITEM_1" {
-			fallbackPath := filepath.Join(configDir, "GROUP_1_ITEM_1_PATTERN.json")
-			data, err = os.ReadFile(fallbackPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read pattern file %s and fallback GROUP_1_ITEM_1_PATTERN.json: %w", patternFileName, err)
-			}
-		} else {
-			return nil, fmt.Errorf("failed to read pattern file %s: %w", patternFileName, err)
-		}
+		return nil, fmt.Errorf("failed to read pattern file %s: %w", configPath, err)
 	}
 
 	var config PriceTableConfiguration
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal pattern file %s: %w", patternFileName, err)
+		return nil, fmt.Errorf("failed to unmarshal pattern file %s: %w", configPath, err)
 	}
 
 	return &config, nil
