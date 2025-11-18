@@ -500,6 +500,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
+	rowCounters := make(map[string]int)
 
 	for _, sg := range subGroups {
 		rowKey := buildCompositeKey(sg.SubGroupKeys, rowFields)
@@ -530,6 +531,13 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		} else {
 			columnKey = sanitizeFieldName(buildCompositeKey(sg.SubGroupKeys, columnGroupFields))
 		}
+		if columnKey == "" {
+			continue
+		}
+
+		rowCounters[columnKey]++
+		rowNumberField := fmt.Sprintf("%s_row_number", columnKey)
+		rowMap[rowKey][rowNumberField] = rowCounters[columnKey]
 
 		udfData := make(map[string]interface{})
 		isHighlightValue := false
