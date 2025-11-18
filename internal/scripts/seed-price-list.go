@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"prime-erp-core/internal/db"
-
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
