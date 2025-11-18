@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"prime-erp-core/internal/db"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type productGroupConfig struct {
@@ -22,13 +25,14 @@ type productGroupConfig struct {
 
 // SeedConfig describes the inputs for generating seed statements.
 type SeedConfig struct {
-	Count                int
-	GroupID              uuid.UUID
-	PriceMin             float64
-	PriceMax             float64
-	ProductGroups        []productGroupConfig
-	ExplicitSubgroupKeys []string
-	RandomSeed           int64
+	Count                 int
+	GroupID               uuid.UUID
+	PriceMin              float64
+	PriceMax              float64
+	ProductGroups         []productGroupConfig
+	ExplicitSubgroupKeys  []string
+	GroupItemCombinations []map[string][]string // Array of group item combinations from JSON
+	RandomSeed            int64
 }
 
 // GeneratedSubGroup holds data for inspection in tests.
@@ -39,7 +43,6 @@ type GeneratedSubGroup struct {
 	IsTrading                 bool
 	PriceUnit                 float64
 	ExtraPriceUnit            float64
-	TermPriceUnit             float64
 	TotalNetPriceUnit         float64
 	PriceWeight               float64
 	ExtraPriceWeight          float64
@@ -47,7 +50,6 @@ type GeneratedSubGroup struct {
 	TotalNetPriceWeight       float64
 	BeforePriceUnit           float64
 	BeforeExtraPriceUnit      float64
-	BeforeTermPriceUnit       float64
 	BeforeTotalNetPriceUnit   float64
 	BeforePriceWeight         float64
 	BeforeExtraPriceWeight    float64
@@ -75,6 +77,9 @@ func main() {
 		subgroupKeysCSV  = flag.String("subgroup-keys", "", "Comma-separated list of explicit subgroup_key values")
 		randomSeed       = flag.Int64("seed", time.Now().UnixNano(), "Seed for random generator")
 		outputPath       = flag.String("output", "", "Optional output file path (defaults to stdout)")
+		executeSeed      = flag.Bool("execute", false, "Execute generated statements against the configured database")
+		databaseName     = flag.String("database", "prime_erp", "Database name suffix (reads database_gorm_url_<name> from env)")
+		connectionString = flag.String("connection-string", "", "Direct database connection string (overrides database name/env variable)")
 	)
 
 	var repeatedKeys multiStringFlag
@@ -102,7 +107,7 @@ func main() {
 		exitWithError(fmt.Errorf("--price-min cannot be greater than --price-max (%.2f > %.2f)", *priceMin, *priceMax))
 	}
 
-	groupItems, err := parseGroupItems(*groupItemsRaw)
+	groupItems, groupItemCombinations, err := parseGroupItems(*groupItemsRaw)
 	if err != nil {
 		exitWithError(err)
 	}
@@ -118,14 +123,22 @@ func main() {
 		exitWithError(errors.New("either --product-groups or --subgroup-key/--subgroup-keys must be provided"))
 	}
 
+	// If groupItemCombinations is provided, use the array length as count
+	// This ensures we generate one record per combination in the JSON file
+	actualCount := *count
+	if len(groupItemCombinations) > 0 {
+		actualCount = len(groupItemCombinations)
+	}
+
 	cfg := SeedConfig{
-		Count:                *count,
-		GroupID:              groupID,
-		PriceMin:             *priceMin,
-		PriceMax:             *priceMax,
-		ProductGroups:        productGroups,
-		ExplicitSubgroupKeys: explicitKeys,
-		RandomSeed:           *randomSeed,
+		Count:                 actualCount,
+		GroupID:               groupID,
+		PriceMin:              *priceMin,
+		PriceMax:              *priceMax,
+		ProductGroups:         productGroups,
+		ExplicitSubgroupKeys:  explicitKeys,
+		GroupItemCombinations: groupItemCombinations,
+		RandomSeed:            *randomSeed,
 	}
 
 	result, err := GenerateSeedStatements(cfg)
@@ -150,6 +163,13 @@ func main() {
 	for _, stmt := range result.SubGroupKeyStatements {
 		fmt.Fprintln(writer, stmt)
 	}
+
+	if *executeSeed {
+		if err := executeSeedStatements(*databaseName, *connectionString, result); err != nil {
+			exitWithError(err)
+		}
+		fmt.Fprintf(os.Stderr, "Executed seed statements against database\n")
+	}
 }
 
 // GenerateSeedStatements builds INSERT statements according to the configuration.
@@ -160,7 +180,19 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 
 	for i := 0; i < cfg.Count; i++ {
 		subGroupID := uuid.New()
-		subGroupKey, keyEntries, err := resolveSubGroupKey(i, groupKeyPool, cfg.ProductGroups, randSrc)
+		var subGroupKey string
+		var keyEntries []subGroupKeyEntry
+		var err error
+
+		// If GroupItemCombinations is provided, use the specific combination for this index
+		// Cycle through combinations if count exceeds array length
+		if len(cfg.GroupItemCombinations) > 0 {
+			combinationIdx := i % len(cfg.GroupItemCombinations)
+			subGroupKey, keyEntries, err = resolveSubGroupKeyFromCombination(cfg.GroupItemCombinations[combinationIdx], cfg.ProductGroups)
+		} else {
+			subGroupKey, keyEntries, err = resolveSubGroupKey(i, groupKeyPool, cfg.ProductGroups, randSrc)
+		}
+
 		if err != nil {
 			return SeedResult{}, err
 		}
@@ -172,7 +204,6 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 			IsTrading:                 randSrc.Intn(2) == 0,
 			PriceUnit:                 randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			ExtraPriceUnit:            randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
-			TermPriceUnit:             randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			TotalNetPriceUnit:         randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			PriceWeight:               randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			ExtraPriceWeight:          randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
@@ -180,7 +211,6 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 			TotalNetPriceWeight:       randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			BeforePriceUnit:           randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			BeforeExtraPriceUnit:      randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
-			BeforeTermPriceUnit:       randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			BeforeTotalNetPriceUnit:   randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			BeforePriceWeight:         randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
 			BeforeExtraPriceWeight:    randomPrice(randSrc, cfg.PriceMin, cfg.PriceMax),
@@ -191,14 +221,13 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 		result.Records = append(result.Records, record)
 
 		subGroupStmt := fmt.Sprintf(
-			"INSERT INTO public.price_list_sub_group (id, price_list_group_id, subgroup_key, is_trading, price_unit, extra_price_unit, term_price_unit, total_net_price_unit, price_weight, extra_price_weight, term_price_weight, total_net_price_weight, before_price_unit, before_extra_price_unit, before_term_price_unit, before_total_net_price_unit, before_price_weight, before_extra_price_weight, before_term_price_weight, before_total_net_price_weight) VALUES (%s, %s, %s, %t, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
+			"INSERT INTO public.price_list_sub_group (id, price_list_group_id, subgroup_key, is_trading, price_unit, extra_price_unit, total_net_price_unit, price_weight, extra_price_weight, term_price_weight, total_net_price_weight, before_price_unit, before_extra_price_unit, before_total_net_price_unit, before_price_weight, before_extra_price_weight, before_term_price_weight, before_total_net_price_weight) VALUES (%s, %s, %s, %t, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
 			formatUUID(record.ID),
 			formatUUID(record.PriceListGroupID),
 			formatString(record.SubGroupKey),
 			record.IsTrading,
 			formatFloat(record.PriceUnit),
 			formatFloat(record.ExtraPriceUnit),
-			formatFloat(record.TermPriceUnit),
 			formatFloat(record.TotalNetPriceUnit),
 			formatFloat(record.PriceWeight),
 			formatFloat(record.ExtraPriceWeight),
@@ -206,7 +235,6 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 			formatFloat(record.TotalNetPriceWeight),
 			formatFloat(record.BeforePriceUnit),
 			formatFloat(record.BeforeExtraPriceUnit),
-			formatFloat(record.BeforeTermPriceUnit),
 			formatFloat(record.BeforeTotalNetPriceUnit),
 			formatFloat(record.BeforePriceWeight),
 			formatFloat(record.BeforeExtraPriceWeight),
@@ -235,6 +263,40 @@ type subGroupKeyEntry struct {
 	Code  string
 	Value string
 	Seq   int
+}
+
+func resolveSubGroupKeyFromCombination(combination map[string][]string, productGroups []productGroupConfig) (string, []subGroupKeyEntry, error) {
+	if len(productGroups) == 0 {
+		return "", nil, errors.New("no product groups available for generating subgroup_key")
+	}
+
+	parts := make([]string, 0, len(productGroups))
+	entries := make([]subGroupKeyEntry, 0, len(productGroups))
+	seq := 1
+
+	// Iterate through product groups in order and use items from combination
+	for _, pg := range productGroups {
+		// Get the item from the combination for this product group
+		items, exists := combination[pg.Code]
+		if exists && len(items) > 0 {
+			// Use the first item from the combination
+			val := items[0]
+			parts = append(parts, val)
+			entries = append(entries, subGroupKeyEntry{
+				Code:  pg.Code,
+				Value: val,
+				Seq:   seq,
+			})
+			seq++
+		}
+		// If product group is not in combination, skip it (don't include in subgroup_key)
+	}
+
+	if len(parts) == 0 {
+		return "", nil, errors.New("combination has no matching product groups")
+	}
+
+	return strings.Join(parts, "|"), entries, nil
 }
 
 func resolveSubGroupKey(idx int, explicitKeys []string, productGroups []productGroupConfig, randSrc *rand.Rand) (string, []subGroupKeyEntry, error) {
@@ -440,29 +502,215 @@ func parseProductGroupEntry(entry string) (productGroupConfig, error) {
 	return cfg, nil
 }
 
-func parseGroupItems(raw string) (map[string][]string, error) {
+func parseGroupItems(raw string) (map[string][]string, []map[string][]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return map[string][]string{}, nil
+		return map[string][]string{}, nil, nil
 	}
 
 	if strings.HasPrefix(raw, "@") {
 		path := strings.TrimPrefix(raw, "@")
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read group-items file: %w", err)
+			return nil, nil, fmt.Errorf("failed to read group-items file: %w", err)
 		}
 		raw = string(content)
 	}
 
-	var parsed map[string][]string
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return nil, fmt.Errorf("failed to parse group-items JSON: %w", err)
+	// Try parsing as single map first
+	parsedMap := map[string][]string{}
+	if err := json.Unmarshal([]byte(raw), &parsedMap); err == nil {
+		return normalizeGroupItems(parsedMap), nil, nil
 	}
-	for key, values := range parsed {
-		parsed[key] = deduplicate(values)
+
+	// Try parsing as array
+	var arrayCombinations []map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &arrayCombinations); err == nil && len(arrayCombinations) > 0 {
+		// Check if this is the code/items format by looking at the first entry
+		firstEntry := arrayCombinations[0]
+		if _, hasCode := firstEntry["code"]; hasCode {
+			// This is the code/items format - use parseGroupItemsArray
+			arrayParsed, err := parseGroupItemsArray(raw)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to parse group-items JSON: %w", err)
+			}
+			return normalizeGroupItems(arrayParsed), nil, nil
+		}
+
+		// This is the groups.json format (array of combinations)
+		combinations := make([]map[string][]string, 0, len(arrayCombinations))
+		mergedMap := map[string][]string{}
+
+		for _, entry := range arrayCombinations {
+			combination := map[string][]string{}
+			for code, values := range entry {
+				// Skip "code" and "items" keys if they exist (they're metadata, not product groups)
+				if code == "code" || code == "items" {
+					continue
+				}
+				items, err := interfaceToStringSlice(values)
+				if err != nil {
+					return nil, nil, fmt.Errorf("invalid items for %s: %w", code, err)
+				}
+				combination[code] = items
+				mergedMap[code] = append(mergedMap[code], items...)
+			}
+			combinations = append(combinations, combination)
+		}
+
+		return normalizeGroupItems(mergedMap), combinations, nil
 	}
-	return parsed, nil
+
+	// Try parsing as array with code/items structure (fallback)
+	arrayParsed, err := parseGroupItemsArray(raw)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse group-items JSON: %w", err)
+	}
+	return normalizeGroupItems(arrayParsed), nil, nil
+}
+
+func executeSeedStatements(databaseName string, connectionString string, result SeedResult) error {
+	var gormDB *gorm.DB
+	var err error
+
+	if connectionString != "" {
+		// Use direct connection string
+		gormDB, err = connectWithString(connectionString)
+		if err != nil {
+			return fmt.Errorf("failed to connect with connection string: %w", err)
+		}
+	} else {
+		// Use environment variable approach
+		gormDB, err = db.ConnectGORM(databaseName)
+		if err != nil {
+			return fmt.Errorf("failed to connect database_gorm_url_%s: %w", databaseName, err)
+		}
+	}
+	defer db.CloseGORM(gormDB)
+
+	return ApplySeedStatements(gormDB, result)
+}
+
+func connectWithString(connectionString string) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect: %w", err)
+	}
+	return db, nil
+}
+
+// ApplySeedStatements persists generated statements inside a transaction.
+func ApplySeedStatements(gormDB *gorm.DB, result SeedResult) error {
+	if gormDB == nil {
+		return errors.New("gorm DB instance is nil")
+	}
+
+	tx := gormDB.Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	if err := execStatements(tx, result.SubGroupStatements, "price_list_sub_group"); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := execStatements(tx, result.SubGroupKeyStatements, "price_list_sub_group_key"); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func execStatements(tx *gorm.DB, statements []string, label string) error {
+	for _, stmt := range statements {
+		if err := tx.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("failed to execute %s statement: %w", label, err)
+		}
+	}
+	return nil
+}
+
+func parseGroupItemsArray(raw string) (map[string][]string, error) {
+	var entries []map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+		return nil, err
+	}
+
+	result := map[string][]string{}
+	for _, entry := range entries {
+		if len(entry) == 0 {
+			continue
+		}
+
+		if codeVal, ok := entry["code"]; ok {
+			code, ok := codeVal.(string)
+			if !ok || strings.TrimSpace(code) == "" {
+				return nil, fmt.Errorf("array entry missing valid code field")
+			}
+			itemsVal, ok := entry["items"]
+			if !ok {
+				return nil, fmt.Errorf("array entry for %s missing items field", code)
+			}
+			items, err := interfaceToStringSlice(itemsVal)
+			if err != nil {
+				return nil, fmt.Errorf("invalid items for %s: %w", code, err)
+			}
+			result[code] = append(result[code], items...)
+			continue
+		}
+
+		for code, values := range entry {
+			if strings.TrimSpace(code) == "" {
+				continue
+			}
+			items, err := interfaceToStringSlice(values)
+			if err != nil {
+				return nil, fmt.Errorf("invalid items for %s: %w", code, err)
+			}
+			result[code] = append(result[code], items...)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no group items found in array")
+	}
+
+	return result, nil
+}
+
+func interfaceToStringSlice(value interface{}) ([]string, error) {
+	list, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("expected array value")
+	}
+
+	result := make([]string, 0, len(list))
+	for _, item := range list {
+		str, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("expected string value")
+		}
+		if trimmed := strings.TrimSpace(str); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result, nil
+}
+
+func normalizeGroupItems(items map[string][]string) map[string][]string {
+	normalized := make(map[string][]string, len(items))
+	for key, values := range items {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		normalized[key] = deduplicate(values)
+	}
+	return normalized
 }
 
 func splitAndTrim(raw string, sep string) []string {

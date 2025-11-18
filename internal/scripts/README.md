@@ -181,9 +181,9 @@ Each `price_list_sub_group` record will have multiple `price_list_sub_group_key`
 
 The script generates the following fields with random values (within the specified price range):
 
-- `price_unit`, `extra_price_unit`, `term_price_unit`, `total_net_price_unit`
+- `price_unit`, `extra_price_unit`, `total_net_price_unit`
 - `price_weight`, `extra_price_weight`, `term_price_weight`, `total_net_price_weight`
-- `before_price_unit`, `before_extra_price_unit`, `before_term_price_unit`, `before_total_net_price_unit`
+- `before_price_unit`, `before_extra_price_unit`, `before_total_net_price_unit`
 - `before_price_weight`, `before_extra_price_weight`, `before_term_price_weight`, `before_total_net_price_weight`
 - `is_trading` (randomly true or false)
 
