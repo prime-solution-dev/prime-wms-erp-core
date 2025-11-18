@@ -183,12 +183,7 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 	require.Len(t, result.SubGroupStatements, 2)
 	require.Len(t, result.SubGroupKeyStatements, 6)
 
-	for _, stmt := range result.SubGroupStatements {
-		require.NoError(t, gormx.Exec(stmt).Error)
-	}
-	for _, stmt := range result.SubGroupKeyStatements {
-		require.NoError(t, gormx.Exec(stmt).Error)
-	}
+	require.NoError(t, ApplySeedStatements(gormx, result))
 
 	var subGroups []models.PriceListSubGroup
 	require.NoError(t, gormx.Find(&subGroups).Error)

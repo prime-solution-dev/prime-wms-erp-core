@@ -39,11 +39,13 @@ go run ./internal/scripts/seed-price-list.go --group-id=<uuid> [OPTIONS]
 - `PRICE_MIN` (or `--price-min`)**: Minimum price/value to generate (default: `0`)
 - `PRICE_MAX` (or `--price-max`)**: Maximum price/value to generate (default: `1000`)
 - `PRODUCT_GROUPS` (or `--product-groups`)**: Comma-separated product group definitions
-- `GROUP_ITEMS` (or `--group-items`)**: JSON map or `@path` to JSON file describing items per product group
+- `GROUP_ITEMS` (or `--group-items`)**: JSON map/array or `@path` to JSON file describing items per product group
 - `SUBGROUP_KEYS` (or `--subgroup-keys`)**: Comma-separated list of explicit subgroup_key values
 - `SUBGROUP_KEY` (or `--subgroup-key`)**: Explicit subgroup_key value (can be repeated multiple times)
 - `OUTPUT` (or `--output`)**: Optional output file path (defaults to stdout)
 - `SEED` (or `--seed`)**: Seed for random generator (defaults to current timestamp)
+- `EXECUTE` (or `--execute`)**: When set, apply the generated statements to the configured database
+- `DATABASE` (or `--database`)**: Database suffix for `database_gorm_url_<suffix>` (default: `prime_erp`)
 
 ## Subgroup Key Generation
 
@@ -123,12 +125,36 @@ make seed-price-list GROUP_ID=550e8400-e29b-41d4-a716-446655440000 \
 
 ### Using Group Items JSON File
 
-Create a JSON file `groups.json`:
+Create a JSON file `groups.json` using either map or array syntax.
+
+**Object map syntax (existing behavior):**
 ```json
 {
   "PRODUCT_GROUP1": ["GROUP_1_ITEM_1", "GROUP_1_ITEM_2"],
   "PRODUCT_GROUP2": ["GROUP_2_ITEM_1", "GROUP_2_ITEM_2"]
 }
+```
+
+**Array syntax (new):**
+```json
+[
+  {
+    "PRODUCT_GROUP1": ["GROUP_1_ITEM_4"],
+    "PRODUCT_GROUP2": ["GROUP_2_ITEM_6"],
+    "PRODUCT_GROUP3": ["GROUP_3_ITEM_9"],
+    "PRODUCT_GROUP4": ["GROUP_4_ITEM_9"],
+    "PRODUCT_GROUP5": ["GROUP_5_ITEM_10"],
+    "PRODUCT_GROUP6": ["GROUP_6_ITEM_2"]
+  },
+  {
+    "PRODUCT_GROUP1": ["GROUP_1_ITEM_4"],
+    "PRODUCT_GROUP2": ["GROUP_2_ITEM_6"],
+    "PRODUCT_GROUP3": ["GROUP_3_ITEM_9"],
+    "PRODUCT_GROUP4": ["GROUP_4_ITEM_9"],
+    "PRODUCT_GROUP5": ["GROUP_5_ITEM_11"],
+    "PRODUCT_GROUP6": ["GROUP_6_ITEM_2"]
+  }
+]
 ```
 
 Then use it:
@@ -144,6 +170,31 @@ Or inline JSON:
 make seed-price-list GROUP_ID=550e8400-e29b-41d4-a716-446655440000 \
   GROUP_ITEMS='{"PRODUCT_GROUP1":["GROUP_1_ITEM_1"],"PRODUCT_GROUP2":["GROUP_2_ITEM_1"]}'
 ```
+
+or with array syntax:
+
+```bash
+make seed-price-list GROUP_ID=550e8400-e29b-41d4-a716-446655440000 \
+  GROUP_ITEMS='[{"code":"PRODUCT_GROUP1","items":["GROUP_1_ITEM_1"]}]'
+```
+
+### Execute Against Database
+
+By default the script prints SQL, but it can also apply the data directly to your database:
+
+1. Export a connection string using the naming pattern `database_gorm_url_<NAME>`. Example:
+   ```bash
+   export database_gorm_url_prime_erp="postgres://user:pass@localhost:5432/prime?sslmode=disable"
+   ```
+2. Run the script with `--execute` (and optionally `--database <NAME>` if you used a different suffix):
+   ```bash
+   make seed-price-list GROUP_ID=550e8400-e29b-41d4-a716-446655440000 \
+     PRODUCT_GROUPS="PRODUCT_GROUP1,PRODUCT_GROUP2" \
+     EXECUTE=true \
+     DATABASE=prime_erp
+   ```
+
+The script opens a GORM connection, runs all inserts inside a single transaction, and rolls back if any statement fails. A short confirmation message is printed to stderr after a successful execution.
 
 ### Save Output to File
 
