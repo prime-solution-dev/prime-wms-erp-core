@@ -95,7 +95,6 @@ func createSeedTestSchema() error {
 			is_trading boolean,
 			price_unit double precision,
 			extra_price_unit double precision,
-			term_price_unit double precision,
 			total_net_price_unit double precision,
 			price_weight double precision,
 			extra_price_weight double precision,
@@ -103,7 +102,6 @@ func createSeedTestSchema() error {
 			total_net_price_weight double precision,
 			before_price_unit double precision,
 			before_extra_price_unit double precision,
-			before_term_price_unit double precision,
 			before_total_net_price_unit double precision,
 			before_price_weight double precision,
 			before_extra_price_weight double precision,
@@ -136,12 +134,13 @@ func createSeedTestSchema() error {
 
 func TestGenerateSeedStatementsWithExplicitKey(t *testing.T) {
 	cfg := SeedConfig{
-		Count:                1,
-		GroupID:              uuid.New(),
-		PriceMin:             0,
-		PriceMax:             100,
-		ExplicitSubgroupKeys: []string{"GROUP_1_ITEM_3|GROUP_2_ITEM_1|GROUP_4_ITEM_2|GROUP_6_ITEM_2"},
-		RandomSeed:           123,
+		Count:                 1,
+		GroupID:               uuid.New(),
+		PriceMin:              0,
+		PriceMax:              100,
+		ExplicitSubgroupKeys:  []string{"GROUP_1_ITEM_3|GROUP_2_ITEM_1|GROUP_4_ITEM_2|GROUP_6_ITEM_2"},
+		GroupItemCombinations: nil,
+		RandomSeed:            123,
 	}
 
 	result, err := GenerateSeedStatements(cfg)
@@ -175,7 +174,8 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 			{Code: "PRODUCT_GROUP2", Items: []string{"GROUP_2_ITEM_1"}},
 			{Code: "PRODUCT_GROUP4", Items: []string{"GROUP_4_ITEM_2"}},
 		},
-		RandomSeed: 42,
+		GroupItemCombinations: nil,
+		RandomSeed:            42,
 	}
 
 	result, err := GenerateSeedStatements(cfg)
@@ -273,7 +273,7 @@ func TestParseGroupItemsSupportsMapAndArray(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := parseGroupItems(tc.input)
+			actual, _, err := parseGroupItems(tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, actual)
 		})
@@ -283,4 +283,81 @@ func TestParseGroupItemsSupportsMapAndArray(t *testing.T) {
 func TestApplySeedStatementsRequiresDB(t *testing.T) {
 	err := ApplySeedStatements(nil, SeedResult{})
 	require.Error(t, err)
+}
+
+func TestGenerateSeedStatementsWithGroupItemCombinations(t *testing.T) {
+	cfg := SeedConfig{
+		Count:    2,
+		GroupID:  uuid.New(),
+		PriceMin: 0,
+		PriceMax: 100,
+		ProductGroups: []productGroupConfig{
+			{Code: "PRODUCT_GROUP1"},
+			{Code: "PRODUCT_GROUP2"},
+			{Code: "PRODUCT_GROUP4"},
+		},
+		GroupItemCombinations: []map[string][]string{
+			{
+				"PRODUCT_GROUP1": {"GROUP_1_ITEM_4"},
+				"PRODUCT_GROUP2": {"GROUP_2_ITEM_6"},
+				"PRODUCT_GROUP4": {"GROUP_4_ITEM_6"},
+			},
+			{
+				"PRODUCT_GROUP1": {"GROUP_1_ITEM_4"},
+				"PRODUCT_GROUP2": {"GROUP_2_ITEM_6"},
+				"PRODUCT_GROUP4": {"GROUP_4_ITEM_7"},
+			},
+		},
+		RandomSeed: 123,
+	}
+
+	result, err := GenerateSeedStatements(cfg)
+	require.NoError(t, err)
+	require.Len(t, result.SubGroupStatements, 2)
+	require.Len(t, result.SubGroupKeyStatements, 6) // 2 records * 3 product groups
+
+	// First record should have the first combination
+	require.Contains(t, result.SubGroupStatements[0], "GROUP_1_ITEM_4|GROUP_2_ITEM_6|GROUP_4_ITEM_6")
+
+	// Second record should have the second combination
+	require.Contains(t, result.SubGroupStatements[1], "GROUP_1_ITEM_4|GROUP_2_ITEM_6|GROUP_4_ITEM_7")
+
+	// Verify key entries
+	require.Len(t, result.Records, 2)
+	require.Equal(t, "GROUP_1_ITEM_4|GROUP_2_ITEM_6|GROUP_4_ITEM_6", result.Records[0].SubGroupKey)
+	require.Equal(t, "GROUP_1_ITEM_4|GROUP_2_ITEM_6|GROUP_4_ITEM_7", result.Records[1].SubGroupKey)
+}
+
+func TestParseGroupItemsReturnsCombinations(t *testing.T) {
+	input := `[
+		{
+			"PRODUCT_GROUP1": ["GROUP_1_ITEM_4"],
+			"PRODUCT_GROUP2": ["GROUP_2_ITEM_6"]
+		},
+		{
+			"PRODUCT_GROUP1": ["GROUP_1_ITEM_5"],
+			"PRODUCT_GROUP2": ["GROUP_2_ITEM_7"]
+		}
+	]`
+
+	merged, combinations, err := parseGroupItems(input)
+	require.NoError(t, err)
+
+	// Check merged map (order may vary, so check individual items)
+	require.Len(t, merged, 2)
+	require.Contains(t, merged, "PRODUCT_GROUP1")
+	require.Contains(t, merged, "PRODUCT_GROUP2")
+	require.ElementsMatch(t, []string{"GROUP_1_ITEM_4", "GROUP_1_ITEM_5"}, merged["PRODUCT_GROUP1"])
+	require.ElementsMatch(t, []string{"GROUP_2_ITEM_6", "GROUP_2_ITEM_7"}, merged["PRODUCT_GROUP2"])
+
+	// Check combinations array
+	require.Len(t, combinations, 2)
+	require.Equal(t, map[string][]string{
+		"PRODUCT_GROUP1": {"GROUP_1_ITEM_4"},
+		"PRODUCT_GROUP2": {"GROUP_2_ITEM_6"},
+	}, combinations[0])
+	require.Equal(t, map[string][]string{
+		"PRODUCT_GROUP1": {"GROUP_1_ITEM_5"},
+		"PRODUCT_GROUP2": {"GROUP_2_ITEM_7"},
+	}, combinations[1])
 }

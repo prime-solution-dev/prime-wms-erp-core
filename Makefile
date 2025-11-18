@@ -14,10 +14,7 @@ tidy:
 .PHONY: seed-price-list seed-price-list-test
 
 seed-price-list:
-	if test -z "$(GROUP_ID)"; \
-		echo "GROUP_ID is required. Usage: make seed-price-list GROUP_ID=<uuid>"; \
-		exit 1; \
-	end
+	@test -n "$(GROUP_ID)"; or begin; echo "GROUP_ID is required. Usage: make seed-price-list GROUP_ID=<uuid>"; exit 1; end
 	go run ./internal/scripts/seed-price-list.go --group-id=$(GROUP_ID) \
 		$(if $(COUNT),--count=$(COUNT),) \
 		$(if $(PRICE_MIN),--price-min=$(PRICE_MIN),) \
@@ -27,8 +24,6 @@ seed-price-list:
 		$(if $(SUBGROUP_KEYS),"--subgroup-keys=$(SUBGROUP_KEYS)",) \
 		$(if $(SUBGROUP_KEY),"--subgroup-key=$(SUBGROUP_KEY)",) \
 		$(if $(OUTPUT),"--output=$(OUTPUT)",) \
-		$(if $(SEED),"--seed=$(SEED)",)
-
-seed-price-list-test:
-	go test ./internal/scripts -run Test
-
+		$(if $(SEED),"--seed=$(SEED)",) \
+		$(if $(EXECUTE),"--execute=$(EXECUTE)",) \
+		$(if $(DATABASE),"--connection-string=$(DATABASE)",)
