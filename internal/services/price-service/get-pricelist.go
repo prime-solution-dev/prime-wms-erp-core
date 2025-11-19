@@ -535,7 +535,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
-	priceLists, err := priceListRepository.GetPriceListGroup(req.CompanyCode, req.SiteCode, req.GroupKeys)
+	priceLists, err := priceListRepository.GetPriceListGroup(req.CompanyCode, req.SiteCode, req.GroupCodes)
 	if err != nil {
 		return nil, err
 	}
@@ -600,6 +600,17 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		paymentTermMap[pt.TermCode] = pt
 	}
 
+	// Get Extra Config
+	extraConfigs, err := priceListRepository.GetPriceListExtraConfig(req.GroupCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	extraConfigMap := map[string]models.PriceListExtraConfig{}
+	for _, ec := range extraConfigs {
+		extraConfigMap[ec.GroupCode] = ec
+	}
+
 	result := []models.GetPriceListResponse{}
 	for _, pl := range priceLists {
 		var effectiveDate *string
@@ -660,7 +671,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 		}
 
-		extras := []models.PriceListExtraResponse{}
+		extrasData := []models.PriceListExtraResponse{}
 		if len(pl.PriceListGroupExtras) > 0 {
 			for _, extra := range pl.PriceListGroupExtras {
 				createDtm := ""
@@ -673,18 +684,21 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
-				extras = append(extras, models.PriceListExtraResponse{
-					ID:               extra.ID.String(),
-					PriceListGroupID: extra.PriceListGroupID.String(),
-					ExtraKey:         extra.ExtraKey,
-					LengthExtraKey:   extra.LengthExtraKey,
-					Operator:         extra.Operator,
-					CondRangeMin:     extra.CondRangeMin,
-					CondRangeMax:     extra.CondRangeMax,
-					CreateBy:         extra.CreateBy,
-					CreateDtm:        createDtm,
-					UpdateBy:         extra.UpdateBy,
-					UpdateDtm:        updateDtm,
+				extrasData = append(extrasData, models.PriceListExtraResponse{
+					ID:                      extra.ID.String(),
+					PriceListGroupID:        extra.PriceListGroupID.String(),
+					ExtraKey:                extra.ExtraKey,
+					ConditionCode:           extra.ConditionCode,
+					ValueInt:                float64(extra.ValueInt),
+					LengthExtraKey:          float64(extra.LengthExtraKey),
+					Operator:                extra.Operator,
+					CondRangeMin:            extra.CondRangeMin,
+					CondRangeMax:            extra.CondRangeMax,
+					CreateBy:                extra.CreateBy,
+					CreateDtm:               createDtm,
+					UpdateBy:                extra.UpdateBy,
+					UpdateDtm:               updateDtm,
+					PriceListGroupExtraKeys: extra.PriceListGroupExtraKeys,
 				})
 			}
 		}
@@ -755,7 +769,17 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		priceListResp.Terms = terms
-		priceListResp.Extras = extras
+
+		extraConfig, ok := extraConfigMap[pl.GroupCode]
+		if ok {
+			priceListResp.Extras.Config = models.PriceListExtraConfigResponse{
+				GroupCode:  extraConfig.GroupCode,
+				IsActive:   extraConfig.IsActive,
+				ConfigJson: extraConfig.ConfigJson,
+			}
+		}
+		priceListResp.Extras.Data = extrasData
+
 		priceListResp.SubGroups = subGroups
 
 		groupKeyParts := strings.Split(pl.GroupKey, "|")
