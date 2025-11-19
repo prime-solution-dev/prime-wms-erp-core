@@ -15,7 +15,6 @@
           "field": "#",
           "headerName": "#",
           "width": 60,
-          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
@@ -25,10 +24,22 @@
           }
         },
         {
+          "field": "thickness",
+          "headerName": "หนา",
+          "width": 120,
+
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "product_group_6"
+        },
+        {
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -40,7 +51,7 @@
           "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -52,7 +63,7 @@
           "field": "od",
           "headerName": "OD",
           "width": 100,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -64,7 +75,7 @@
           "field": "line_bundle",
           "headerName": "เส้น/มัด",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -76,7 +87,7 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -88,7 +99,7 @@
           "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 140,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
@@ -98,7 +109,7 @@
           "field": "extra_price_unit",
           "headerName": "Extra (THB)",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -110,7 +121,7 @@
           "field": "remark",
           "headerName": "Notes",
           "width": 200,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "dataMapping": "remark"
@@ -272,4 +283,3 @@
     "description": "Configuration for GROUP_1_ITEM_3 - Direct SubGroup rows pattern grouped by PRODUCT_GROUP4"
   }
 }
-
