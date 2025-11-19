@@ -67,7 +67,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },
@@ -79,7 +79,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -91,7 +91,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "market_weight"
         },
@@ -113,7 +113,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -125,7 +125,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "line_bundle"
         },
@@ -156,20 +156,20 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_weight_before",
+              "field": "price_kg_before_price_weight",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_weight_after",
+              "field": "price_kg_total_net_price_weight",
               "headerName": "ราคาขาย after",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_weight"
             }
@@ -181,20 +181,20 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before",
+              "field": "price_line_before_price_unit",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_unit"
             },
             {
-              "field": "price_line_after",
+              "field": "price_line_total_net_price_unit",
               "headerName": "ราคาขาย after",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_unit"
             }
@@ -213,12 +213,12 @@
   "tableConfig": {
     "groupHeaderHeight": 50,
     "headerHeight": 40,
-    "pagination": false,
+    "pagination": false,  
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
-      "showColumnToggle": true
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
     },
     "gridOptions": {
       "suppressMovableColumns": true,
