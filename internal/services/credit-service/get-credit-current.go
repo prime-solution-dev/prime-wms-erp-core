@@ -269,12 +269,15 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 			}
 		}
 
+		invoiceCodeString := mapToString(invoiceCodeMap)
+
 		//AR Payment
 		queryPayment := fmt.Sprintf(`
 			select t.invoice_code , coalesce(t.amount, 0) amount
 			from payment_invoice t 
 			where t.invoice_code in ('%s')
-		`, strings.Join(mapKeys(invoiceCodeMap), `','`))
+		`, strings.Join(invoiceCodeString, `','`))
+		fmt.Println(queryPayment)
 		rowsPayment, err := db.ExecuteQuery(sqlx, queryPayment)
 		if err != nil {
 			return res, err
@@ -290,6 +293,8 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 			custMap[customerCode] = cust
 		}
 
+		invoiceCodeItemString := mapToString(invoiceCodeItem)
+
 		//DN & CN
 		queryDN := fmt.Sprintf(`
 			select i.invoice_code, i.invoice_type
@@ -299,7 +304,8 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 			where i.status in ('PENDING', 'COMPLETED') and i.invoice_type in ('CN', 'DN')
 				and ii.document_ref <> '' and ii.document_ref_item != ''
 				and (ii.document_ref, ii.document_ref_item ) in (%s) 
-		`, strings.Join(mapKeys(invoiceCodeItem), `,`))
+		`, strings.Join(invoiceCodeItemString, `,`))
+		fmt.Println(queryDN)
 		rowsDN, err := db.ExecuteQuery(sqlx, queryDN)
 		if err != nil {
 			return res, err
@@ -371,6 +377,14 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 	}
 
 	return res, nil
+}
+
+func mapToString(m map[string]string) []string {
+	var sb []string
+	for _, v := range m {
+		sb = append(sb, v)
+	}
+	return sb
 }
 
 func mapKeys(m map[string]string) []string {

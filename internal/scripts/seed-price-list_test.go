@@ -1,0 +1,211 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	tc "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+var postgresContainer tc.Container
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	req := tc.ContainerRequest{
+		Image:        "postgres:16",
+		Env:          map[string]string{"POSTGRES_PASSWORD": "test", "POSTGRES_USER": "test", "POSTGRES_DB": "testdb"},
+		ExposedPorts: []string{"5432/tcp"},
+		WaitingFor:   wait.ForListeningPort("5432/tcp").WithStartupTimeout(60 * time.Second),
+	}
+
+	container, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{ContainerRequest: req, Started: true})
+	if err != nil {
+		fmt.Printf("failed to start postgres container: %v\n", err)
+		os.Exit(1)
+	}
+	postgresContainer = container
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		fmt.Printf("failed to get host: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	mappedPort, err := container.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		fmt.Printf("failed to get mapped port: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	dsn := fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable", host, mappedPort.Port())
+	os.Setenv("database_gorm_url_prime_erp", dsn)
+
+	if err := createSeedTestSchema(); err != nil {
+		fmt.Printf("failed to create schema: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	code := m.Run()
+	_ = container.Terminate(ctx)
+	os.Exit(code)
+}
+
+func createSeedTestSchema() error {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	statements := []string{
+		`CREATE TABLE IF NOT EXISTS price_list_group (
+			id uuid PRIMARY KEY,
+			company_code text,
+			site_code text,
+			group_code text,
+			price_unit double precision,
+			price_weight double precision,
+			before_price_unit double precision,
+			before_price_weight double precision,
+			currency text,
+			effective_date timestamp NULL,
+			remark text,
+			group_key text,
+			create_by text,
+			create_dtm timestamp,
+			update_by text,
+			update_dtm timestamp
+		);`,
+		`CREATE TABLE IF NOT EXISTS price_list_sub_group (
+			id uuid PRIMARY KEY,
+			price_list_group_id uuid REFERENCES price_list_group(id),
+			subgroup_key text,
+			is_trading boolean,
+			price_unit double precision,
+			extra_price_unit double precision,
+			term_price_unit double precision,
+			total_net_price_unit double precision,
+			price_weight double precision,
+			extra_price_weight double precision,
+			term_price_weight double precision,
+			total_net_price_weight double precision,
+			before_price_unit double precision,
+			before_extra_price_unit double precision,
+			before_term_price_unit double precision,
+			before_total_net_price_unit double precision,
+			before_price_weight double precision,
+			before_extra_price_weight double precision,
+			before_term_price_weight double precision,
+			before_total_net_price_weight double precision,
+			effective_date timestamp NULL,
+			remark text,
+			create_by text,
+			create_dtm timestamp,
+			update_by text,
+			update_dtm timestamp,
+			udf_json json NULL
+		);`,
+		`CREATE TABLE IF NOT EXISTS price_list_sub_group_key (
+			id uuid PRIMARY KEY,
+			sub_group_id uuid REFERENCES price_list_sub_group(id),
+			code text,
+			value text,
+			seq integer
+		);`,
+	}
+
+	for _, stmt := range statements {
+		if err := gormx.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func TestGenerateSeedStatementsWithExplicitKey(t *testing.T) {
+	cfg := SeedConfig{
+		Count:                1,
+		GroupID:              uuid.New(),
+		PriceMin:             0,
+		PriceMax:             100,
+		ExplicitSubgroupKeys: []string{"GROUP_1_ITEM_3|GROUP_2_ITEM_1|GROUP_4_ITEM_2|GROUP_6_ITEM_2"},
+		RandomSeed:           123,
+	}
+
+	result, err := GenerateSeedStatements(cfg)
+	require.NoError(t, err)
+	require.Len(t, result.SubGroupStatements, 1)
+	require.Len(t, result.SubGroupKeyStatements, 4)
+	require.Contains(t, result.SubGroupStatements[0], "GROUP_1_ITEM_3|GROUP_2_ITEM_1|GROUP_4_ITEM_2|GROUP_6_ITEM_2")
+
+	for _, stmt := range result.SubGroupKeyStatements {
+		require.NotEmpty(t, stmt)
+		require.Contains(t, stmt, "INSERT INTO public.price_list_sub_group_key")
+	}
+}
+
+func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	require.NoError(t, err)
+	defer db.CloseGORM(gormx)
+
+	groupID := uuid.New()
+	err = gormx.Exec("INSERT INTO price_list_group (id, company_code, site_code, group_code, price_unit, price_weight, before_price_unit, before_price_weight, currency) VALUES (?, 'TEST', 'TEST', 'GROUP', 0, 0, 0, 0, 'THB')", groupID).Error
+	require.NoError(t, err)
+
+	cfg := SeedConfig{
+		Count:    2,
+		GroupID:  groupID,
+		PriceMin: 0,
+		PriceMax: 1000,
+		ProductGroups: []productGroupConfig{
+			{Code: "PRODUCT_GROUP1", Items: []string{"GROUP_1_ITEM_1"}},
+			{Code: "PRODUCT_GROUP2", Items: []string{"GROUP_2_ITEM_1"}},
+			{Code: "PRODUCT_GROUP4", Items: []string{"GROUP_4_ITEM_2"}},
+		},
+		RandomSeed: 42,
+	}
+
+	result, err := GenerateSeedStatements(cfg)
+	require.NoError(t, err)
+	require.Len(t, result.SubGroupStatements, 2)
+	require.Len(t, result.SubGroupKeyStatements, 6)
+
+	for _, stmt := range result.SubGroupStatements {
+		require.NoError(t, gormx.Exec(stmt).Error)
+	}
+	for _, stmt := range result.SubGroupKeyStatements {
+		require.NoError(t, gormx.Exec(stmt).Error)
+	}
+
+	var subGroups []models.PriceListSubGroup
+	require.NoError(t, gormx.Find(&subGroups).Error)
+	require.Len(t, subGroups, 2)
+
+	for _, sg := range subGroups {
+		require.GreaterOrEqual(t, sg.PriceUnit, cfg.PriceMin)
+		require.LessOrEqual(t, sg.PriceUnit, cfg.PriceMax)
+		require.NotEmpty(t, sg.SubgroupKey)
+	}
+
+	var keys []models.PriceListSubGroupKey
+	require.NoError(t, gormx.Find(&keys).Error)
+	require.Len(t, keys, 6)
+
+	for _, key := range keys {
+		require.Contains(t, []string{"PRODUCT_GROUP1", "PRODUCT_GROUP2", "PRODUCT_GROUP4"}, key.Code)
+		require.NotEmpty(t, key.Value)
+	}
+}
