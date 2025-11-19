@@ -144,6 +144,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/UpdateSaleStatusPayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
 	})
+	sale.POST("/UpdateStatusSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateStatusSale)
+	})
 
 	sale.POST("/EditSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.EditSale)
