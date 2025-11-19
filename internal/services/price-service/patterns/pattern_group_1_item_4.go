@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, groupKey string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, groupKey string) (PriceListDetailApiResponse, error) {
 	config, err := loadConfiguration(groupKey)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupKey, err)
@@ -26,39 +26,62 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupKey)
 	}
 
-	// Collect all subgroups
 	allSubGroups := make([]models.PriceListSubGroupResponse, 0)
 	for _, priceList := range priceListData {
 		allSubGroups = append(allSubGroups, priceList.SubGroups...)
 	}
+	if len(allSubGroups) == 0 {
+		return PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}, nil
+	}
 
-	// Group subgroups by PRODUCT_GROUP4
-	groupedByProductGroup4 := make(map[string][]models.PriceListSubGroupResponse)
+	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		productGroup4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-		if productGroup4 == "" {
-			// If no PRODUCT_GROUP4, use a default group
-			productGroup4 = "Other"
+		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		if productGroup2 == "" {
+			productGroup2 = "อื่นๆ"
 		}
-		groupedByProductGroup4[productGroup4] = append(groupedByProductGroup4[productGroup4], sg)
+		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
 	}
 
-	// Sort productGroup4 keys for consistent tab order
-	productGroup4Keys := make([]string, 0, len(groupedByProductGroup4))
-	for pg4 := range groupedByProductGroup4 {
-		productGroup4Keys = append(productGroup4Keys, pg4)
+	tabOrder := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, cat := range pattern.ApplicableCategories {
+		if _, ok := groupedByProductGroup2[cat]; ok {
+			tabOrder = append(tabOrder, cat)
+			seen[cat] = true
+		}
 	}
-	sort.Strings(productGroup4Keys)
+	remaining := make([]string, 0)
+	for key := range groupedByProductGroup2 {
+		if !seen[key] {
+			remaining = append(remaining, key)
+		}
+	}
+	sort.Strings(remaining)
+	tabOrder = append(tabOrder, remaining...)
 
-	// Build columns once (same for all tabs)
 	columns := buildFixedColumns(pattern)
 
-	// Create tabs for each PRODUCT_GROUP4
-	tabs := make([]PriceListDetailTabConfig, 0)
-	for _, productGroup4 := range productGroup4Keys {
-		subGroups := groupedByProductGroup4[productGroup4]
-		rowData := buildDirectRows(pattern, subGroups)
+	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
+	for _, tabLabel := range tabOrder {
+		subGroups := groupedByProductGroup2[tabLabel]
 
+		sort.SliceStable(subGroups, func(i, j int) bool {
+			sizeI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
+			sizeJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
+			if sizeI == sizeJ {
+				thicknessI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP6")
+				thicknessJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP6")
+				return thicknessI < thicknessJ
+			}
+			return sizeI < sizeJ
+		})
+
+		rowData := buildDirectRows(pattern, subGroups)
 		tableData := make([]map[string]interface{}, len(rowData))
 		for i, row := range rowData {
 			tableData[i] = map[string]interface{}(row)
@@ -66,9 +89,9 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 
 		tab := PriceListDetailTabConfig{
 			ID:    uuid.New(),
-			Label: productGroup4,
+			Label: tabLabel,
 			TableConfig: TableConfig{
-				Title:             productGroup4,
+				Title:             tabLabel,
 				GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
 				HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
 				Pagination:        boolPtr(config.TableConfig.Pagination),

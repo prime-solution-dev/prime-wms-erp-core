@@ -55,6 +55,7 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 			GridOptions: &GridOptions{
 				SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
 				SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+				EnableCellSpan:         boolPtr(config.TableConfig.GridOptions.EnableCellSpan),
 			},
 			Columns: columns,
 		},

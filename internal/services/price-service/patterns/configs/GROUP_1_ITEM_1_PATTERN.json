@@ -29,7 +29,7 @@
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_unit"
         },
@@ -38,7 +38,7 @@
           "headerName": "ราคาขาย After",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_unit"
         },
@@ -47,7 +47,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -56,7 +56,7 @@
           "headerName": "น.น.",
           "width": 80,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },
@@ -143,7 +143,7 @@
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_unit"
         },
@@ -152,7 +152,7 @@
           "headerName": "ราคาขาย After",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_unit"
         },
@@ -161,7 +161,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -170,7 +170,7 @@
           "headerName": "น.น.",
           "width": 80,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },
@@ -280,7 +280,7 @@
           "headerName": "ราคาขาย before",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_unit"
         },
@@ -290,7 +290,7 @@
           "width": 130,
           "enableTooltip": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_unit"
         },
@@ -299,7 +299,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -308,7 +308,7 @@
           "headerName": "น.น.",
           "width": 80,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },

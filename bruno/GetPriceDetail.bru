@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: http://localhost:9115/price/GetPriceDetail
+  url: {{URL_ERP}}/GetPriceDetail
   body: json
   auth: inherit
 }
@@ -16,7 +16,7 @@ body:json {
     "site_codes": [
       "PRM-00A"
     ],
-    "group_codes": ["GROUP_1_ITEM_1"],
+    "group_codes": ["GROUP_1_ITEM_3"],
     "sub_group_codes": []
   }
 }

@@ -77,7 +77,7 @@ After loading data, the system:
    - `GROUP_1_ITEM_1` → `BuildGroup1Item1Response()`
    - `GROUP_1_ITEM_2` → `BuildGroup1Item2Response()`
    - `GROUP_1_ITEM_3` → `BuildGroup1Item3Response()`
-   - `GROUP_1_ITEM_4` → Returns empty response (placeholder)
+   - `GROUP_1_ITEM_4` → `BuildGroup1Item4Response()`
 
 ## Pattern System
 
@@ -88,6 +88,7 @@ Patterns are defined in JSON configuration files located in `patterns/configs/`:
 - `GROUP_1_ITEM_1_PATTERN.json`
 - `GROUP_1_ITEM_2_PATTERN.json`
 - `GROUP_1_ITEM_3_PATTERN.json`
+- `GROUP_1_ITEM_4_PATTERN.json`
 
 Each configuration file contains:
 
@@ -194,6 +195,28 @@ Each configuration file contains:
    b. Create tab with same columns but different data
 ```
 
+#### 4. GROUP_1_ITEM_4 Pattern
+
+**Builder**: `BuildGroup1Item4Response()`
+
+**Characteristics**:
+
+- **PRODUCT_GROUP2 tabs**: Builds one tab per `PRODUCT_GROUP2` value (e.g., "ท่อเหลี่ยม", "ท่อแบน", "ท่อดำ"), with extras alphabetically appended.
+- **Shared fixed columns**: Uses `buildFixedColumns()` for the header layout shown in the wireframe.
+- **Row spanning**: Enables AG Grid cell spanning (`gridOptions.enableCellSpan = true`) and flags the `Size` column with `spanRows = true` so contiguous duplicate sizes merge visually.
+- **Direct rows**: Uses `buildDirectRows()` per tab and sorts data by Size → Thickness to keep span data contiguous.
+- **Price column groups**: Static column groups render weight (`กก.(C)`) and length (`เส้น`) price before/after pairs.
+
+**Data Flow**:
+```
+1. Load GROUP_1_ITEM_4 pattern configuration
+2. Select the default enabled pattern
+3. Aggregate all subgroups and group them by PRODUCT_GROUP2
+4. Sort tab labels by applicableCategories order then alphabetically
+5. Sort each tab's rows by PRODUCT_GROUP4 then PRODUCT_GROUP6
+6. Build fixed columns once and create a tab per PRODUCT_GROUP2
+```
+
 ## Data Transformation
 
 ### Helper Functions
@@ -247,6 +270,7 @@ Builds columns from pattern configuration:
 - Fixed columns (pinned, locked)
 - Column groups (static groups with children)
 - Regular columns
+- **Row spanning**: Columns can specify `spanRows: true`, and `tableConfig.gridOptions.enableCellSpan` must be enabled to merge contiguous duplicate values.
 
 ### Row Building
 
