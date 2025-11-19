@@ -21,11 +21,11 @@
           }
         },
         {
-          "field": "weight",
-          "headerName": "Weight",
+          "field": "thickness",
+          "headerName": "หนา",
           "width": 100,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "product_group_6"
         },
@@ -34,7 +34,7 @@
           "headerName": "Weight-spec",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },
@@ -43,7 +43,7 @@
           "headerName": "Avg.kg stock",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -52,16 +52,16 @@
           "headerName": "OD",
           "width": 110,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
-          "dataMapping": "od"
+          "dataMapping": "product_group_8"
         },
         {
           "field": "line_bundle",
-          "headerName": "Line/bundle",
+          "headerName": "เส้น/มัด",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "line_bundle"
         },
@@ -70,13 +70,13 @@
           "headerName": "Stock",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "stock"
         },
         {
-          "field": "highlight_blue",
-          "headerName": "Highlight blue",
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
           "width": 140,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
@@ -86,13 +86,13 @@
           "headerName": "Extra (THB)",
           "width": 130,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
         {
-          "field": "note",
-          "headerName": "Note",
+          "field": "remark",
+          "headerName": "หมายเหตุ",
           "width": 180,
           "dataMapping": "remark"
         },
@@ -107,98 +107,98 @@
       "fixedColumns": [],
       "columnGroups": [
         {
-          "headerName": "Awaiting Production",
+          "headerName": "รอผลิต",
           "groupId": "awaiting_production",
           "openByDefault": true,
           "children": [
             {
-              "field": "import_date",
-              "headerName": "Import Date",
+              "field": "awaiting_production_import_date",
+              "headerName": "วัน เข้า",
               "width": 140,
               "dataMapping": "import_date"
             },
             {
-              "field": "ton",
-              "headerName": "Ton",
+              "field": "awaiting_production_ton",
+              "headerName": "ตัน",
               "width": 120,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "ton"
             },
             {
-              "field": "producer",
-              "headerName": "Producer",
+              "field": "awaiting_production_producer",
+              "headerName": "ผู้ผลิต",
               "width": 140,
               "dataMapping": "producer"
             }
           ]
         },
         {
-          "headerName": "Price kg",
+          "headerName": "ราคา กก",
           "groupId": "price_kg",
           "openByDefault": true,
           "children": [
             {
-              "field": "price_kg_before",
-              "headerName": "Selling Price Before",
+              "field": "price_kg_before_price_weight",
+              "headerName": "ราคาขาย before",
               "width": 160,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_kg_after",
-              "headerName": "Selling Price After",
+              "field": "price_kg_total_net_price_weight",
+              "headerName": "ราคาขาย after",
               "width": 160,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_weight"
             }
           ]
         },
         {
-          "headerName": "Line price",
+          "headerName": "ราคา เส้น",
           "groupId": "price_line",
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before",
-              "headerName": "Selling Price Before",
+              "field": "price_line_before_price_unit",
+              "headerName": "ราคาขาย before",
               "width": 160,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_unit"
             },
             {
-              "field": "price_line_after",
-              "headerName": "Selling Price After",
+              "field": "price_line_total_net_price_unit",
+              "headerName": "ราคาขาย after",
               "width": 160,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_unit"
             }
           ]
         },
         {
-          "headerName": "Sale",
+          "headerName": "ขาย",
           "groupId": "sale",
           "openByDefault": true,
           "children": [
             {
               "field": "sale_fast",
-              "headerName": "Fast",
+              "headerName": "เร็ว",
               "width": 110,
               "cellRenderer": "agCheckboxCellRenderer",
               "dataMapping": "fast"
             },
             {
               "field": "sale_slow",
-              "headerName": "Slow",
+              "headerName": "ช้า",
               "width": 110,
               "cellRenderer": "agCheckboxCellRenderer",
               "dataMapping": "slow"
@@ -242,9 +242,9 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
-      "showColumnToggle": true
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
     },
     "gridOptions": {
       "suppressMovableColumns": true,
