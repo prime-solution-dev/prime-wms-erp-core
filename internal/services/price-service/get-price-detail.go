@@ -148,15 +148,15 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	for _, resp := range responses {
 		// Extract GroupKey from first subgroup's subgroup_key (first part before "|")
 		groupKey := ""
-		groupKeyName := ""
+		GroupName := ""
 		if len(resp.SubGroups) > 0 && resp.SubGroups[0].SubGroupKey != "" {
 			groupKey = pricePatterns.ExtractGroupKey(resp.SubGroups[0].SubGroupKey)
-			// Get GroupKeyName from group item map using the last part of group_key
+			// Get GroupName from group item map using the last part of group_key
 			if groupKey != "" {
 				// Extract the last part (e.g., "GROUP_1_ITEM_1" -> "GROUP_1_ITEM_1")
 				// Actually, groupKey is already the first part, so we can use it directly
 				if item, ok := groupItemMap[groupKey]; ok {
-					groupKeyName = item.ItemName
+					GroupName = item.ItemName
 				}
 			}
 		}
@@ -173,7 +173,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 			Currency:          resp.Currency,
 			Remark:            resp.Remark,
 			GroupKey:          groupKey,
-			GroupKeyName:      groupKeyName,
+			GroupName:         GroupName,
 		}
 
 		// Format effective date

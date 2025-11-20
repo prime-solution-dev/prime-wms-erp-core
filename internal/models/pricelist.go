@@ -304,6 +304,7 @@ type GetPriceListResponse struct {
 	CompanyCode       string                           `json:"company_code"`
 	SiteCode          string                           `json:"site_code"`
 	GroupCode         string                           `json:"group_code"`
+	GroupName         string                           `json:"group_name"`
 	PriceUnit         float64                          `json:"price_unit"`
 	PriceWeight       float64                          `json:"price_weight"`
 	BeforePriceUnit   float64                          `json:"before_price_unit"`
@@ -312,7 +313,6 @@ type GetPriceListResponse struct {
 	EffectiveDate     *string                          `json:"effective_date"`
 	Remark            string                           `json:"remark"`
 	GroupKey          string                           `json:"group_key"`
-	GroupKeyName      string                           `json:"group_key_name"`
 	CreateBy          string                           `json:"create_by"`
 	CreateDtm         string                           `json:"create_dtm"`
 	UpdateBy          string                           `json:"update_by"`

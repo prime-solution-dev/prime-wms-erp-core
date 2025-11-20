@@ -783,7 +783,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		priceListResp.SubGroups = subGroups
 
 		groupKeyParts := strings.Split(pl.GroupKey, "|")
-		priceListResp.GroupKeyName = groupItemMap[groupKeyParts[len(groupKeyParts)-1]].ItemName
+		priceListResp.GroupName = groupItemMap[groupKeyParts[len(groupKeyParts)-1]].ItemName
 
 		result = append(result, priceListResp)
 	}
