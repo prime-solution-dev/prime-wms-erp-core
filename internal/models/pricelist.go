@@ -231,21 +231,31 @@ type PriceListTermResponse struct {
 	UpdateDtm        string  `json:"update_dtm"`
 }
 
+type PriceListGroupExtraKeyResponse struct {
+	ID           string `json:"id"`
+	GroupExtraID string `json:"group_extra_id"`
+	GroupCode    string `json:"group_code"`
+	GroupName    string `json:"group_name"`
+	ValueCode    string `json:"value_code"`
+	ValueName    string `json:"value_name"`
+	Seq          int    `json:"seq"`
+}
+
 type PriceListExtraResponse struct {
-	ID                      string                   `json:"id"`
-	PriceListGroupID        string                   `json:"price_list_group_id"`
-	ExtraKey                string                   `json:"extra_key"`
-	ConditionCode           string                   `json:"condition_code"`
-	ValueInt                float64                  `json:"value_int"`
-	LengthExtraKey          float64                  `json:"length_extra_key"`
-	Operator                string                   `json:"operator"`
-	CondRangeMin            float64                  `json:"cond_range_min"`
-	CondRangeMax            float64                  `json:"cond_range_max"`
-	CreateBy                string                   `json:"create_by"`
-	CreateDtm               string                   `json:"create_dtm"`
-	UpdateBy                string                   `json:"update_by"`
-	UpdateDtm               string                   `json:"update_dtm"`
-	PriceListGroupExtraKeys []PriceListGroupExtraKey `json:"price_list_group_extra_keys"`
+	ID                      string                           `json:"id"`
+	PriceListGroupID        string                           `json:"price_list_group_id"`
+	ExtraKey                string                           `json:"extra_key"`
+	ConditionCode           string                           `json:"condition_code"`
+	ValueInt                float64                          `json:"value_int"`
+	LengthExtraKey          float64                          `json:"length_extra_key"`
+	Operator                string                           `json:"operator"`
+	CondRangeMin            float64                          `json:"cond_range_min"`
+	CondRangeMax            float64                          `json:"cond_range_max"`
+	CreateBy                string                           `json:"create_by"`
+	CreateDtm               string                           `json:"create_dtm"`
+	UpdateBy                string                           `json:"update_by"`
+	UpdateDtm               string                           `json:"update_dtm"`
+	PriceListGroupExtraKeys []PriceListGroupExtraKeyResponse `json:"price_list_group_extra_keys"`
 }
 
 type PriceListExtraConfigResponse struct {
