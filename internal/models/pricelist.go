@@ -14,6 +14,7 @@ type PriceListGroup struct {
 	CompanyCode          string                `json:"company_code"`
 	SiteCode             string                `json:"site_code"`
 	GroupCode            string                `json:"group_code"`
+	GroupName            string                `json:"group_name"`
 	PriceUnit            float64               `json:"price_unit"`
 	PriceWeight          float64               `json:"price_weight"`
 	BeforePriceUnit      float64               `json:"before_price_unit"`
