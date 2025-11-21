@@ -656,6 +656,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			CompanyCode:       pl.CompanyCode,
 			SiteCode:          pl.SiteCode,
 			GroupCode:         pl.GroupCode,
+			GroupName:         pl.GroupName,
 			PriceUnit:         pl.PriceUnit,
 			PriceWeight:       pl.PriceWeight,
 			BeforePriceUnit:   pl.BeforePriceUnit,
@@ -829,9 +830,6 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		priceListResp.Extras.Data = extrasData
 
 		priceListResp.SubGroups = subGroups
-
-		groupKeyParts := strings.Split(pl.GroupKey, "|")
-		priceListResp.GroupName = groupItemMap[groupKeyParts[len(groupKeyParts)-1]].ItemName
 
 		result = append(result, priceListResp)
 	}
