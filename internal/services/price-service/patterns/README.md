@@ -11,7 +11,7 @@ The Price List Detail service (`get-price-detail`) is a sophisticated pricing sy
 1. **Service Layer** (`get-price-detail.go`)
    - Main entry point for the API
    - Handles request validation and orchestration
-   - Routes to appropriate pattern builders based on `GroupKey`
+   - Routes to appropriate pattern builders based on `GroupCode`
 
 2. **Pattern System** (`patterns/`)
    - Configuration-driven table generation
@@ -69,11 +69,11 @@ GetPriceDetail
 
 After loading data, the system:
 
-1. **Extracts GroupKey**: From the first price list item's `GroupKey` field
-   - The `GroupKey` is extracted from the first subgroup's `subgroup_key` (first part before "|")
-   - Example: `"GROUP_1_ITEM_1|GROUP_2_ITEM_2|..."` → `"GROUP_1_ITEM_1"`
+1. **Reads GroupCode**: Directly from the first price list item's `GroupCode` field
+   - This value comes from `price_list_group.group_code`
+   - Example: `"GROUP_1_ITEM_1"`
 
-2. **Routes to Pattern Handler**: Based on `GroupKey`, selects appropriate builder:
+2. **Routes to Pattern Handler**: Based on `GroupCode`, selects appropriate builder:
    - `GROUP_1_ITEM_1` → `BuildGroup1Item1Response()`
    - `GROUP_1_ITEM_2` → `BuildGroup1Item2Response()`
    - `GROUP_1_ITEM_3` → `BuildGroup1Item3Response()`
