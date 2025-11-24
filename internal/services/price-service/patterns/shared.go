@@ -28,6 +28,7 @@ type PatternConfig struct {
 	ApplicableCategories []string            `json:"applicableCategories"`
 	EditableSuffixes     []string            `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes    []string            `json:"fetchable_suffixes,omitempty"`
+	ItemFormat           []ItemFormatPart    `json:"itemFormat,omitempty"`
 }
 
 type GroupingConfig struct {
@@ -157,12 +158,25 @@ type CellStyle struct {
 
 type AGGridRowData map[string]interface{}
 
-func loadConfiguration(groupKey string) (*PriceTableConfiguration, error) {
-	if groupKey == "" {
-		return nil, fmt.Errorf("groupKey is required")
+type ItemFormatPart struct {
+	Type  string `json:"type"`  // "group" or "literal"
+	Value string `json:"value"` // group code or literal text
+}
+
+var defaultItemFormat = []ItemFormatPart{
+	{Type: "group", Value: "PRODUCT_GROUP4"},
+	{Type: "literal", Value: "x"},
+	{Type: "group", Value: "PRODUCT_GROUP6"},
+	{Type: "literal", Value: "x"},
+	{Type: "group", Value: "PRODUCT_GROUP7"},
+}
+
+func loadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
+	if groupCode == "" {
+		return nil, fmt.Errorf("groupCode is required")
 	}
 
-	configPath := fmt.Sprintf("configs/%s_PATTERN.json", groupKey)
+	configPath := fmt.Sprintf("configs/%s_PATTERN.json", groupCode)
 
 	data, err := patternConfigs.ReadFile(configPath)
 	if err != nil {
@@ -713,6 +727,32 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 	return rows
 }
 
+func buildItemValue(pattern *PatternConfig, sg models.PriceListSubGroupResponse) string {
+	format := pattern.ItemFormat
+	if len(format) == 0 {
+		format = defaultItemFormat
+	}
+
+	var builder strings.Builder
+	for _, part := range format {
+		switch strings.ToLower(part.Type) {
+		case "group":
+			if part.Value == "" {
+				continue
+			}
+			if groupVal := getValueNameByGroupCode(sg.SubGroupKeys, part.Value); groupVal != "" {
+				builder.WriteString(groupVal)
+			}
+		case "literal":
+			builder.WriteString(part.Value)
+		default:
+			continue
+		}
+	}
+
+	return strings.TrimSpace(builder.String())
+}
+
 func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	rows := []AGGridRowData{}
 
@@ -730,6 +770,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var odValue interface{}
 		var stockValue interface{}
 		var importDateValue interface{}
+		var deliveryDateValue interface{}
 		var tonValue interface{}
 		var producerValue interface{}
 		fastValue := false
@@ -766,6 +807,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if importDate, ok := udfData["import_date"]; ok {
 					importDateValue = importDate
 				}
+				if deliveryDate, ok := udfData["delivery_date"]; ok {
+					deliveryDateValue = deliveryDate
+				}
 				if ton, ok := udfData["ton"]; ok {
 					tonValue = ton
 				}
@@ -775,6 +819,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
 					if importDate, ok := apMap["import_date"]; ok {
 						importDateValue = importDate
+					}
+					if deliveryDate, ok := apMap["delivery_date"]; ok {
+						deliveryDateValue = deliveryDate
 					}
 					if ton, ok := apMap["ton"]; ok {
 						tonValue = ton
@@ -803,16 +850,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 			}
 		}
-
-		itemParts := []string{}
-		for _, code := range []string{"PRODUCT_GROUP4", "PRODUCT_GROUP6", "PRODUCT_GROUP7"} {
-			valueName := getValueNameByGroupCode(sg.SubGroupKeys, code)
-			if valueName != "" {
-				itemParts = append(itemParts, valueName)
-			}
-		}
-		row["item"] = strings.Join(itemParts, "x")
-
+		row["item"] = buildItemValue(pattern, sg)
 		for _, fixedCol := range pattern.FixedColumns {
 			switch fixedCol.DataMapping {
 			case "item":
@@ -824,12 +862,18 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
 			case "product_group_4":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-			case "product_group_8":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
 			case "product_group_6":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+			case "product_group_7":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
+			case "product_group_8":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
 			case "price_weight":
 				row[fixedCol.Field] = sg.PriceWeight
+			case "before_price_weight":
+				row[fixedCol.Field] = sg.BeforePriceWeight
+			case "extra_price_weight":
+				row[fixedCol.Field] = sg.ExtraPriceWeight
 			case "market_weight":
 				if marketWeightValue != nil {
 					row[fixedCol.Field] = *marketWeightValue
@@ -855,6 +899,15 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			case "remark":
 				row[fixedCol.Field] = sg.Remark
 			}
+
+			if fixedCol.DataMapping == "" {
+				switch fixedCol.Field {
+				case "weight_spec":
+					row[fixedCol.Field] = 0.0
+				case "avg_kg_stock":
+					row[fixedCol.Field] = 0.0
+				}
+			}
 		}
 
 		for _, colGroup := range pattern.ColumnGroups {
@@ -870,6 +923,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[childCol.Field] = sg.TotalNetPriceUnit
 				case "import_date":
 					row[childCol.Field] = importDateValue
+				case "delivery_date":
+					row[childCol.Field] = deliveryDateValue
 				case "ton":
 					row[childCol.Field] = tonValue
 				case "producer":
@@ -908,6 +963,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[colConfig.Field] = stockValue
 			case "import_date":
 				row[colConfig.Field] = importDateValue
+			case "delivery_date":
+				row[colConfig.Field] = deliveryDateValue
 			case "ton":
 				row[colConfig.Field] = tonValue
 			case "producer":
