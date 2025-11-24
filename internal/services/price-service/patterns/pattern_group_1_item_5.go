@@ -1,0 +1,199 @@
+package patterns
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"prime-erp-core/internal/models"
+
+	"github.com/google/uuid"
+)
+
+func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, groupKey string) (PriceListDetailApiResponse, error) {
+	config, err := loadConfiguration(groupKey)
+	if err != nil {
+		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupKey, err)
+	}
+
+	var pattern *PatternConfig
+	for i := range config.Patterns {
+		if config.Patterns[i].ID == config.DefaultPattern && config.Patterns[i].Enabled {
+			pattern = &config.Patterns[i]
+			break
+		}
+	}
+	if pattern == nil {
+		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupKey)
+	}
+
+	allSubGroups := make([]models.PriceListSubGroupResponse, 0)
+	for _, priceList := range priceListData {
+		allSubGroups = append(allSubGroups, priceList.SubGroups...)
+	}
+	if len(allSubGroups) == 0 {
+		return PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}, nil
+	}
+
+	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
+	for _, sg := range allSubGroups {
+		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		if productGroup2 == "" {
+			productGroup2 = "อื่นๆ"
+		}
+		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
+	}
+
+	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2)
+	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
+
+	for _, tabLabel := range tabOrder {
+		subGroups := groupedByProductGroup2[tabLabel]
+		columns := buildGroup1Item5Columns(pattern, subGroups)
+		rowData := buildDynamicRows(pattern, subGroups)
+
+		tableData := make([]map[string]interface{}, len(rowData))
+		for i, row := range rowData {
+			tableData[i] = map[string]interface{}(row)
+		}
+
+		tab := PriceListDetailTabConfig{
+			ID:    uuid.New(),
+			Label: tabLabel,
+			TableConfig: TableConfig{
+				Title:             tabLabel,
+				GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+				HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+				Pagination:        boolPtr(config.TableConfig.Pagination),
+				Toolbar: &Toolbar{
+					Show:             boolPtr(config.TableConfig.Toolbar.Show),
+					ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+					ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+					ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+				},
+				GridOptions: &GridOptions{
+					SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+					SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+					EnableCellSpan:         boolPtr(config.TableConfig.GridOptions.EnableCellSpan),
+				},
+				Columns: columns,
+			},
+			TableData:         tableData,
+			EditableSuffixes:  pattern.EditableSuffixes,
+			FetchableSuffixes: pattern.FetchableSuffixes,
+		}
+
+		tabs = append(tabs, tab)
+	}
+
+	return PriceListDetailApiResponse{
+		Id:   uuid.MustParse(priceListData[0].ID),
+		Name: "Price List Detail",
+		Tabs: tabs,
+	}, nil
+}
+
+func buildGroup1Item5Columns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
+	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
+	uniqueValues := make(map[string]bool)
+	for _, sg := range subGroups {
+		key := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
+		if key != "" {
+			uniqueValues[key] = true
+		}
+	}
+
+	sizeLabels := make([]string, 0, len(uniqueValues))
+	for label := range uniqueValues {
+		sizeLabels = append(sizeLabels, label)
+	}
+	sort.Strings(sizeLabels)
+
+	columns := make([]ColumnDef, 0, len(sizeLabels))
+	for _, label := range sizeLabels {
+		sanitized := sanitizeFieldName(label)
+		colGroup := ColumnDef{
+			HeaderName:    label,
+			GroupID:       fmt.Sprintf("size_%s", sanitized),
+			OpenByDefault: boolPtr(true),
+			Children:      []ColumnDef{},
+		}
+
+		for _, colConfig := range pattern.Columns {
+			colGroup.Children = append(colGroup.Children, buildItem5ColumnDef(colConfig, sanitized))
+		}
+
+		for _, nestedGroup := range pattern.ColumnGroups {
+			colGroup.Children = append(colGroup.Children, buildItem5NestedGroup(nestedGroup, sanitized))
+		}
+
+		columns = append(columns, colGroup)
+	}
+
+	return columns
+}
+
+func buildItem5ColumnDef(config ColumnConfigItem, prefix string) ColumnDef {
+	field := fmt.Sprintf("%s_%s", prefix, config.Field)
+	col := ColumnDef{
+		Field:        field,
+		HeaderName:   config.HeaderName,
+		Width:        intPtr(config.Width),
+		CellRenderer: config.CellRenderer,
+	}
+
+	if config.CellStyle != nil {
+		col.CellStyle = convertCellStyle(config.CellStyle)
+	}
+	if config.EnableTooltip {
+		col.EnableTooltip = boolPtr(true)
+	}
+
+	return col
+}
+
+func buildItem5NestedGroup(config ColumnGroupConfig, prefix string) ColumnDef {
+	groupID := config.GroupID
+	if groupID == "" {
+		groupID = config.HeaderName
+	}
+
+	group := ColumnDef{
+		HeaderName:    config.HeaderName,
+		GroupID:       fmt.Sprintf("%s_%s", prefix, sanitizeFieldName(groupID)),
+		OpenByDefault: boolPtr(config.OpenByDefault),
+		Children:      []ColumnDef{},
+	}
+
+	for _, child := range config.Children {
+		group.Children = append(group.Children, buildItem5ColumnDef(child, prefix))
+	}
+
+	return group
+}
+
+func buildTabOrder(preferred []string, groupedData map[string][]models.PriceListSubGroupResponse) []string {
+	tabOrder := make([]string, 0, len(groupedData))
+	seen := make(map[string]bool)
+
+	for _, label := range preferred {
+		if _, ok := groupedData[label]; ok {
+			tabOrder = append(tabOrder, label)
+			seen[label] = true
+		}
+	}
+
+	remaining := make([]string, 0)
+	for label := range groupedData {
+		if !seen[label] {
+			remaining = append(remaining, label)
+		}
+	}
+	sort.Strings(remaining)
+
+	return append(tabOrder, remaining...)
+}

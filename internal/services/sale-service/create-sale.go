@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	verifyService "prime-erp-core/internal/services/verify-service"
 	"time"
 
@@ -65,11 +66,18 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	createSaleItems := []models.SaleItem{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
-	for _, saleReq := range req.Sales {
+	// Generate all sale codes first
+	saleCodes, err := generateSaleCodes(ctx, len(req.Sales))
+	if err != nil {
+		return nil, err
+	}
+
+	for i, saleReq := range req.Sales {
 		tempSale := saleReq.Sale
 		tempSale.ID = uuid.New()
 
-		saleCode := uuid.New().String()
+		// Use pre-generated sale code
+		saleCode := saleCodes[i]
 
 		if tempSale.SaleCode == "" {
 			tempSale.SaleCode = saleCode
@@ -288,5 +296,64 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
+	// Update running number after successful creation
+	if err := updateSaleRunningConfig(ctx, len(createSales)); err != nil {
+		// Log error but don't fail the transaction as sales are already created
+		fmt.Printf("Warning: failed to update running config: %v\n", err)
+	}
+
 	return res, nil
+}
+
+// updateSaleRunningConfig updates the running number configuration for sales
+func updateSaleRunningConfig(ctx *gin.Context, count int) error {
+	if count <= 0 {
+		return nil // No sales created, nothing to update
+	}
+
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_SO",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	return nil
+}
+
+// generateSaleCodes generates sale codes using system config
+func generateSaleCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No sales to generate codes for
+	}
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_SO",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+	}
+
+	saleCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sale codes: %v", err)
+	}
+
+	saleResult, ok := saleCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(saleResult.Data) != count {
+		return nil, errors.New("failed to get correct number of sale codes from system config")
+	}
+
+	return saleResult.Data, nil
 }

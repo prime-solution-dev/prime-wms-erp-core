@@ -126,15 +126,18 @@ type SaleWithInvoiceItems struct {
 	InvoiceItems []models.InvoiceItem
 }
 
-func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, error) {
+func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithInvoiceItems, error) {
 
 	sqlx, err := db.ConnectSqlx(`prime_erp`)
 	if err != nil {
 		return nil, err
 	}
-	searchCustomerCode := ""
+	search := ""
 	if customerCode != "" {
-		searchCustomerCode = fmt.Sprintf(` and s.customer_code  = '%s'`, customerCode)
+		search += fmt.Sprintf(` and s.customer_code  = '%s'`, customerCode)
+	}
+	if saleCode != "" {
+		search += fmt.Sprintf(` and s.sale_code  = '%s'`, saleCode)
 	}
 
 	query := fmt.Sprintf(`
@@ -155,7 +158,7 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true and (i.invoice_type = 'AR' or i.invoice_type = 'CN' or i.invoice_type = 'DN')
 		%s
 		 ORDER BY s.sale_code
-	`, searchCustomerCode)
+	`, search)
 
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
