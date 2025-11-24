@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item6Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
 	config, err := loadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
@@ -33,7 +33,7 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 	if len(allSubGroups) == 0 {
 		return PriceListDetailApiResponse{
 			Id:   uuid.MustParse(priceListData[0].ID),
-			Name: "Price List Detail",
+			Name: "หมวดเหล็กฉาก",
 			Tabs: []PriceListDetailTabConfig{},
 		}, nil
 	}
@@ -47,23 +47,7 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
 	}
 
-	tabOrder := make([]string, 0)
-	seen := make(map[string]bool)
-	for _, cat := range pattern.ApplicableCategories {
-		if _, ok := groupedByProductGroup2[cat]; ok {
-			tabOrder = append(tabOrder, cat)
-			seen[cat] = true
-		}
-	}
-	remaining := make([]string, 0)
-	for key := range groupedByProductGroup2 {
-		if !seen[key] {
-			remaining = append(remaining, key)
-		}
-	}
-	sort.Strings(remaining)
-	tabOrder = append(tabOrder, remaining...)
-
+	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2)
 	columns := buildFixedColumns(pattern)
 
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
@@ -71,14 +55,14 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 		subGroups := groupedByProductGroup2[tabLabel]
 
 		sort.SliceStable(subGroups, func(i, j int) bool {
-			sizeI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
-			sizeJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
-			if sizeI == sizeJ {
-				thicknessI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP6")
-				thicknessJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP6")
-				return thicknessI < thicknessJ
+			group4I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
+			group4J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
+			if group4I == group4J {
+				group7I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP7")
+				group7J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP7")
+				return group7I < group7J
 			}
-			return sizeI < sizeJ
+			return group4I < group4J
 		})
 
 		rowData := buildDirectRows(pattern, subGroups)

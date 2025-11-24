@@ -123,6 +123,7 @@ type PriceListSubGroup struct {
 	UpdateBy                  string                 `json:"update_by"`
 	UpdateDtm                 *time.Time             `json:"update_dtm"`
 	UdfJson                   json.RawMessage        `json:"udf_json"`
+	PriceListGroup            PriceListGroup         `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group"`
 	PriceListSubGroupKeys     []PriceListSubGroupKey `gorm:"foreignKey:SubGroupID;references:ID" json:"price_list_sub_group_keys"`
 }
 

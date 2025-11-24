@@ -8,10 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupKey string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupKey)
+func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+	config, err := loadConfiguration(groupCode)
 	if err != nil {
-		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupKey, err)
+		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
 
 	var pattern *PatternConfig
@@ -22,7 +22,7 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 		}
 	}
 	if pattern == nil {
-		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupKey)
+		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupCode)
 	}
 
 	subGroups := make([]models.PriceListSubGroupResponse, 0)

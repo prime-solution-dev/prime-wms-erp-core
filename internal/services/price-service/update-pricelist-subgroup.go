@@ -34,8 +34,6 @@ func UpdatePriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 	}
 
-	utils.PrintJSON(req)
-
 	// Call repository function (batch)
 	if err := updateSubGroupFunc(req); err != nil {
 		return nil, fmt.Errorf("failed to update price list sub group: %w", err)
