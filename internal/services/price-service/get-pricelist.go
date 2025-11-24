@@ -535,7 +535,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
-	priceLists, err := priceListRepository.GetPriceListGroup(req.CompanyCode, req.SiteCode, req.GroupKeys)
+	priceLists, err := priceListRepository.GetPriceListGroup(req.CompanyCode, req.SiteCode, req.GroupCodes)
 	if err != nil {
 		return nil, err
 	}
@@ -600,6 +600,49 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		paymentTermMap[pt.TermCode] = pt
 	}
 
+	// Get Extra Config
+	extraConfigs, err := priceListRepository.GetPriceListExtraConfig(req.GroupCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	extraConfigMap := map[string]models.PriceListExtraConfig{}
+	for _, ec := range extraConfigs {
+		extraConfigMap[ec.GroupCode] = ec
+	}
+
+	// Get Group Master
+	groupMasterReq := models.GetGroupRequest{
+		GroupCodes: []string{},
+		ItemCodes:  []string{},
+	}
+
+	groupMasterReqJson, err := json.Marshal(groupMasterReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal group request to JSON: " + err.Error())
+	}
+
+	groupMasterReqString := string(groupMasterReqJson)
+
+	groupMasterResp, err := groupService.GetGroup(ctx, groupMasterReqString)
+	if err != nil {
+		return nil, err
+	}
+
+	groupMasterRespData, ok := groupMasterResp.([]models.GetGroupResponse)
+	if !ok {
+		return nil, errors.New("failed to cast group response")
+	}
+
+	groupMasterMap := map[string]models.GetGroupResponse{}
+	groupMasterItemMap := map[string]models.GetGroupItemResponse{}
+	for _, g := range groupMasterRespData {
+		groupMasterMap[g.GroupCode] = g
+		for _, item := range g.Items {
+			groupMasterItemMap[item.ItemCode] = item
+		}
+	}
+
 	result := []models.GetPriceListResponse{}
 	for _, pl := range priceLists {
 		var effectiveDate *string
@@ -613,6 +656,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			CompanyCode:       pl.CompanyCode,
 			SiteCode:          pl.SiteCode,
 			GroupCode:         pl.GroupCode,
+			GroupName:         pl.GroupName,
 			PriceUnit:         pl.PriceUnit,
 			PriceWeight:       pl.PriceWeight,
 			BeforePriceUnit:   pl.BeforePriceUnit,
@@ -660,7 +704,7 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 		}
 
-		extras := []models.PriceListExtraResponse{}
+		extrasData := []models.PriceListExtraResponse{}
 		if len(pl.PriceListGroupExtras) > 0 {
 			for _, extra := range pl.PriceListGroupExtras {
 				createDtm := ""
@@ -673,18 +717,37 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z")
 				}
 
-				extras = append(extras, models.PriceListExtraResponse{
-					ID:               extra.ID.String(),
-					PriceListGroupID: extra.PriceListGroupID.String(),
-					ExtraKey:         extra.ExtraKey,
-					LengthExtraKey:   extra.LengthExtraKey,
-					Operator:         extra.Operator,
-					CondRangeMin:     extra.CondRangeMin,
-					CondRangeMax:     extra.CondRangeMax,
-					CreateBy:         extra.CreateBy,
-					CreateDtm:        createDtm,
-					UpdateBy:         extra.UpdateBy,
-					UpdateDtm:        updateDtm,
+				priceListGroupExtraKeys := []models.PriceListGroupExtraKeyResponse{}
+				for _, pk := range extra.PriceListGroupExtraKeys {
+					group := groupMasterMap[pk.Code]
+					groupItem := groupMasterItemMap[pk.Value]
+
+					priceListGroupExtraKeys = append(priceListGroupExtraKeys, models.PriceListGroupExtraKeyResponse{
+						ID:           pk.ID.String(),
+						GroupExtraID: pk.GroupExtraID.String(),
+						GroupCode:    pk.Code,
+						GroupName:    group.GroupName,
+						ValueCode:    pk.Value,
+						ValueName:    groupItem.ItemName,
+						Seq:          pk.Seq,
+					})
+				}
+
+				extrasData = append(extrasData, models.PriceListExtraResponse{
+					ID:                      extra.ID.String(),
+					PriceListGroupID:        extra.PriceListGroupID.String(),
+					ExtraKey:                extra.ExtraKey,
+					ConditionCode:           extra.ConditionCode,
+					ValueInt:                float64(extra.ValueInt),
+					LengthExtraKey:          float64(extra.LengthExtraKey),
+					Operator:                extra.Operator,
+					CondRangeMin:            extra.CondRangeMin,
+					CondRangeMax:            extra.CondRangeMax,
+					CreateBy:                extra.CreateBy,
+					CreateDtm:               createDtm,
+					UpdateBy:                extra.UpdateBy,
+					UpdateDtm:               updateDtm,
+					PriceListGroupExtraKeys: priceListGroupExtraKeys,
 				})
 			}
 		}
@@ -755,11 +818,18 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		priceListResp.Terms = terms
-		priceListResp.Extras = extras
-		priceListResp.SubGroups = subGroups
 
-		groupKeyParts := strings.Split(pl.GroupKey, "|")
-		priceListResp.GroupKeyName = groupItemMap[groupKeyParts[len(groupKeyParts)-1]].ItemName
+		extraConfig, ok := extraConfigMap[pl.GroupCode]
+		if ok {
+			priceListResp.Extras.Config = models.PriceListExtraConfigResponse{
+				GroupCode:  extraConfig.GroupCode,
+				IsActive:   extraConfig.IsActive,
+				ConfigJson: extraConfig.ConfigJson,
+			}
+		}
+		priceListResp.Extras.Data = extrasData
+
+		priceListResp.SubGroups = subGroups
 
 		result = append(result, priceListResp)
 	}
