@@ -10,7 +10,6 @@ func GetBaseURL() string {
 	return ""
 }
 
-// API Endpoint variables
 var (
 	GET_INVENTORY_ATP_ENDPOINT string
 	CREATE_ORDER_ENDPOINT      string
@@ -18,7 +17,6 @@ var (
 	GET_PACK_SO_ENDPOINT       string
 )
 
-// Initialize sets the endpoint values (call after loading .env)
 func Initialize() {
 	GET_INVENTORY_ATP_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/GetInventoryAtp"
 	CREATE_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CreateOrders"

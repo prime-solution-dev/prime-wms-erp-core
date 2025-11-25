@@ -32,3 +32,4 @@ Jenkinsfile
 # Editor/IDE
 # .idea/
 # .vscode/
+.cursor/
