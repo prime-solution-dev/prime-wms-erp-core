@@ -124,7 +124,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].CreditTermDay = float64(supplier.CreditTerm)
 			/* 	newTime := time.Now().AddDate(0, 0, req[i].CreditTermDay)
 			req[i].PaymentDate = &newTime
-			req[i].DocumentDate = &time.Now() */
+			req[i].DocumentDate = &time.Now()  */
 		}
 		totalAmount := 0.0
 		totalVat := 0.0

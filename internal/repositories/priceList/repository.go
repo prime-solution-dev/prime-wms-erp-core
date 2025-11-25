@@ -12,7 +12,7 @@ import (
 )
 
 // GetPriceListGroup
-func GetPriceListGroup(companyCode string, siteCode string, GroupKeys []string) ([]models.PriceListGroup, error) {
+func GetPriceListGroup(companyCode string, siteCode string, groupCodes []string) ([]models.PriceListGroup, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, err
@@ -23,13 +23,13 @@ func GetPriceListGroup(companyCode string, siteCode string, GroupKeys []string) 
 	query := gormx.Model(&models.PriceListGroup{}).
 		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
 
-	if len(GroupKeys) > 0 {
-		query = query.Where("group_key IN ?", GroupKeys)
+	if len(groupCodes) > 0 {
+		query = query.Where("group_code IN ?", groupCodes)
 	}
 
 	if err := query.
 		Preload("PriceListGroupTerms").
-		Preload("PriceListGroupExtras").
+		Preload("PriceListGroupExtras.PriceListGroupExtraKeys").
 		Preload("PriceListSubGroups.PriceListSubGroupKeys").
 		Find(&priceListGroups).Error; err != nil {
 		return priceListGroups, err
@@ -60,6 +60,27 @@ func GetPriceListSubGroupByID(subGroupID uuid.UUID) (*models.PriceListSubGroup, 
 	}
 
 	return &subGroup, nil
+}
+
+func GetPriceListExtraConfig(groupCodes []string) ([]models.PriceListExtraConfig, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	priceListExtraConfigs := []models.PriceListExtraConfig{}
+	query := gormx.Model(&models.PriceListExtraConfig{})
+
+	if len(groupCodes) > 0 {
+		query = query.Where("group_code IN ?", groupCodes)
+	}
+
+	if err := query.Find(&priceListExtraConfigs).Error; err != nil {
+		return priceListExtraConfigs, err
+	}
+
+	return priceListExtraConfigs, nil
 }
 
 // CreatePriceListGroup
@@ -152,6 +173,35 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 					return err
 				}
 			}
+		}
+
+		return nil
+	})
+}
+
+// UpdateExtra
+func UpdateExtra(extras []models.PriceListGroupExtra) error {
+	priceListGroupIDs := []uuid.UUID{}
+	for _, extra := range extras {
+		priceListGroupIDs = append(priceListGroupIDs, extra.PriceListGroupID)
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		// Delete old Extra
+		if extraResult := tx.Where("price_list_group_id IN ?", priceListGroupIDs).
+			Delete(&models.PriceListGroupExtra{}); extraResult.Error != nil {
+			return extraResult.Error
+		}
+
+		// Insert new Extra
+		if err := tx.Create(&extras).Error; err != nil {
+			return err
 		}
 
 		return nil
