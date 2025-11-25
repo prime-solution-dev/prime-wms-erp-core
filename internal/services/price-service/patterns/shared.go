@@ -582,6 +582,11 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
+		var stockValue interface{}
+		var stockQuantityValue interface{}
+		var batchNoValue interface{}
+		var warehouseValue interface{}
+		var codeValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -725,6 +730,21 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 					row[fieldName] = inactiveValue
 				} else {
 					row[fieldName] = false
+				}
+			case "stock":
+				row[fieldName] = stockValue
+			case "stock_quantity":
+				row[fieldName] = stockQuantityValue
+			case "batch_no":
+				row[fieldName] = batchNoValue
+			case "warehouse":
+				row[fieldName] = warehouseValue
+			case "code":
+				row[fieldName] = codeValue
+			case "":
+				// Empty dataMapping - set default values for calculated/empty fields
+				if colConfig.Field == "weight_spec" || colConfig.Field == "avg_kg_stock" {
+					row[fieldName] = 0.0
 				}
 			}
 		}
