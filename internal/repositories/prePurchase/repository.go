@@ -83,6 +83,15 @@ func GetPOBigLotList(
 	offset := (page - 1) * pageSize
 	if err := query.
 		Preload("PrePurchaseItems").
+		Order(`
+        CASE
+            WHEN status_approve = 'PENDING' AND status = 'PENDING' THEN 1
+            WHEN status_approve = 'PROCESS' THEN 2
+            WHEN status_approve = 'COMPLETED' THEN 3
+            ELSE 4
+        END ASC,
+				create_dtm DESC
+    `).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&prePurchaseList).Error; err != nil {
