@@ -292,8 +292,6 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"GROUP_1_ITEM_3": pricePatterns.BuildGroup1Item3Response,
 		"GROUP_1_ITEM_4": pricePatterns.BuildGroup1Item4Response,
 		"GROUP_1_ITEM_5": pricePatterns.BuildGroup1Item5Response,
-		"GROUP_1_ITEM_6": pricePatterns.BuildGroup1Item6Response,
-		"GROUP_1_ITEM_7": pricePatterns.BuildGroup1Item7Response,
 	}
 
 	handler, ok := handlers[groupCode]
