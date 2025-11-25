@@ -280,10 +280,6 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	groupCode := priceListData[0].GroupCode
 	if groupCode == "" {
 		return nil, fmt.Errorf("GroupCode is missing in price list data")
-	// Determine the pattern handler from the group's code
-	groupCode := priceListData[0].GroupCode
-	if groupCode == "" {
-		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
 
 	type priceTableHandler func([]models.GetPriceListResponse, string) (pricePatterns.PriceListDetailApiResponse, error)
@@ -311,4 +307,4 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return response, nil
-}
+	}
