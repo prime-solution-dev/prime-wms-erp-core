@@ -319,6 +319,14 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 			col.CellStyle = convertCellStyle(fixedCol.CellStyle)
 		}
 
+		if fixedCol.CellRenderer != "" {
+			col.CellRenderer = fixedCol.CellRenderer
+		}
+
+		if fixedCol.SpanRows {
+			col.SpanRows = boolPtr(true)
+		}
+
 		columns = append(columns, col)
 	}
 
@@ -574,6 +582,11 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
+		var stockValue interface{}
+		var stockQuantityValue interface{}
+		var batchNoValue interface{}
+		var warehouseValue interface{}
+		var codeValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -583,9 +596,25 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 					inactiveValue = inactive
 					hasInactiveValue = true
 				}
+				if sq, ok := udfData["stock_quantity"]; ok {
+					stockQuantityValue = sq
+				}
+				if bn, ok := udfData["batch_no"]; ok {
+					batchNoValue = bn
+				}
+				if wh, ok := udfData["warehouse"]; ok {
+					warehouseValue = wh
+				}
+				if code, ok := udfData["code"]; ok {
+					codeValue = code
+				}
 				for key, value := range udfData {
-					if key == "is_highlight" || key == "inactive" {
+					if key == "is_highlight" || key == "inactive" || key == "stock_quantity" || key == "batch_no" || key == "warehouse" || key == "code" {
 						continue
+					}
+
+					if key == "stock" {
+						stockValue = value
 					}
 
 					if key == "awaiting_production" {
@@ -642,8 +671,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			switch colConfig.DataMapping {
 			case "product_group_3":
 				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+			case "product_group_4":
+				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
 			case "product_group_8":
 				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
+			case "product_group_7":
+				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
 			case "product_group_6":
 				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 			case "price_list_group_id":
@@ -697,6 +730,21 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 					row[fieldName] = inactiveValue
 				} else {
 					row[fieldName] = false
+				}
+			case "stock":
+				row[fieldName] = stockValue
+			case "stock_quantity":
+				row[fieldName] = stockQuantityValue
+			case "batch_no":
+				row[fieldName] = batchNoValue
+			case "warehouse":
+				row[fieldName] = warehouseValue
+			case "code":
+				row[fieldName] = codeValue
+			case "":
+				// Empty dataMapping - set default values for calculated/empty fields
+				if colConfig.Field == "weight_spec" || colConfig.Field == "avg_kg_stock" {
+					row[fieldName] = 0.0
 				}
 			}
 		}
