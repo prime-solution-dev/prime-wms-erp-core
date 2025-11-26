@@ -1,0 +1,230 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item4_pg2_tabs",
+      "name": "PRODUCT_GROUP2 Tabs Layout",
+      "description": "Multi-tab layout for GROUP_1_ITEM_4 grouped by PRODUCT_GROUP2 with row-spanning Size column",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PRODUCT_GROUP2",
+        "rows": "",
+        "columnGroups": ""
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 70,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "size",
+          "headerName": "Size",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_4",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "thickness",
+          "headerName": "หนา",
+          "width": 110,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_6",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "spec",
+          "headerName": "spec",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_3"
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-spec",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "avg_kg_stock",
+          "headerName": "Avg.kg stock",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "market_weight",
+          "headerName": "น.น ตลาด",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "market_weight"
+        },
+        {
+          "field": "highlight_blue",
+          "headerName": "Highlight สีฟ้า",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "extra_price_unit",
+          "headerName": "Extra (THB)",
+          "width": 140,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_unit"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 140,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "line_bundle"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 210,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 120,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
+        }
+      ],
+      "columnGroups": [
+        {
+          "headerName": "กก.(C)",
+          "groupId": "price_weight_group",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "price_kg_before_price_weight",
+              "headerName": "ราคาขาย before",
+              "width": 150,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_price_weight"
+            },
+            {
+              "field": "price_kg_total_net_price_weight",
+              "headerName": "ราคาขาย after",
+              "width": 150,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_weight"
+            }
+          ]
+        },
+        {
+          "headerName": "เส้น",
+          "groupId": "price_line_group",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "price_line_before_price_unit",
+              "headerName": "ราคาขาย before",
+              "width": 150,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_price_unit"
+            },
+            {
+              "field": "price_line_total_net_price_unit",
+              "headerName": "ราคาขาย after",
+              "width": 150,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_unit"
+            }
+          ]
+        }
+      ],
+      "columns": [],
+      "applicableCategories": [
+        "ท่อเหลี่ยม",
+        "ท่อแบน",
+        "ท่อดำ"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item4_pg2_tabs",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,  
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  }
+}
+

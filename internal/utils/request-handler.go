@@ -26,3 +26,34 @@ func ProcessRequest(c *gin.Context, serviceFunc func(*gin.Context, string) (inte
 	// ส่ง response กลับไปยัง client
 	c.JSON(http.StatusOK, response)
 }
+
+// ProcessRequestWithBinding processes requests using Gin's binding and validation
+// This function uses ShouldBindJSON which returns errors that should be handled by the caller
+func ProcessRequestWithBinding(c *gin.Context, serviceFunc func(*gin.Context) (interface{}, error)) {
+	// Call service function which should use ShouldBindJSON internally
+	response, err := serviceFunc(c)
+	if err != nil {
+		// Check if it's a binding/validation error
+		if bindingErr, ok := err.(*BindingError); ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Validation failed",
+				"details": bindingErr.Message,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Send response back to client
+	c.JSON(http.StatusOK, response)
+}
+
+// BindingError represents a binding/validation error
+type BindingError struct {
+	Message string
+}
+
+func (e *BindingError) Error() string {
+	return e.Message
+}

@@ -40,6 +40,8 @@ type CreateOrderDetail struct {
 	DocumentRefType     string                  `json:"document_ref_type"`
 	DocumentRef         string                  `json:"document_ref"`
 	Remark              string                  `json:"remark"`
+	CompanyCode         string                  `json:"company_code"`
+	SiteCode            string                  `json:"site_code"`
 	OrderItem           []CreateOrderItemDetail `json:"order_item"`
 }
 
