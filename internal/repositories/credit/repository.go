@@ -214,6 +214,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize 
 	if len(customerCode) > 0 {
 		query = query.Where("customer_code in (?)", customerCode)
 	}
+	query = query.Where("request_type in (?)", "EXTRA")
 	var count int64
 	query.Count(&count)
 
