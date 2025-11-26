@@ -21,6 +21,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	requestData := map[string]interface{}{
 		"request_type": []string{"EXTRA"},
 		"is_action":    []bool{false},
+		"status":       []string{"PENDING"},
 	}
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
@@ -103,7 +104,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			now := time.Now()
 			exp := creditRequestValue.ExpireDtm
 			if exp.Before(now) {
-				creditTransaction = append(creditTransaction, models.CreditTransaction{
+				/* creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
 					Amount:          creditRequestValue.Amount,
@@ -133,7 +134,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					RequestDate:                  creditRequestValue.RequestDate,
 					ActionDate:                   creditRequestValue.ActionDate,
 					IsAction:                     creditRequestValue.IsAction,
-				})
+				}) */
 
 			}
 		}
