@@ -15,11 +15,10 @@ import (
 
 	creditService "prime-erp-core/internal/services/credit-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreditExtra(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreditExtra() (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCredit"
 	bodyNewRequest := strings.NewReader(`{}`)

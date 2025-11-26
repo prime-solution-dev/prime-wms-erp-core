@@ -224,6 +224,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCreditRequests)
 	})
+	credit.POST("/GetCreditRequestCronjob", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCreditRequestCronjob)
+	})
+
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.CreateCreditRequest)
 	})
@@ -312,7 +316,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	///cronjob
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {
-		utils.ProcessRequest(c, CronjobService.CreditRequestEffectiveDtm)
+		utils.ProcessRequest(c, CronjobService.GetKernalManual)
 	})
 	//email alert
 	emailAlert := ctx.Group("/emailAlert")

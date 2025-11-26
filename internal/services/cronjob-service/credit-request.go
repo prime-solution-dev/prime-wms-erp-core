@@ -15,13 +15,12 @@ import (
 
 	creditService "prime-erp-core/internal/services/credit-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreditRequestEffectiveDtm() (interface{}, error) {
 
-	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequest"
+	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequestCronjob"
 	bodyNewRequest := strings.NewReader(`{}`)
 	reqHttp, err := http.NewRequest("POST", url, bodyNewRequest)
 	if err != nil {
@@ -54,53 +53,62 @@ func CreditRequestEffectiveDtm(ctx *gin.Context, jsonPayload string) (interface{
 	creditTransaction := []models.CreditTransaction{}
 	creditRequestUpdate := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
-		if creditRequestValue.ExpireDtm.After(time.Now()) || creditRequestValue.ExpireDtm.Equal(time.Now()) {
-			creditTransaction = append(creditTransaction, models.CreditTransaction{
-				TransactionCode: creditRequestValue.RequestCode,
-				TransactionType: creditRequestValue.RequestType,
-				Amount:          creditRequestValue.Amount,
-				AdjustAmount:    0,
-				EffectiveDtm:    creditRequestValue.EffectiveDtm,
-				ExpireDtm:       creditRequestValue.ExpireDtm,
-				//ForceExpireDtm:  req[i].e,
-				//ApproveDate:     "",
-				IsApprove: false,
-				Status:    "EXPIRED",
-				Reason:    "",
-			})
-			creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
-				ID:     creditRequestValue.ID,
-				Status: "CANCELLED",
-			})
+		if creditRequestValue.ExpireDtm != nil {
+			if creditRequestValue.ExpireDtm.After(time.Now()) || creditRequestValue.ExpireDtm.Equal(time.Now()) {
+				creditTransaction = append(creditTransaction, models.CreditTransaction{
+					TransactionCode: creditRequestValue.RequestCode,
+					TransactionType: creditRequestValue.RequestType,
+					Amount:          creditRequestValue.Amount,
+					AdjustAmount:    0,
+					EffectiveDtm:    creditRequestValue.EffectiveDtm,
+					ExpireDtm:       creditRequestValue.ExpireDtm,
+					//ForceExpireDtm:  req[i].e,
+					//ApproveDate:     "",
+					IsApprove: false,
+					Status:    "EXPIRED",
+					Reason:    "",
+				})
+				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
+					ID:     creditRequestValue.ID,
+					Status: "CANCELLED",
+				})
 
+			}
 		}
-		if creditRequestValue.EffectiveDtm.After(time.Now()) || creditRequestValue.EffectiveDtm.Equal(time.Now()) {
-			creditExtra := []models.CreditExtra{}
-			CreditID := uuid.New()
-			if creditRequestValue.RequestType == "EXTRA" {
-				creditExtra = append(creditExtra, models.CreditExtra{
-					ID:       uuid.New(),
-					CreditID: CreditID,
-					//ExtraType:    "",
+		if creditRequestValue.EffectiveDtm != nil {
+			fmt.Println("Now:", time.Now().Format(time.RFC3339))
+			fmt.Println("Effective:", creditRequestValue.EffectiveDtm)
+			now := time.Now()
+			eff := creditRequestValue.EffectiveDtm
+			if !eff.Before(now) {
+				creditExtra := []models.CreditExtra{}
+				CreditID := uuid.New()
+				if creditRequestValue.RequestType == "EXTRA" {
+					creditExtra = append(creditExtra, models.CreditExtra{
+						ID:       uuid.New(),
+						CreditID: CreditID,
+						//ExtraType:    "",
+						Amount:       creditRequestValue.Amount,
+						EffectiveDtm: creditRequestValue.EffectiveDtm,
+						ExpireDtm:    creditRequestValue.ExpireDtm,
+						DocRef:       creditRequestValue.RequestCode,
+						//ApproveDate:  "",
+					})
+				}
+				credit = append(credit, models.Credit{
+					ID:           CreditID,
+					CustomerCode: creditRequestValue.CustomerCode,
 					Amount:       creditRequestValue.Amount,
 					EffectiveDtm: creditRequestValue.EffectiveDtm,
-					ExpireDtm:    creditRequestValue.ExpireDtm,
+					IsActive:     true,
 					DocRef:       creditRequestValue.RequestCode,
-					//ApproveDate:  "",
+					//ApproveDate:        "",
+					AlertBalanceCredit: false,
+					CreditExtra:        creditExtra,
 				})
 			}
-			credit = append(credit, models.Credit{
-				ID:           CreditID,
-				CustomerCode: creditRequestValue.CustomerCode,
-				Amount:       creditRequestValue.Amount,
-				EffectiveDtm: creditRequestValue.EffectiveDtm,
-				IsActive:     true,
-				DocRef:       creditRequestValue.RequestCode,
-				//ApproveDate:        "",
-				AlertBalanceCredit: false,
-				CreditExtra:        creditExtra,
-			})
 		}
+
 		if creditRequestValue.BalanceCreditLimit < 0 {
 			creditRequestForAlert = append(creditRequestForAlert, creditRequestValue)
 		}
