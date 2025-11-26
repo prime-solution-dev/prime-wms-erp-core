@@ -228,7 +228,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, approvalValue := range approvalRes.(ResultCreditTransaction).CreditTransaction {
-		if approvalValue.Status != "COMPLETED" {
+		if approvalValue.Status == "INACTIVE" || approvalValue.Status == "CANCELED" || approvalValue.Status == "REJECT" {
 			reqCodeAmountMap, exist := reqCodeAmount[approvalValue.TransactionCode]
 			if exist {
 				creditLimit := 0.0
