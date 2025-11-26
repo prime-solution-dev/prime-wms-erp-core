@@ -45,6 +45,7 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mapCreditDocref[creditValue.DocRef] = creditValue
 	}
 	creditIDForDelete := []uuid.UUID{}
+	creditExtraIDForDelete := []uuid.UUID{}
 	creditTransaction := []models.CreditTransaction{}
 
 	for i, credit := range req {
@@ -57,6 +58,7 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				if req[i].CreditExtra[o].CreditID == uuid.Nil {
 					req[i].CreditExtra[o].CreditID = creditID
 				}
+				creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].CreditExtra[o].CreditID)
 				creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
 			}
 
@@ -98,7 +100,7 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	if len(creditIDForDelete) > 0 {
-		errDeleteCredit := repositoryCredit.DeleteCredit(creditIDForDelete)
+		errDeleteCredit := repositoryCredit.DeleteCredit(creditIDForDelete, creditExtraIDForDelete)
 		if errDeleteCredit != nil {
 			return nil, errDeleteCredit
 		}

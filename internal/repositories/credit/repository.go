@@ -155,7 +155,7 @@ func UpdateCredit(credit []models.Credit, creditExtra []models.CreditExtra) (int
 
 	return rowsAffected, nil
 }
-func DeleteCredit(creditID []uuid.UUID) error {
+func DeleteCredit(creditID []uuid.UUID, creditExtra []uuid.UUID) error {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
 	if err != nil {
@@ -169,11 +169,14 @@ func DeleteCredit(creditID []uuid.UUID) error {
 			return result.Error
 		}
 
-		resultCreditExtra := gormx.Where("credit_id IN (?)", creditValue).Delete(&models.CreditExtra{})
+	}
+	for _, creditExtraValue := range creditExtra {
+
+		resultCreditExtra := gormx.Where("credit_id IN (?)", creditExtraValue).Delete(&models.CreditExtra{})
 
 		if resultCreditExtra.Error != nil {
 			gormx.Rollback()
-			return result.Error
+			return resultCreditExtra.Error
 		}
 
 	}
