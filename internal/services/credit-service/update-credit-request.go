@@ -53,22 +53,24 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					DocRef:       req[i].RequestCode,
 					//ApproveDate:  "",
 				})
-			}
-			now := time.Now()
-			credit = append(credit, models.Credit{
-				ID:                 CreditID,
-				CustomerCode:       req[i].CustomerCode,
-				Amount:             req[i].Amount,
-				EffectiveDtm:       req[i].EffectiveDtm,
-				IsActive:           true,
-				DocRef:             req[i].RequestCode,
-				ApproveDate:        &now,
-				AlertBalanceCredit: false,
-				CreditExtra:        creditExtra,
-			})
-			if req[i].RequestType == "BASE" {
+			} else {
+				now := time.Now()
+				credit = append(credit, models.Credit{
+					ID:                 CreditID,
+					CustomerCode:       req[i].CustomerCode,
+					Amount:             req[i].Amount,
+					EffectiveDtm:       req[i].EffectiveDtm,
+					IsActive:           true,
+					DocRef:             req[i].RequestCode,
+					ApproveDate:        &now,
+					AlertBalanceCredit: false,
+					CreditExtra:        creditExtra,
+				})
+
 				req[i].IsAction = true
+
 			}
+
 		}
 
 		creditRequestValue = append(creditRequestValue, req[i])
