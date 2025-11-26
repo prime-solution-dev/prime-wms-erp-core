@@ -18,7 +18,9 @@ type GetHistoryReq struct {
 }
 type GetHistoryRes struct {
 	ID                  uuid.UUID  `json:"id"`
+	CustomerCode        string     `json:"customer_code"`
 	RequestCode         string     `json:"request_code"`
+	RequestType         string     `json:"request_type"`
 	CreditLimit         float64    `json:"credit_limit"`
 	IncreaseCreditLimit float64    `json:"increase_credit_limit"`
 	StartDateTime       *time.Time `json:"start_date_time"`
@@ -26,6 +28,9 @@ type GetHistoryRes struct {
 	SubmitDateTime      *time.Time `json:"submit_date_time"`
 	ApproveDateTime     *time.Time `json:"approve_date_time"`
 	Status              string     `json:"status"`
+	EffectiveDtm        *time.Time `json:"effective_dtm"`
+	ExpireDtm           *time.Time `json:"expire_dtm"`
+	RequestDate         *time.Time `json:"request_date"`
 }
 type ResultHistory struct {
 	Total      int             `json:"total"`
@@ -55,7 +60,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "EXTRA" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -63,12 +70,17 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				})
 			}
 			if creditValue.RequestType == "BASE" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -76,35 +88,51 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				})
 			}
 		} else {
-			if creditValue.RequestType == "EXTRA" {
-				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
-					ID:                  creditValue.ID,
-					RequestCode:         creditValue.RequestCode,
-					CreditLimit:         0,
-					IncreaseCreditLimit: creditValue.Amount,
-					StartDateTime:       creditValue.EffectiveDtm,
-					EndDateTime:         creditValue.ExpireDtm,
-					SubmitDateTime:      creditValue.CreateDtm,
-					ApproveDateTime:     creditValue.ActionDate,
-					Status:              creditValue.Status,
+			if creditValue.Status == "CANCELED" {
+				if creditValue.RequestType == "EXTRA" {
+					reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
+						ID:                  creditValue.ID,
+						CustomerCode:        creditValue.CustomerCode,
+						RequestCode:         creditValue.RequestCode,
+						RequestType:         creditValue.RequestType,
+						CreditLimit:         0,
+						IncreaseCreditLimit: creditValue.Amount,
+						StartDateTime:       creditValue.EffectiveDtm,
+						EndDateTime:         creditValue.ExpireDtm,
+						SubmitDateTime:      creditValue.CreateDtm,
+						ApproveDateTime:     creditValue.ActionDate,
+						Status:              creditValue.Status,
+						EffectiveDtm:        creditValue.EffectiveDtm,
+						ExpireDtm:           creditValue.ExpireDtm,
+						RequestDate:         creditValue.RequestDate,
+					}
+				}
+				if creditValue.RequestType == "BASE" {
+					reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
+						ID:                  creditValue.ID,
+						CustomerCode:        creditValue.CustomerCode,
+						RequestCode:         creditValue.RequestCode,
+						RequestType:         creditValue.RequestType,
+						CreditLimit:         creditValue.Amount,
+						IncreaseCreditLimit: 0,
+						StartDateTime:       creditValue.EffectiveDtm,
+						EndDateTime:         creditValue.ExpireDtm,
+						SubmitDateTime:      creditValue.CreateDtm,
+						ApproveDateTime:     creditValue.ActionDate,
+						Status:              creditValue.Status,
+						EffectiveDtm:        creditValue.EffectiveDtm,
+						ExpireDtm:           creditValue.ExpireDtm,
+						RequestDate:         creditValue.RequestDate,
+					}
 				}
 			}
-			if creditValue.RequestType == "BASE" {
-				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
-					ID:                  creditValue.ID,
-					RequestCode:         creditValue.RequestCode,
-					CreditLimit:         creditValue.Amount,
-					IncreaseCreditLimit: 0,
-					StartDateTime:       creditValue.EffectiveDtm,
-					EndDateTime:         creditValue.ExpireDtm,
-					SubmitDateTime:      creditValue.CreateDtm,
-					ApproveDateTime:     creditValue.ActionDate,
-					Status:              creditValue.Status,
-				}
-			}
+
 			reqCode = append(reqCode, creditValue.RequestCode)
 		}
 
