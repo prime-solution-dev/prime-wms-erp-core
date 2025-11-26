@@ -19,7 +19,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequestCronjob"
 	requestData := map[string]interface{}{
-		"request_type": "EXTRA",
+		"request_type": []string{"EXTRA"},
 		"is_action":    []bool{false},
 	}
 	jsonData, err := json.Marshal(requestData)
