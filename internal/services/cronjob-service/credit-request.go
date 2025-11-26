@@ -102,7 +102,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 		if creditRequestValue.ExpireDtm != nil {
 			now := time.Now()
 			exp := creditRequestValue.ExpireDtm
-			if !exp.Before(now) {
+			if exp.Before(now) {
 				creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
