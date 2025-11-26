@@ -106,17 +106,17 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 						DocRef:       creditRequestValue.RequestCode,
 						ApproveDate:  &now,
 					})
+				} else {
+					credit = append(credit, models.Credit{
+						CustomerCode:       creditRequestValue.CustomerCode,
+						Amount:             creditRequestValue.Amount,
+						EffectiveDtm:       creditRequestValue.EffectiveDtm,
+						IsActive:           true,
+						DocRef:             creditRequestValue.RequestCode,
+						ApproveDate:        &now,
+						AlertBalanceCredit: false,
+					})
 				}
-
-				credit = append(credit, models.Credit{
-					CustomerCode:       creditRequestValue.CustomerCode,
-					Amount:             creditRequestValue.Amount,
-					EffectiveDtm:       creditRequestValue.EffectiveDtm,
-					IsActive:           true,
-					DocRef:             creditRequestValue.RequestCode,
-					ApproveDate:        &now,
-					AlertBalanceCredit: false,
-				})
 
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
 					ID:                           creditRequestValue.ID,
