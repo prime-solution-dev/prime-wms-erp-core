@@ -88,9 +88,10 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			req[i].CreditExtra = []models.CreditExtra{}
 
 			if req[i].DocRef != "" {
-				creditValue = append(creditValue, req[i])
+
 				creditMapValue, exist := mapCredit[req[i].CustomerCode]
 				if exist {
+					req[i].ID = creditMapValue.ID
 					creditIDForDelete = append(creditIDForDelete, creditMapValue.ID)
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
 						TransactionCode: creditMapValue.CustomerCode,
@@ -104,6 +105,7 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 						Reason:          "",
 					})
 				}
+				creditValue = append(creditValue, req[i])
 			}
 
 		}
