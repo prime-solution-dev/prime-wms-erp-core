@@ -253,7 +253,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, requestType []strin
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -268,6 +268,9 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pa
 	}
 	if len(customerCode) > 0 {
 		query = query.Where("customer_code in (?)", customerCode)
+	}
+	if len(isAction) > 0 {
+		query = query.Where("is_action in (?)", isAction)
 	}
 
 	var count int64
