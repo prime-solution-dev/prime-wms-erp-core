@@ -19,6 +19,7 @@ type GetHistoryReq struct {
 type GetHistoryRes struct {
 	ID                  uuid.UUID  `json:"id"`
 	RequestCode         string     `json:"request_code"`
+	RequestType         string     `json:"request_type"`
 	CreditLimit         float64    `json:"credit_limit"`
 	IncreaseCreditLimit float64    `json:"increase_credit_limit"`
 	StartDateTime       *time.Time `json:"start_date_time"`
@@ -56,6 +57,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -69,6 +71,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -83,6 +86,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         0,
 					IncreaseCreditLimit: creditValue.Amount,
 					StartDateTime:       creditValue.EffectiveDtm,
@@ -96,6 +100,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
 					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
 					CreditLimit:         creditValue.Amount,
 					IncreaseCreditLimit: 0,
 					StartDateTime:       creditValue.EffectiveDtm,

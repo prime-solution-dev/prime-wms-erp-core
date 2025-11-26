@@ -25,10 +25,10 @@ type CreditRequest struct {
 	RequestDate                  *time.Time `json:"request_date"`
 	ActionDate                   *time.Time `json:"action_date"`
 	IsAction                     bool       `json:"is_action"`
-	CreateBy                     string     `json:"create_by"`
-	CreateDtm                    *time.Time `json:"create_dtm"`
-	UpdateBy                     string     `json:"update_by"`
-	UpdateDate                   *time.Time `json:"update_date"`
+	CreateBy                     string     `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm                    *time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy                     string     `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate                   time.Time  `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 }
 
 func (CreditRequest) TableName() string { return "credit_request" }
@@ -42,10 +42,10 @@ type Credit struct {
 	DocRef             string        `json:"doc_ref"`
 	ApproveDate        *time.Time    `json:"approve_date"`
 	AlertBalanceCredit bool          `json:"alert_balance_credit"`
-	CreateBy           string        `json:"create_by"`
-	CreateDtm          *time.Time    `json:"create_dtm"`
-	UpdateBy           string        `json:"update_by"`
-	UpdateDate         *time.Time    `json:"update_date"`
+	CreateBy           string        `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm          *time.Time    `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy           string        `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate         time.Time     `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 	CreditExtra        []CreditExtra `json:"credit_extra" gorm:"foreignKey:CreditID;references:ID"`
 }
 
@@ -60,10 +60,10 @@ type CreditExtra struct {
 	ExpireDtm    *time.Time `json:"expire_dtm"`
 	DocRef       string     `json:"doc_ref"`
 	ApproveDate  *time.Time `json:"approve_date"`
-	CreateBy     string     `json:"create_by"`
-	CreateDtm    *time.Time `json:"create_dtm"`
-	UpdateBy     string     `json:"update_by"`
-	UpdateDate   *time.Time `json:"update_date"`
+	CreateBy     string     `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm    *time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy     string     `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate   time.Time  `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 }
 
 func (CreditExtra) TableName() string { return "credit_extra" }
@@ -81,10 +81,10 @@ type CreditTransaction struct {
 	Status          string     `json:"status"`
 	Reason          string     `json:"reason"`
 	ApproveDate     *time.Time `json:"approve_date"`
-	CreateBy        string     `json:"create_by"`
-	CreateDtm       *time.Time `json:"create_dtm"`
-	UpdateBy        string     `json:"update_by"`
-	UpdateDate      *time.Time `json:"update_date"`
+	CreateBy        string     `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm       *time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy        string     `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate      time.Time  `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 }
 
 func (CreditTransaction) TableName() string { return "credit_transaction" }
