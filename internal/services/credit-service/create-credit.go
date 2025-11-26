@@ -63,25 +63,26 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			req[i].ID = creditID
 			approvalIDForReturn = append(approvalIDForReturn, creditID)
 			req[i].CreditExtra = []models.CreditExtra{}
+
 			if req[i].DocRef != "" {
 				creditValue = append(creditValue, req[i])
+				creditMapValue, exist := mapCredit[req[i].CustomerCode]
+				if exist {
+					creditIDForDelete = append(creditIDForDelete, creditMapValue.ID)
+					creditTransaction = append(creditTransaction, models.CreditTransaction{
+						TransactionCode: creditMapValue.CustomerCode,
+						TransactionType: "BASE",
+						Amount:          req[i].Amount,
+						AdjustAmount:    0,
+						EffectiveDtm:    req[i].EffectiveDtm,
+						ExpireDtm:       req[i].EffectiveDtm,
+						IsApprove:       false,
+						Status:          "INACTIVE",
+						Reason:          "",
+					})
+				}
 			}
 
-			creditMapValue, exist := mapCredit[req[i].CustomerCode]
-			if exist {
-				creditIDForDelete = append(creditIDForDelete, creditMapValue.ID)
-				creditTransaction = append(creditTransaction, models.CreditTransaction{
-					TransactionCode: creditMapValue.CustomerCode,
-					TransactionType: "BASE",
-					Amount:          req[i].Amount,
-					AdjustAmount:    0,
-					EffectiveDtm:    req[i].EffectiveDtm,
-					ExpireDtm:       req[i].EffectiveDtm,
-					IsApprove:       false,
-					Status:          "INACTIVE",
-					Reason:          "",
-				})
-			}
 		}
 
 	}
