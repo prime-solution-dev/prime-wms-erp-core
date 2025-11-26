@@ -18,6 +18,7 @@ type GetHistoryReq struct {
 }
 type GetHistoryRes struct {
 	ID                  uuid.UUID  `json:"id"`
+	CustomerCode        string     `json:"customer_code"`
 	RequestCode         string     `json:"request_code"`
 	RequestType         string     `json:"request_type"`
 	CreditLimit         float64    `json:"credit_limit"`
@@ -59,6 +60,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "EXTRA" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
 					RequestType:         creditValue.RequestType,
 					CreditLimit:         0,
@@ -76,6 +78,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "BASE" {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
 					RequestType:         creditValue.RequestType,
 					CreditLimit:         creditValue.Amount,
@@ -94,6 +97,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "EXTRA" {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
 					RequestType:         creditValue.RequestType,
 					CreditLimit:         0,
@@ -111,6 +115,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if creditValue.RequestType == "BASE" {
 				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
 					RequestCode:         creditValue.RequestCode,
 					RequestType:         creditValue.RequestType,
 					CreditLimit:         creditValue.Amount,
