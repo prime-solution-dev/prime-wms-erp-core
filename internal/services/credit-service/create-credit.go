@@ -73,11 +73,9 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					AdjustAmount:    0,
 					EffectiveDtm:    req[i].EffectiveDtm,
 					ExpireDtm:       req[i].EffectiveDtm,
-					/* ForceExpireDtm:  time.Now(),
-					ApproveDate:     "",  */
-					IsApprove: false,
-					Status:    "INACTIVE",
-					Reason:    "",
+					IsApprove:       false,
+					Status:          "INACTIVE",
+					Reason:          "",
 				})
 			}
 		}

@@ -14,8 +14,6 @@ import (
 	"time"
 
 	creditService "prime-erp-core/internal/services/credit-service"
-
-	"github.com/google/uuid"
 )
 
 func CreditRequestEffectiveDtm() (interface{}, error) {
@@ -48,6 +46,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	}
 
 	fmt.Println("Response Status:", resp.Status)
+	creditExtraMap := map[string][]models.CreditExtra{}
 	credit := []models.Credit{}
 	creditRequestForAlert := []models.CreditRequest{}
 	creditTransaction := []models.CreditTransaction{}
@@ -97,34 +96,47 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			now := time.Now()
 			eff := creditRequestValue.EffectiveDtm
 			if !eff.Before(now) {
-				creditExtra := []models.CreditExtra{}
-				CreditID := uuid.New()
+
 				if creditRequestValue.RequestType == "EXTRA" {
-					creditExtra = append(creditExtra, models.CreditExtra{
-						ID:       uuid.New(),
-						CreditID: CreditID,
-						//ExtraType:    "",
+
+					creditExtraMap[creditRequestValue.CustomerCode] = append(creditExtraMap[creditRequestValue.CustomerCode], models.CreditExtra{
 						Amount:       creditRequestValue.Amount,
 						EffectiveDtm: creditRequestValue.EffectiveDtm,
 						ExpireDtm:    creditRequestValue.ExpireDtm,
 						DocRef:       creditRequestValue.RequestCode,
-						//ApproveDate:  "",
+						ApproveDate:  &now,
 					})
 				}
+
 				credit = append(credit, models.Credit{
-					ID:           CreditID,
-					CustomerCode: creditRequestValue.CustomerCode,
-					Amount:       creditRequestValue.Amount,
-					EffectiveDtm: creditRequestValue.EffectiveDtm,
-					IsActive:     true,
-					DocRef:       creditRequestValue.RequestCode,
-					//ApproveDate:        "",
+					CustomerCode:       creditRequestValue.CustomerCode,
+					Amount:             creditRequestValue.Amount,
+					EffectiveDtm:       creditRequestValue.EffectiveDtm,
+					IsActive:           true,
+					DocRef:             creditRequestValue.RequestCode,
+					ApproveDate:        &now,
 					AlertBalanceCredit: false,
-					CreditExtra:        creditExtra,
 				})
+
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
-					ID:       creditRequestValue.ID,
-					IsAction: true,
+					ID:                           creditRequestValue.ID,
+					IsAction:                     true,
+					RequestCode:                  creditRequestValue.RequestCode,
+					CustomerCode:                 creditRequestValue.CustomerCode,
+					CustomerName:                 creditRequestValue.CustomerName,
+					TemporaryIncreaseCreditLimit: creditRequestValue.TemporaryIncreaseCreditLimit,
+					ConsumedCredit:               creditRequestValue.ConsumedCredit,
+					BalanceCreditLimit:           creditRequestValue.BalanceCreditLimit,
+					CustomeStatus:                creditRequestValue.CustomeStatus,
+					Amount:                       creditRequestValue.Amount,
+					RequestType:                  creditRequestValue.RequestType,
+					IsApprove:                    creditRequestValue.IsApprove,
+					Reason:                       creditRequestValue.Reason,
+					EffectiveDtm:                 creditRequestValue.EffectiveDtm,
+					ExpireDtm:                    creditRequestValue.ExpireDtm,
+					RequestDate:                  creditRequestValue.RequestDate,
+					ActionDate:                   creditRequestValue.ActionDate,
+					Status:                       creditRequestValue.Status,
 				})
 			}
 		}
@@ -166,6 +178,16 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 
 	}
 	if len(credit) > 0 {
+
+		for i := range credit {
+
+			creditExtra, existCreditExtraMap := creditExtraMap[credit[i].CustomerCode]
+			if existCreditExtraMap {
+				credit[i].CreditExtra = creditExtra
+			}
+
+		}
+
 		jsonBytesCredit, err := json.Marshal(credit)
 		if err != nil {
 			return nil, err
