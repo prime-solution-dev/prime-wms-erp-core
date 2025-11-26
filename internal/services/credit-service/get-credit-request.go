@@ -18,6 +18,7 @@ type GetCreditReq struct {
 	CustomerCode []string    `json:"customer_code"`
 	IsAction     []bool      `json:"is_action"`
 	RequestType  []string    `json:"request_type"`
+	Status       []string    `json:"status"`
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
@@ -162,7 +163,7 @@ func GetCreditRequestCronjob(ctx *gin.Context, jsonPayload string) (interface{},
 		return nil, errors.New("failed to unmarshal JSON into struct : " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.IsAction, req.RequestType, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.IsAction, req.RequestType, req.Status, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}

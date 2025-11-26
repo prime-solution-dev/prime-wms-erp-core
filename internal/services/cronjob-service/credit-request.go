@@ -21,6 +21,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	requestData := map[string]interface{}{
 		"request_type": []string{"EXTRA"},
 		"is_action":    []bool{false},
+		"status":       []string{"COMPLETED"},
 	}
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
