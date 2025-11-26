@@ -294,6 +294,11 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"GROUP_1_ITEM_5": pricePatterns.BuildGroup1Item5Response,
 		"GROUP_1_ITEM_6": pricePatterns.BuildGroup1Item6Response,
 		"GROUP_1_ITEM_7": pricePatterns.BuildGroup1Item7Response,
+		"GROUP_1_ITEM_8": pricePatterns.BuildGroup1Item8Response,
+		"GROUP_1_ITEM_9": pricePatterns.BuildGroup1Item9Response,
+		"GROUP_1_ITEM_10": func(data []models.GetPriceListResponse, code string) (pricePatterns.PriceListDetailApiResponse, error) {
+			return pricePatterns.BuildGroup1Item10Response(data, code)
+		},
 	}
 
 	handler, ok := handlers[groupCode]
@@ -307,4 +312,4 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return response, nil
-	}
+}
