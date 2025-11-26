@@ -52,22 +52,24 @@ func CreditExtra() (interface{}, error) {
 	creditExtraID := []uuid.UUID{}
 	for _, creditValue := range creditRequest.Credit {
 		for _, creditExtraValue := range creditValue.CreditExtra {
-			if creditExtraValue.ExpireDtm.After(time.Now()) || creditExtraValue.ExpireDtm.Equal(time.Now()) {
-				creditTransaction = append(creditTransaction, models.CreditTransaction{
-					TransactionCode: creditExtraValue.DocRef,
-					TransactionType: "EXTRA",
-					Amount:          creditExtraValue.Amount,
-					AdjustAmount:    0,
-					EffectiveDtm:    creditExtraValue.EffectiveDtm,
-					ExpireDtm:       creditExtraValue.ExpireDtm,
-					//ForceExpireDtm:  req[i].e,
-					//ApproveDate:     "",
-					IsApprove: false,
-					Status:    "INACTIVE",
-					Reason:    "",
-				})
+			if creditExtraValue.ExpireDtm != nil {
+				if creditExtraValue.ExpireDtm.After(time.Now()) || creditExtraValue.ExpireDtm.Equal(time.Now()) {
+					creditTransaction = append(creditTransaction, models.CreditTransaction{
+						TransactionCode: creditExtraValue.DocRef,
+						TransactionType: "EXTRA",
+						Amount:          creditExtraValue.Amount,
+						AdjustAmount:    0,
+						EffectiveDtm:    creditExtraValue.EffectiveDtm,
+						ExpireDtm:       creditExtraValue.ExpireDtm,
+						//ForceExpireDtm:  req[i].e,
+						//ApproveDate:     "",
+						IsApprove: false,
+						Status:    "INACTIVE",
+						Reason:    "",
+					})
+					creditExtraID = append(creditExtraID, creditExtraValue.ID)
+				}
 			}
-			creditExtraID = append(creditExtraID, creditExtraValue.ID)
 		}
 	}
 	if len(creditExtraID) > 0 {

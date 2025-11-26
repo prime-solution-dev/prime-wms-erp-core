@@ -54,7 +54,9 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	creditRequestUpdate := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
 		if creditRequestValue.ExpireDtm != nil {
-			if creditRequestValue.ExpireDtm.After(time.Now()) || creditRequestValue.ExpireDtm.Equal(time.Now()) {
+			now := time.Now()
+			exp := creditRequestValue.ExpireDtm
+			if !exp.Before(now) {
 				creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
@@ -62,11 +64,9 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					AdjustAmount:    0,
 					EffectiveDtm:    creditRequestValue.EffectiveDtm,
 					ExpireDtm:       creditRequestValue.ExpireDtm,
-					//ForceExpireDtm:  req[i].e,
-					//ApproveDate:     "",
-					IsApprove: false,
-					Status:    "EXPIRED",
-					Reason:    "",
+					IsApprove:       false,
+					Status:          "EXPIRED",
+					Reason:          "",
 				})
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
 					ID:     creditRequestValue.ID,
