@@ -106,6 +106,10 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					AlertBalanceCredit: false,
 					CreditExtra:        creditExtra,
 				})
+				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
+					ID:       creditRequestValue.ID,
+					IsAction: true,
+				})
 			}
 		}
 

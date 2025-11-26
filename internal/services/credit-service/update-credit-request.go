@@ -5,6 +5,7 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -53,21 +54,23 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					//ApproveDate:  "",
 				})
 			}
-
+			now := time.Now()
 			credit = append(credit, models.Credit{
-				ID:           CreditID,
-				CustomerCode: req[i].CustomerCode,
-				Amount:       req[i].Amount,
-				EffectiveDtm: req[i].EffectiveDtm,
-				IsActive:     true,
-				DocRef:       req[i].RequestCode,
-				//ApproveDate:        "",
+				ID:                 CreditID,
+				CustomerCode:       req[i].CustomerCode,
+				Amount:             req[i].Amount,
+				EffectiveDtm:       req[i].EffectiveDtm,
+				IsActive:           true,
+				DocRef:             req[i].RequestCode,
+				ApproveDate:        &now,
 				AlertBalanceCredit: false,
 				CreditExtra:        creditExtra,
 			})
-
+			if req[i].RequestType == "BASE" {
+				req[i].IsAction = true
+			}
 		}
-		req[i].IsAction = true
+
 		creditRequestValue = append(creditRequestValue, req[i])
 
 		creditTransaction = append(creditTransaction, models.CreditTransaction{
