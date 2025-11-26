@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/models"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,6 +21,7 @@ type PatternConfig struct {
 	Name                 string              `json:"name"`
 	Description          string              `json:"description"`
 	Enabled              bool                `json:"enabled"`
+	Summary              *SummaryConfig      `json:"summary,omitempty"`
 	Grouping             GroupingConfig      `json:"grouping"`
 	ColumnLevels         []ColumnLevel       `json:"columnLevels,omitempty"`
 	Columns              []ColumnConfigItem  `json:"columns"`
@@ -103,6 +105,7 @@ type PriceListDetailTabConfig struct {
 	Label             string                   `json:"label"`
 	TableConfig       TableConfig              `json:"tableConfig"`
 	TableData         []map[string]interface{} `json:"tableData"`
+	SummaryRows       []SummaryRow             `json:"summaryRows,omitempty"`
 	EditableSuffixes  []string                 `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes []string                 `json:"fetchable_suffixes,omitempty"`
 }
@@ -128,6 +131,26 @@ type GridOptions struct {
 	SuppressMovableColumns *bool `json:"suppressMovableColumns,omitempty"`
 	SuppressMenuHide       *bool `json:"suppressMenuHide,omitempty"`
 	EnableCellSpan         *bool `json:"enableCellSpan,omitempty"`
+}
+
+type SummaryConfig struct {
+	RowGroupField string                 `json:"rowGroupField"`
+	LabelField    string                 `json:"labelField,omitempty"`
+	LabelValue    string                 `json:"labelValue,omitempty"`
+	Columns       []SummaryColumnConfig  `json:"columns"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type SummaryColumnConfig struct {
+	Field               string `json:"field"`
+	Aggregation         string `json:"aggregation"`
+	ApplyToColumnGroups *bool  `json:"applyToColumnGroups,omitempty"`
+}
+
+type SummaryRow struct {
+	RowGroupValue string                 `json:"row_group_value"`
+	Label         string                 `json:"label"`
+	Data          map[string]interface{} `json:"data"`
 }
 
 type ColumnDef struct {
@@ -200,15 +223,56 @@ func getValueNameByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
+func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {
+	for _, sgk := range subGroupKeys {
+		if sgk.GroupCode == groupCode {
+			return sgk.ValueCode
+		}
+	}
+	return ""
+}
+
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueNameByGroupCode)
+}
+
+func buildCompositeCodeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueCodeByGroupCode)
+}
+
+func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
 	parts := []string{}
 	for _, code := range groupCodes {
-		valueName := getValueNameByGroupCode(subGroupKeys, code)
-		if valueName != "" {
-			parts = append(parts, valueName)
+		value := extractor(subGroupKeys, code)
+		if value != "" {
+			parts = append(parts, value)
 		}
 	}
 	return strings.Join(parts, "|")
+}
+
+func sanitizeIdentifier(primary, fallback string) string {
+	if sanitized := sanitizeFieldName(primary); sanitized != "" {
+		return sanitized
+	}
+	if sanitized := sanitizeFieldName(fallback); sanitized != "" {
+		return sanitized
+	}
+	return "value"
+}
+
+const hierarchyKeySeparator = "|:|"
+
+func composeHierarchyKey(code, label string) string {
+	return fmt.Sprintf("%s%s%s", code, hierarchyKeySeparator, label)
+}
+
+func splitHierarchyKey(key string) (string, string) {
+	parts := strings.SplitN(key, hierarchyKeySeparator, 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "", key
 }
 
 func ExtractGroupKey(subgroupKey string) string {
@@ -342,33 +406,49 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 }
 
 func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+	type columnGroupValue struct {
+		Label string
+		Code  string
+	}
+
 	columns := []ColumnDef{}
-	uniqueValues := make(map[string]bool)
+	uniqueValues := make(map[string]columnGroupValue)
 	for _, sg := range subGroups {
-		key := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-		if key != "" {
-			uniqueValues[key] = true
+		label := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
+		if label == "" {
+			continue
+		}
+		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+		mapKey := fmt.Sprintf("%s|%s", label, code)
+		uniqueValues[mapKey] = columnGroupValue{
+			Label: label,
+			Code:  code,
 		}
 	}
 
-	// Sort keys to ensure consistent column order
+	// Sort keys to ensure consistent column order by label
 	sortedKeys := make([]string, 0, len(uniqueValues))
-	for valueName := range uniqueValues {
-		sortedKeys = append(sortedKeys, valueName)
+	for key := range uniqueValues {
+		sortedKeys = append(sortedKeys, key)
 	}
-	sort.Strings(sortedKeys)
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+	})
 
-	for _, valueName := range sortedKeys {
+	for _, key := range sortedKeys {
+		value := uniqueValues[key]
+		groupIdentifier := sanitizeIdentifier(value.Code, value.Label)
+
 		columnGroup := ColumnDef{
-			HeaderName:    valueName,
-			GroupID:       fmt.Sprintf("group_%s", sanitizeFieldName(valueName)),
+			HeaderName:    value.Label,
+			GroupID:       fmt.Sprintf("group_%s", groupIdentifier),
 			OpenByDefault: boolPtr(true),
 			Children:      []ColumnDef{},
 		}
 
 		for _, colConfig := range pattern.Columns {
 			childCol := ColumnDef{
-				Field:        fmt.Sprintf("%s_%s", sanitizeFieldName(valueName), colConfig.Field),
+				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
 				HeaderName:   colConfig.HeaderName,
 				Width:        intPtr(colConfig.Width),
 				CellRenderer: colConfig.CellRenderer,
@@ -396,26 +476,27 @@ func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevel
 	hierarchy := make(map[string]interface{})
 
 	for _, sg := range subGroups {
-		// Extract level values dynamically
-		levelValues := make([]string, len(columnLevels))
+		levelKeys := make([]string, len(columnLevels))
 		for i, level := range columnLevels {
-			levelValues[i] = getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
+			label := getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
+			code := getValueCodeByGroupCode(sg.SubGroupKeys, level.Field)
+			levelKeys[i] = composeHierarchyKey(code, label)
 		}
 
-		// Build nested map structure dynamically
 		current := hierarchy
-		for i, value := range levelValues {
-			if i == len(levelValues)-1 {
-				// Last level: mark as leaf
-				if current[value] == nil {
-					current[value] = true
+		for i, key := range levelKeys {
+			if key == "" {
+				continue
+			}
+			if i == len(levelKeys)-1 {
+				if current[key] == nil {
+					current[key] = true
 				}
 			} else {
-				// Intermediate level: create nested map if needed
-				if current[value] == nil {
-					current[value] = make(map[string]interface{})
+				if current[key] == nil {
+					current[key] = make(map[string]interface{})
 				}
-				current = current[value].(map[string]interface{})
+				current = current[key].(map[string]interface{})
 			}
 		}
 	}
@@ -428,7 +509,8 @@ func buildColumnGroupsRecursive(
 	hierarchy map[string]interface{},
 	pattern *PatternConfig,
 	levelIndex int,
-	levelPath []string,
+	labelPath []string,
+	codePath []string,
 ) []ColumnDef {
 	columns := []ColumnDef{}
 
@@ -439,34 +521,32 @@ func buildColumnGroupsRecursive(
 	}
 	sort.Strings(keys)
 
-	for _, key := range keys {
-		value := hierarchy[key]
-		// Create a new slice to avoid modifying the shared levelPath
-		currentPath := make([]string, len(levelPath)+1)
-		copy(currentPath, levelPath)
-		currentPath[len(levelPath)] = key
+	for _, encodedKey := range keys {
+		value := hierarchy[encodedKey]
+		code, label := splitHierarchyKey(encodedKey)
 
-		// Build GroupID dynamically from level path
-		sanitizedPathParts := make([]string, len(currentPath))
-		for i, part := range currentPath {
-			sanitizedPathParts[i] = sanitizeFieldName(part)
+		currentLabelPath := append([]string{}, labelPath...)
+		currentCodePath := append([]string{}, codePath...)
+		currentLabelPath = append(currentLabelPath, label)
+		currentCodePath = append(currentCodePath, code)
+
+		sanitizedPathParts := make([]string, len(currentCodePath))
+		for i := range currentCodePath {
+			sanitizedPathParts[i] = sanitizeIdentifier(currentCodePath[i], currentLabelPath[i])
 		}
+
 		groupID := fmt.Sprintf("group_l%d_%s", levelIndex+1, strings.Join(sanitizedPathParts, "_"))
 
-		// Check if this is a leaf node (final level)
 		if levelIndex == len(pattern.ColumnLevels)-1 {
-			// This is the final level - create column group with pattern.Columns as children
 			columnGroup := ColumnDef{
-				HeaderName:    key,
+				HeaderName:    label,
 				GroupID:       groupID,
 				OpenByDefault: boolPtr(true),
 				Children:      []ColumnDef{},
 			}
 
-			// Build field prefix dynamically from all level values
 			fieldPrefix := strings.Join(sanitizedPathParts, "_")
 
-			// Add pattern columns as children
 			for _, colConfig := range pattern.Columns {
 				childCol := ColumnDef{
 					Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
@@ -488,13 +568,12 @@ func buildColumnGroupsRecursive(
 
 			columns = append(columns, columnGroup)
 		} else {
-			// This is an intermediate level - recurse into nested map
 			if nestedMap, ok := value.(map[string]interface{}); ok {
 				columnGroup := ColumnDef{
-					HeaderName:    key,
+					HeaderName:    label,
 					GroupID:       groupID,
 					OpenByDefault: boolPtr(true),
-					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentPath),
+					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath),
 				}
 				columns = append(columns, columnGroup)
 			}
@@ -513,7 +592,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 	hierarchy := buildHierarchyMap(subGroups, pattern.ColumnLevels)
 
 	// Build columns recursively
-	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{})
+	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{})
 
 	return columns
 }
@@ -531,6 +610,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			continue
 		}
 
+		itemValue := buildItemValue(pattern, sg)
 		var columnLabel string
 		var columnKey string
 		if len(pattern.ColumnLevels) > 0 {
@@ -538,14 +618,16 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			keyParts := []string{}
 			for _, level := range pattern.ColumnLevels {
 				valueName := getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
+				valueCode := getValueCodeByGroupCode(sg.SubGroupKeys, level.Field)
 				labelParts = append(labelParts, valueName)
-				keyParts = append(keyParts, sanitizeFieldName(valueName))
+				keyParts = append(keyParts, sanitizeIdentifier(valueCode, valueName))
 			}
 			columnLabel = strings.Join(labelParts, " | ")
 			columnKey = strings.Join(keyParts, "_")
 		} else {
 			columnLabel = buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-			columnKey = sanitizeFieldName(columnLabel)
+			columnCode := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+			columnKey = sanitizeIdentifier(columnCode, columnLabel)
 		}
 		if columnLabel == "" {
 			columnLabel = columnKey
@@ -570,6 +652,10 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				row[fieldName] = valueName
 			}
 
+			if itemValue != "" {
+				row["item"] = itemValue
+			}
+
 			rowMap[compositeKey] = row
 			rows = append(rows, row)
 		}
@@ -582,6 +668,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
+		var lineBundleValue *float64
 		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
@@ -595,6 +682,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				if inactive, ok := udfData["inactive"].(bool); ok {
 					inactiveValue = inactive
 					hasInactiveValue = true
+				}
+				if lb, ok := udfData["line_bundle"].(float64); ok {
+					lineBundleValue = &lb
+				} else if lb, ok := udfData["line_bundle"].(int); ok {
+					lbFloat := float64(lb)
+					lineBundleValue = &lbFloat
 				}
 				if sq, ok := udfData["stock_quantity"]; ok {
 					stockQuantityValue = sq
@@ -665,6 +758,10 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			}
 		}
 
+		row["is_highlight"] = isHighlightValue
+		row["weight_spec"] = sg.PriceWeight
+		row["avg_kg_stock"] = sg.TotalNetPriceWeight
+
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
 
@@ -733,6 +830,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				}
 			case "stock":
 				row[fieldName] = stockValue
+			case "line_bundle":
+				if lineBundleValue != nil {
+					row[fieldName] = *lineBundleValue
+				} else {
+					row[fieldName] = nil
+				}
 			case "stock_quantity":
 				row[fieldName] = stockQuantityValue
 			case "batch_no":
@@ -821,6 +924,14 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var deliveryDateValue interface{}
 		var tonValue interface{}
 		var producerValue interface{}
+		var stockQuantityValue interface{}
+		var batchNoValue interface{}
+		var warehouseValue interface{}
+		var codeValue interface{}
+		var bkkValue interface{}
+		var factoryValue interface{}
+		var countryValue interface{}
+		var shipNoValue interface{}
 		fastValue := false
 		slowValue := false
 		hasFastValue := false
@@ -864,6 +975,34 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if producer, ok := udfData["producer"]; ok {
 					producerValue = producer
 				}
+				if sq, ok := udfData["stock_quantity"]; ok {
+					stockQuantityValue = sq
+				}
+				if bn, ok := udfData["batch_no"]; ok {
+					batchNoValue = bn
+				}
+				if wh, ok := udfData["warehouse"]; ok {
+					warehouseValue = wh
+				}
+				if code, ok := udfData["code"]; ok {
+					codeValue = code
+				}
+				if bkk, ok := udfData["bkk"]; ok {
+					bkkValue = bkk
+				} else if bn, ok := udfData["batch_no"]; ok {
+					bkkValue = bn
+				}
+				if factory, ok := udfData["factory"]; ok {
+					factoryValue = factory
+				} else if producer, ok := udfData["producer"]; ok {
+					factoryValue = producer
+				}
+				if country, ok := udfData["country"]; ok {
+					countryValue = country
+				}
+				if shipNo, ok := udfData["ship_no"]; ok {
+					shipNoValue = shipNo
+				}
 				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
 					if importDate, ok := apMap["import_date"]; ok {
 						importDateValue = importDate
@@ -904,6 +1043,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			case "item":
 			case "type":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+			case "product_group_5":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
 			case "product_group_2":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
 			case "product_group_3":
@@ -916,6 +1057,10 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
 			case "product_group_8":
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
+			case "product_group_9":
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+			case "ship_no":
+				row[fixedCol.Field] = shipNoValue
 			case "price_weight":
 				row[fixedCol.Field] = sg.PriceWeight
 			case "before_price_weight":
@@ -954,6 +1099,23 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[fixedCol.Field] = 0.0
 				case "avg_kg_stock":
 					row[fixedCol.Field] = 0.0
+				case "product_group_6":
+					row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+				default:
+					// For other fields without dataMapping, try to infer from field name
+					if strings.HasPrefix(fixedCol.Field, "product_group_") {
+						// Convert "product_group_6" to "PRODUCT_GROUP6"
+						parts := strings.Split(fixedCol.Field, "_")
+						if len(parts) >= 3 {
+							groupCode := fmt.Sprintf("PRODUCT_GROUP%s", parts[2])
+							row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
+						} else {
+							row[fixedCol.Field] = ""
+						}
+					} else {
+						// Set to empty string if no mapping found
+						row[fixedCol.Field] = ""
+					}
 				}
 			}
 		}
@@ -997,6 +1159,22 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			switch colConfig.DataMapping {
 			case "extra_price_unit":
 				row[colConfig.Field] = sg.ExtraPriceUnit
+			case "product_group_3":
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+			case "product_group_5":
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
+			case "product_group_6":
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+			case "product_group_8":
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
+			case "product_group_9":
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+			case "before_price_weight":
+				row[colConfig.Field] = sg.BeforePriceWeight
+			case "total_net_price_weight":
+				row[colConfig.Field] = sg.TotalNetPriceWeight
+			case "price_weight":
+				row[colConfig.Field] = sg.PriceWeight
 			case "line_bundle":
 				if lineBundleValue != nil {
 					row[colConfig.Field] = *lineBundleValue
@@ -1029,6 +1207,36 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				} else {
 					row[colConfig.Field] = false
 				}
+			case "stock_quantity":
+				row[colConfig.Field] = stockQuantityValue
+			case "batch_no":
+				row[colConfig.Field] = batchNoValue
+			case "warehouse":
+				row[colConfig.Field] = warehouseValue
+			case "code":
+				row[colConfig.Field] = codeValue
+			case "bkk":
+				row[colConfig.Field] = bkkValue
+			case "factory":
+				row[colConfig.Field] = factoryValue
+			case "country":
+				row[colConfig.Field] = countryValue
+			case "is_highlight":
+				row[colConfig.Field] = isHighlightValue
+			case "inactive":
+				if hasInactiveValue {
+					row[colConfig.Field] = inactiveValue
+				} else {
+					row[colConfig.Field] = false
+				}
+			case "":
+				// Empty dataMapping - set default values for calculated/empty fields
+				if colConfig.Field == "weight_spec" || colConfig.Field == "avg_kg_stock" {
+					row[colConfig.Field] = 0.0
+				} else {
+					// For other fields with empty dataMapping, set to empty string
+					row[colConfig.Field] = ""
+				}
 			}
 		}
 
@@ -1039,6 +1247,156 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 	}
 
 	return rows
+}
+
+func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow {
+	if pattern == nil || pattern.Summary == nil || len(rows) == 0 {
+		return nil
+	}
+
+	cfg := pattern.Summary
+	if cfg.RowGroupField == "" || len(cfg.Columns) == 0 {
+		return nil
+	}
+
+	summaryMap := make(map[string]*SummaryRow)
+	order := make([]string, 0)
+
+	for _, row := range rows {
+		rowGroupValue := getRowGroupValue(row, cfg)
+		if rowGroupValue == "" {
+			continue
+		}
+
+		summaryRow, exists := summaryMap[rowGroupValue]
+		if !exists {
+			data := map[string]interface{}{
+				"row_group_value": rowGroupValue,
+				"is_summary_row":  true,
+			}
+			if cfg.RowGroupField != "" {
+				if val, ok := row[cfg.RowGroupField]; ok {
+					data[cfg.RowGroupField] = val
+				} else {
+					data[cfg.RowGroupField] = rowGroupValue
+				}
+			}
+			if cfg.LabelField != "" && cfg.LabelValue != "" {
+				data[cfg.LabelField] = cfg.LabelValue
+			}
+
+			summaryRow = &SummaryRow{
+				RowGroupValue: rowGroupValue,
+				Label:         cfg.LabelValue,
+				Data:          data,
+			}
+			summaryMap[rowGroupValue] = summaryRow
+			order = append(order, rowGroupValue)
+		}
+
+		for _, column := range cfg.Columns {
+			fieldName := column.Field
+			if fieldName == "" {
+				continue
+			}
+
+			applyToColumnGroups := true
+			if column.ApplyToColumnGroups != nil {
+				applyToColumnGroups = *column.ApplyToColumnGroups
+			}
+
+			if applyToColumnGroups {
+				columnKey := fmt.Sprintf("%v", row["column_group_key"])
+				if columnKey == "" {
+					continue
+				}
+				fieldName = fmt.Sprintf("%s_%s", columnKey, column.Field)
+			}
+
+			aggregateSummaryValue(summaryRow.Data, fieldName, row[fieldName], column.Aggregation)
+		}
+	}
+
+	if len(summaryMap) == 0 {
+		return nil
+	}
+
+	result := make([]SummaryRow, 0, len(summaryMap))
+	for _, key := range order {
+		if sr, ok := summaryMap[key]; ok {
+			result = append(result, *sr)
+		}
+	}
+
+	return result
+}
+
+func getRowGroupValue(row AGGridRowData, cfg *SummaryConfig) string {
+	if row == nil || cfg == nil {
+		return ""
+	}
+
+	if value, ok := row["row_group_value"]; ok {
+		if str := fmt.Sprintf("%v", value); str != "" {
+			return str
+		}
+	}
+
+	if cfg.RowGroupField != "" {
+		if value, ok := row[cfg.RowGroupField]; ok {
+			return fmt.Sprintf("%v", value)
+		}
+	}
+
+	return ""
+}
+
+func aggregateSummaryValue(target map[string]interface{}, field string, raw interface{}, aggregation string) {
+	if target == nil || field == "" {
+		return
+	}
+
+	value, ok := toFloat64(raw)
+	if !ok {
+		return
+	}
+
+	current, _ := toFloat64(target[field])
+	switch strings.ToLower(aggregation) {
+	case "sum", "":
+		target[field] = current + value
+	}
+}
+
+func toFloat64(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case nil:
+		return 0, false
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case string:
+		if v == "" {
+			return 0, false
+		}
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+			return parsed, true
+		}
+	}
+	return 0, false
 }
 
 func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
