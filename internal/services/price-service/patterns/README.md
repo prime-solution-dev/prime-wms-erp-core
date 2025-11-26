@@ -111,7 +111,15 @@ Each configuration file contains:
       "columnGroups": [...],              // Static column groups
       "applicableCategories": [...],      // Which categories use this pattern
       "editable_suffixes": [...],         // Editable field suffixes
-      "fetchable_suffixes": [...]         // Fetchable field suffixes
+      "fetchable_suffixes": [...],        // Fetchable field suffixes
+      "summary": {                        // Optional summary configuration
+        "rowGroupField": "product_group_6",
+        "labelField": "ship_no",
+        "labelValue": "รวม",
+        "columns": [
+          { "field": "quantity", "aggregation": "sum" }
+        ]
+      }
     }
   ],
   "defaultPattern": "pattern_id",
@@ -124,6 +132,13 @@ Each configuration file contains:
   }
 }
 ```
+
+#### Summary Rows
+
+- `rowGroupField`: Field used to cluster base rows when computing totals (e.g., `product_group_6` for thickness).
+- `labelField` / `labelValue`: Optional field/value to stamp the rendered summary row (e.g., show `"รวม"` under `Ship No.`).
+- `columns`: Array of aggregations. Each entry references a field from the pattern configuration. Set `applyToColumnGroups` to `false` (default `true`) to aggregate direct-row fields.
+- Computed results are returned in `tab.summaryRows` so the frontend can inject them without mutating `tableData`.
 
 ### Pattern Types
 
