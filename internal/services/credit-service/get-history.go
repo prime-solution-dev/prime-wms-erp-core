@@ -233,8 +233,8 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if exist {
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  approvalValue.ID,
-					CreditLimit:         reqCodeAmountMap.CreditLimit,
-					IncreaseCreditLimit: reqCodeAmountMap.IncreaseCreditLimit,
+					CreditLimit:         approvalValue.Amount,
+					IncreaseCreditLimit: approvalValue.Amount,
 					StartDateTime:       reqCodeAmountMap.StartDateTime,
 					EndDateTime:         reqCodeAmountMap.EndDateTime,
 					SubmitDateTime:      reqCodeAmountMap.SubmitDateTime,
