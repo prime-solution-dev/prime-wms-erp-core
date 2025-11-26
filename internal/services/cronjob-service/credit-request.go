@@ -69,8 +69,24 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					Reason:          "",
 				})
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
-					ID:     creditRequestValue.ID,
-					Status: "CANCELLED",
+					ID:                           creditRequestValue.ID,
+					Status:                       "CANCELLED",
+					RequestCode:                  creditRequestValue.RequestCode,
+					CustomerCode:                 creditRequestValue.CustomerCode,
+					CustomerName:                 creditRequestValue.CustomerName,
+					TemporaryIncreaseCreditLimit: creditRequestValue.TemporaryIncreaseCreditLimit,
+					ConsumedCredit:               creditRequestValue.ConsumedCredit,
+					BalanceCreditLimit:           creditRequestValue.BalanceCreditLimit,
+					CustomeStatus:                creditRequestValue.CustomeStatus,
+					Amount:                       creditRequestValue.Amount,
+					RequestType:                  creditRequestValue.RequestType,
+					IsApprove:                    creditRequestValue.IsApprove,
+					Reason:                       creditRequestValue.Reason,
+					EffectiveDtm:                 creditRequestValue.EffectiveDtm,
+					ExpireDtm:                    creditRequestValue.ExpireDtm,
+					RequestDate:                  creditRequestValue.RequestDate,
+					ActionDate:                   creditRequestValue.ActionDate,
+					IsAction:                     creditRequestValue.IsAction,
 				})
 
 			}
