@@ -48,20 +48,20 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	creditTransaction := []models.CreditTransaction{}
 
 	for i, credit := range req {
-		creditID := uuid.New()
-		for o := range credit.CreditExtra {
-			creditExtraID := uuid.New()
-			req[i].CreditExtra[o].ID = creditExtraID
-			req[i].CreditExtra[o].CreditID = creditID
-			creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
-		}
-
-		req[i].ID = creditID
-		approvalIDForReturn = append(approvalIDForReturn, creditID)
-		req[i].CreditExtra = []models.CreditExtra{}
-
 		_, existMapCreditDocref := mapCreditDocref[req[i].DocRef]
 		if !existMapCreditDocref {
+			creditID := uuid.New()
+			for o := range credit.CreditExtra {
+				creditExtraID := uuid.New()
+				req[i].CreditExtra[o].ID = creditExtraID
+				req[i].CreditExtra[o].CreditID = creditID
+				creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
+			}
+
+			req[i].ID = creditID
+			approvalIDForReturn = append(approvalIDForReturn, creditID)
+			req[i].CreditExtra = []models.CreditExtra{}
+
 			creditValue = append(creditValue, req[i])
 			creditMapValue, exist := mapCredit[req[i].CustomerCode]
 			if exist {
