@@ -27,6 +27,9 @@ type GetHistoryRes struct {
 	SubmitDateTime      *time.Time `json:"submit_date_time"`
 	ApproveDateTime     *time.Time `json:"approve_date_time"`
 	Status              string     `json:"status"`
+	EffectiveDtm        *time.Time `json:"effective_dtm"`
+	ExpireDtm           *time.Time `json:"expire_dtm"`
+	RequestDate         *time.Time `json:"request_date"`
 }
 type ResultHistory struct {
 	Total      int             `json:"total"`
@@ -65,6 +68,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				})
 			}
 			if creditValue.RequestType == "BASE" {
@@ -79,6 +85,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				})
 			}
 		} else {
@@ -94,6 +103,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				}
 			}
 			if creditValue.RequestType == "BASE" {
@@ -108,6 +120,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      creditValue.CreateDtm,
 					ApproveDateTime:     creditValue.ActionDate,
 					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				}
 			}
 			reqCode = append(reqCode, creditValue.RequestCode)
