@@ -198,7 +198,7 @@ func DeleteCreditExtra(creditExtraID []uuid.UUID) error {
 
 	return nil
 }
-func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequest(id []uuid.UUID, customerCode []string, requestType []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -214,7 +214,10 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize 
 	if len(customerCode) > 0 {
 		query = query.Where("customer_code in (?)", customerCode)
 	}
-	query = query.Where("request_type in (?)", "EXTRA")
+	if len(requestType) > 0 {
+		query = query.Where("request_type in (?)", requestType)
+	}
+
 	var count int64
 	query.Count(&count)
 

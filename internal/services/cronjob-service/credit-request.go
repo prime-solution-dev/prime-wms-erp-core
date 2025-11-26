@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
-	"strings"
 	"time"
 
 	creditService "prime-erp-core/internal/services/credit-service"
@@ -19,8 +18,14 @@ import (
 func CreditRequestEffectiveDtm() (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequestCronjob"
-	bodyNewRequest := strings.NewReader(`{}`)
-	reqHttp, err := http.NewRequest("POST", url, bodyNewRequest)
+	requestData := map[string]interface{}{
+		"request_type": "EXTRA",
+	}
+	jsonData, err := json.Marshal(requestData)
+	if err != nil {
+		errors.New("Error marshalling data :")
+	}
+	reqHttp, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
