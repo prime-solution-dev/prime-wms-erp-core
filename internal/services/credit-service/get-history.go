@@ -231,10 +231,17 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if approvalValue.Status != "COMPLETED" {
 			reqCodeAmountMap, exist := reqCodeAmount[approvalValue.TransactionCode]
 			if exist {
+				creditLimit := 0.0
+				increaseCreditLimit := 0.0
+				if approvalValue.TransactionType == "EXTRA" {
+					increaseCreditLimit = approvalValue.Amount
+				} else {
+					creditLimit = approvalValue.Amount
+				}
 				historyRes = append(historyRes, GetHistoryRes{
 					ID:                  approvalValue.ID,
-					CreditLimit:         approvalValue.Amount,
-					IncreaseCreditLimit: approvalValue.Amount,
+					CreditLimit:         creditLimit,
+					IncreaseCreditLimit: increaseCreditLimit,
 					StartDateTime:       reqCodeAmountMap.StartDateTime,
 					EndDateTime:         reqCodeAmountMap.EndDateTime,
 					SubmitDateTime:      reqCodeAmountMap.SubmitDateTime,
