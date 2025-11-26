@@ -1,13 +1,14 @@
 package CronjobService
 
 import (
+	"prime-erp-core/internal/cronjob"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 )
 
 func init() {
-	//cronjob.RegisterJob("wms-kernal", GetKernal, "*/1 * * * *")
+	cronjob.RegisterJob("wms-kernal", GetKernal, "*/1 * * * *")
 }
 
 func GetKernalManual(ctx *gin.Context, jsonPayload string) (interface{}, error) {
