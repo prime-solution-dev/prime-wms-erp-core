@@ -48,7 +48,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, nil, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, nil, nil, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
