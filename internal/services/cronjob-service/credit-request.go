@@ -49,8 +49,49 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	if err != nil {
 		fmt.Println("Response Status:", err)
 	}
+	customerCode := []string{}
+	for _, creditRequestValue := range creditRequest.CreditRequest {
+		customerCode = append(customerCode, creditRequestValue.CustomerCode)
+	}
 
-	fmt.Println("Response Status:", resp.Status)
+	urlGetCredit := os.Getenv("base_url_erp") + "/credit/GetCredit"
+	requestDataGetCredit := map[string]interface{}{
+		"customer_code": customerCode,
+	}
+	jsonDataGetCredit, err := json.Marshal(requestDataGetCredit)
+	if err != nil {
+		errors.New("Error marshalling data :")
+	}
+	reqHttpGetCredit, errGetCredit := http.NewRequest("POST", urlGetCredit, bytes.NewBuffer(jsonDataGetCredit))
+	if errGetCredit != nil {
+		return nil, errors.New("Error parsing DateTo: " + err.Error())
+	}
+
+	reqHttp.Header.Set("Content-Type", "application/json")
+
+	// Create a client and execute the request
+	clientGetCredit := &http.Client{}
+	respGetCredit, errGetCredit := clientGetCredit.Do(reqHttpGetCredit)
+	if errGetCredit != nil {
+		return nil, errors.New("Error parsing DateTo : " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	bodyGetCredit, errGetCredit := ioutil.ReadAll(respGetCredit.Body)
+	if errGetCredit != nil {
+		fmt.Println("Response Status:", err)
+	}
+	var getCredit creditService.ResultCredit
+	err = json.Unmarshal(bodyGetCredit, &getCredit)
+	if err != nil {
+		fmt.Println("Response Status:", err)
+	}
+
+	creditMap := map[string]models.Credit{}
+	for _, creditValue := range getCredit.Credit {
+		creditMap[creditValue.CustomerCode] = creditValue
+	}
+
 	creditExtraMap := map[string][]models.CreditExtra{}
 	credit := []models.Credit{}
 	creditRequestForAlert := []models.CreditRequest{}
@@ -103,25 +144,23 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			if !eff.Before(now) {
 
 				if creditRequestValue.RequestType == "EXTRA" {
+					creditMapValue, existMapCredit := creditMap[creditRequestValue.CustomerCode]
+					if existMapCredit {
+						creditExtraMap[creditRequestValue.CustomerCode] = append(creditExtraMap[creditRequestValue.CustomerCode], models.CreditExtra{
+							CreditID:     creditMapValue.ID,
+							Amount:       creditRequestValue.Amount,
+							EffectiveDtm: creditRequestValue.EffectiveDtm,
+							ExpireDtm:    creditRequestValue.ExpireDtm,
+							DocRef:       creditRequestValue.RequestCode,
+							ApproveDate:  &now,
+						})
+					}
 
-					creditExtraMap[creditRequestValue.CustomerCode] = append(creditExtraMap[creditRequestValue.CustomerCode], models.CreditExtra{
-						Amount:       creditRequestValue.Amount,
-						EffectiveDtm: creditRequestValue.EffectiveDtm,
-						ExpireDtm:    creditRequestValue.ExpireDtm,
-						DocRef:       creditRequestValue.RequestCode,
-						ApproveDate:  &now,
-					})
-				} else {
-					credit = append(credit, models.Credit{
-						CustomerCode:       creditRequestValue.CustomerCode,
-						Amount:             creditRequestValue.Amount,
-						EffectiveDtm:       creditRequestValue.EffectiveDtm,
-						IsActive:           true,
-						DocRef:             creditRequestValue.RequestCode,
-						ApproveDate:        &now,
-						AlertBalanceCredit: false,
-					})
 				}
+
+				credit = append(credit, models.Credit{
+					CustomerCode: creditRequestValue.CustomerCode,
+				})
 
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
 					ID:                           creditRequestValue.ID,
