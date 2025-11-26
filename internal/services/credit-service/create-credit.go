@@ -99,7 +99,7 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	if len(creditIDForDelete) > 0 {
+	if len(creditIDForDelete) > 0 || len(creditExtraIDForDelete) > 0 {
 		errDeleteCredit := repositoryCredit.DeleteCredit(creditIDForDelete, creditExtraIDForDelete)
 		if errDeleteCredit != nil {
 			return nil, errDeleteCredit
