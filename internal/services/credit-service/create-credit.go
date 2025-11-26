@@ -38,11 +38,16 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errGetCredit
 	}
 	mapCredit := map[string]models.Credit{}
+	mapCreditExtra := map[uuid.UUID]models.CreditExtra{}
 	mapCreditDocref := map[string]models.Credit{}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
 		mapCredit[creditValue.CustomerCode] = creditValue
 		mapCreditDocref[creditValue.DocRef] = creditValue
+		for _, creditExtraValue := range creditValue.CreditExtra {
+			mapCreditExtra[creditValue.ID] = creditExtraValue
+		}
+
 	}
 	creditIDForDelete := []uuid.UUID{}
 	creditExtraIDForDelete := []uuid.UUID{}
@@ -58,8 +63,24 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				if req[i].CreditExtra[o].CreditID == uuid.Nil {
 					req[i].CreditExtra[o].CreditID = creditID
 				}
-				creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].CreditExtra[o].CreditID)
 				creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
+
+				creditmapCreditExtra, exist := mapCreditExtra[req[i].CreditExtra[o].CreditID]
+				if exist {
+					creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].CreditExtra[o].CreditID)
+					creditTransaction = append(creditTransaction, models.CreditTransaction{
+						TransactionCode: creditmapCreditExtra.CreditID.String(),
+						TransactionType: "EXTRA",
+						Amount:          creditmapCreditExtra.Amount,
+						AdjustAmount:    0,
+						EffectiveDtm:    creditmapCreditExtra.EffectiveDtm,
+						ExpireDtm:       creditmapCreditExtra.EffectiveDtm,
+						IsApprove:       false,
+						Status:          "INACTIVE",
+						Reason:          "",
+					})
+				}
+
 			}
 
 			req[i].ID = creditID
@@ -74,10 +95,10 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
 						TransactionCode: creditMapValue.CustomerCode,
 						TransactionType: "BASE",
-						Amount:          req[i].Amount,
+						Amount:          creditMapValue.Amount,
 						AdjustAmount:    0,
-						EffectiveDtm:    req[i].EffectiveDtm,
-						ExpireDtm:       req[i].EffectiveDtm,
+						EffectiveDtm:    creditMapValue.EffectiveDtm,
+						ExpireDtm:       creditMapValue.EffectiveDtm,
 						IsApprove:       false,
 						Status:          "INACTIVE",
 						Reason:          "",
