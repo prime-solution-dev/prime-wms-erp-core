@@ -3,6 +3,7 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	"time"
@@ -82,11 +83,9 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			AdjustAmount:    0,
 			EffectiveDtm:    req[i].EffectiveDtm,
 			ExpireDtm:       req[i].ExpireDtm,
-			//ForceExpireDtm:  req[i].e,
-			//ApproveDate:     "",
-			IsApprove: false,
-			Status:    req[i].Status,
-			Reason:    "",
+			IsApprove:       false,
+			Status:          req[i].Status,
+			Reason:          "",
 		})
 
 	}
@@ -106,6 +105,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(string(jsonByteserrCredit))
 		_, errCreateCredit := CreateCredit(ctx, string(jsonByteserrCredit))
 		if errCreateCredit != nil {
 			return nil, errCreateCredit
