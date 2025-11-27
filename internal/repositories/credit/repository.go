@@ -360,6 +360,17 @@ func UpdateCreditRequest(creditRequest []models.CreditRequest) (int, error) {
 		}
 		rowsAffected = int(result.RowsAffected)
 	}
+	if rowsAffected == 0 {
+		for _, creditRequestValue := range creditRequest {
+			result := gormx.Table("credit_request").Where("request_code = ?", creditRequestValue.RequestCode).Updates(&creditRequestValue)
+
+			if result.Error != nil {
+				gormx.Rollback()
+				return 0, result.Error
+			}
+			rowsAffected = int(result.RowsAffected)
+		}
+	}
 
 	return rowsAffected, nil
 }

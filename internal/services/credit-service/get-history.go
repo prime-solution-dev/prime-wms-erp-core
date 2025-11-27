@@ -150,7 +150,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			reqCode = append(reqCode, creditValue.RequestCode)
-
+			if creditValue.Status == "REJECT" {
+				reqCode = append(reqCode, creditValue.ID.String())
+			}
 		}
 
 	}
@@ -179,6 +181,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			historyRes = append(historyRes, GetHistoryRes{
 				ID:                  creditExtraValue.ID,
 				CreditLimit:         0,
+				RequestType:         "EXTRA",
 				IncreaseCreditLimit: creditExtraValue.Amount,
 				StartDateTime:       creditExtraValue.EffectiveDtm,
 				EndDateTime:         creditExtraValue.ExpireDtm,
@@ -203,6 +206,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		historyRes = append(historyRes, GetHistoryRes{
 			ID:                  creditValue.ID,
 			CreditLimit:         creditValue.Amount,
+			RequestType:         "BASE",
 			IncreaseCreditLimit: 0,
 			StartDateTime:       creditValue.EffectiveDtm,
 			SubmitDateTime:      creditValue.CreateDtm,
