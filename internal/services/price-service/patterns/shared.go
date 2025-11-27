@@ -1091,6 +1091,16 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
 				row[fixedCol.Field] = sg.Remark
+			case "product_group_6_x_product_group_7":
+				// Composite field: PRODUCT_GROUP6 " x " PRODUCT_GROUP7
+				pg6 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+				pg7 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
+				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg6, pg7)
+			case "product_group_5_product_group_3":
+				// Composite field: PRODUCT_GROUP5 + PRODUCT_GROUP3 (no separator)
+				pg5 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
+				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[fixedCol.Field] = pg5 + pg3
 			}
 
 			if fixedCol.DataMapping == "" {
@@ -1247,6 +1257,216 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 	}
 
 	return rows
+}
+
+// buildProductGroup2ColumnGroups builds dynamic column groups from PRODUCT_GROUP2 values
+// Each column group contains children columns defined in pattern.Columns
+func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
+	type columnGroupValue struct {
+		Label string
+		Code  string
+	}
+
+	columns := []ColumnDef{}
+	uniqueValues := make(map[string]columnGroupValue)
+
+	// Extract unique PRODUCT_GROUP2 values
+	for _, sg := range subGroups {
+		label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		if label == "" {
+			continue
+		}
+		code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		mapKey := fmt.Sprintf("%s|%s", label, code)
+		uniqueValues[mapKey] = columnGroupValue{
+			Label: label,
+			Code:  code,
+		}
+	}
+
+	// Sort keys to ensure consistent column order by label
+	sortedKeys := make([]string, 0, len(uniqueValues))
+	for key := range uniqueValues {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+	})
+
+	// Build column groups with children from pattern.Columns
+	for _, key := range sortedKeys {
+		value := uniqueValues[key]
+		groupIdentifier := sanitizeIdentifier(value.Code, value.Label)
+
+		columnGroup := ColumnDef{
+			HeaderName:    value.Label,
+			GroupID:       fmt.Sprintf("group_%s", groupIdentifier),
+			OpenByDefault: boolPtr(true),
+			Children:      []ColumnDef{},
+		}
+
+		// Add children columns from pattern.Columns
+		for _, colConfig := range pattern.Columns {
+			childCol := ColumnDef{
+				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
+				HeaderName:   colConfig.HeaderName,
+				Width:        intPtr(colConfig.Width),
+				CellRenderer: colConfig.CellRenderer,
+			}
+
+			if colConfig.CellStyle != nil {
+				childCol.CellStyle = convertCellStyle(colConfig.CellStyle)
+			}
+
+			if colConfig.EnableTooltip {
+				childCol.EnableTooltip = boolPtr(true)
+			}
+
+			columnGroup.Children = append(columnGroup.Children, childCol)
+		}
+
+		columns = append(columns, columnGroup)
+	}
+
+	return columns
+}
+
+// buildDirectRowsWithProductGroup2 builds rows with fixed columns and dynamic PRODUCT_GROUP2 column group data
+func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	if len(subGroups) == 0 {
+		return nil
+	}
+
+	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
+	type pg2Entry struct {
+		Code  string
+		Label string
+	}
+
+	pg2Map := make(map[string]string) // code -> label
+	for _, sg := range subGroups {
+		code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		if code != "" {
+			pg2Map[code] = label
+		}
+	}
+
+	pg2Entries := make([]pg2Entry, 0, len(pg2Map))
+	for code, label := range pg2Map {
+		pg2Entries = append(pg2Entries, pg2Entry{Code: code, Label: label})
+	}
+	sort.Slice(pg2Entries, func(i, j int) bool {
+		return pg2Entries[i].Label < pg2Entries[j].Label
+	})
+
+	rows := []AGGridRowData{}
+	rowMap := make(map[string]AGGridRowData)
+	rowOrder := []string{}
+
+	for _, sg := range subGroups {
+		thickness := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
+		length := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
+		thicknessLength := strings.TrimSpace(fmt.Sprintf("%s x %s", thickness, length))
+
+		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
+		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+		size := strings.TrimSpace(fmt.Sprintf("%s%s", sizePart1, sizePart2))
+
+		rowKey := fmt.Sprintf("%s|%s", thicknessLength, size)
+		if rowKey == "|" {
+			rowKey = sg.ID
+		}
+
+		row, exists := rowMap[rowKey]
+		if !exists {
+			row = AGGridRowData{
+				"id":                 uuid.New().String(),
+				"thickness_x_length": thicknessLength,
+				"size":               size,
+			}
+			if itemValue := buildItemValue(pattern, sg); itemValue != "" {
+				row["item"] = itemValue
+			}
+
+			// Initialize default values for every PRODUCT_GROUP2 column group
+			for _, entry := range pg2Entries {
+				identifier := sanitizeIdentifier(entry.Code, entry.Label)
+				row[fmt.Sprintf("%s_subgroup_id", identifier)] = ""
+				for _, colConfig := range pattern.Columns {
+					fieldName := fmt.Sprintf("%s_%s", identifier, colConfig.Field)
+					row[fieldName] = defaultValueForProductGroup2Column(colConfig)
+				}
+			}
+
+			rowMap[rowKey] = row
+			rowOrder = append(rowOrder, rowKey)
+		}
+
+		// Update base descriptors if new data is available
+		row["thickness_x_length"] = thicknessLength
+		row["size"] = size
+
+		// Parse UDF data for highlight flag
+		isHighlightValue := false
+		if len(sg.UdfJson) > 0 {
+			udfData := make(map[string]interface{})
+			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				if h, ok := udfData["is_highlight"].(bool); ok {
+					isHighlightValue = h
+				}
+			}
+		}
+
+		pg2Code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		pg2Label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		if pg2Code == "" {
+			continue
+		}
+		identifier := sanitizeIdentifier(pg2Code, pg2Label)
+
+		// Set subgroup identifier for the specific PRODUCT_GROUP2 entry
+		row[fmt.Sprintf("%s_subgroup_id", identifier)] = sg.ID
+
+		// Populate dynamic column values for this PRODUCT_GROUP2
+		for _, colConfig := range pattern.Columns {
+			fieldName := fmt.Sprintf("%s_%s", identifier, colConfig.Field)
+			switch colConfig.DataMapping {
+			case "is_highlight":
+				row[fieldName] = isHighlightValue
+			case "price_weight":
+				row[fieldName] = sg.PriceWeight
+			case "total_net_price_weight":
+				row[fieldName] = sg.TotalNetPriceWeight
+			case "before_price_unit":
+				row[fieldName] = sg.BeforePriceUnit
+			case "total_net_price_unit":
+				row[fieldName] = sg.TotalNetPriceUnit
+			case "extra_price_unit":
+				row[fieldName] = sg.ExtraPriceUnit
+			default:
+				row[fieldName] = nil
+			}
+		}
+	}
+
+	// Convert map to ordered slice
+	for _, key := range rowOrder {
+		rows = append(rows, rowMap[key])
+	}
+
+	return rows
+}
+
+func defaultValueForProductGroup2Column(colConfig ColumnConfigItem) interface{} {
+	switch colConfig.DataMapping {
+	case "is_highlight":
+		return false
+	case "price_weight", "total_net_price_weight", "before_price_unit", "total_net_price_unit", "extra_price_unit":
+		return 0.0
+	default:
+		return nil
+	}
 }
 
 func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow {
