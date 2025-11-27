@@ -6,7 +6,7 @@
       "description": "Tabular layout for GROUP_1_ITEM_8 with per-thickness summaries",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
+        "tabs": "",
         "rows": "",
         "columnGroups": ""
       },
@@ -166,6 +166,12 @@
           "headerName": "ปท.",
           "width": 80,
           "dataMapping": "country"
+        },
+        {
+          "field": "tsm",
+          "headerName": "สมอ.",
+          "width": 100,
+          "dataMapping": "tsm"
         },
         {
           "field": "remark",
