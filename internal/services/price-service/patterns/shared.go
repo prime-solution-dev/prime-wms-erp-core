@@ -932,6 +932,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var factoryValue interface{}
 		var countryValue interface{}
 		var shipNoValue interface{}
+		var tsmValue interface{}
 		fastValue := false
 		slowValue := false
 		hasFastValue := false
@@ -1002,6 +1003,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 				if shipNo, ok := udfData["ship_no"]; ok {
 					shipNoValue = shipNo
+				}
+				if tsm, ok := udfData["tsm"]; ok {
+					tsmValue = tsm
 				}
 				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
 					if importDate, ok := apMap["import_date"]; ok {
@@ -1205,6 +1209,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[colConfig.Field] = tonValue
 			case "producer":
 				row[colConfig.Field] = producerValue
+			case "tsm":
+				row[colConfig.Field] = tsmValue
 			case "fast":
 				if hasFastValue {
 					row[colConfig.Field] = fastValue

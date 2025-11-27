@@ -191,8 +191,13 @@
         "GROUP_1_ITEM_8"
       ],
       "editable_suffixes": [
-        "total_net_price_unit",
-        "extra_price_unit",
+        "total_net_price_weight",
+        "extra_price_weight",
+        "bkk",
+        "code",
+        "institute",
+        "country",
+        "tsm",
         "remark"
       ],
       "fetchable_suffixes": [
