@@ -143,7 +143,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			fmt.Println("Effective:", creditRequestValue.EffectiveDtm)
 			now := time.Now()
 			eff := creditRequestValue.EffectiveDtm
-			if !eff.Before(now) {
+			if eff.Before(now) {
 
 				if creditRequestValue.RequestType == "EXTRA" {
 					creditMapValue, existMapCredit := creditMap[creditRequestValue.CustomerCode]
