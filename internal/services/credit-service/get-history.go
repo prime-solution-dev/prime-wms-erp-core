@@ -179,6 +179,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			historyRes = append(historyRes, GetHistoryRes{
 				ID:                  creditExtraValue.ID,
 				CreditLimit:         0,
+				RequestType:         "EXTRA",
 				IncreaseCreditLimit: creditExtraValue.Amount,
 				StartDateTime:       creditExtraValue.EffectiveDtm,
 				EndDateTime:         creditExtraValue.ExpireDtm,
@@ -203,6 +204,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		historyRes = append(historyRes, GetHistoryRes{
 			ID:                  creditValue.ID,
 			CreditLimit:         creditValue.Amount,
+			RequestType:         "BASE",
 			IncreaseCreditLimit: 0,
 			StartDateTime:       creditValue.EffectiveDtm,
 			SubmitDateTime:      creditValue.CreateDtm,

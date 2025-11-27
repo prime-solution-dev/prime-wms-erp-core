@@ -201,7 +201,6 @@ func DeleteCreditExtra(creditExtraID []uuid.UUID) error {
 
 	return nil
 }
-
 func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, requestType []string, status []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
