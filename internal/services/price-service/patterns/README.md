@@ -11,7 +11,7 @@ The Price List Detail service (`get-price-detail`) is a sophisticated pricing sy
 1. **Service Layer** (`get-price-detail.go`)
    - Main entry point for the API
    - Handles request validation and orchestration
-   - Routes to appropriate pattern builders based on `GroupKey`
+   - Routes to appropriate pattern builders based on `GroupCode`
 
 2. **Pattern System** (`patterns/`)
    - Configuration-driven table generation
@@ -69,15 +69,15 @@ GetPriceDetail
 
 After loading data, the system:
 
-1. **Extracts GroupKey**: From the first price list item's `GroupKey` field
-   - The `GroupKey` is extracted from the first subgroup's `subgroup_key` (first part before "|")
-   - Example: `"GROUP_1_ITEM_1|GROUP_2_ITEM_2|..."` → `"GROUP_1_ITEM_1"`
+1. **Reads GroupCode**: Directly from the first price list item's `GroupCode` field
+   - This value comes from `price_list_group.group_code`
+   - Example: `"GROUP_1_ITEM_1"`
 
-2. **Routes to Pattern Handler**: Based on `GroupKey`, selects appropriate builder:
+2. **Routes to Pattern Handler**: Based on `GroupCode`, selects appropriate builder:
    - `GROUP_1_ITEM_1` → `BuildGroup1Item1Response()`
    - `GROUP_1_ITEM_2` → `BuildGroup1Item2Response()`
    - `GROUP_1_ITEM_3` → `BuildGroup1Item3Response()`
-   - `GROUP_1_ITEM_4` → Returns empty response (placeholder)
+   - `GROUP_1_ITEM_4` → `BuildGroup1Item4Response()`
 
 ## Pattern System
 
@@ -88,6 +88,7 @@ Patterns are defined in JSON configuration files located in `patterns/configs/`:
 - `GROUP_1_ITEM_1_PATTERN.json`
 - `GROUP_1_ITEM_2_PATTERN.json`
 - `GROUP_1_ITEM_3_PATTERN.json`
+- `GROUP_1_ITEM_4_PATTERN.json`
 
 Each configuration file contains:
 
@@ -110,7 +111,15 @@ Each configuration file contains:
       "columnGroups": [...],              // Static column groups
       "applicableCategories": [...],      // Which categories use this pattern
       "editable_suffixes": [...],         // Editable field suffixes
-      "fetchable_suffixes": [...]         // Fetchable field suffixes
+      "fetchable_suffixes": [...],        // Fetchable field suffixes
+      "summary": {                        // Optional summary configuration
+        "rowGroupField": "product_group_6",
+        "labelField": "ship_no",
+        "labelValue": "รวม",
+        "columns": [
+          { "field": "quantity", "aggregation": "sum" }
+        ]
+      }
     }
   ],
   "defaultPattern": "pattern_id",
@@ -123,6 +132,13 @@ Each configuration file contains:
   }
 }
 ```
+
+#### Summary Rows
+
+- `rowGroupField`: Field used to cluster base rows when computing totals (e.g., `product_group_6` for thickness).
+- `labelField` / `labelValue`: Optional field/value to stamp the rendered summary row (e.g., show `"รวม"` under `Ship No.`).
+- `columns`: Array of aggregations. Each entry references a field from the pattern configuration. Set `applyToColumnGroups` to `false` (default `true`) to aggregate direct-row fields.
+- Computed results are returned in `tab.summaryRows` so the frontend can inject them without mutating `tableData`.
 
 ### Pattern Types
 
@@ -194,6 +210,28 @@ Each configuration file contains:
    b. Create tab with same columns but different data
 ```
 
+#### 4. GROUP_1_ITEM_4 Pattern
+
+**Builder**: `BuildGroup1Item4Response()`
+
+**Characteristics**:
+
+- **PRODUCT_GROUP2 tabs**: Builds one tab per `PRODUCT_GROUP2` value (e.g., "ท่อเหลี่ยม", "ท่อแบน", "ท่อดำ"), with extras alphabetically appended.
+- **Shared fixed columns**: Uses `buildFixedColumns()` for the header layout shown in the wireframe.
+- **Row spanning**: Enables AG Grid cell spanning (`gridOptions.enableCellSpan = true`) and flags the `Size` column with `spanRows = true` so contiguous duplicate sizes merge visually.
+- **Direct rows**: Uses `buildDirectRows()` per tab and sorts data by Size → Thickness to keep span data contiguous.
+- **Price column groups**: Static column groups render weight (`กก.(C)`) and length (`เส้น`) price before/after pairs.
+
+**Data Flow**:
+```
+1. Load GROUP_1_ITEM_4 pattern configuration
+2. Select the default enabled pattern
+3. Aggregate all subgroups and group them by PRODUCT_GROUP2
+4. Sort tab labels by applicableCategories order then alphabetically
+5. Sort each tab's rows by PRODUCT_GROUP4 then PRODUCT_GROUP6
+6. Build fixed columns once and create a tab per PRODUCT_GROUP2
+```
+
 ## Data Transformation
 
 ### Helper Functions
@@ -247,6 +285,7 @@ Builds columns from pattern configuration:
 - Fixed columns (pinned, locked)
 - Column groups (static groups with children)
 - Regular columns
+- **Row spanning**: Columns can specify `spanRows: true`, and `tableConfig.gridOptions.enableCellSpan` must be enabled to merge contiguous duplicate values.
 
 ### Row Building
 

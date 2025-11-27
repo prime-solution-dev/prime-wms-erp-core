@@ -67,6 +67,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/SubGroup/Latest", func(c *gin.Context) {
 		utils.ProcessRequestWithBinding(c, priceService.GetLatestPriceListSubGroup)
 	})
+	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.UpdateExtras)
+	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
 
@@ -144,6 +147,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/UpdateSaleStatusPayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
 	})
+	sale.POST("/UpdateStatusSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateStatusSale)
+	})
 
 	sale.POST("/EditSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.EditSale)
@@ -218,6 +224,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCreditRequests)
 	})
+	credit.POST("/GetCreditRequestCronjob", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCreditRequestCronjob)
+	})
+
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.CreateCreditRequest)
 	})
@@ -306,7 +316,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	///cronjob
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {
-		utils.ProcessRequest(c, CronjobService.CreditRequestEffectiveDtm)
+		utils.ProcessRequest(c, CronjobService.GetKernalManual)
 	})
 	//email alert
 	emailAlert := ctx.Group("/emailAlert")

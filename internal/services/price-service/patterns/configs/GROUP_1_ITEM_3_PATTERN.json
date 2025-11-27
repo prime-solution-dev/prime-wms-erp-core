@@ -15,7 +15,6 @@
           "field": "#",
           "headerName": "#",
           "width": 60,
-          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
@@ -25,14 +24,26 @@
           }
         },
         {
-          "field": "weight_spec",
-          "headerName": "Weight-spec",
+          "field": "thickness",
+          "headerName": "หนา",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
+          },
+          "dataMapping": "product_group_6"
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-spec",
+          "width": 120,
+
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
           },
           "dataMapping": "price_weight"
         },
@@ -40,11 +51,11 @@
           "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -52,11 +63,11 @@
           "field": "od",
           "headerName": "OD",
           "width": 100,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "od"
         },
@@ -64,11 +75,11 @@
           "field": "line_bundle",
           "headerName": "เส้น/มัด",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "line_bundle"
         },
@@ -76,11 +87,11 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "stock"
         },
@@ -88,7 +99,7 @@
           "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 140,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
@@ -98,11 +109,11 @@
           "field": "extra_price_unit",
           "headerName": "Extra (THB)",
           "width": 120,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -110,7 +121,7 @@
           "field": "remark",
           "headerName": "Notes",
           "width": 200,
-          "pinned": "left",
+
           "lockPosition": true,
           "suppressMovable": true,
           "dataMapping": "remark"
@@ -158,10 +169,10 @@
           "children": [
             {
               "field": "price_kg_before_price_weight",
-              "headerName": "ราคาขาย before",
+              "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_weight"
             },
@@ -170,7 +181,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_weight"
             }
@@ -186,7 +197,7 @@
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "before_price_unit"
             },
@@ -195,7 +206,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "right"
+                "textAlign": "left"
               },
               "dataMapping": "total_net_price_unit"
             }
@@ -272,4 +283,3 @@
     "description": "Configuration for GROUP_1_ITEM_3 - Direct SubGroup rows pattern grouped by PRODUCT_GROUP4"
   }
 }
-

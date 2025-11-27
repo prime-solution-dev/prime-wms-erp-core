@@ -1,0 +1,157 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group_1_item_9_default",
+      "name": "GROUP_1_ITEM_9 Length Matrix",
+      "description": "Single table layout for GROUP_1_ITEM_9 with PRODUCT_GROUP3 column groups and row-span columns for Product Group and Length",
+      "enabled": true,
+      "grouping": {
+        "tabs": "",
+        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP7",
+        "columnGroups": "PRODUCT_GROUP3"
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "product_group_2",
+          "headerName": "Product Group",
+          "width": 180,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "spanRows": true,
+          "dataMapping": "product_group_2",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "product_group_7",
+          "headerName": "ความยาว",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "spanRows": true,
+          "dataMapping": "product_group_7",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "product_group_6",
+          "headerName": "Size",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_6",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-spec",
+          "width": 140,
+          "dataMapping": "",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "avg_kg_stock",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "dataMapping": "",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 130,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        }
+      ],
+      "columns": [
+        {
+          "field": "before_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 150,
+          "dataMapping": "before_price_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 150,
+          "dataMapping": "price_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "extra_price_unit",
+          "headerName": "Extra (THB)",
+          "width": 130,
+          "dataMapping": "extra_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        }
+      ],
+      "applicableCategories": [
+        "GROUP_1_ITEM_9"
+      ],
+      "editable_suffixes": [
+        "price_weight",
+        "extra_price_unit",
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "price_weight",
+        "extra_price_unit"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group_1_item_9_default",
+  "tableConfig": {
+    "groupHeaderHeight": 60,
+    "headerHeight": 44,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": true,
+      "showRefresh": true,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": true,
+      "enableCellSpan": true
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-02-25",
+    "description": "Configuration for GROUP_1_ITEM_9 showing dynamic PRODUCT_GROUP3 columns with row-spanned Product Group and Length headers."
+  }
+}
+

@@ -155,7 +155,7 @@ func UpdateCredit(credit []models.Credit, creditExtra []models.CreditExtra) (int
 
 	return rowsAffected, nil
 }
-func DeleteCredit(creditID []uuid.UUID) error {
+func DeleteCredit(creditID []uuid.UUID, creditExtra []uuid.UUID) error {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
 	if err != nil {
@@ -169,11 +169,14 @@ func DeleteCredit(creditID []uuid.UUID) error {
 			return result.Error
 		}
 
-		resultCreditExtra := gormx.Where("credit_id IN (?)", creditValue).Delete(&models.CreditExtra{})
+	}
+	for _, creditExtraValue := range creditExtra {
+
+		resultCreditExtra := gormx.Where("credit_id IN (?)", creditExtraValue).Delete(&models.CreditExtra{})
 
 		if resultCreditExtra.Error != nil {
 			gormx.Rollback()
-			return result.Error
+			return resultCreditExtra.Error
 		}
 
 	}
@@ -198,7 +201,7 @@ func DeleteCreditExtra(creditExtraID []uuid.UUID) error {
 
 	return nil
 }
-func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, requestType []string, status []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -214,6 +217,16 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize 
 	if len(customerCode) > 0 {
 		query = query.Where("customer_code in (?)", customerCode)
 	}
+	if len(requestType) > 0 {
+		query = query.Where("request_type in (?)", requestType)
+	}
+	if len(isAction) > 0 {
+		query = query.Where("is_action in (?)", isAction)
+	}
+	if len(status) > 0 {
+		query = query.Where("status in (?)", status)
+	}
+
 	var count int64
 	query.Count(&count)
 
@@ -246,7 +259,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, page int, pageSize 
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -261,6 +274,9 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, page int, pa
 	}
 	if len(customerCode) > 0 {
 		query = query.Where("customer_code in (?)", customerCode)
+	}
+	if len(isAction) > 0 {
+		query = query.Where("is_action in (?)", isAction)
 	}
 
 	var count int64

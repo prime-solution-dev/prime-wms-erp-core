@@ -3,8 +3,10 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -52,22 +54,26 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					DocRef:       req[i].RequestCode,
 					//ApproveDate:  "",
 				})
+			} else {
+				now := time.Now()
+				credit = append(credit, models.Credit{
+					ID:                 CreditID,
+					CustomerCode:       req[i].CustomerCode,
+					Amount:             req[i].Amount,
+					EffectiveDtm:       req[i].EffectiveDtm,
+					IsActive:           true,
+					DocRef:             req[i].RequestCode,
+					ApproveDate:        &now,
+					AlertBalanceCredit: false,
+					CreditExtra:        creditExtra,
+				})
+
+				req[i].IsAction = true
+
 			}
 
-			credit = append(credit, models.Credit{
-				ID:           CreditID,
-				CustomerCode: req[i].CustomerCode,
-				Amount:       req[i].Amount,
-				EffectiveDtm: req[i].EffectiveDtm,
-				IsActive:     true,
-				DocRef:       req[i].RequestCode,
-				//ApproveDate:        "",
-				AlertBalanceCredit: false,
-				CreditExtra:        creditExtra,
-			})
-
 		}
-		req[i].IsAction = true
+
 		creditRequestValue = append(creditRequestValue, req[i])
 
 		creditTransaction = append(creditTransaction, models.CreditTransaction{
@@ -77,11 +83,9 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			AdjustAmount:    0,
 			EffectiveDtm:    req[i].EffectiveDtm,
 			ExpireDtm:       req[i].ExpireDtm,
-			//ForceExpireDtm:  req[i].e,
-			//ApproveDate:     "",
-			IsApprove: false,
-			Status:    req[i].Status,
-			Reason:    "",
+			IsApprove:       false,
+			Status:          req[i].Status,
+			Reason:          "",
 		})
 
 	}
@@ -101,6 +105,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(string(jsonByteserrCredit))
 		_, errCreateCredit := CreateCredit(ctx, string(jsonByteserrCredit))
 		if errCreateCredit != nil {
 			return nil, errCreateCredit

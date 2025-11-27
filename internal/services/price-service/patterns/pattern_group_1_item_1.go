@@ -3,6 +3,7 @@ package patterns
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"prime-erp-core/internal/models"
 
@@ -47,8 +48,87 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(pattern, subGroups)
 
-			tableData := make([]map[string]interface{}, len(rowData))
-			for i, row := range rowData {
+			// Merge rows with the same row_group_value into a single row
+			// This groups all column group columns into one row per row key
+			mergedRowMap := make(map[string]AGGridRowData)
+			for _, row := range rowData {
+				rowGroupValue := fmt.Sprintf("%v", row["row_group_value"])
+				if rowGroupValue == "" {
+					continue
+				}
+
+				mergedRow, exists := mergedRowMap[rowGroupValue]
+				if !exists {
+					// Create new merged row with common fields
+					mergedRow = make(AGGridRowData)
+					// Copy common fields (only once)
+					if val, ok := row["id"]; ok {
+						mergedRow["id"] = val
+					}
+					// Copy row grouping fields (these are the same for all rows being merged)
+					for _, field := range strings.Split(pattern.Grouping.Rows, "|") {
+						fieldName := convertGroupCodeToFieldName(field)
+						if val, ok := row[fieldName]; ok {
+							mergedRow[fieldName] = val
+						}
+					}
+					if val, ok := row["row_group_value"]; ok {
+						mergedRow["row_group_value"] = val
+					}
+					if val, ok := row["is_trading"]; ok {
+						mergedRow["is_trading"] = val
+					}
+					if val, ok := row["subgroup_id"]; ok {
+						mergedRow["subgroup_id"] = val
+					}
+				}
+
+				// Merge all column-specific fields from this row
+				for key, value := range row {
+					// Skip common fields that we already set (these have the same value across all rows being merged)
+					if key == "id" || key == "row_group_value" || key == "is_trading" || key == "subgroup_id" {
+						continue
+					}
+					// Skip row grouping fields
+					skipField := false
+					for _, field := range strings.Split(pattern.Grouping.Rows, "|") {
+						fieldName := convertGroupCodeToFieldName(field)
+						if key == fieldName {
+							skipField = true
+							break
+						}
+					}
+					if skipField {
+						continue
+					}
+					// For column_group_key and column_group_value, keep the last value (they differ per column group)
+					// This maintains some metadata while avoiding true duplicates
+					if key == "column_group_key" || key == "column_group_value" {
+						mergedRow[key] = value
+						continue
+					}
+					// Copy all other fields (column group specific fields)
+					mergedRow[key] = value
+				}
+
+				mergedRowMap[rowGroupValue] = mergedRow
+			}
+
+			// Convert merged rows to slice and sort
+			mergedRows := make([]AGGridRowData, 0, len(mergedRowMap))
+			for _, row := range mergedRowMap {
+				mergedRows = append(mergedRows, row)
+			}
+
+			// Sort merged rows by row_group_value
+			sort.SliceStable(mergedRows, func(i, j int) bool {
+				rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
+				rowGroupJ := fmt.Sprintf("%v", mergedRows[j]["row_group_value"])
+				return rowGroupI < rowGroupJ
+			})
+
+			tableData := make([]map[string]interface{}, len(mergedRows))
+			for i, row := range mergedRows {
 				tableData[i] = map[string]interface{}(row)
 			}
 
@@ -79,6 +159,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 						GridOptions: &GridOptions{
 							SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
 							SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+							EnableCellSpan:         boolPtr(config.TableConfig.GridOptions.EnableCellSpan),
 						},
 						Columns: columns,
 					},

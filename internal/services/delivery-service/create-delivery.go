@@ -289,6 +289,8 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			DocumentRefType:     "DELIVERY",
 			DocumentRef:         deliveryCode,
 			Remark:              deliveryReq.Remark,
+			CompanyCode:         deliveryReq.CompanyCode,
+			SiteCode:            deliveryReq.SiteCode,
 			OrderItem:           createOrderItemDetail,
 		}
 
