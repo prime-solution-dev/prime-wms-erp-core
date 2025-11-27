@@ -10,19 +10,24 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
-	"strings"
 	"time"
 
 	creditService "prime-erp-core/internal/services/credit-service"
-
-	"github.com/google/uuid"
 )
 
 func CreditRequestEffectiveDtm() (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequestCronjob"
-	bodyNewRequest := strings.NewReader(`{}`)
-	reqHttp, err := http.NewRequest("POST", url, bodyNewRequest)
+	requestData := map[string]interface{}{
+		"request_type": []string{"EXTRA"},
+		"is_action":    []bool{false},
+		"status":       []string{"COMPLETED"},
+	}
+	jsonData, err := json.Marshal(requestData)
+	if err != nil {
+		errors.New("Error marshalling data :")
+	}
+	reqHttp, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
@@ -46,18 +51,60 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	if err != nil {
 		fmt.Println("Response Status:", err)
 	}
+	customerCode := []string{}
+	for _, creditRequestValue := range creditRequest.CreditRequest {
+		customerCode = append(customerCode, creditRequestValue.CustomerCode)
+	}
 
-	fmt.Println("Response Status:", resp.Status)
+	urlGetCredit := os.Getenv("base_url_erp") + "/credit/GetCredit"
+	requestDataGetCredit := map[string]interface{}{
+		"customer_code": customerCode,
+	}
+	jsonDataGetCredit, err := json.Marshal(requestDataGetCredit)
+	if err != nil {
+		errors.New("Error marshalling data :")
+	}
+	reqHttpGetCredit, errGetCredit := http.NewRequest("POST", urlGetCredit, bytes.NewBuffer(jsonDataGetCredit))
+	if errGetCredit != nil {
+		return nil, errors.New("Error parsing DateTo: " + err.Error())
+	}
+
+	reqHttp.Header.Set("Content-Type", "application/json")
+
+	// Create a client and execute the request
+	clientGetCredit := &http.Client{}
+	respGetCredit, errGetCredit := clientGetCredit.Do(reqHttpGetCredit)
+	if errGetCredit != nil {
+		return nil, errors.New("Error parsing DateTo : " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	bodyGetCredit, errGetCredit := ioutil.ReadAll(respGetCredit.Body)
+	if errGetCredit != nil {
+		fmt.Println("Response Status:", err)
+	}
+	var getCredit creditService.ResultCredit
+	err = json.Unmarshal(bodyGetCredit, &getCredit)
+	if err != nil {
+		fmt.Println("Response Status:", err)
+	}
+
+	creditMap := map[string]models.Credit{}
+	for _, creditValue := range getCredit.Credit {
+		creditMap[creditValue.CustomerCode] = creditValue
+	}
+
+	creditExtraMap := map[string][]models.CreditExtra{}
 	credit := []models.Credit{}
 	creditRequestForAlert := []models.CreditRequest{}
 	creditTransaction := []models.CreditTransaction{}
 	creditRequestUpdate := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
 		if creditRequestValue.ExpireDtm != nil {
-			now := time.Now()
+			/*now := time.Now()
 			exp := creditRequestValue.ExpireDtm
-			if !exp.Before(now) {
-				creditTransaction = append(creditTransaction, models.CreditTransaction{
+			if exp.Before(now) {
+				 creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
 					Amount:          creditRequestValue.Amount,
@@ -89,42 +136,53 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					IsAction:                     creditRequestValue.IsAction,
 				})
 
-			}
+			}*/
 		}
 		if creditRequestValue.EffectiveDtm != nil {
 			fmt.Println("Now:", time.Now().Format(time.RFC3339))
 			fmt.Println("Effective:", creditRequestValue.EffectiveDtm)
 			now := time.Now()
 			eff := creditRequestValue.EffectiveDtm
-			if !eff.Before(now) {
-				creditExtra := []models.CreditExtra{}
-				CreditID := uuid.New()
+			if eff.Before(now) {
+
 				if creditRequestValue.RequestType == "EXTRA" {
-					creditExtra = append(creditExtra, models.CreditExtra{
-						ID:       uuid.New(),
-						CreditID: CreditID,
-						//ExtraType:    "",
-						Amount:       creditRequestValue.Amount,
-						EffectiveDtm: creditRequestValue.EffectiveDtm,
-						ExpireDtm:    creditRequestValue.ExpireDtm,
-						DocRef:       creditRequestValue.RequestCode,
-						//ApproveDate:  "",
-					})
+					creditMapValue, existMapCredit := creditMap[creditRequestValue.CustomerCode]
+					if existMapCredit {
+						creditExtraMap[creditRequestValue.CustomerCode] = append(creditExtraMap[creditRequestValue.CustomerCode], models.CreditExtra{
+							CreditID:     creditMapValue.ID,
+							Amount:       creditRequestValue.Amount,
+							EffectiveDtm: creditRequestValue.EffectiveDtm,
+							ExpireDtm:    creditRequestValue.ExpireDtm,
+							DocRef:       creditRequestValue.RequestCode,
+							ApproveDate:  &now,
+						})
+					}
+
 				}
+
 				credit = append(credit, models.Credit{
-					ID:           CreditID,
 					CustomerCode: creditRequestValue.CustomerCode,
-					Amount:       creditRequestValue.Amount,
-					EffectiveDtm: creditRequestValue.EffectiveDtm,
-					IsActive:     true,
-					DocRef:       creditRequestValue.RequestCode,
-					//ApproveDate:        "",
-					AlertBalanceCredit: false,
-					CreditExtra:        creditExtra,
 				})
+
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
-					ID:       creditRequestValue.ID,
-					IsAction: true,
+					ID:                           creditRequestValue.ID,
+					IsAction:                     true,
+					RequestCode:                  creditRequestValue.RequestCode,
+					CustomerCode:                 creditRequestValue.CustomerCode,
+					CustomerName:                 creditRequestValue.CustomerName,
+					TemporaryIncreaseCreditLimit: creditRequestValue.TemporaryIncreaseCreditLimit,
+					ConsumedCredit:               creditRequestValue.ConsumedCredit,
+					BalanceCreditLimit:           creditRequestValue.BalanceCreditLimit,
+					CustomeStatus:                creditRequestValue.CustomeStatus,
+					Amount:                       creditRequestValue.Amount,
+					RequestType:                  creditRequestValue.RequestType,
+					IsApprove:                    creditRequestValue.IsApprove,
+					Reason:                       creditRequestValue.Reason,
+					EffectiveDtm:                 creditRequestValue.EffectiveDtm,
+					ExpireDtm:                    creditRequestValue.ExpireDtm,
+					RequestDate:                  creditRequestValue.RequestDate,
+					ActionDate:                   creditRequestValue.ActionDate,
+					Status:                       creditRequestValue.Status,
 				})
 			}
 		}
@@ -166,6 +224,16 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 
 	}
 	if len(credit) > 0 {
+
+		for i := range credit {
+
+			creditExtra, existCreditExtraMap := creditExtraMap[credit[i].CustomerCode]
+			if existCreditExtraMap {
+				credit[i].CreditExtra = creditExtra
+			}
+
+		}
+
 		jsonBytesCredit, err := json.Marshal(credit)
 		if err != nil {
 			return nil, err

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, nil, nil, nil, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -94,46 +95,64 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				})
 			}
 		} else {
-			if creditValue.Status == "CANCELED" {
-				if creditValue.RequestType == "EXTRA" {
-					reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
-						ID:                  creditValue.ID,
-						CustomerCode:        creditValue.CustomerCode,
-						RequestCode:         creditValue.RequestCode,
-						RequestType:         creditValue.RequestType,
-						CreditLimit:         0,
-						IncreaseCreditLimit: creditValue.Amount,
-						StartDateTime:       creditValue.EffectiveDtm,
-						EndDateTime:         creditValue.ExpireDtm,
-						SubmitDateTime:      creditValue.CreateDtm,
-						ApproveDateTime:     creditValue.ActionDate,
-						Status:              creditValue.Status,
-						EffectiveDtm:        creditValue.EffectiveDtm,
-						ExpireDtm:           creditValue.ExpireDtm,
-						RequestDate:         creditValue.RequestDate,
-					}
+			if creditValue.RequestType == "EXTRA" {
+				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
+					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
+					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
+					CreditLimit:         0,
+					IncreaseCreditLimit: creditValue.Amount,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
+					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				}
-				if creditValue.RequestType == "BASE" {
-					reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
-						ID:                  creditValue.ID,
-						CustomerCode:        creditValue.CustomerCode,
-						RequestCode:         creditValue.RequestCode,
-						RequestType:         creditValue.RequestType,
-						CreditLimit:         creditValue.Amount,
-						IncreaseCreditLimit: 0,
-						StartDateTime:       creditValue.EffectiveDtm,
-						EndDateTime:         creditValue.ExpireDtm,
-						SubmitDateTime:      creditValue.CreateDtm,
-						ApproveDateTime:     creditValue.ActionDate,
-						Status:              creditValue.Status,
-						EffectiveDtm:        creditValue.EffectiveDtm,
-						ExpireDtm:           creditValue.ExpireDtm,
-						RequestDate:         creditValue.RequestDate,
-					}
+			}
+			if creditValue.RequestType == "BASE" {
+				reqCodeAmount[creditValue.RequestCode] = GetHistoryRes{
+					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
+					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
+					CreditLimit:         creditValue.Amount,
+					IncreaseCreditLimit: 0,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
+					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
 				}
+				reqCodeAmount[creditValue.CustomerCode] = GetHistoryRes{
+					ID:                  creditValue.ID,
+					CustomerCode:        creditValue.CustomerCode,
+					RequestCode:         creditValue.RequestCode,
+					RequestType:         creditValue.RequestType,
+					CreditLimit:         creditValue.Amount,
+					IncreaseCreditLimit: 0,
+					StartDateTime:       creditValue.EffectiveDtm,
+					EndDateTime:         creditValue.ExpireDtm,
+					SubmitDateTime:      creditValue.CreateDtm,
+					ApproveDateTime:     creditValue.ActionDate,
+					Status:              creditValue.Status,
+					EffectiveDtm:        creditValue.EffectiveDtm,
+					ExpireDtm:           creditValue.ExpireDtm,
+					RequestDate:         creditValue.RequestDate,
+				}
+				reqCode = append(reqCode, creditValue.CustomerCode)
 			}
 
 			reqCode = append(reqCode, creditValue.RequestCode)
+			if creditValue.Status == "REJECT" {
+				reqCode = append(reqCode, creditValue.RequestCode)
+			}
 		}
 
 	}
@@ -150,16 +169,28 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if errGetCredit != nil {
 		return nil, errGetCredit
 	}
-
+	codeInCredit := []string{}
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
 		isActive := "INACTIVE"
 		if creditValue.IsActive {
 			isActive = "ACTIVE"
 		}
-
+		codeInCredit = append(codeInCredit, creditValue.DocRef)
 		for _, creditExtraValue := range creditValue.CreditExtra {
 
 			historyRes = append(historyRes, GetHistoryRes{
+				ID:                  creditExtraValue.ID,
+				CreditLimit:         0,
+				RequestType:         "EXTRA",
+				IncreaseCreditLimit: creditExtraValue.Amount,
+				StartDateTime:       creditExtraValue.EffectiveDtm,
+				EndDateTime:         creditExtraValue.ExpireDtm,
+				SubmitDateTime:      creditExtraValue.CreateDtm,
+				ApproveDateTime:     creditExtraValue.ApproveDate,
+				Status:              isActive,
+			})
+
+			reqCodeAmount[creditExtraValue.CreditID.String()] = GetHistoryRes{
 				ID:                  creditExtraValue.ID,
 				CreditLimit:         0,
 				IncreaseCreditLimit: creditExtraValue.Amount,
@@ -168,11 +199,14 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				SubmitDateTime:      creditExtraValue.CreateDtm,
 				ApproveDateTime:     creditExtraValue.ApproveDate,
 				Status:              isActive,
-			})
+			}
+			reqCode = append(reqCode, creditExtraValue.CreditID.String())
+
 		}
 		historyRes = append(historyRes, GetHistoryRes{
 			ID:                  creditValue.ID,
 			CreditLimit:         creditValue.Amount,
+			RequestType:         "BASE",
 			IncreaseCreditLimit: 0,
 			StartDateTime:       creditValue.EffectiveDtm,
 			SubmitDateTime:      creditValue.CreateDtm,
@@ -180,6 +214,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Status:              isActive,
 		})
 	}
+	reqCode = slices.DeleteFunc(reqCode, func(v string) bool {
+		return slices.Contains(codeInCredit, v)
+	})
 
 	requestApprovalData := map[string]interface{}{
 		"transaction_code": reqCode,
@@ -195,20 +232,29 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, approvalValue := range approvalRes.(ResultCreditTransaction).CreditTransaction {
-
-		reqCodeAmountMap, exist := reqCodeAmount[approvalValue.TransactionCode]
-		if exist {
-			historyRes = append(historyRes, GetHistoryRes{
-				ID:                  approvalValue.ID,
-				CreditLimit:         reqCodeAmountMap.CreditLimit,
-				IncreaseCreditLimit: reqCodeAmountMap.IncreaseCreditLimit,
-				StartDateTime:       reqCodeAmountMap.StartDateTime,
-				EndDateTime:         reqCodeAmountMap.EndDateTime,
-				SubmitDateTime:      reqCodeAmountMap.SubmitDateTime,
-				ApproveDateTime:     reqCodeAmountMap.ApproveDateTime,
-				Status:              approvalValue.Status,
-			})
+		if approvalValue.Status == "INACTIVE" || approvalValue.Status == "CANCELED" || approvalValue.Status == "REJECT" {
+			reqCodeAmountMap, exist := reqCodeAmount[approvalValue.TransactionCode]
+			if exist {
+				creditLimit := 0.0
+				increaseCreditLimit := 0.0
+				if approvalValue.TransactionType == "EXTRA" {
+					increaseCreditLimit = approvalValue.Amount
+				} else {
+					creditLimit = approvalValue.Amount
+				}
+				historyRes = append(historyRes, GetHistoryRes{
+					ID:                  approvalValue.ID,
+					CreditLimit:         creditLimit,
+					IncreaseCreditLimit: increaseCreditLimit,
+					StartDateTime:       reqCodeAmountMap.StartDateTime,
+					EndDateTime:         reqCodeAmountMap.EndDateTime,
+					SubmitDateTime:      reqCodeAmountMap.SubmitDateTime,
+					ApproveDateTime:     reqCodeAmountMap.ApproveDateTime,
+					Status:              approvalValue.Status,
+				})
+			}
 		}
+
 	}
 
 	resultApproval := ResultHistory{

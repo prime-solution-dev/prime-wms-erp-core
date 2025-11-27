@@ -38,13 +38,19 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errGetCredit
 	}
 	mapCredit := map[string]models.Credit{}
+	mapCreditExtra := map[uuid.UUID]models.CreditExtra{}
 	mapCreditDocref := map[string]models.Credit{}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
 		mapCredit[creditValue.CustomerCode] = creditValue
 		mapCreditDocref[creditValue.DocRef] = creditValue
+		for _, creditExtraValue := range creditValue.CreditExtra {
+			mapCreditExtra[creditValue.ID] = creditExtraValue
+		}
+
 	}
 	creditIDForDelete := []uuid.UUID{}
+	creditExtraIDForDelete := []uuid.UUID{}
 	creditTransaction := []models.CreditTransaction{}
 
 	for i, credit := range req {
@@ -54,32 +60,54 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for o := range credit.CreditExtra {
 				creditExtraID := uuid.New()
 				req[i].CreditExtra[o].ID = creditExtraID
-				req[i].CreditExtra[o].CreditID = creditID
+				if req[i].CreditExtra[o].CreditID == uuid.Nil {
+					req[i].CreditExtra[o].CreditID = creditID
+				}
 				creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
+
+				creditmapCreditExtra, exist := mapCreditExtra[req[i].CreditExtra[o].CreditID]
+				if exist {
+					creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].CreditExtra[o].CreditID)
+					creditTransaction = append(creditTransaction, models.CreditTransaction{
+						TransactionCode: creditmapCreditExtra.CreditID.String(),
+						TransactionType: "EXTRA",
+						Amount:          creditmapCreditExtra.Amount,
+						AdjustAmount:    0,
+						EffectiveDtm:    creditmapCreditExtra.EffectiveDtm,
+						ExpireDtm:       creditmapCreditExtra.EffectiveDtm,
+						IsApprove:       false,
+						Status:          "INACTIVE",
+						Reason:          "",
+					})
+				}
+
 			}
 
 			req[i].ID = creditID
 			approvalIDForReturn = append(approvalIDForReturn, creditID)
 			req[i].CreditExtra = []models.CreditExtra{}
 
-			creditValue = append(creditValue, req[i])
-			creditMapValue, exist := mapCredit[req[i].CustomerCode]
-			if exist {
-				creditIDForDelete = append(creditIDForDelete, creditMapValue.ID)
-				creditTransaction = append(creditTransaction, models.CreditTransaction{
-					TransactionCode: creditMapValue.CustomerCode,
-					TransactionType: "BASE",
-					Amount:          req[i].Amount,
-					AdjustAmount:    0,
-					EffectiveDtm:    req[i].EffectiveDtm,
-					ExpireDtm:       req[i].EffectiveDtm,
-					/* ForceExpireDtm:  time.Now(),
-					ApproveDate:     "",  */
-					IsApprove: false,
-					Status:    "INACTIVE",
-					Reason:    "",
-				})
+			if req[i].DocRef != "" {
+
+				creditMapValue, exist := mapCredit[req[i].CustomerCode]
+				if exist {
+					req[i].ID = creditMapValue.ID
+					creditIDForDelete = append(creditIDForDelete, creditMapValue.ID)
+					creditTransaction = append(creditTransaction, models.CreditTransaction{
+						TransactionCode: creditMapValue.CustomerCode,
+						TransactionType: "BASE",
+						Amount:          creditMapValue.Amount,
+						AdjustAmount:    0,
+						EffectiveDtm:    creditMapValue.EffectiveDtm,
+						ExpireDtm:       creditMapValue.EffectiveDtm,
+						IsApprove:       false,
+						Status:          "INACTIVE",
+						Reason:          "",
+					})
+				}
+				creditValue = append(creditValue, req[i])
 			}
+
 		}
 
 	}
@@ -94,8 +122,8 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	if len(creditIDForDelete) > 0 {
-		errDeleteCredit := repositoryCredit.DeleteCredit(creditIDForDelete)
+	if len(creditIDForDelete) > 0 || len(creditExtraIDForDelete) > 0 {
+		errDeleteCredit := repositoryCredit.DeleteCredit(creditIDForDelete, creditExtraIDForDelete)
 		if errDeleteCredit != nil {
 			return nil, errDeleteCredit
 		}
