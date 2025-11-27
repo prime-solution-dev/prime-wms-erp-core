@@ -139,10 +139,11 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			}*/
 		}
 		if creditRequestValue.EffectiveDtm != nil {
-			fmt.Println("Now:", time.Now().Format(time.RFC3339))
+			fmt.Println("Now:", time.Now())
 			fmt.Println("Effective:", creditRequestValue.EffectiveDtm)
 			now := time.Now()
 			eff := creditRequestValue.EffectiveDtm
+
 			if eff.Before(now) {
 
 				if creditRequestValue.RequestType == "EXTRA" {
