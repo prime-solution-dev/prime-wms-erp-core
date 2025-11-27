@@ -67,8 +67,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 						Status:          "REJECT",
 						Reason:          "",
 					})
-					u, _ := uuid.Parse(GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef)
-					req[0].ID = u
+					req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef
 					creditExtraIDForDelete = append(creditExtraIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
 				} else {
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
@@ -80,8 +79,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 						Status:          "REJECT",
 						Reason:          "",
 					})
-					u, _ := uuid.Parse(GetCreditRes.(ResultCredit).Credit[0].DocRef)
-					req[0].ID = u
+					req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].DocRef
 					creditIDForDelete = append(creditIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
 				}
 			}
