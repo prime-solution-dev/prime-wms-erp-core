@@ -150,7 +150,9 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			reqCode = append(reqCode, creditValue.RequestCode)
-
+			if creditValue.Status == "REJECT" {
+				reqCode = append(reqCode, creditValue.ID.String())
+			}
 		}
 
 	}

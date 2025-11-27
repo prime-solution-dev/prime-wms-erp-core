@@ -122,19 +122,19 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 
 		creditRequestValue = append(creditRequestValue, req[i])
-
-		creditTransaction = append(creditTransaction, models.CreditTransaction{
-			TransactionCode: req[i].RequestCode,
-			TransactionType: req[i].RequestType,
-			Amount:          req[i].Amount,
-			AdjustAmount:    0,
-			EffectiveDtm:    req[i].EffectiveDtm,
-			ExpireDtm:       req[i].ExpireDtm,
-			IsApprove:       false,
-			Status:          req[i].Status,
-			Reason:          "",
-		})
-
+		if req[i].Status != "REJECT" {
+			creditTransaction = append(creditTransaction, models.CreditTransaction{
+				TransactionCode: req[i].RequestCode,
+				TransactionType: req[i].RequestType,
+				Amount:          req[i].Amount,
+				AdjustAmount:    0,
+				EffectiveDtm:    req[i].EffectiveDtm,
+				ExpireDtm:       req[i].ExpireDtm,
+				IsApprove:       false,
+				Status:          req[i].Status,
+				Reason:          "",
+			})
+		}
 	}
 	if len(creditTransaction) > 0 {
 		jsonByteserrCreditTransaction, err := json.Marshal(creditTransaction)
