@@ -153,9 +153,9 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 		i.invoice_code,
 		i.invoice_type
     FROM sale s
-    LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-	LEFT JOIN invoice  i  ON i.id = it.invoice_id  
-		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true and (i.invoice_type = 'AR' or i.invoice_type = 'CN' or i.invoice_type = 'DN')
+    LEFT JOIN invoice_item it ON s.sale_code = it.document_ref 
+	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR')
+		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
 		%s
 		 ORDER BY s.sale_code
 	`, search)

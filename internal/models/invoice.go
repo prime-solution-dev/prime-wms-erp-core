@@ -48,6 +48,7 @@ type Invoice struct {
 	PartyDocumentRef       string           `json:"party_document_ref"`
 	InvoiceDate            *time.Time       `json:"invoice_date"`
 	TotalDiscount          float64          `json:"total_discount"`
+	PaymentStatus          string           `gorm:"-" json:"payment_status"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
