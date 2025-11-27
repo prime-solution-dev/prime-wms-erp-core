@@ -224,7 +224,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 		query = query.Where("is_action in (?)", isAction)
 	}
 	if len(status) > 0 {
-		query = query.Where("status in (?)", status)
+		query = query.Where("status  in (?)", status)
 	}
 
 	var count int64

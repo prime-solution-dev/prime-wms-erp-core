@@ -57,7 +57,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			if len(GetCreditRes.(ResultCredit).Credit) > 0 {
 				if req[i].RequestType == "EXTRA" {
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
-						TransactionCode: GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].ID.String(),
+						TransactionCode: GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef,
 						TransactionType: "EXTRA",
 						Amount:          GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].Amount,
 						AdjustAmount:    0,
@@ -71,7 +71,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					creditExtraIDForDelete = append(creditExtraIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
 				} else {
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
-						TransactionCode: GetCreditRes.(ResultCredit).Credit[0].ID.String(),
+						TransactionCode: GetCreditRes.(ResultCredit).Credit[0].DocRef,
 						TransactionType: "EXTRA",
 						Amount:          GetCreditRes.(ResultCredit).Credit[0].Amount,
 						AdjustAmount:    0,
