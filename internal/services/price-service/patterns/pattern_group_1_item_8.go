@@ -38,25 +38,25 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
-	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
+	groupedByProductGroup1 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP1")
 		if tabKey == "" {
 			tabKey = "อื่นๆ"
 		}
-		groupedByProductGroup2[tabKey] = append(groupedByProductGroup2[tabKey], sg)
+		groupedByProductGroup1[tabKey] = append(groupedByProductGroup1[tabKey], sg)
 	}
 
 	tabOrder := make([]string, 0)
 	seen := make(map[string]bool)
 	for _, cat := range pattern.ApplicableCategories {
-		if _, ok := groupedByProductGroup2[cat]; ok {
+		if _, ok := groupedByProductGroup1[cat]; ok {
 			tabOrder = append(tabOrder, cat)
 			seen[cat] = true
 		}
 	}
 	remaining := make([]string, 0)
-	for key := range groupedByProductGroup2 {
+	for key := range groupedByProductGroup1 {
 		if !seen[key] {
 			remaining = append(remaining, key)
 		}
@@ -68,7 +68,7 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
 
 	for _, tabLabel := range tabOrder {
-		subGroups := groupedByProductGroup2[tabLabel]
+		subGroups := groupedByProductGroup1[tabLabel]
 		if len(subGroups) == 0 {
 			continue
 		}
