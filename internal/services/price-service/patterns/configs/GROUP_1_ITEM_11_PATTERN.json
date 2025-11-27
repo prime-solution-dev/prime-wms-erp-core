@@ -1,0 +1,136 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item11_flat_steel",
+      "name": "Flat Steel Category Pattern",
+      "description": "Pattern for flat steel category with fixed columns (หนา x ยาว with row spanning, ขนาด) and dynamic PRODUCT_GROUP2 column groups",
+      "enabled": true,
+      "grouping": {
+        "tabs": "",
+        "rows": "PRODUCT_GROUP5|PRODUCT_GROUP3",
+        "columnGroups": "PRODUCT_GROUP2"
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "thickness_x_length",
+          "headerName": "หนา x ยาว",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_6_x_product_group_7",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "size",
+          "headerName": "ขนาด",
+          "width": 100,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_5_product_group_3",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        }
+      ],
+      "columnGroups": [],
+      "columns": [
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 100,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-spec",
+          "width": 120,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": ""
+        },
+        {
+          "field": "avg_kg_stock",
+          "headerName": "Avg.kg stock",
+          "width": 120,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": ""
+        },
+        {
+          "field": "before_price_weight",
+          "headerName": "ราคาขาย before",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "before_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย after",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_thb",
+          "headerName": "Extra (THB)",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        }
+      ],
+      "applicableCategories": ["หมวดเหล็กแบน"],
+      "editable_suffixes": ["is_highlight", "total_net_price_weight", "remark"],
+      "fetchable_suffixes": [
+        "before_price_weight",
+        "total_net_price_weight",
+        "extra_price_weight"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item11_flat_steel",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": false,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  }
+}
+
