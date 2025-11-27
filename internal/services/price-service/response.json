@@ -1,0 +1,830 @@
+{
+  "id": "a7bc1a27-e8d2-4404-9a6f-719dddd8ca23",
+  "name": "Price List Detail",
+  "tabs": [
+    {
+      "id": "64a7a879-b724-4e84-99c5-8640447a344c",
+      "label": "หมวดเหล็กแบน",
+      "tableConfig": {
+        "title": "หมวดเหล็กแบน",
+        "toolbar": {
+          "show": true,
+          "showSearch": false,
+          "showRefresh": false,
+          "showColumnToggle": false
+        },
+        "pagination": false,
+        "groupHeaderHeight": 50,
+        "headerHeight": 40,
+        "columns": [
+          {
+            "field": "#",
+            "headerName": "#",
+            "width": 60,
+            "pinned": "left",
+            "lockPosition": true,
+            "suppressMovable": true,
+            "valueGetter": "node.rowIndex + 1",
+            "cellStyle": {
+              "textAlign": "center",
+              "fontWeight": "500"
+            }
+          },
+          {
+            "field": "thickness_x_length",
+            "headerName": "หนา x ยาว",
+            "width": 120,
+            "pinned": "left",
+            "lockPosition": true,
+            "suppressMovable": true,
+            "cellStyle": {
+              "textAlign": "center",
+              "fontWeight": "600"
+            },
+            "spanRows": true
+          },
+          {
+            "field": "size",
+            "headerName": "ขนาด",
+            "width": 100,
+            "pinned": "left",
+            "lockPosition": true,
+            "suppressMovable": true,
+            "cellStyle": {
+              "textAlign": "center"
+            }
+          },
+          {
+            "field": "is_highlight",
+            "headerName": "Highlight สีฟ้า",
+            "width": 100,
+            "cellRenderer": "agCheckboxCellRenderer"
+          },
+          {
+            "field": "weight_spec",
+            "headerName": "Weight-spec",
+            "width": 120,
+            "cellStyle": {
+              "textAlign": "left"
+            }
+          },
+          {
+            "field": "avg_kg_stock",
+            "headerName": "Avg.kg stock",
+            "width": 120,
+            "cellStyle": {
+              "textAlign": "left"
+            }
+          },
+          {
+            "field": "price_before",
+            "headerName": "ราคาขาย before",
+            "width": 130,
+            "cellStyle": {
+              "textAlign": "left"
+            }
+          },
+          {
+            "field": "price_after",
+            "headerName": "ราคาขาย after",
+            "width": 130,
+            "cellStyle": {
+              "textAlign": "left"
+            }
+          },
+          {
+            "field": "extra_thb",
+            "headerName": "Extra (THB)",
+            "width": 100,
+            "cellStyle": {
+              "textAlign": "left"
+            }
+          },
+          {
+            "headerName": "เหล็กแบนตัด",
+            "groupId": "group_group_2_item_20",
+            "openByDefault": true,
+            "children": [
+              {
+                "field": "group_2_item_20_is_highlight",
+                "headerName": "Highlight สีฟ้า",
+                "width": 100,
+                "cellRenderer": "agCheckboxCellRenderer"
+              },
+              {
+                "field": "group_2_item_20_weight_spec",
+                "headerName": "Weight-spec",
+                "width": 120,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_20_avg_kg_stock",
+                "headerName": "Avg.kg stock",
+                "width": 120,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_20_price_before",
+                "headerName": "ราคาขาย before",
+                "width": 130,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_20_price_after",
+                "headerName": "ราคาขาย after",
+                "width": 130,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_20_extra_thb",
+                "headerName": "Extra (THB)",
+                "width": 100,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              }
+            ]
+          },
+          {
+            "headerName": "เหล็กแบนรีด",
+            "groupId": "group_group_2_item_19",
+            "openByDefault": true,
+            "children": [
+              {
+                "field": "group_2_item_19_is_highlight",
+                "headerName": "Highlight สีฟ้า",
+                "width": 100,
+                "cellRenderer": "agCheckboxCellRenderer"
+              },
+              {
+                "field": "group_2_item_19_weight_spec",
+                "headerName": "Weight-spec",
+                "width": 120,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_19_avg_kg_stock",
+                "headerName": "Avg.kg stock",
+                "width": 120,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_19_price_before",
+                "headerName": "ราคาขาย before",
+                "width": 130,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_19_price_after",
+                "headerName": "ราคาขาย after",
+                "width": 130,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              },
+              {
+                "field": "group_2_item_19_extra_thb",
+                "headerName": "Extra (THB)",
+                "width": 100,
+                "cellStyle": {
+                  "textAlign": "left"
+                }
+              }
+            ]
+          }
+        ],
+        "gridOptions": {
+          "suppressMovableColumns": false,
+          "suppressMenuHide": false,
+          "enableCellSpan": true
+        }
+      },
+      "tableData": [
+        {
+          "group_2_item_19_avg_kg_stock": 57.48,
+          "group_2_item_19_extra_thb": 5.83,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 773.39,
+          "group_2_item_19_price_before": 247.82,
+          "group_2_item_19_subgroup_id": "b149bbbb-1635-43a8-8cfa-ae9c3a172314",
+          "group_2_item_19_weight_spec": 658.56,
+          "group_2_item_20_avg_kg_stock": 68.74,
+          "group_2_item_20_extra_thb": 853.11,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 492.62,
+          "group_2_item_20_price_before": 519.59,
+          "group_2_item_20_subgroup_id": "b8558c77-babd-4b1c-9800-b703b5a55ec0",
+          "group_2_item_20_weight_spec": 843.99,
+          "id": "ba9ea2e5-9a65-424a-b29f-dd7413cf1a8b",
+          "item": "x3.0x6",
+          "size": "1219SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 861.5,
+          "group_2_item_19_extra_thb": 157.34,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 203.74,
+          "group_2_item_19_price_before": 317.99,
+          "group_2_item_19_subgroup_id": "60516440-5f5e-4990-af0c-b72a9db9994f",
+          "group_2_item_19_weight_spec": 888.31,
+          "group_2_item_20_avg_kg_stock": 502.69,
+          "group_2_item_20_extra_thb": 734.22,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 50.03,
+          "group_2_item_20_price_before": 91.96,
+          "group_2_item_20_subgroup_id": "c38adf63-940d-4785-8f56-b6fcf2d27db7",
+          "group_2_item_20_weight_spec": 420.5,
+          "id": "91c89588-4f27-4952-ad0f-4e9151a2ed46",
+          "item": "x3.0x6",
+          "size": "1500SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 915.23,
+          "group_2_item_19_extra_thb": 412.05,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 678.3,
+          "group_2_item_19_price_before": 820.49,
+          "group_2_item_19_subgroup_id": "01443193-c928-4cc0-813b-3e87916746a7",
+          "group_2_item_19_weight_spec": 615.64,
+          "group_2_item_20_avg_kg_stock": 501.28,
+          "group_2_item_20_extra_thb": 485.21,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 542.63,
+          "group_2_item_20_price_before": 747.47,
+          "group_2_item_20_subgroup_id": "5946c0bb-6c39-46d3-846a-0d1038110db8",
+          "group_2_item_20_weight_spec": 548.4,
+          "id": "755f6fc1-7c47-4658-962f-547329bd6f7f",
+          "item": "x3.0x6",
+          "size": "25SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 419.74,
+          "group_2_item_19_extra_thb": 865.73,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 717.57,
+          "group_2_item_19_price_before": 507.61,
+          "group_2_item_19_subgroup_id": "ca66e1b5-bf04-41be-b114-69a23dd57395",
+          "group_2_item_19_weight_spec": 539.21,
+          "group_2_item_20_avg_kg_stock": 493.05,
+          "group_2_item_20_extra_thb": 908.74,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 31.47,
+          "group_2_item_20_price_before": 898.75,
+          "group_2_item_20_subgroup_id": "da53afb7-2a81-47f5-84e5-23c796886ee3",
+          "group_2_item_20_weight_spec": 793.12,
+          "id": "b669b0f4-a78f-454b-b9ce-b9e193649bf8",
+          "item": "x3.0x6",
+          "size": "32SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 206.55,
+          "group_2_item_19_extra_thb": 496.62,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 727.94,
+          "group_2_item_19_price_before": 900.84,
+          "group_2_item_19_subgroup_id": "ac7d5d03-4f5e-4850-aab9-173ff3bff8c4",
+          "group_2_item_19_weight_spec": 126.87,
+          "group_2_item_20_avg_kg_stock": 420.23,
+          "group_2_item_20_extra_thb": 725.69,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 705.59,
+          "group_2_item_20_price_before": 6.73,
+          "group_2_item_20_subgroup_id": "2877cb1e-a23e-483e-971d-09a1be112e6e",
+          "group_2_item_20_weight_spec": 290.81,
+          "id": "b4008713-f80d-4ba5-bf3c-c8ba529538f6",
+          "item": "x3.0x6",
+          "size": "38SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 465.06,
+          "group_2_item_19_extra_thb": 950.16,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 465.91,
+          "group_2_item_19_price_before": 667.27,
+          "group_2_item_19_subgroup_id": "67e0bda9-a190-4838-b2b5-60eb116f6b87",
+          "group_2_item_19_weight_spec": 599.81,
+          "group_2_item_20_avg_kg_stock": 999.87,
+          "group_2_item_20_extra_thb": 423.82,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 541.07,
+          "group_2_item_20_price_before": 767.12,
+          "group_2_item_20_subgroup_id": "7c7a216c-9325-4c21-82cf-cf393cc0c942",
+          "group_2_item_20_weight_spec": 83.96,
+          "id": "c0743c26-0650-436a-95a8-d5111a11c486",
+          "item": "x3.0x6",
+          "size": "4'SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 679.6,
+          "group_2_item_19_extra_thb": 647.32,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 339.75,
+          "group_2_item_19_price_before": 763.39,
+          "group_2_item_19_subgroup_id": "a69b1c0f-ae50-4ea6-973b-538079bea64b",
+          "group_2_item_19_weight_spec": 481.72,
+          "group_2_item_20_avg_kg_stock": 439.84,
+          "group_2_item_20_extra_thb": 471.98,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 546.14,
+          "group_2_item_20_price_before": 899.81,
+          "group_2_item_20_subgroup_id": "cc547149-f673-4389-bac9-c277d2a504c8",
+          "group_2_item_20_weight_spec": 810.85,
+          "id": "0d56f57d-45e6-40bb-9975-d69bc8f405e9",
+          "item": "x3.0x6",
+          "size": "5'SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 430.78,
+          "group_2_item_19_extra_thb": 742.09,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 228.32,
+          "group_2_item_19_price_before": 751.76,
+          "group_2_item_19_subgroup_id": "8c1baa30-6e63-4a6a-91db-8a0400ade984",
+          "group_2_item_19_weight_spec": 655.05,
+          "group_2_item_20_avg_kg_stock": 460.97,
+          "group_2_item_20_extra_thb": 830.59,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 154.13,
+          "group_2_item_20_price_before": 158.79,
+          "group_2_item_20_subgroup_id": "32498f7d-d00e-487c-9c53-fd9d9b2ea411",
+          "group_2_item_20_weight_spec": 495.53,
+          "id": "17e4ef0b-062d-4345-af93-b2daba694387",
+          "item": "x3.0x6",
+          "size": "50SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 953.67,
+          "group_2_item_19_extra_thb": 778.45,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 344.12,
+          "group_2_item_19_price_before": 700.01,
+          "group_2_item_19_subgroup_id": "514547eb-5bd7-4e12-878d-1d8062e1fe80",
+          "group_2_item_19_weight_spec": 470.48,
+          "group_2_item_20_avg_kg_stock": 562.35,
+          "group_2_item_20_extra_thb": 273.28,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 369.15,
+          "group_2_item_20_price_before": 162.41,
+          "group_2_item_20_subgroup_id": "befe598c-9fa2-4822-b8c5-e1e880200839",
+          "group_2_item_20_weight_spec": 898.42,
+          "id": "4695e1e2-dd61-4abe-845b-5f772ef98122",
+          "item": "x3.0x6",
+          "size": "65SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 472.33,
+          "group_2_item_19_extra_thb": 335.94,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 650.44,
+          "group_2_item_19_price_before": 435.09,
+          "group_2_item_19_subgroup_id": "9046b80e-5038-4ad9-a192-74ac16e8d14a",
+          "group_2_item_19_weight_spec": 799.44,
+          "group_2_item_20_avg_kg_stock": 933.03,
+          "group_2_item_20_extra_thb": 41.99,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 793.09,
+          "group_2_item_20_price_before": 543.4,
+          "group_2_item_20_subgroup_id": "e39b9aac-c0e4-4482-8df8-84d0b41ae2fe",
+          "group_2_item_20_weight_spec": 46.05,
+          "id": "95e0e716-11f0-46c2-b7c0-fc3b11e4a35d",
+          "item": "x3.0x6",
+          "size": "SM400C-TI",
+          "thickness_x_length": "3.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 967.78,
+          "group_2_item_19_extra_thb": 916.57,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 371.96,
+          "group_2_item_19_price_before": 144.96,
+          "group_2_item_19_subgroup_id": "c9de5d43-7acc-4ae7-b253-514aa16d13eb",
+          "group_2_item_19_weight_spec": 32.73,
+          "group_2_item_20_avg_kg_stock": 107.88,
+          "group_2_item_20_extra_thb": 6.47,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 100.27,
+          "group_2_item_20_price_before": 230.4,
+          "group_2_item_20_subgroup_id": "5da8569f-8a50-41d5-b442-76940f274db5",
+          "group_2_item_20_weight_spec": 444.16,
+          "id": "0be0e865-ac44-4852-a1e2-462b4176d3ab",
+          "item": "x4.0x6",
+          "size": "1219SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 386.85,
+          "group_2_item_19_extra_thb": 611.26,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 913.15,
+          "group_2_item_19_price_before": 927.59,
+          "group_2_item_19_subgroup_id": "854a2e47-d0c6-4b83-ad99-ef04adf1026e",
+          "group_2_item_19_weight_spec": 822.9,
+          "group_2_item_20_avg_kg_stock": 971.55,
+          "group_2_item_20_extra_thb": 107.31,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 728.47,
+          "group_2_item_20_price_before": 614.29,
+          "group_2_item_20_subgroup_id": "1e455017-6101-4b11-ae82-976d572eb546",
+          "group_2_item_20_weight_spec": 346.22,
+          "id": "6b9a5ff8-2b4f-44b1-bd77-f541a07e1246",
+          "item": "x4.0x6",
+          "size": "1500SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 217.27,
+          "group_2_item_19_extra_thb": 686.85,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 489.85,
+          "group_2_item_19_price_before": 855.84,
+          "group_2_item_19_subgroup_id": "00854950-510c-47e1-b7ba-ad487a18d7c1",
+          "group_2_item_19_weight_spec": 702.37,
+          "group_2_item_20_avg_kg_stock": 501.25,
+          "group_2_item_20_extra_thb": 892.65,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 111.27,
+          "group_2_item_20_price_before": 911.79,
+          "group_2_item_20_subgroup_id": "71546bff-0273-48dc-be6f-3b8ba312d9c7",
+          "group_2_item_20_weight_spec": 40.83,
+          "id": "b33bf31d-2476-4fca-8f03-d283ac8c71ff",
+          "item": "x4.0x6",
+          "size": "25SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 990.96,
+          "group_2_item_19_extra_thb": 252.59,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 483.01,
+          "group_2_item_19_price_before": 490.54,
+          "group_2_item_19_subgroup_id": "5ad727d8-8dd6-489c-8c47-34bd7faa4b05",
+          "group_2_item_19_weight_spec": 540.72,
+          "group_2_item_20_avg_kg_stock": 676.21,
+          "group_2_item_20_extra_thb": 87.55,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 645.62,
+          "group_2_item_20_price_before": 95.23,
+          "group_2_item_20_subgroup_id": "1a6e8667-ebd9-49f0-bd2b-715453d6ba98",
+          "group_2_item_20_weight_spec": 817.07,
+          "id": "6b852771-0035-4155-a00f-e97b1cf5d0b4",
+          "item": "x4.0x6",
+          "size": "32SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 463.64,
+          "group_2_item_19_extra_thb": 857.55,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 794.76,
+          "group_2_item_19_price_before": 155.86,
+          "group_2_item_19_subgroup_id": "4f7c8ea6-dbc7-4731-a45b-6a631a0455e3",
+          "group_2_item_19_weight_spec": 115.51,
+          "group_2_item_20_avg_kg_stock": 281.38,
+          "group_2_item_20_extra_thb": 951.64,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 91.61,
+          "group_2_item_20_price_before": 939.97,
+          "group_2_item_20_subgroup_id": "4eb02d61-eea5-4ee3-9030-a20ae8d72d12",
+          "group_2_item_20_weight_spec": 921.63,
+          "id": "c1a67df2-c721-4330-a348-30b38d5e1ede",
+          "item": "x4.0x6",
+          "size": "38SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 921.16,
+          "group_2_item_19_extra_thb": 606.17,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 532.32,
+          "group_2_item_19_price_before": 518.5,
+          "group_2_item_19_subgroup_id": "336c2179-d36c-412b-b7bf-9cd1e0184c03",
+          "group_2_item_19_weight_spec": 739.86,
+          "group_2_item_20_avg_kg_stock": 547.18,
+          "group_2_item_20_extra_thb": 615.02,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 127.57,
+          "group_2_item_20_price_before": 804.49,
+          "group_2_item_20_subgroup_id": "74a9a013-d30a-4e17-9b40-3009b82449e0",
+          "group_2_item_20_weight_spec": 122.68,
+          "id": "d221d633-5c85-4e20-8c26-bd2c8cfbbede",
+          "item": "x4.0x6",
+          "size": "4'SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 431.61,
+          "group_2_item_19_extra_thb": 383.12,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 750.56,
+          "group_2_item_19_price_before": 594.41,
+          "group_2_item_19_subgroup_id": "83a43b38-16a7-4f54-a8e1-7f2890b90ea2",
+          "group_2_item_19_weight_spec": 679.87,
+          "group_2_item_20_avg_kg_stock": 421.64,
+          "group_2_item_20_extra_thb": 963.49,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 130.96,
+          "group_2_item_20_price_before": 983.14,
+          "group_2_item_20_subgroup_id": "eee6d2d5-5fe6-4752-b6ba-67eb55d50c11",
+          "group_2_item_20_weight_spec": 130.62,
+          "id": "0ee38832-1efd-4ef0-b986-0de59db222ea",
+          "item": "x4.0x6",
+          "size": "5'SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 44.76,
+          "group_2_item_19_extra_thb": 891.38,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 305.84,
+          "group_2_item_19_price_before": 923.03,
+          "group_2_item_19_subgroup_id": "baaaffba-f4ab-4ecd-b8ca-26b36460f5ec",
+          "group_2_item_19_weight_spec": 724.25,
+          "group_2_item_20_avg_kg_stock": 322.27,
+          "group_2_item_20_extra_thb": 83.15,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 930.56,
+          "group_2_item_20_price_before": 54.42,
+          "group_2_item_20_subgroup_id": "c09aeb14-cf7c-47a8-9014-e0bf038be2f1",
+          "group_2_item_20_weight_spec": 650.01,
+          "id": "d6f6e9ba-0898-42c9-9337-f490434f605c",
+          "item": "x4.0x6",
+          "size": "50SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 925.96,
+          "group_2_item_19_extra_thb": 121.68,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 599.09,
+          "group_2_item_19_price_before": 392.21,
+          "group_2_item_19_subgroup_id": "62b3d24c-2c4a-4f57-bdfe-ee1d3cad8262",
+          "group_2_item_19_weight_spec": 52.95,
+          "group_2_item_20_avg_kg_stock": 328.24,
+          "group_2_item_20_extra_thb": 576.92,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 497.19,
+          "group_2_item_20_price_before": 278.39,
+          "group_2_item_20_subgroup_id": "29585c91-977e-475f-b497-9997b8d50607",
+          "group_2_item_20_weight_spec": 658.15,
+          "id": "b08cb44e-1349-43ac-b0df-b3bd370d51bb",
+          "item": "x4.0x6",
+          "size": "65SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 766.26,
+          "group_2_item_19_extra_thb": 210.76,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 356.99,
+          "group_2_item_19_price_before": 837.22,
+          "group_2_item_19_subgroup_id": "d13725b1-5a9c-43d1-963e-a90d58bfba61",
+          "group_2_item_19_weight_spec": 820.67,
+          "group_2_item_20_avg_kg_stock": 804.84,
+          "group_2_item_20_extra_thb": 505.99,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 239.53,
+          "group_2_item_20_price_before": 827.16,
+          "group_2_item_20_subgroup_id": "f09924c4-9cfb-4b75-aa5c-d0e9af8b3369",
+          "group_2_item_20_weight_spec": 179.19,
+          "id": "1605ef7b-e76e-4232-8115-1b64caaf9ba8",
+          "item": "x4.0x6",
+          "size": "SM400C-TI",
+          "thickness_x_length": "4.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 578.2,
+          "group_2_item_19_extra_thb": 487.43,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 606.19,
+          "group_2_item_19_price_before": 25.1,
+          "group_2_item_19_subgroup_id": "ce2e6c31-63e1-4f5f-96a8-0aaa11f3ceaf",
+          "group_2_item_19_weight_spec": 288.1,
+          "group_2_item_20_avg_kg_stock": 915.87,
+          "group_2_item_20_extra_thb": 337.75,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 629.72,
+          "group_2_item_20_price_before": 741.34,
+          "group_2_item_20_subgroup_id": "2c4ac35d-37eb-4379-863b-f42bef37bf9a",
+          "group_2_item_20_weight_spec": 581.99,
+          "id": "bd54f6aa-ab80-4ef2-8512-7b4488cac744",
+          "item": "x40.0x6",
+          "size": "1219SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 557.07,
+          "group_2_item_19_extra_thb": 596.58,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 971.48,
+          "group_2_item_19_price_before": 88.6,
+          "group_2_item_19_subgroup_id": "f3880e67-1f9f-43a0-89b5-9e7f0e84a86c",
+          "group_2_item_19_weight_spec": 466.12,
+          "group_2_item_20_avg_kg_stock": 96.18,
+          "group_2_item_20_extra_thb": 911.64,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 541.27,
+          "group_2_item_20_price_before": 169.54,
+          "group_2_item_20_subgroup_id": "5dfb6f2e-33fb-4616-94df-02e5c7cd572f",
+          "group_2_item_20_weight_spec": 994.35,
+          "id": "2d7f0b24-4f8c-4172-860d-cf1940f823db",
+          "item": "x40.0x6",
+          "size": "1500SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 895.26,
+          "group_2_item_19_extra_thb": 982.9,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 211.82,
+          "group_2_item_19_price_before": 113.12,
+          "group_2_item_19_subgroup_id": "a2490920-ef84-4a3f-b9fc-0113bacd5395",
+          "group_2_item_19_weight_spec": 747.33,
+          "group_2_item_20_avg_kg_stock": 373.27,
+          "group_2_item_20_extra_thb": 585.85,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 843.57,
+          "group_2_item_20_price_before": 202.1,
+          "group_2_item_20_subgroup_id": "d5b2da7e-1248-4287-ad7b-d7da01e43344",
+          "group_2_item_20_weight_spec": 12.81,
+          "id": "8ae222b0-004f-498c-9f92-7995a8fc4183",
+          "item": "x40.0x6",
+          "size": "25SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 214.51,
+          "group_2_item_19_extra_thb": 197.05,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 75.62,
+          "group_2_item_19_price_before": 254.8,
+          "group_2_item_19_subgroup_id": "5a5e6128-5d5b-4768-8f32-524951d7d9f3",
+          "group_2_item_19_weight_spec": 445.72,
+          "group_2_item_20_avg_kg_stock": 722.29,
+          "group_2_item_20_extra_thb": 624.31,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 72.17,
+          "group_2_item_20_price_before": 342.7,
+          "group_2_item_20_subgroup_id": "5c727071-13b9-4b31-b2da-2c6f9884e230",
+          "group_2_item_20_weight_spec": 520.87,
+          "id": "04f93f32-f1b7-4a1b-ba6c-6374d2fbda6a",
+          "item": "x40.0x6",
+          "size": "32SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 976.38,
+          "group_2_item_19_extra_thb": 303.05,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 904.1,
+          "group_2_item_19_price_before": 502.28,
+          "group_2_item_19_subgroup_id": "aeba7af0-8704-48cb-b2c7-32d466541bd4",
+          "group_2_item_19_weight_spec": 518.42,
+          "group_2_item_20_avg_kg_stock": 788.24,
+          "group_2_item_20_extra_thb": 864.74,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 888.27,
+          "group_2_item_20_price_before": 888.62,
+          "group_2_item_20_subgroup_id": "2f88a593-e2e4-4581-af06-23585a53b57f",
+          "group_2_item_20_weight_spec": 450.05,
+          "id": "18102a71-89f4-4b0a-9e65-673cb18139d9",
+          "item": "x40.0x6",
+          "size": "38SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 411.51,
+          "group_2_item_19_extra_thb": 966.55,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 613.12,
+          "group_2_item_19_price_before": 992.58,
+          "group_2_item_19_subgroup_id": "f5feac7d-aa85-46fa-b3db-fd4768538668",
+          "group_2_item_19_weight_spec": 752.4,
+          "group_2_item_20_avg_kg_stock": 617.88,
+          "group_2_item_20_extra_thb": 892.17,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 477.35,
+          "group_2_item_20_price_before": 16.62,
+          "group_2_item_20_subgroup_id": "a6cd55cf-7f1f-4831-b3f2-3d806c43c892",
+          "group_2_item_20_weight_spec": 242.54,
+          "id": "f88c5802-7f49-4f84-b2ce-d4145a545f3e",
+          "item": "x40.0x6",
+          "size": "4'SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 830,
+          "group_2_item_19_extra_thb": 502.88,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 631.66,
+          "group_2_item_19_price_before": 976.42,
+          "group_2_item_19_subgroup_id": "15e4a162-a07b-479e-90c0-82416e0478a7",
+          "group_2_item_19_weight_spec": 687.87,
+          "group_2_item_20_avg_kg_stock": 120.26,
+          "group_2_item_20_extra_thb": 787.58,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 198.07,
+          "group_2_item_20_price_before": 585.64,
+          "group_2_item_20_subgroup_id": "ff92697e-4c6f-4e89-8b93-305e4eceb547",
+          "group_2_item_20_weight_spec": 430.69,
+          "id": "c81799d6-9ccb-431e-a77e-ce7d40a56cfd",
+          "item": "x40.0x6",
+          "size": "5'SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 237.76,
+          "group_2_item_19_extra_thb": 54.37,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 331.89,
+          "group_2_item_19_price_before": 392.25,
+          "group_2_item_19_subgroup_id": "38d35fdc-03ed-4d4b-9e41-98d20ee89a68",
+          "group_2_item_19_weight_spec": 853.23,
+          "group_2_item_20_avg_kg_stock": 466.45,
+          "group_2_item_20_extra_thb": 671.33,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 43.64,
+          "group_2_item_20_price_before": 387.86,
+          "group_2_item_20_subgroup_id": "af6247e9-7527-411e-adb8-d403b7693f74",
+          "group_2_item_20_weight_spec": 785.63,
+          "id": "98b3e9bf-e8db-40da-bcac-e1b416cf0998",
+          "item": "x40.0x6",
+          "size": "50SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 840.37,
+          "group_2_item_19_extra_thb": 169.64,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 741.67,
+          "group_2_item_19_price_before": 541.28,
+          "group_2_item_19_subgroup_id": "a15b046d-05e0-4ffa-a7e6-28f5ec80dfa8",
+          "group_2_item_19_weight_spec": 723.4,
+          "group_2_item_20_avg_kg_stock": 854.95,
+          "group_2_item_20_extra_thb": 47.87,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 938.83,
+          "group_2_item_20_price_before": 253.06,
+          "group_2_item_20_subgroup_id": "afa143ea-9abc-4dd8-96e5-3fadcf5df3cd",
+          "group_2_item_20_weight_spec": 215.41,
+          "id": "e4373d68-0ebd-41ce-80b1-88e0ca3c34bf",
+          "item": "x40.0x6",
+          "size": "65SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        },
+        {
+          "group_2_item_19_avg_kg_stock": 860.47,
+          "group_2_item_19_extra_thb": 231.17,
+          "group_2_item_19_is_highlight": false,
+          "group_2_item_19_price_after": 802.67,
+          "group_2_item_19_price_before": 646.48,
+          "group_2_item_19_subgroup_id": "027cf926-c110-4052-aa40-e11add7d67cb",
+          "group_2_item_19_weight_spec": 457.85,
+          "group_2_item_20_avg_kg_stock": 946.08,
+          "group_2_item_20_extra_thb": 687.97,
+          "group_2_item_20_is_highlight": false,
+          "group_2_item_20_price_after": 225.98,
+          "group_2_item_20_price_before": 834.58,
+          "group_2_item_20_subgroup_id": "d6e20a54-de4f-44cf-8eef-bf03295dfcde",
+          "group_2_item_20_weight_spec": 962.47,
+          "id": "52ab8b67-dd78-404a-8c54-abb14465e266",
+          "item": "x40.0x6",
+          "size": "SM400C-TI",
+          "thickness_x_length": "40.0 x 6"
+        }
+      ],
+      "editable_suffixes": [
+        "is_highlight",
+        "total_net_price_unit",
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "price_unit",
+        "total_net_price_unit",
+        "extra_price_unit"
+      ]
+    }
+  ]
+}
