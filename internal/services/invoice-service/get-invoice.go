@@ -5,6 +5,7 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
+	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 
@@ -15,6 +16,7 @@ import (
 type GetInvoiceRequest struct {
 	ID           []uuid.UUID `json:"id"`
 	InvoiceCode  []string    `json:"invoice_code"`
+	InvoiceRef   []string    `json:"invoice_ref"`
 	InvoiceType  []string    `json:"invoice_type"`
 	CustomerCode []string    `json:"customer_code"`
 	Status       []string    `json:"status"`
@@ -40,17 +42,19 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.Page, req.PageSize)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.Page, req.PageSize)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
 	supplierReq := models.GetSupplierListRequest{}
 	productCodes := []string{}
+	invoiceCode := []string{}
 	for _, invoiceValue := range invoice {
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
 		}
+		invoiceCode = append(invoiceCode, invoiceValue.InvoiceCode)
 	}
 	mapSupplier, err := prePurchaseService.GetSupplierByCode(supplierReq)
 	if err != nil {
@@ -70,6 +74,36 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// Get Product Group One
 
+	requestDataGetPayment := map[string]interface{}{
+		"invoice_code": invoiceCode,
+	}
+
+	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
+	if err != nil {
+		return nil, err
+	}
+
+	payment, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+	if errGetPayment != nil {
+		return nil, errGetPayment
+	}
+	resultPayment := payment.(paymentService.ResultPayment).Payment
+	paymentValueMap := map[string]float64{}
+
+	for _, paymentValue := range resultPayment {
+		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+
+			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
+			if exist {
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
+			} else {
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
+			}
+
+		}
+
+	}
+
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
@@ -87,6 +121,13 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 
 			}
+		}
+		paymentItemMap, exist := paymentValueMap[invoice[i].InvoiceCode]
+		if exist {
+			if invoice[i].TotalAmount == paymentItemMap {
+				invoice[i].PaymentStatus = "Paid"
+			}
+
 		}
 	}
 
