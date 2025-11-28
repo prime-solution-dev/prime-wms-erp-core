@@ -1100,6 +1100,11 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				pg6 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 				pg7 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
 				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg6, pg7)
+			case "product_group_4_x_product_group_3":
+				// Composite field: PRODUCT_GROUP4 " x " PRODUCT_GROUP3
+				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
 			case "product_group_5_product_group_3":
 				// Composite field: PRODUCT_GROUP5 + PRODUCT_GROUP3 (no separator)
 				pg5 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
@@ -1171,6 +1176,10 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 
 		for _, colConfig := range pattern.Columns {
 			switch colConfig.DataMapping {
+			case "product_group_4_x_product_group_3":
+				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[colConfig.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
 			case "extra_price_unit":
 				row[colConfig.Field] = sg.ExtraPriceUnit
 			case "product_group_3":
