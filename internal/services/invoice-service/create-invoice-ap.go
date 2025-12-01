@@ -20,6 +20,7 @@ import (
 type POData struct {
 	QTY    float64
 	Weight float64
+	POITEM string
 }
 
 type ToleranceErrorItem struct {
@@ -69,14 +70,11 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if errGetPO != nil {
 		return nil, errGetPO
 	}
-	poMap := map[string]POData{}
+	poMap := map[string]models.PurchaseItemResponse{}
 	for _, poValue := range po.(models.GetPurchaseResponse).DataList {
 		for _, poItemsValue := range poValue.Items {
 			keyConvert := fmt.Sprintf("%s|%s", poValue.PurchaseCode, poItemsValue.PurchaseItem)
-			poMap[keyConvert] = POData{
-				QTY:    poItemsValue.Qty,
-				Weight: poItemsValue.TotalWeight,
-			}
+			poMap[keyConvert] = poItemsValue
 		}
 	}
 
@@ -114,7 +112,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if errmapProduct != nil {
 		return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 	}
-
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -124,13 +121,43 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTel = supplier.Phone
 			req[i].PartyTaxID = supplier.TaxID
 			req[i].PartyExternalID = supplier.ExternalID
+			req[i].CreditTermDay = float64(supplier.CreditTerm)
+			/* 	newTime := time.Now().AddDate(0, 0, req[i].CreditTermDay)
+			req[i].PaymentDate = &newTime
+			req[i].DocumentDate = &time.Now()  */
 		}
+		totalAmount := 0.0
+		totalVat := 0.0
+		subtotalExclVat := 0.0
+		totalDiscount := 0.0
 		for it, invoiceItem := range invoice.InvoiceItem {
 			req[i].InvoiceItem[it].ProductName = mapProduct[req[i].InvoiceItem[it].ProductCode].ProductName
-			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
+			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
-				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
+				req[i].InvoiceItem[it].PriceUnit = poQTYMapResult.PriceUnit
+				req[i].InvoiceItem[it].InvoiceUnitType = poQTYMapResult.PurchaseUnitType
+				req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
+				req[i].InvoiceItem[it].WeightUnit = poQTYMapResult.WeightUnit
+				req[i].InvoiceItem[it].Avg_weightUnit = poQTYMapResult.WeightUnit
+				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
+				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
+				xxx := 0.0
+				if poQTYMapResult.UnitUom == "KG" {
+					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
+				} else {
+					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
+				}
+				req[i].InvoiceItem[it].SubtotalExclVat = xxx - req[i].InvoiceItem[it].TotalDiscount
+				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
+				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
+
+				totalAmount += req[i].InvoiceItem[it].TotalAmount
+				totalVat += req[i].InvoiceItem[it].TotalVat
+				subtotalExclVat += req[i].InvoiceItem[it].SubtotalExclVat
+				totalDiscount += req[i].InvoiceItem[it].TotalDiscount
+
+				poQTY := poQTYMapResult.Qty + (poQTYMapResult.Qty * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
 
 					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
@@ -142,10 +169,10 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 				}
 				if invoiceItem.Weight > 0 {
-					if invoiceItem.Weight > poQTYMapResult.Weight {
+					if invoiceItem.Weight > poQTYMapResult.TotalWeight {
 						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 							Index:   it,
-							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
+							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.TotalWeight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
 						})
@@ -161,6 +188,10 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				})
 			} */
 		}
+		req[i].TotalAmount = totalAmount
+		req[i].TotalVat = totalVat
+		req[i].SubtotalExclVat = subtotalExclVat
+		req[i].TotalDiscount = totalDiscount
 
 	}
 	if len(toleranceErrorResponse.ToleranceError) == 0 {

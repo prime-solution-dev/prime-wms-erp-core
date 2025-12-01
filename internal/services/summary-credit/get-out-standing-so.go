@@ -29,7 +29,7 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	result, errGetSale := repositorySale.GetSalesWithInvoiceItems(req.CustomerCode)
+	result, errGetSale := repositorySale.GetSalesWithInvoiceItems(req.CustomerCode, "")
 	if errGetSale != nil {
 		return nil, errGetSale
 	}
@@ -87,9 +87,9 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 			SaleCode:      resultValue.Sale.SaleCode,
 			SaleDate:      resultValue.Sale.DeliveryDate,
 			SaleAmount:    resultValue.Sale.TotalAmount,
-			StatusPayment: resultValue.Sale.StatusPayment,
 			Paid:          paidSale,
 			OutStandingSo: resultValue.Sale.TotalAmount - paidSale,
+			StatusPayment: resultValue.Sale.StatusPayment,
 		}
 		resultOutStandingSoRes = append(resultOutStandingSoRes, detail)
 	}

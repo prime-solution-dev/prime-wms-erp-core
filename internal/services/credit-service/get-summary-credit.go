@@ -3,6 +3,7 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
@@ -86,12 +87,17 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	}
 	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
 
+	totalCreditLimit := creditLimit + increaseCreditLimit
+	consumedCredit := remainDeposit - (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN)
+
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,
 		IncreaseCreditLimit: increaseCreditLimit,
-		TotalCreditLimit:    creditLimit + increaseCreditLimit,
-		ConsumedCredit:      remainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice),
-		BalanceCreditLimit:  (creditLimit + increaseCreditLimit) - (remainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice)),
+		TotalCreditLimit:    totalCreditLimit,
+		ConsumedCredit:      math.Round(consumedCredit*100) / 100,
+
+		BalanceCreditLimit: totalCreditLimit + consumedCredit,
 	}
 
 	return resultSummaryCredit, nil

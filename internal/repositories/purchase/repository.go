@@ -6,6 +6,7 @@ import (
 	"prime-erp-core/internal/models"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -35,6 +36,7 @@ func GetPurchaseList(
 	productCodes []string,
 	purchaseType []string,
 	docRef []string,
+	tradingRef []string,
 	companyCode string,
 	siteCode string,
 	page int,
@@ -90,6 +92,10 @@ func GetPurchaseList(
 		query = query.Where("doc_ref IN ?", docRef)
 	}
 
+	if len(tradingRef) > 0 {
+		query = query.Where("trading_ref IN ?", tradingRef)
+	}
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -103,6 +109,103 @@ func GetPurchaseList(
 	offset := (page - 1) * pageSize
 	if err := query.
 		Preload("PurchaseItems").
+		Order(`
+        CASE
+            WHEN status_approve = 'PENDING' AND status = 'PENDING' THEN 1
+            WHEN status_approve = 'PROCESS' THEN 2
+            WHEN status_approve = 'COMPLETED' THEN 3
+            ELSE 4
+        END ASC,
+				create_dtm DESC
+    `).
+		Limit(pageSize).
+		Offset(offset).
+		Find(&purchases).Error; err != nil {
+		return nil, 0, 0, 0, 0, err
+	}
+
+	totalPages := 0
+	if totalRecords > 0 {
+		totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	}
+
+	if page == 0 {
+		page = 1
+	}
+
+	return purchases, int(totalRecords), page, pageSize, totalPages, nil
+}
+
+func GetPurchaseListByGRFilter(
+	supplierCodes []string,
+	statusApprove []string,
+	purchaseItemStatus []string,
+	productCodes []string,
+	notItems []models.ExceptPurchaseAndPurchaseItemRequest,
+	companyCode string,
+	siteCode string,
+	page int,
+	pageSize int,
+) ([]models.Purchase, int, int, int, int, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, 0, 0, 0, 0, err
+	}
+	defer db.CloseGORM(gormx)
+
+	var purchases []models.Purchase
+	var totalRecords int64
+
+	// Build base query
+	query := gormx.Model(&models.Purchase{}).
+		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+
+	if len(purchaseItemStatus) > 0 {
+		query = query.Preload("PurchaseItems", "status IN ?", purchaseItemStatus)
+	} else {
+		query = query.Preload("PurchaseItems")
+	}
+
+	if len(notItems) > 0 {
+		for _, notItem := range notItems {
+			subQuery := gormx.Model(&models.PurchaseItem{}).
+				Select("1").
+				Where("purchase.id = purchase_item.purchase_id").
+				Where("purchase_item.purchase_item IN ?", notItem.PurchaseItemCodes)
+
+			query = query.Where("NOT EXISTS (?)", subQuery)
+		}
+	}
+
+	if len(supplierCodes) > 0 {
+		query = query.Where("supplier_code IN ?", supplierCodes)
+	}
+
+	if len(statusApprove) > 0 {
+		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(productCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_code IN ?", productCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
+	// Count total records (no preload needed)
+	if err := query.Count(&totalRecords).Error; err != nil {
+		return nil, 0, 0, 0, 0, err
+	}
+
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
+	}
+
+	// Apply pagination
+	offset := (page - 1) * pageSize
+	if err := query.
 		Limit(pageSize).
 		Offset(offset).
 		Find(&purchases).Error; err != nil {
@@ -278,6 +381,55 @@ func CompletePO(purchaseCodes []string) (err error) {
 			}).Error; err != nil {
 			return err
 		}
+		return nil
+	})
+}
+
+func CompletePOItem(purchaseItemCodes []string) error {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.PurchaseItem{}).
+			Where("purchase_item IN ?", purchaseItemCodes).
+			Updates(map[string]interface{}{
+				"status":     "COMPLETED",
+				"update_dtm": time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+
+		purchaseIDs := []uuid.UUID{}
+
+		if err := tx.Model(&models.PurchaseItem{}).
+			Select("purchase_id").
+			Where("purchase_item IN ?", purchaseItemCodes).
+			Group("purchase_id").
+			Scan(&purchaseIDs).Error; err != nil {
+			return err
+		}
+
+		for _, purchaseID := range purchaseIDs {
+			var notCompletedCount int64
+
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id = ? AND status = ?", purchaseID, "COMPLETED").
+				Count(&notCompletedCount).Error; err != nil {
+				return err
+			}
+
+			if notCompletedCount == 0 {
+				if err := tx.Model(&models.Purchase{}).
+					Where("id = ?", purchaseID).
+					Update("status", "COMPLETED").Error; err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
 }

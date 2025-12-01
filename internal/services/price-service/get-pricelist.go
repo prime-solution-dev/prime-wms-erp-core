@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
+	priceListRepository "prime-erp-core/internal/repositories/priceList"
+	groupService "prime-erp-core/internal/services/group-service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -71,28 +74,29 @@ type GroupKey struct {
 }
 
 type SubGroup struct {
-	ID                        uuid.UUID  `json:"id"`
-	SubGroupKey               string     `json:"subgroup_key"`
-	IsTrading                 bool       `json:"is_trading"`
-	PriceUnit                 float64    `json:"price_unit"`
-	ExtraPriceUnit            float64    `json:"extra_price_unit"`
-	TermPriceUnit             float64    `json:"term_price_unit"`
-	TotalNetPriceUnit         float64    `json:"total_net_price_unit"`
-	PriceWeight               float64    `json:"price_weight"`
-	ExtraPriceWeight          float64    `json:"extra_price_weight"`
-	TermPriceWeight           float64    `json:"term_price_weight"`
-	TotalNetPriceWeight       float64    `json:"total_net_price_weight"`
-	BeforePriceUnit           float64    `json:"before_price_unit"`
-	BeforeExtraPriceUnit      float64    `json:"before_extra_price_unit"`
-	BeforeTermPriceUnit       float64    `json:"before_term_price_unit"`
-	BeforeTotalNetPriceUnit   float64    `json:"before_total_net_price_unit"`
-	BeforePriceWeight         float64    `json:"before_price_weight"`
-	BeforeExtraPriceWeight    float64    `json:"before_extra_price_weight"`
-	BeforeTermPriceWeight     float64    `json:"before_term_price_weight"`
-	BeforeTotalNetPriceWeight float64    `json:"before_total_net_price_weight"`
-	EffectiveDate             time.Time  `json:"effective_date"`
-	Remark                    string     `json:"remark"`
-	GroupKeys                 []GroupKey `json:"group_keys"`
+	ID                        uuid.UUID       `json:"id"`
+	SubGroupKey               string          `json:"subgroup_key"`
+	IsTrading                 bool            `json:"is_trading"`
+	PriceUnit                 float64         `json:"price_unit"`
+	ExtraPriceUnit            float64         `json:"extra_price_unit"`
+	TermPriceUnit             float64         `json:"term_price_unit"`
+	TotalNetPriceUnit         float64         `json:"total_net_price_unit"`
+	PriceWeight               float64         `json:"price_weight"`
+	ExtraPriceWeight          float64         `json:"extra_price_weight"`
+	TermPriceWeight           float64         `json:"term_price_weight"`
+	TotalNetPriceWeight       float64         `json:"total_net_price_weight"`
+	BeforePriceUnit           float64         `json:"before_price_unit"`
+	BeforeExtraPriceUnit      float64         `json:"before_extra_price_unit"`
+	BeforeTermPriceUnit       float64         `json:"before_term_price_unit"`
+	BeforeTotalNetPriceUnit   float64         `json:"before_total_net_price_unit"`
+	BeforePriceWeight         float64         `json:"before_price_weight"`
+	BeforeExtraPriceWeight    float64         `json:"before_extra_price_weight"`
+	BeforeTermPriceWeight     float64         `json:"before_term_price_weight"`
+	BeforeTotalNetPriceWeight float64         `json:"before_total_net_price_weight"`
+	EffectiveDate             time.Time       `json:"effective_date"`
+	UdfJson                   json.RawMessage `json:"udf_json"`
+	Remark                    string          `json:"remark"`
+	GroupKeys                 []GroupKey      `json:"group_keys"`
 }
 
 func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -152,7 +156,7 @@ func getExtras(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGr
 		where 1=1
 		and ple.price_list_group_id in ('%s')
 	`, strings.Join(groupIDs, `','`))
-	println(query)
+	// println(query)
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
 		return nil, fmt.Errorf("ExecuteQuery error: %w", err)
@@ -308,7 +312,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plsg.is_trading, FALSE) AS is_trading,
 			COALESCE(plsg.price_unit, 0) AS price_unit,
 			COALESCE(plsg.extra_price_unit, 0) AS extra_price_unit,
-			COALESCE(plsg.term_price_unit, 0) AS term_price_unit,
 			COALESCE(plsg.total_net_price_unit, 0) AS total_net_price_unit,
 			COALESCE(plsg.price_weight, 0) AS price_weight,
 			COALESCE(plsg.extra_price_weight, 0) AS extra_price_weight,
@@ -323,7 +326,8 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plsg.before_term_price_weight, 0) AS before_term_price_weight,
 			COALESCE(plsg.before_total_net_price_weight, 0) AS before_total_net_price_weight,
 			plsg.effective_date AS sub_effective_date,
-			COALESCE(plsg.remark, '') AS sub_remark
+			COALESCE(plsg.remark, '') AS sub_remark,
+			plsg.udf_json AS udf_json
 		FROM price_list_group plg
 		LEFT JOIN price_list_sub_group plsg ON plg.id = plsg.price_list_group_id
 		WHERE 1=1 %s
@@ -366,7 +370,6 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				IsTrading:                 toBool(row["is_trading"]),
 				PriceUnit:                 toFloat64(row["price_unit"]),
 				ExtraPriceUnit:            toFloat64(row["extra_price_unit"]),
-				TermPriceUnit:             toFloat64(row["term_price_unit"]),
 				TotalNetPriceUnit:         toFloat64(row["total_net_price_unit"]),
 				PriceWeight:               toFloat64(row["price_weight"]),
 				ExtraPriceWeight:          toFloat64(row["extra_price_weight"]),
@@ -381,6 +384,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforeTermPriceWeight:     toFloat64(row["before_term_price_weight"]),
 				BeforeTotalNetPriceWeight: toFloat64(row["before_total_net_price_weight"]),
 				Remark:                    toString(row["sub_remark"]),
+				UdfJson:                   toJsonRawMessage(row["udf_json"]),
 			}
 			if t := toTime(row["sub_effective_date"]); t != nil {
 				subGroup.EffectiveDate = *t
@@ -497,4 +501,338 @@ func parseUUID(s string) uuid.UUID {
 		return uuid.Nil
 	}
 	return id
+}
+
+func toJsonRawMessage(v interface{}) json.RawMessage {
+	if v == nil {
+		return nil
+	}
+
+	// If it's already a byte slice, return it
+	if b, ok := v.([]byte); ok {
+		return json.RawMessage(b)
+	}
+
+	// If it's a string, convert to bytes
+	if s, ok := v.(string); ok {
+		if s == "" {
+			return nil
+		}
+		return json.RawMessage(s)
+	}
+
+	// Try to marshal to JSON
+	if data, err := json.Marshal(v); err == nil {
+		return json.RawMessage(data)
+	}
+
+	return nil
+}
+
+func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.GetPriceListRequest{}
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, err
+	}
+
+	priceLists, err := priceListRepository.GetPriceListGroup(req.CompanyCode, req.SiteCode, req.GroupCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	//Get Group Master
+	groupReq := models.GetGroupRequest{
+		GroupCodes: []string{},
+		ItemCodes:  []string{},
+	}
+
+	groupReqJson, err := json.Marshal(groupReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal group request to JSON: " + err.Error())
+	}
+
+	groupReqString := string(groupReqJson)
+
+	resp, err := groupService.GetGroup(ctx, groupReqString)
+	if err != nil {
+		return nil, err
+	}
+
+	groupResp, ok := resp.([]models.GetGroupResponse)
+	if !ok {
+		return nil, errors.New("failed to cast group response")
+	}
+
+	groupMap := map[string]models.GetGroupResponse{}
+	groupItemMap := map[string]models.GetGroupItemResponse{}
+	for _, g := range groupResp {
+		groupMap[g.GroupCode] = g
+		for _, item := range g.Items {
+			groupItemMap[item.ItemCode] = item
+		}
+	}
+
+	// Get Payment Term
+	termReq := GetPaymentTermRequest{
+		TermCode: []string{},
+		TermType: []string{},
+	}
+
+	termReqJson, err := json.Marshal(termReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal payment term request to JSON: " + err.Error())
+	}
+
+	termReqString := string(termReqJson)
+
+	termResp, err := GetPaymentTerm(ctx, termReqString)
+	if err != nil {
+		return nil, err
+	}
+
+	paymentTerms, ok := termResp.([]GetPaymentTermResponse)
+	if !ok {
+		return nil, errors.New("failed to cast payment term response")
+	}
+
+	paymentTermMap := map[string]GetPaymentTermResponse{}
+	for _, pt := range paymentTerms {
+		paymentTermMap[pt.TermCode] = pt
+	}
+
+	// Get Extra Config
+	extraConfigs, err := priceListRepository.GetPriceListExtraConfig(req.GroupCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	extraConfigMap := map[string]models.PriceListExtraConfig{}
+	for _, ec := range extraConfigs {
+		extraConfigMap[ec.GroupCode] = ec
+	}
+
+	// Get Group Master
+	groupMasterReq := models.GetGroupRequest{
+		GroupCodes: []string{},
+		ItemCodes:  []string{},
+	}
+
+	groupMasterReqJson, err := json.Marshal(groupMasterReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal group request to JSON: " + err.Error())
+	}
+
+	groupMasterReqString := string(groupMasterReqJson)
+
+	groupMasterResp, err := groupService.GetGroup(ctx, groupMasterReqString)
+	if err != nil {
+		return nil, err
+	}
+
+	groupMasterRespData, ok := groupMasterResp.([]models.GetGroupResponse)
+	if !ok {
+		return nil, errors.New("failed to cast group response")
+	}
+
+	groupMasterMap := map[string]models.GetGroupResponse{}
+	groupMasterItemMap := map[string]models.GetGroupItemResponse{}
+	for _, g := range groupMasterRespData {
+		groupMasterMap[g.GroupCode] = g
+		for _, item := range g.Items {
+			groupMasterItemMap[item.ItemCode] = item
+		}
+	}
+
+	result := []models.GetPriceListResponse{}
+	for _, pl := range priceLists {
+		var effectiveDate *string
+		if pl.EffectiveDate != nil {
+			formattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+			effectiveDate = &formattedDate
+		}
+
+		priceListResp := models.GetPriceListResponse{
+			ID:                pl.ID.String(),
+			CompanyCode:       pl.CompanyCode,
+			SiteCode:          pl.SiteCode,
+			GroupCode:         pl.GroupCode,
+			GroupName:         pl.GroupName,
+			PriceUnit:         pl.PriceUnit,
+			PriceWeight:       pl.PriceWeight,
+			BeforePriceUnit:   pl.BeforePriceUnit,
+			BeforePriceWeight: pl.BeforePriceWeight,
+			Currency:          pl.Currency,
+			EffectiveDate:     effectiveDate,
+			Remark:            pl.Remark,
+			GroupKey:          pl.GroupKey,
+			CreateBy:          pl.CreateBy,
+			CreateDtm:         pl.CreateDtm.Format("2006-01-02T15:04:05Z"),
+			UpdateBy:          pl.UpdateBy,
+			UpdateDtm:         pl.UpdateDtm.Format("2006-01-02T15:04:05Z"),
+		}
+
+		terms := []models.PriceListTermResponse{}
+		if len(pl.PriceListGroupTerms) > 0 {
+			for _, term := range pl.PriceListGroupTerms {
+				termData := paymentTermMap[term.TermCode]
+
+				createDtm := ""
+				if term.CreateDtm != nil {
+					createDtm = term.CreateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				updateDtm := ""
+				if term.UpdateDtm != nil {
+					updateDtm = term.UpdateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				terms = append(terms, models.PriceListTermResponse{
+					ID:               term.ID.String(),
+					PriceListGroupID: term.PriceListGroupID.String(),
+					TermCode:         term.TermCode,
+					TermName:         termData.TermName,
+					TermType:         termData.TermType,
+					Pdc:              term.Pdc,
+					PdcPercent:       term.PdcPercent,
+					Due:              term.Due,
+					DuePercent:       term.DuePercent,
+					CreateBy:         term.CreateBy,
+					CreateDtm:        createDtm,
+					UpdateBy:         term.UpdateBy,
+					UpdateDtm:        updateDtm,
+				})
+			}
+		}
+
+		extrasData := []models.PriceListExtraResponse{}
+		if len(pl.PriceListGroupExtras) > 0 {
+			for _, extra := range pl.PriceListGroupExtras {
+				createDtm := ""
+				if extra.CreateDtm != nil {
+					createDtm = extra.CreateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				updateDtm := ""
+				if extra.UpdateDtm != nil {
+					updateDtm = extra.UpdateDtm.Format("2006-01-02T15:04:05Z")
+				}
+
+				priceListGroupExtraKeys := []models.PriceListGroupExtraKeyResponse{}
+				for _, pk := range extra.PriceListGroupExtraKeys {
+					group := groupMasterMap[pk.Code]
+					groupItem := groupMasterItemMap[pk.Value]
+
+					priceListGroupExtraKeys = append(priceListGroupExtraKeys, models.PriceListGroupExtraKeyResponse{
+						ID:           pk.ID.String(),
+						GroupExtraID: pk.GroupExtraID.String(),
+						GroupCode:    pk.Code,
+						GroupName:    group.GroupName,
+						ValueCode:    pk.Value,
+						ValueName:    groupItem.ItemName,
+						Seq:          pk.Seq,
+					})
+				}
+
+				extrasData = append(extrasData, models.PriceListExtraResponse{
+					ID:                      extra.ID.String(),
+					PriceListGroupID:        extra.PriceListGroupID.String(),
+					ExtraKey:                extra.ExtraKey,
+					ConditionCode:           extra.ConditionCode,
+					ValueInt:                float64(extra.ValueInt),
+					LengthExtraKey:          float64(extra.LengthExtraKey),
+					Operator:                extra.Operator,
+					CondRangeMin:            extra.CondRangeMin,
+					CondRangeMax:            extra.CondRangeMax,
+					CreateBy:                extra.CreateBy,
+					CreateDtm:               createDtm,
+					UpdateBy:                extra.UpdateBy,
+					UpdateDtm:               updateDtm,
+					PriceListGroupExtraKeys: priceListGroupExtraKeys,
+				})
+			}
+		}
+
+		subGroups := []models.PriceListSubGroupResponse{}
+		if len(pl.PriceListSubGroups) > 0 {
+			for _, sg := range pl.PriceListSubGroups {
+				subGroupKeys := []models.PriceListSubGroupKeyResponse{}
+				if len(sg.PriceListSubGroupKeys) > 0 {
+					for _, sgk := range sg.PriceListSubGroupKeys {
+						subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
+							ID:         sgk.ID.String(),
+							SubGroupID: sgk.SubGroupID.String(),
+							GroupCode:  sgk.Code,
+							GroupName:  groupMap[sgk.Code].GroupName,
+							ValueCode:  sgk.Value,
+							ValueName:  groupItemMap[sgk.Value].ItemName,
+							Seq:        sgk.Seq,
+						})
+					}
+				}
+
+				var sgEffectiveDate *string
+				if pl.EffectiveDate != nil {
+					sgFormattedDate := pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+					sgEffectiveDate = &sgFormattedDate
+				}
+
+				sgCreateDtm := ""
+				if pl.EffectiveDate != nil {
+					sgCreateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+				}
+
+				sgUpdateDtm := ""
+				if pl.EffectiveDate != nil {
+					sgUpdateDtm = pl.EffectiveDate.Format("2006-01-02T15:04:05Z")
+				}
+
+				subGroups = append(subGroups, models.PriceListSubGroupResponse{
+					ID:                        sg.ID.String(),
+					PriceListGroupID:          sg.PriceListGroupID.String(),
+					SubgroupKey:               sg.SubgroupKey,
+					IsTrading:                 sg.IsTrading,
+					PriceUnit:                 sg.PriceUnit,
+					ExtraPriceUnit:            sg.ExtraPriceUnit,
+					TotalNetPriceUnit:         sg.TotalNetPriceUnit,
+					PriceWeight:               sg.PriceWeight,
+					ExtraPriceWeight:          sg.ExtraPriceWeight,
+					TermPriceWeight:           sg.TermPriceWeight,
+					TotalNetPriceWeight:       sg.TotalNetPriceWeight,
+					BeforePriceUnit:           sg.BeforePriceUnit,
+					BeforeExtraPriceUnit:      sg.BeforeExtraPriceUnit,
+					BeforeTermPriceUnit:       sg.BeforeTermPriceUnit,
+					BeforeTotalNetPriceUnit:   sg.BeforeTotalNetPriceUnit,
+					BeforePriceWeight:         sg.BeforePriceWeight,
+					BeforeExtraPriceWeight:    sg.BeforeExtraPriceWeight,
+					BeforeTermPriceWeight:     sg.BeforeTermPriceWeight,
+					BeforeTotalNetPriceWeight: sg.BeforeTotalNetPriceWeight,
+					EffectiveDate:             sgEffectiveDate,
+					Remark:                    sg.Remark,
+					CreateBy:                  sg.CreateBy,
+					CreateDtm:                 sgCreateDtm,
+					UpdateBy:                  sg.UpdateBy,
+					UpdateDtm:                 sgUpdateDtm,
+					SubGroupKeys:              subGroupKeys,
+				})
+			}
+		}
+
+		priceListResp.Terms = terms
+
+		extraConfig, ok := extraConfigMap[pl.GroupCode]
+		if ok {
+			priceListResp.Extras.Config = models.PriceListExtraConfigResponse{
+				GroupCode:  extraConfig.GroupCode,
+				IsActive:   extraConfig.IsActive,
+				ConfigJson: extraConfig.ConfigJson,
+			}
+		}
+		priceListResp.Extras.Data = extrasData
+
+		priceListResp.SubGroups = subGroups
+
+		result = append(result, priceListResp)
+	}
+
+	return result, nil
 }

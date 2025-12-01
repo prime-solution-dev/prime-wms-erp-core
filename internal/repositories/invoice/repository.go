@@ -12,7 +12,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -48,6 +48,17 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchInvoiceType = fmt.Sprintf(` and invoice.invoice_type IN (%s)`, whereInClause)
 	}
+
+	searchInvoiceRef := ""
+	if len(invoiceRef) > 0 {
+		quotedStrings := make([]string, len(invoiceRef))
+		for i, s := range invoiceRef {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchInvoiceRef = fmt.Sprintf(` and invoice.invoice_ref IN (%s)`, whereInClause)
+	}
+
 	searchCustomerCode := ""
 	if len(customerCode) > 0 {
 		quotedStrings := make([]string, len(customerCode))
@@ -73,13 +84,13 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 			quotedStrings[i] = fmt.Sprintf("'%s'", s)
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
-		searchDocRef = fmt.Sprintf(` and invoice.doc_ref IN (%s)`, whereInClause)
+		searchDocRef = fmt.Sprintf(` and invoice.document_ref IN (%s)`, whereInClause)
 	}
 
 	var invoiceID []uuid.UUID
 	gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
+		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
 		Group("invoice.id").Scan(&invoiceID)
 
 	if len(invoiceID) > 0 {
@@ -120,7 +131,38 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		return nil, 0, 0, err
 	}
 }
-func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (err error) {
+
+func GetInvoiceRelatedByPO(companyCode string, siteCode string, purchaseCodes []string, purchaseItemCodes []string, invoiceType []string, status []string) ([]models.Invoice, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	var invoices []models.Invoice
+
+	query := gormx.Model(&models.Invoice{}).
+		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
+
+	preloadConditionsString := "document_ref IN ? AND document_ref_item IN ? AND status IN ?"
+
+	if len(invoiceType) > 0 {
+		query = query.Where("invoice_type IN ?", invoiceType)
+	}
+
+	if len(preloadConditionsString) != 0 {
+		query = query.Preload("InvoiceItem", preloadConditionsString, purchaseCodes, purchaseItemCodes, status)
+	}
+
+	err = query.Find(&invoices).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return invoices, nil
+}
+
+func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem, deposit []models.InvoiceDeposit) (err error) {
 	gormx, err := db.ConnectGORM(`prime_erp`)
 	defer db.CloseGORM(gormx)
 	if err != nil {
@@ -145,6 +187,13 @@ func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (
 	}
 	if len(invoiceItem) > 0 {
 		result := tx.Create(&invoiceItem)
+		if result.Error != nil {
+			tx.Rollback()
+			return result.Error
+		}
+	}
+	if len(deposit) > 0 {
+		result := tx.Create(&deposit)
 		if result.Error != nil {
 			tx.Rollback()
 			return result.Error
@@ -179,4 +228,24 @@ func UpdateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem) (
 	}
 
 	return rowsAffected, nil
+}
+func DeleteInvoice(id []uuid.UUID) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+
+	resultSuggest := gormx.Table("invoice").Where("id IN (?)", id).Delete(models.Invoice{})
+	if resultSuggest.Error != nil {
+		gormx.Rollback()
+		return resultSuggest.Error
+	}
+	resultBatch := gormx.Table("invoice_item").Where("invoice_id IN (?)", id).Delete(models.InvoiceItem{})
+	if resultBatch.Error != nil {
+		gormx.Rollback()
+		return resultBatch.Error
+	}
+
+	return
 }

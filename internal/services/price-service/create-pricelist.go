@@ -34,9 +34,9 @@ func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			EffectiveDate:     r.EffectiveDate,
 			Remark:            r.Remark,
 			CreateBy:          "system", // TODO: get user from auth
-			CreateDtm:         &now,
+			CreateDtm:         now,
 			UpdateBy:          "system", // TODO: get user from auth
-			UpdateDtm:         &now,
+			UpdateDtm:         now,
 		}
 
 		terms := []models.PriceListGroupTerm{}
@@ -56,7 +56,7 @@ func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			}
 			terms = append(terms, term)
 		}
-		priceListGroup.Terms = terms
+		priceListGroup.PriceListGroupTerms = terms
 		priceListGroups = append(priceListGroups, priceListGroup)
 	}
 

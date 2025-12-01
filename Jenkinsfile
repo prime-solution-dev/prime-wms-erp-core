@@ -29,7 +29,6 @@ pipeline {
                 }
             }
         }
-
         stage('SSH to Remote Server') {
             steps {
                 script {

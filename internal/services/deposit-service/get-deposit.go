@@ -12,6 +12,7 @@ import (
 
 type GetDepositRequest struct {
 	ID           []uuid.UUID `json:"id"`
+	DepositCode  []string    `json:"deposit_code"`
 	CustomerCode []string    `json:"customer_code"`
 	Status       []string    `json:"status"`
 	Page         int         `json:"page"`

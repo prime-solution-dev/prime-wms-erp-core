@@ -8,6 +8,7 @@ import (
 	CronjobService "prime-erp-core/internal/services/cronjob-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	emailservice "prime-erp-core/internal/services/email-service"
+	groupService "prime-erp-core/internal/services/group-service"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -26,6 +27,12 @@ import (
 )
 
 func RegisterRoutes(ctx *gin.Engine) {
+	//group
+	group := ctx.Group("/group")
+
+	group.POST("/GetGroupMaster", func(c *gin.Context) {
+		utils.ProcessRequest(c, groupService.GetGroup)
+	})
 
 	//price
 	price := ctx.Group("/price")
@@ -39,14 +46,29 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetComparePrice)
 	})
+	price.POST("/GetPriceList", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceList)
+	}) // for Base Price and price list feature
 	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.CreatePriceListBase)
 	})
 	price.POST("/UpdatePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.UpdatePriceListBase)
 	})
+	price.POST("/UpdatePriceListSubGroup", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.UpdatePriceListSubGroup)
+	})
 	price.POST("/DeletePriceListGroupBase", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.DeletePriceListBase)
+	})
+	price.POST("/GetPriceDetail", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceDetail)
+	})
+	price.POST("/SubGroup/Latest", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.GetLatestPriceListSubGroup)
+	})
+	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.UpdateExtras)
 	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
@@ -102,11 +124,21 @@ func RegisterRoutes(ctx *gin.Engine) {
 	invoice.POST("/UpdateInvoiceCN", func(c *gin.Context) {
 		utils.ProcessRequest(c, invoiceService.UpdateInvoiceCN)
 	})
+	invoice.POST("/CreateInvoiceDN", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.CreateInvoiceDN)
+	})
+	invoice.POST("/UpdateInvoiceDN", func(c *gin.Context) {
+		utils.ProcessRequest(c, invoiceService.UpdateInvoiceDN)
+	})
 	//payment
-	payment := ctx.Group("/GetPayment")
+	payment := ctx.Group("/payment")
 	payment.POST("/GetPayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, paymentService.GetPayment)
 	})
+	payment.POST("/CreatePayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.CreatePayment)
+	})
+
 	//sale
 	sale := ctx.Group("/sale")
 	sale.POST("/CreateSale", func(c *gin.Context) {
@@ -114,6 +146,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	sale.POST("/UpdateSaleStatusPayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
+	})
+	sale.POST("/UpdateStatusSale", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateStatusSale)
 	})
 
 	sale.POST("/EditSale", func(c *gin.Context) {
@@ -131,6 +166,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/UpdateStatusApproveSale", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.UpdateStatusApproveSale)
 	})
+
+	sale.POST("/GetSalePack", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.GetSalePack)
+	})
 	//delivery
 	delivery := ctx.Group("/delivery")
 	delivery.POST("/CreateDelivery", func(c *gin.Context) {
@@ -145,10 +184,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
 	})
-	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
-	})
-
+	/* 	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
+	   		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
+	   	})
+	*/
 	//time
 	time := ctx.Group("/time")
 	time.POST("/GetTime", func(c *gin.Context) {
@@ -158,6 +197,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	deposit := ctx.Group("/deposit")
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
 		utils.ProcessRequest(c, depositService.GetDeposit)
+	})
+	deposit.POST("/CreateDepost", func(c *gin.Context) {
+		utils.ProcessRequest(c, depositService.CreateDepost)
 	})
 
 	//approval
@@ -182,6 +224,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	credit.POST("/GetCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCreditRequests)
 	})
+	credit.POST("/GetCreditRequestCronjob", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCreditRequestCronjob)
+	})
+
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.CreateCreditRequest)
 	})
@@ -248,6 +294,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPO)
 	})
+	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.GetPOItem)
+	})
 	purchase.POST("/UpdatePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.UpdatePO)
 	})
@@ -260,11 +309,14 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/CompletePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePO)
 	})
+	purchase.POST("/CompletePOItem", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CompletePOItem)
+	})
 
 	///cronjob
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {
-		utils.ProcessRequest(c, CronjobService.CreditRequestEffectiveDtm)
+		utils.ProcessRequest(c, CronjobService.GetKernalManual)
 	})
 	//email alert
 	emailAlert := ctx.Group("/emailAlert")

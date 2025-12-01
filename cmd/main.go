@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"prime-erp-core/config"
+	"prime-erp-core/internal/cronjob"
 	"prime-erp-core/internal/middleware"
 	"prime-erp-core/internal/routes"
 
@@ -17,6 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file ")
 	}
+	cronjob.AutoStartCronJobs()
 
 	// Initialize endpoint constants after loading .env
 	config.Initialize()

@@ -23,6 +23,7 @@ type Delivery struct {
 	TotalWeight      float64    `json:"total_weight"`
 	Remark           string     `json:"remark"`
 	Status           string     `json:"status"`
+	BookingSlotType  string     `json:"booking_slot_type"`
 	CreateDate       time.Time  `json:"create_date"`
 	CreateBy         string     `json:"create_by"`
 	UpdateDate       time.Time  `json:"update_date"`

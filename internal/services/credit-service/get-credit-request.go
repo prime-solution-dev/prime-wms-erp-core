@@ -8,7 +8,6 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -17,6 +16,9 @@ import (
 type GetCreditReq struct {
 	ID           []uuid.UUID `json:"id"`
 	CustomerCode []string    `json:"customer_code"`
+	IsAction     []bool      `json:"is_action"`
+	RequestType  []string    `json:"request_type"`
+	Status       []string    `json:"status"`
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
@@ -36,7 +38,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -110,22 +112,23 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
-	requestDataGetConsumend := map[string]interface{}{
-		"customer_code": strings.Join(req.CustomerCode, ""),
-		"paid_invoice":  true,
-	}
-	jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
-	if err != nil {
-		return nil, err
-	}
-
-	paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
-	if errApproval != nil {
-		return nil, errApproval
-	}
-	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
-
 	for i := range credit {
+
+		requestDataGetConsumend := map[string]interface{}{
+			"customer_code": credit[i].CustomerCode,
+			"paid_invoice":  true,
+		}
+		jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
+		if err != nil {
+			return nil, err
+		}
+
+		paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
+		if errApproval != nil {
+			return nil, errApproval
+		}
+		resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
+
 		conMapCustomer, exist := convertCustomerMap[credit[i].CustomerCode]
 		if exist {
 			credit[i].CustomerName = conMapCustomer.CustomerName
@@ -134,10 +137,35 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
 		if exist {
-			credit[i].ConsumedCredit = conMapremainDeposit - (resultGetPaidInvoice.TotalAmount + resultGetPaidInvoice.PaidInvoice)
+			credit[i].ConsumedCredit = conMapremainDeposit - (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+				resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN)
+
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
 
+	}
+
+	resultApproval := ResultCreditRequest{
+		Total:         totalRecords,
+		Page:          req.Page,
+		PageSize:      req.PageSize,
+		TotalPages:    totalPages,
+		CreditRequest: credit,
+	}
+
+	return resultApproval, nil
+}
+func GetCreditRequestCronjob(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+
+	var req GetCreditReq
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct : " + err.Error())
+	}
+
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.IsAction, req.RequestType, req.Status, req.Page, req.PageSize)
+	if errApproval != nil {
+		return nil, errApproval
 	}
 
 	resultApproval := ResultCreditRequest{
