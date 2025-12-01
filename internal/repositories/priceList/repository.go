@@ -50,6 +50,7 @@ func GetPriceListSubGroupByID(subGroupID uuid.UUID) (*models.PriceListSubGroup, 
 
 	if err := gormx.Model(&models.PriceListSubGroup{}).
 		Where("id = ?", subGroupID).
+		Preload("PriceListGroup").
 		Preload("PriceListSubGroupKeys").
 		First(&subGroup).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

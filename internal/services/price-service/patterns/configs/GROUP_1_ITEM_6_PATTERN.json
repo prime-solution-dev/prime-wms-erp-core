@@ -1,0 +1,161 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item6_pg2_tabs",
+      "name": "เหล็กฉาก / รางน้ำ",
+      "description": "Fixed-column layout grouped by PRODUCT_GROUP2 with listing, pricing, and logistics fields",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PRODUCT_GROUP2",
+        "rows": "",
+        "columnGroups": ""
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 70,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "item",
+          "headerName": "รายการ",
+          "width": 180,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "item"
+        },
+        {
+          "field": "brand",
+          "headerName": "ยี่ห้อ",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_3"
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-spec",
+          "width": 130,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": ""
+        },
+        {
+          "field": "avg_kg_stock",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": ""
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_price_weight",
+          "headerName": "ราคาขาย before",
+          "width": 160,
+          "dataMapping": "before_price_weight"
+        },
+        {
+          "field": "price_weight",
+          "headerName": "ราคาขาย after",
+          "width": 160,
+          "dataMapping": "price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 140,
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 130,
+          "dataMapping": "line_bundle"
+        },
+        {
+          "field": "delivery_date",
+          "headerName": "ส่งมอบ ว/ด/ป",
+          "width": 150,
+          "dataMapping": "delivery_date"
+        },
+        {
+          "field": "ton",
+          "headerName": "จำนวนตัน",
+          "width": 130,
+          "dataMapping": "ton"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
+        }
+      ],
+      "columnGroups": [],
+      "columns": [],
+      "itemFormat": [
+        {
+          "type": "group",
+          "value": "PRODUCT_GROUP4"
+        },
+        {
+          "type": "literal",
+          "value": "x"
+        },
+        {
+          "type": "group",
+          "value": "PRODUCT_GROUP7"
+        }
+      ],
+      "applicableCategories": [
+        "เหล็กฉาก",
+        "รางน้ำ"
+      ],
+      "editable_suffixes": [],
+      "fetchable_suffixes": []
+    }
+  ],
+  "defaultPattern": "pattern_group1_item6_pg2_tabs",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": false
+    }
+  }
+}
+

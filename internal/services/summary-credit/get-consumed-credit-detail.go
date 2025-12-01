@@ -3,7 +3,9 @@ package summaryService
 import (
 	"encoding/json"
 	"errors"
+	"prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
+	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 
 	"github.com/gin-gonic/gin"
@@ -86,6 +88,28 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	}
+	requestDataGetInvoice := map[string]interface{}{
+		"invoice_ref": invoiceCode,
+	}
+	jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
+	if err != nil {
+		return nil, err
+	}
+	invoice, errGetInvoice := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoice))
+	if errGetInvoice != nil {
+		return nil, errGetInvoice
+	}
+	resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
+	resultInvoiceMap := map[string]models.Invoice{}
+	for _, resultInvoiceValue := range resultInvoice {
+		sumAmunt := 0.0
+		for _, invoiceItemValue := range resultInvoiceValue.InvoiceItem {
+			sumAmunt += invoiceItemValue.TotalAmount
+		}
+		resultInvoiceValue.TotalAmount = sumAmunt
+		resultInvoiceMap[resultInvoiceValue.InvoiceRef] = resultInvoiceValue
+	}
+
 	saleAmount := 0.00
 	sumInvoiceTotalAmountAR := 0.00
 	sumInvoiceTotalAmountCN := 0.00
@@ -102,21 +126,22 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				invoicePaidAmount = paymentItemMap
 			}
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
-			if invoiceItemsValue.InvoiceType == "CN" {
-				sumInvoiceTotalAmountCN += invoiceItemsValue.TotalAmount
-			}
-			if invoiceItemsValue.InvoiceType == "DN" {
-				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
-				sumPaymentTotalAmountDN += invoicePaidAmount
-			}
 			if invoiceItemsValue.InvoiceType == "AR" {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
 				sumPaymentTotalAmountAR += invoicePaidAmount
 			}
-
 			invoiceAmount := invoiceItemsValue.TotalAmount
-			if invoiceItemsValue.InvoiceType == "CN" {
-				invoiceAmount = -invoiceItemsValue.TotalAmount
+			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
+			if existResultInvoiceMap {
+				if invoiceItemMap.InvoiceType == "DN" {
+					sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
+					sumPaymentTotalAmountDN += invoicePaidAmount
+				}
+
+				if invoiceItemMap.InvoiceType == "CN" {
+					sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
+					invoiceAmount = -invoiceItemMap.TotalAmount
+				}
 			}
 
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{

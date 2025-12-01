@@ -349,6 +349,8 @@ func TestGetPriceListSubGroupByID(t *testing.T) {
 	if assert.NotNil(t, result, "expected result") {
 		assert.Equal(t, subGroupID, result.ID)
 		assert.Equal(t, groupID, result.PriceListGroupID)
+		assert.Equal(t, groupID, result.PriceListGroup.ID)
+		assert.Equal(t, "TEST_GROUP_FETCH", result.PriceListGroup.GroupCode)
 		assert.Equal(t, "SUB_1", result.SubgroupKey)
 		assert.True(t, result.IsTrading)
 		assert.Equal(t, 11.0, result.PriceUnit)

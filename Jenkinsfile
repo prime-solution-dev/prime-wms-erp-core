@@ -5,10 +5,10 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Kernel-Develop' 
+        TARGET_BRANCH = 'Demo' 
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '47.128.166.228'
-        SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
+        REMOTE_HOST = '18.139.159.17'
+        SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -91,7 +91,7 @@ stage('Update .env with DB_PASSWORD') {
     steps {
         script {
             echo 'Updating .env file with DB_PASSWORD on remote...'
-            withCredentials([string(credentialsId: 'Jenkinskernaluatserver', variable: 'DB_PASSWORD')]) {
+            withCredentials([string(credentialsId: 'Jenkinsdemoserver', variable: 'DB_PASSWORD')]) {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                 "cd ${REPO_NAME} && \\

@@ -2,13 +2,14 @@ package patterns
 
 import (
 	"fmt"
+	"sort"
 
 	"prime-erp-core/internal/models"
 
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
 	config, err := loadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
@@ -25,24 +26,53 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupCode)
 	}
 
-	subGroups := make([]models.PriceListSubGroupResponse, 0)
+	allSubGroups := make([]models.PriceListSubGroupResponse, 0)
 	for _, priceList := range priceListData {
-		subGroups = append(subGroups, priceList.SubGroups...)
+		allSubGroups = append(allSubGroups, priceList.SubGroups...)
+	}
+	if len(allSubGroups) == 0 {
+		return PriceListDetailApiResponse{
+			Id:   uuid.MustParse(priceListData[0].ID),
+			Name: "Price List Detail",
+			Tabs: []PriceListDetailTabConfig{},
+		}, nil
 	}
 
-	columns := buildFixedColumns(pattern)
-	rowData := buildDirectRows(pattern, subGroups)
+	columns := buildDynamicColumns(pattern, allSubGroups)
+	rows := buildDynamicRows(pattern, allSubGroups)
+	mergedRows := mergeGroup1Item9Rows(rows)
 
-	tableData := make([]map[string]interface{}, len(rowData))
-	for i, row := range rowData {
+	sort.SliceStable(mergedRows, func(i, j int) bool {
+		itemI := fmt.Sprintf("%v", mergedRows[i]["product_group_4"])
+		itemJ := fmt.Sprintf("%v", mergedRows[j]["product_group_4"])
+		if itemI == itemJ {
+			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
+			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
+			if lengthI == lengthJ {
+				weightI := fmt.Sprintf("%v", mergedRows[i]["weight_spec"])
+				weightJ := fmt.Sprintf("%v", mergedRows[j]["weight_spec"])
+				return weightI < weightJ
+			}
+			return lengthI < lengthJ
+		}
+		return itemI < itemJ
+	})
+
+	tableData := make([]map[string]interface{}, len(mergedRows))
+	for i, row := range mergedRows {
 		tableData[i] = map[string]interface{}(row)
+	}
+
+	tabLabel := pattern.Name
+	if tabLabel == "" {
+		tabLabel = groupCode
 	}
 
 	tab := PriceListDetailTabConfig{
 		ID:    uuid.New(),
-		Label: "หมวดเหล็กตัวซี",
+		Label: tabLabel,
 		TableConfig: TableConfig{
-			Title:             "หมวดเหล็กตัวซี",
+			Title:             tabLabel,
 			GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
 			HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
 			Pagination:        boolPtr(config.TableConfig.Pagination),
@@ -66,7 +96,7 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 
 	return PriceListDetailApiResponse{
 		Id:   uuid.MustParse(priceListData[0].ID),
-		Name: "หมวดเหล็กตัวซี",
+		Name: "Price List Detail",
 		Tabs: []PriceListDetailTabConfig{tab},
 	}, nil
 }

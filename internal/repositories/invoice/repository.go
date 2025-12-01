@@ -12,7 +12,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -48,6 +48,17 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchInvoiceType = fmt.Sprintf(` and invoice.invoice_type IN (%s)`, whereInClause)
 	}
+
+	searchInvoiceRef := ""
+	if len(invoiceRef) > 0 {
+		quotedStrings := make([]string, len(invoiceRef))
+		for i, s := range invoiceRef {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchInvoiceRef = fmt.Sprintf(` and invoice.invoice_ref IN (%s)`, whereInClause)
+	}
+
 	searchCustomerCode := ""
 	if len(customerCode) > 0 {
 		quotedStrings := make([]string, len(customerCode))
@@ -79,7 +90,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 	var invoiceID []uuid.UUID
 	gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
+		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
 		Group("invoice.id").Scan(&invoiceID)
 
 	if len(invoiceID) > 0 {

@@ -16,6 +16,9 @@ import (
 type GetCreditReq struct {
 	ID           []uuid.UUID `json:"id"`
 	CustomerCode []string    `json:"customer_code"`
+	IsAction     []bool      `json:"is_action"`
+	RequestType  []string    `json:"request_type"`
+	Status       []string    `json:"status"`
 	Page         int         `json:"page"`
 	PageSize     int         `json:"page_size"`
 }
@@ -35,7 +38,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -140,6 +143,29 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
 
+	}
+
+	resultApproval := ResultCreditRequest{
+		Total:         totalRecords,
+		Page:          req.Page,
+		PageSize:      req.PageSize,
+		TotalPages:    totalPages,
+		CreditRequest: credit,
+	}
+
+	return resultApproval, nil
+}
+func GetCreditRequestCronjob(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+
+	var req GetCreditReq
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct : " + err.Error())
+	}
+
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequest(req.ID, req.CustomerCode, req.IsAction, req.RequestType, req.Status, req.Page, req.PageSize)
+	if errApproval != nil {
+		return nil, errApproval
 	}
 
 	resultApproval := ResultCreditRequest{

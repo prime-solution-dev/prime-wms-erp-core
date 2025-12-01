@@ -276,10 +276,10 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}, nil
 	}
 
-	// Extract GroupKey from the first element
-	groupKey := priceListData[0].GroupKey
-	if groupKey == "" {
-		return nil, fmt.Errorf("GroupKey is missing in price list data")
+	// Determine the pattern handler from the group's code
+	groupCode := priceListData[0].GroupCode
+	if groupCode == "" {
+		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
 
 	type priceTableHandler func([]models.GetPriceListResponse, string) (pricePatterns.PriceListDetailApiResponse, error)
@@ -292,14 +292,22 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"GROUP_1_ITEM_3": pricePatterns.BuildGroup1Item3Response,
 		"GROUP_1_ITEM_4": pricePatterns.BuildGroup1Item4Response,
 		"GROUP_1_ITEM_5": pricePatterns.BuildGroup1Item5Response,
+		"GROUP_1_ITEM_6": pricePatterns.BuildGroup1Item6Response,
+		"GROUP_1_ITEM_7": pricePatterns.BuildGroup1Item7Response,
+		"GROUP_1_ITEM_8": pricePatterns.BuildGroup1Item8Response,
+		"GROUP_1_ITEM_9": pricePatterns.BuildGroup1Item9Response,
+		"GROUP_1_ITEM_10": func(data []models.GetPriceListResponse, code string) (pricePatterns.PriceListDetailApiResponse, error) {
+			return pricePatterns.BuildGroup1Item10Response(data, code)
+		},
+		"GROUP_1_ITEM_11": pricePatterns.BuildGroup1Item11Response,
 	}
 
-	handler, ok := handlers[groupKey]
+	handler, ok := handlers[groupCode]
 	if !ok {
-		return nil, fmt.Errorf("unsupported GroupKey: %s", groupKey)
+		return nil, fmt.Errorf("unsupported GroupCode: %s", groupCode)
 	}
 
-	response, err := handler(priceListData, groupKey)
+	response, err := handler(priceListData, groupCode)
 	if err != nil {
 		return nil, err
 	}

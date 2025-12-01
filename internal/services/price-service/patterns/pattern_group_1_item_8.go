@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
 	config, err := loadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
@@ -27,8 +27,8 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 	}
 
 	allSubGroups := make([]models.PriceListSubGroupResponse, 0)
-	for _, priceList := range priceListData {
-		allSubGroups = append(allSubGroups, priceList.SubGroups...)
+	for _, pl := range priceListData {
+		allSubGroups = append(allSubGroups, pl.SubGroups...)
 	}
 	if len(allSubGroups) == 0 {
 		return PriceListDetailApiResponse{
@@ -38,25 +38,25 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
-	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
+	groupedByProductGroup1 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
-		if productGroup2 == "" {
-			productGroup2 = "อื่นๆ"
+		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP1")
+		if tabKey == "" {
+			tabKey = "อื่นๆ"
 		}
-		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
+		groupedByProductGroup1[tabKey] = append(groupedByProductGroup1[tabKey], sg)
 	}
 
 	tabOrder := make([]string, 0)
 	seen := make(map[string]bool)
 	for _, cat := range pattern.ApplicableCategories {
-		if _, ok := groupedByProductGroup2[cat]; ok {
+		if _, ok := groupedByProductGroup1[cat]; ok {
 			tabOrder = append(tabOrder, cat)
 			seen[cat] = true
 		}
 	}
 	remaining := make([]string, 0)
-	for key := range groupedByProductGroup2 {
+	for key := range groupedByProductGroup1 {
 		if !seen[key] {
 			remaining = append(remaining, key)
 		}
@@ -65,27 +65,33 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 	tabOrder = append(tabOrder, remaining...)
 
 	columns := buildFixedColumns(pattern)
-
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
-	for _, tabLabel := range tabOrder {
-		subGroups := groupedByProductGroup2[tabLabel]
 
-		sort.SliceStable(subGroups, func(i, j int) bool {
-			sizeI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
-			sizeJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
-			if sizeI == sizeJ {
-				thicknessI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP6")
-				thicknessJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP6")
-				return thicknessI < thicknessJ
+	for _, tabLabel := range tabOrder {
+		subGroups := groupedByProductGroup1[tabLabel]
+		if len(subGroups) == 0 {
+			continue
+		}
+
+		rows := buildDirectRows(pattern, subGroups)
+
+		sort.SliceStable(rows, func(i, j int) bool {
+			thicknessI := fmt.Sprintf("%v", rows[i]["product_group_6"])
+			thicknessJ := fmt.Sprintf("%v", rows[j]["product_group_6"])
+			if thicknessI == thicknessJ {
+				shipI := fmt.Sprintf("%v", rows[i]["ship_no"])
+				shipJ := fmt.Sprintf("%v", rows[j]["ship_no"])
+				return shipI < shipJ
 			}
-			return sizeI < sizeJ
+			return thicknessI < thicknessJ
 		})
 
-		rowData := buildDirectRows(pattern, subGroups)
-		tableData := make([]map[string]interface{}, len(rowData))
-		for i, row := range rowData {
+		tableData := make([]map[string]interface{}, len(rows))
+		for i, row := range rows {
 			tableData[i] = map[string]interface{}(row)
 		}
+
+		summaryRows := buildSummaryRows(pattern, rows)
 
 		tab := PriceListDetailTabConfig{
 			ID:    uuid.New(),
@@ -109,6 +115,7 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 				Columns: columns,
 			},
 			TableData:         tableData,
+			SummaryRows:       summaryRows,
 			EditableSuffixes:  pattern.EditableSuffixes,
 			FetchableSuffixes: pattern.FetchableSuffixes,
 		}

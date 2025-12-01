@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item7Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
 	config, err := loadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
@@ -64,26 +64,80 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 	sort.Strings(remaining)
 	tabOrder = append(tabOrder, remaining...)
 
-	columns := buildFixedColumns(pattern)
-
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
 	for _, tabLabel := range tabOrder {
 		subGroups := groupedByProductGroup2[tabLabel]
+		if len(subGroups) == 0 {
+			continue
+		}
 
-		sort.SliceStable(subGroups, func(i, j int) bool {
-			sizeI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
-			sizeJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
-			if sizeI == sizeJ {
-				thicknessI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP6")
-				thicknessJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP6")
-				return thicknessI < thicknessJ
+		columns := buildDynamicColumns(pattern, subGroups)
+		rowData := buildDynamicRows(pattern, subGroups)
+
+		// Merge rows with the same row_group_value into a single row
+		// This groups all PRODUCT_GROUP5 columns into one row per PRODUCT_GROUP6
+		mergedRowMap := make(map[string]AGGridRowData)
+		for _, row := range rowData {
+			rowGroupValue := fmt.Sprintf("%v", row["row_group_value"])
+			if rowGroupValue == "" {
+				continue
 			}
-			return sizeI < sizeJ
+
+			mergedRow, exists := mergedRowMap[rowGroupValue]
+			if !exists {
+				// Create new merged row with common fields
+				mergedRow = make(AGGridRowData)
+				// Copy common fields (only once)
+				if val, ok := row["id"]; ok {
+					mergedRow["id"] = val
+				}
+				if val, ok := row["product_group_6"]; ok {
+					mergedRow["product_group_6"] = val
+				}
+				if val, ok := row["row_group_value"]; ok {
+					mergedRow["row_group_value"] = val
+				}
+				if val, ok := row["is_trading"]; ok {
+					mergedRow["is_trading"] = val
+				}
+				if val, ok := row["subgroup_id"]; ok {
+					mergedRow["subgroup_id"] = val
+				}
+			}
+
+			// Merge all column-specific fields from this row
+			for key, value := range row {
+				// Skip common fields that we already set (these have the same value across all rows being merged)
+				if key == "id" || key == "product_group_6" || key == "row_group_value" || key == "is_trading" || key == "subgroup_id" {
+					continue
+				}
+				// For column_group_key and column_group_value, keep the last value (they differ per column group)
+				// This maintains some metadata while avoiding true duplicates
+				if key == "column_group_key" || key == "column_group_value" {
+					mergedRow[key] = value
+					continue
+				}
+				// Copy all other fields (column group specific fields like 4_x8_*, 5_x20_*)
+				mergedRow[key] = value
+			}
+
+			mergedRowMap[rowGroupValue] = mergedRow
+		}
+
+		// Convert merged rows to slice and sort
+		mergedRows := make([]AGGridRowData, 0, len(mergedRowMap))
+		for _, row := range mergedRowMap {
+			mergedRows = append(mergedRows, row)
+		}
+
+		sort.SliceStable(mergedRows, func(i, j int) bool {
+			thicknessI := fmt.Sprintf("%v", mergedRows[i]["product_group_6"])
+			thicknessJ := fmt.Sprintf("%v", mergedRows[j]["product_group_6"])
+			return thicknessI < thicknessJ
 		})
 
-		rowData := buildDirectRows(pattern, subGroups)
-		tableData := make([]map[string]interface{}, len(rowData))
-		for i, row := range rowData {
+		tableData := make([]map[string]interface{}, len(mergedRows))
+		for i, row := range mergedRows {
 			tableData[i] = map[string]interface{}(row)
 		}
 
@@ -118,7 +172,7 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 
 	return PriceListDetailApiResponse{
 		Id:   uuid.MustParse(priceListData[0].ID),
-		Name: "Price List Detail",
+		Name: "ม้วน",
 		Tabs: tabs,
 	}, nil
 }
