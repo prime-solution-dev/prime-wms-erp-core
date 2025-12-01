@@ -87,13 +87,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 110,
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
           "headerName": "Avg. kg stock",
           "width": 130,
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "line_bundle",
@@ -102,22 +102,22 @@
           "dataMapping": "line_bundle"
         },
         {
-          "field": "before_price_unit",
+          "field": "before_price_weight",
           "headerName": "ราคาขาย before",
           "width": 140,
-          "dataMapping": "before_price_unit"
+          "dataMapping": "before_price_weight"
         },
         {
-          "field": "price_unit",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย after",
           "width": 140,
-          "dataMapping": "total_net_price_unit"
+          "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "extra_thb",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 120,
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "delivery_date",
@@ -137,14 +137,14 @@
       "applicableCategories": ["I-Beams"],
       "editable_suffixes": [
         "is_highlight",
-        "total_net_price_unit",
-        "extra_price_unit",
-        "remark"
+        "total_net_price_weight",
+        "delivery_date",
+        "line_bundle",
+        "remark",
+        "remark_next_production"
       ],
       "fetchable_suffixes": [
-        "before_price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
+        "total_net_price_weight"
       ]
     }
   ],
