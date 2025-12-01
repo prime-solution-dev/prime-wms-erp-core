@@ -397,7 +397,7 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
 
 	if len(pattern.ColumnLevels) > 0 {
-		columns = append(columns, buildMultiLevelColumns(pattern, subGroups, columnGroupFields)...)
+		columns = append(columns, buildMultiLevelColumns(pattern, subGroups)...)
 	} else {
 		columns = append(columns, buildSingleLevelColumns(pattern, subGroups, columnGroupFields)...)
 	}
@@ -583,7 +583,7 @@ func buildColumnGroupsRecursive(
 	return columns
 }
 
-func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
 	if len(pattern.ColumnLevels) == 0 {
 		return []ColumnDef{}
 	}
