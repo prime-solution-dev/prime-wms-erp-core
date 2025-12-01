@@ -81,13 +81,13 @@
           "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "total_net_price_weight",
+          "field": "extra_price_weight",
           "headerName": "Extra",
           "width": 110,
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "weight_spec",
@@ -111,7 +111,7 @@
           "field": "institute",
           "headerName": "สถาบัน",
           "width": 140,
-          "dataMapping": "warehouse"
+          "dataMapping": "institute"
         },
         {
           "field": "stock",
@@ -231,14 +231,14 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {
       "suppressMovableColumns": false,
       "suppressMenuHide": true,
-      "enableCellSpan": false
+      "enableCellSpan": true
     }
   },
   "metadata": {

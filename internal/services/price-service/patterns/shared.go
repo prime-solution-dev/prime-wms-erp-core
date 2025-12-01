@@ -149,7 +149,7 @@ type SummaryColumnConfig struct {
 
 type SummaryRow struct {
 	RowGroupValue string                 `json:"row_group_value"`
-	Label         string                 `json:"label"`
+	Label         string                 `json:"label,omitempty"`
 	Data          map[string]interface{} `json:"data"`
 }
 
@@ -933,6 +933,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var countryValue interface{}
 		var shipNoValue interface{}
 		var tsmValue interface{}
+		var instituteValue interface{}
 		fastValue := false
 		slowValue := false
 		hasFastValue := false
@@ -1006,6 +1007,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 				if tsm, ok := udfData["tsm"]; ok {
 					tsmValue = tsm
+				}
+				if institute, ok := udfData["institute"]; ok {
+					instituteValue = institute
 				}
 				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
 					if importDate, ok := apMap["import_date"]; ok {
@@ -1246,6 +1250,8 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[colConfig.Field] = factoryValue
 			case "country":
 				row[colConfig.Field] = countryValue
+			case "institute":
+				row[colConfig.Field] = instituteValue
 			case "is_highlight":
 				row[colConfig.Field] = isHighlightValue
 			case "inactive":
@@ -1505,24 +1511,33 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 
 		summaryRow, exists := summaryMap[rowGroupValue]
 		if !exists {
-			data := map[string]interface{}{
-				"row_group_value": rowGroupValue,
-				"is_summary_row":  true,
-			}
-			if cfg.RowGroupField != "" {
-				if val, ok := row[cfg.RowGroupField]; ok {
-					data[cfg.RowGroupField] = val
-				} else {
-					data[cfg.RowGroupField] = rowGroupValue
+			// Initialize data map with all aggregated fields set to 0
+			data := make(map[string]interface{})
+
+			// Initialize all summary column fields to 0
+			for _, column := range cfg.Columns {
+				if column.Field == "" {
+					continue
 				}
-			}
-			if cfg.LabelField != "" && cfg.LabelValue != "" {
-				data[cfg.LabelField] = cfg.LabelValue
+
+				applyToColumnGroups := true
+				if column.ApplyToColumnGroups != nil {
+					applyToColumnGroups = *column.ApplyToColumnGroups
+				}
+
+				fieldName := column.Field
+				if applyToColumnGroups {
+					// For column groups, we'll initialize when we encounter the first row with that column group
+					// For now, we'll handle it in the aggregation loop
+					continue
+				} else {
+					// Initialize non-column-group fields to 0
+					data[fieldName] = float64(0)
+				}
 			}
 
 			summaryRow = &SummaryRow{
 				RowGroupValue: rowGroupValue,
-				Label:         cfg.LabelValue,
 				Data:          data,
 			}
 			summaryMap[rowGroupValue] = summaryRow
@@ -1554,6 +1569,27 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 
 	if len(summaryMap) == 0 {
 		return nil
+	}
+
+	// Ensure all summary fields are present in data, initializing to 0 if missing
+	for _, summaryRow := range summaryMap {
+		for _, column := range cfg.Columns {
+			if column.Field == "" {
+				continue
+			}
+
+			applyToColumnGroups := true
+			if column.ApplyToColumnGroups != nil {
+				applyToColumnGroups = *column.ApplyToColumnGroups
+			}
+
+			if !applyToColumnGroups {
+				// For non-column-group fields, ensure they exist in data
+				if _, exists := summaryRow.Data[column.Field]; !exists {
+					summaryRow.Data[column.Field] = float64(0)
+				}
+			}
+		}
 	}
 
 	result := make([]SummaryRow, 0, len(summaryMap))
