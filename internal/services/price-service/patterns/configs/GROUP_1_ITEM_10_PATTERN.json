@@ -92,7 +92,7 @@
         },
         {
           "field": "extra_price_unit",
-          "headerName": "Extra (THB)",
+          "headerName": "Extra",
           "width": 130,
           "dataMapping": "extra_price_unit",
           "cellStyle": {
@@ -107,6 +107,13 @@
           "cellStyle": {
             "textAlign": "right"
           }
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
         }
       ],
       "itemFormat": [
@@ -127,15 +134,14 @@
         "GROUP_1_ITEM_10"
       ],
       "editable_suffixes": [
+        "is_highlight",
         "total_net_price_unit",
-        "extra_price_unit",
         "line_bundle",
-        "remark"
+        "remark",
+        "inactive"
       ],
       "fetchable_suffixes": [
-        "before_price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
+        "total_net_price_unit"
       ]
     }
   ],

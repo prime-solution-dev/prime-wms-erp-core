@@ -130,6 +130,13 @@
           "headerName": "remark ผลิตงวดต่อไป",
           "width": 180,
           "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
         }
       ],
       "columnGroups": [],
@@ -141,7 +148,8 @@
         "delivery_date",
         "line_bundle",
         "remark",
-        "remark_next_production"
+        "remark_next_production",
+        "inactive"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight"

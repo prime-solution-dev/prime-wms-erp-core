@@ -77,10 +77,10 @@
           "dataMapping": "before_price_weight"
         },
         {
-          "field": "price_weight",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย after",
           "width": 160,
-          "dataMapping": "price_weight"
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "extra_price_weight",
@@ -137,8 +137,17 @@
         "เหล็กฉาก",
         "รางน้ำ"
       ],
-      "editable_suffixes": [],
-      "fetchable_suffixes": []
+      "editable_suffixes": [
+        "is_highlight",
+        "line_bundle",
+        "total_net_price_weight",
+        "delivery_date",
+        "ton",
+        "inactive"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight"
+      ]
     }
   ],
   "defaultPattern": "pattern_group1_item6_pg2_tabs",
