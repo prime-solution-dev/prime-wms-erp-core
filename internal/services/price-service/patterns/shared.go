@@ -731,13 +731,13 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 						continue
 					}
 
-					if key == "sale" {
-						if saleMap, ok := value.(map[string]interface{}); ok {
-							if fast, ok := saleMap["fast"]; ok {
-								row[fmt.Sprintf("%s_sale_%s", columnKey, sanitizeFieldName("fast"))] = fast
+					if key == "selling" {
+						if sellingMap, ok := value.(map[string]interface{}); ok {
+							if selling_fast, ok := sellingMap["selling_fast"]; ok {
+								row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = selling_fast
 							}
-							if slow, ok := saleMap["slow"]; ok {
-								row[fmt.Sprintf("%s_sale_%s", columnKey, sanitizeFieldName("slow"))] = slow
+							if slow, ok := sellingMap["slow"]; ok {
+								row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("slow"))] = slow
 							}
 						}
 						continue
@@ -940,7 +940,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var shipNoValue interface{}
 		var tsmValue interface{}
 		var instituteValue interface{}
-		fastValue := false
+		selling_fastValue := false
 		slowValue := false
 		hasFastValue := false
 		hasSlowValue := false
@@ -1031,20 +1031,20 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 						producerValue = producer
 					}
 				}
-				if fast, ok := udfData["fast"].(bool); ok {
-					fastValue = fast
+				if selling_fast, ok := udfData["selling_fast"].(bool); ok {
+					selling_fastValue = selling_fast
 					hasFastValue = true
 				}
 				if slow, ok := udfData["slow"].(bool); ok {
 					slowValue = slow
 					hasSlowValue = true
 				}
-				if saleMap, ok := udfData["sale"].(map[string]interface{}); ok {
-					if fast, ok := saleMap["fast"].(bool); ok {
-						fastValue = fast
+				if sellingMap, ok := udfData["selling"].(map[string]interface{}); ok {
+					if selling_fast, ok := sellingMap["selling_fast"].(bool); ok {
+						selling_fastValue = selling_fast
 						hasFastValue = true
 					}
-					if slow, ok := saleMap["slow"].(bool); ok {
+					if slow, ok := sellingMap["slow"].(bool); ok {
 						slowValue = slow
 						hasSlowValue = true
 					}
@@ -1168,9 +1168,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[childCol.Field] = tonValue
 				case "producer":
 					row[childCol.Field] = producerValue
-				case "fast":
+				case "selling_fast":
 					if hasFastValue {
-						row[childCol.Field] = fastValue
+						row[childCol.Field] = selling_fastValue
 					} else {
 						row[childCol.Field] = false
 					}
@@ -1230,9 +1230,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[colConfig.Field] = producerValue
 			case "tsm":
 				row[colConfig.Field] = tsmValue
-			case "fast":
+			case "selling_fast":
 				if hasFastValue {
-					row[colConfig.Field] = fastValue
+					row[colConfig.Field] = selling_fastValue
 				} else {
 					row[colConfig.Field] = false
 				}

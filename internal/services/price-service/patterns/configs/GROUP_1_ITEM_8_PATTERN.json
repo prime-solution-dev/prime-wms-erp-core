@@ -185,7 +185,8 @@
           "headerName": "Inactive",
           "width": 120,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "applicableCategories": [
