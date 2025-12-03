@@ -31,6 +31,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
+          "spanRows": true,
           "cellStyle": {
             "fontWeight": "600"
           }
@@ -237,7 +238,7 @@
     },
     "gridOptions": {
       "suppressMovableColumns": false,
-      "suppressMenuHide": true,
+      "suppressMenuHide": false,
       "enableCellSpan": true
     }
   },

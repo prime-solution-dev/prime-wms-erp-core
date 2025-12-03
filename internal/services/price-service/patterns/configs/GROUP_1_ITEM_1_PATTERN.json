@@ -7,7 +7,7 @@
       "enabled": true,
       "grouping": {
         "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6|PRODUCT_GROUP3|PRODUCT_GROUP5",
+        "rows": "PRODUCT_GROUP6",
         "columnGroups": "PRODUCT_GROUP5"
       },
       "columns": [
@@ -360,7 +360,8 @@
     },
     "gridOptions": {
       "suppressMovableColumns": false,
-      "suppressMenuHide": false
+      "suppressMenuHide": false,
+      "enableCellSpan": true
     }
   },
   "metadata": {
