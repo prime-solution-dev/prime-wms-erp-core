@@ -49,6 +49,7 @@ type ColumnConfigItem struct {
 	Field           string                 `json:"field"`
 	HeaderName      string                 `json:"headerName"`
 	Width           int                    `json:"width"`
+	Hide            bool                   `json:"hide,omitempty"`
 	Pinned          string                 `json:"pinned,omitempty"`
 	LockPosition    bool                   `json:"lockPosition,omitempty"`
 	SuppressMovable bool                   `json:"suppressMovable,omitempty"`
@@ -158,6 +159,7 @@ type ColumnDef struct {
 	Field           string      `json:"field,omitempty"`
 	HeaderName      string      `json:"headerName,omitempty"`
 	Width           *int        `json:"width,omitempty"`
+	Hide            *bool       `json:"hide,omitempty"`
 	Pinned          string      `json:"pinned,omitempty"`
 	LockPosition    *bool       `json:"lockPosition,omitempty"`
 	SuppressMovable *bool       `json:"suppressMovable,omitempty"`
@@ -374,6 +376,7 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 			Field:           fixedCol.Field,
 			HeaderName:      fixedCol.HeaderName,
 			Width:           intPtr(fixedCol.Width),
+			Hide:            boolPtr(fixedCol.Hide),
 			Pinned:          fixedCol.Pinned,
 			LockPosition:    boolPtr(fixedCol.LockPosition),
 			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
@@ -452,6 +455,7 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
 				HeaderName:   colConfig.HeaderName,
 				Width:        intPtr(colConfig.Width),
+				Hide:         boolPtr(colConfig.Hide),
 				CellRenderer: colConfig.CellRenderer,
 			}
 
@@ -553,6 +557,7 @@ func buildColumnGroupsRecursive(
 					Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
 					HeaderName:   colConfig.HeaderName,
 					Width:        intPtr(colConfig.Width),
+					Hide:         boolPtr(colConfig.Hide),
 					CellRenderer: colConfig.CellRenderer,
 				}
 
@@ -1333,6 +1338,7 @@ func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.P
 				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
 				HeaderName:   colConfig.HeaderName,
 				Width:        intPtr(colConfig.Width),
+				Hide:         boolPtr(colConfig.Hide),
 				CellRenderer: colConfig.CellRenderer,
 			}
 
@@ -1715,6 +1721,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 			Field:           fixedCol.Field,
 			HeaderName:      fixedCol.HeaderName,
 			Width:           intPtr(fixedCol.Width),
+			Hide:            boolPtr(fixedCol.Hide),
 			Pinned:          fixedCol.Pinned,
 			LockPosition:    boolPtr(fixedCol.LockPosition),
 			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
@@ -1749,6 +1756,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 				Field:      childColConfig.Field,
 				HeaderName: childColConfig.HeaderName,
 				Width:      intPtr(childColConfig.Width),
+				Hide:       boolPtr(childColConfig.Hide),
 			}
 
 			if childColConfig.CellStyle != nil {
@@ -1778,6 +1786,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 			Field:      colConfig.Field,
 			HeaderName: colConfig.HeaderName,
 			Width:      intPtr(colConfig.Width),
+			Hide:       boolPtr(colConfig.Hide),
 		}
 
 		if colConfig.CellStyle != nil {
