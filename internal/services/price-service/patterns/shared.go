@@ -106,6 +106,7 @@ type PriceListDetailTabConfig struct {
 	TableConfig       TableConfig              `json:"tableConfig"`
 	TableData         []map[string]interface{} `json:"tableData"`
 	SummaryRows       []SummaryRow             `json:"summaryRows,omitempty"`
+	SummaryField      map[string]interface{}   `json:"summaryField,omitempty"`
 	EditableSuffixes  []string                 `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes []string                 `json:"fetchable_suffixes,omitempty"`
 }
@@ -1600,6 +1601,42 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 	}
 
 	return result
+}
+
+func buildSummaryField(summaryRows []SummaryRow) map[string]interface{} {
+	if len(summaryRows) == 0 {
+		return nil
+	}
+
+	summaryField := make(map[string]interface{})
+
+	// Iterate through all summaryRows
+	for _, summaryRow := range summaryRows {
+		if summaryRow.Data == nil {
+			continue
+		}
+
+		// For each field in the summaryRow's Data, sum the numeric values
+		for fieldName, fieldValue := range summaryRow.Data {
+			// Try to convert to float64
+			value, ok := toFloat64(fieldValue)
+			if !ok {
+				// Skip non-numeric values
+				continue
+			}
+
+			// Get current value in summaryField (default to 0 if not present)
+			current, _ := toFloat64(summaryField[fieldName])
+			summaryField[fieldName] = current + value
+		}
+	}
+
+	// Return nil if no numeric fields were found
+	if len(summaryField) == 0 {
+		return nil
+	}
+
+	return summaryField
 }
 
 func getRowGroupValue(row AGGridRowData, cfg *SummaryConfig) string {
