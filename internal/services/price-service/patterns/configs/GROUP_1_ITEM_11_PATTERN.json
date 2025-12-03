@@ -54,13 +54,6 @@
       "columnGroups": [],
       "columns": [
         {
-          "field": "is_highlight",
-          "headerName": "Highlight สีฟ้า",
-          "width": 100,
-          "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "is_highlight"
-        },
-        {
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 120,
@@ -104,14 +97,19 @@
             "textAlign": "left"
           },
           "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
         }
       ],
       "applicableCategories": ["หมวดเหล็กแบน"],
-      "editable_suffixes": ["is_highlight", "total_net_price_weight", "remark"],
+      "editable_suffixes": ["is_highlight", "total_net_price_weight", "remark", "inactive"],
       "fetchable_suffixes": [
-        "before_price_weight",
-        "total_net_price_weight",
-        "extra_price_weight"
+        "total_net_price_weight"
       ]
     }
   ],
