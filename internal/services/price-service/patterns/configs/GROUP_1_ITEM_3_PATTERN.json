@@ -27,7 +27,6 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 120,
-
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -45,7 +44,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
@@ -57,7 +56,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "od",
@@ -87,7 +86,6 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 120,
-
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -106,7 +104,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "extra_price_unit",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 120,
 
@@ -115,7 +113,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "remark",
@@ -193,22 +191,22 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before_price_unit",
+              "field": "price_line_before_price_weight",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_unit"
+              "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_line_total_net_price_unit",
+              "field": "price_line_total_net_price_weight",
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "total_net_price_unit"
+              "dataMapping": "total_net_price_weight"
             }
           ]
         },
@@ -234,30 +232,33 @@
           ]
         }
       ],
-      "columns": [],
+      "columns": [
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive"
+        }
+      ],
       "applicableCategories": [],
       "editable_suffixes": [
         "is_highlight",
         "line_bundle",
-        "stock",
-        "od",
-        "import_date",
-        "ton",
-        "producer",
-        "fast",
-        "slow",
-        "total_net_price_weight",
-        "total_net_price_unit",
-        "remark"
+        "waiting_production_import_date",
+        "waiting_production_ton",
+        "waiting_production_producer",
+        "price_kg_before_price_weight",
+        "price_kg_total_net_price_weight",
+        "price_line_before_price_weight",
+        "price_line_total_net_price_weight",
+        "selling_fast",
+        "selling_slow",
+        "remark",
+        "inactive"
       ],
       "fetchable_suffixes": [
-        "price_unit",
-        "price_weight",
-        "total_net_price_unit",
-        "total_net_price_weight",
-        "extra_price_unit",
-        "before_price_unit",
-        "before_price_weight"
+        "total_net_price_weight"
       ]
     }
   ],
