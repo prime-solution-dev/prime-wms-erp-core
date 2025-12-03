@@ -74,7 +74,8 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [
@@ -187,7 +188,8 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [
@@ -318,7 +320,8 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [

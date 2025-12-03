@@ -146,7 +146,8 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "columnGroups": [
