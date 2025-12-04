@@ -133,7 +133,7 @@ func buildGroup1Item5Columns(pattern *PatternConfig, subGroups []models.PriceLis
 
 		colGroup := ColumnDef{
 			HeaderName:    value.Label,
-			GroupID:       fmt.Sprintf("size_%s", groupIdentifier),
+			GroupID:       groupIdentifier,
 			OpenByDefault: boolPtr(true),
 			Children:      []ColumnDef{},
 		}
