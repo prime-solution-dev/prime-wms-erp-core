@@ -432,6 +432,7 @@ type UpdatePriceListExtraRequest struct {
 
 type PriceListFormulas struct {
 	ID          uuid.UUID       `json:"id" gorm:"primary_key;not null"`
+	FormulaCode string          `json:"formula_code" gorm:"not null"`
 	Name        string          `json:"name" gorm:"not null"`
 	Uom         string          `json:"uom" gorm:"not null"`
 	FormulaType string          `json:"formula_type" gorm:"not null"`

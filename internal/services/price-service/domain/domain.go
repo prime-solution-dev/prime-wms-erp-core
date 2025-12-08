@@ -35,6 +35,8 @@ type Price struct {
 	Id                  string  `json:"id"`
 	TotalNetPriceUnit   float64 `json:"total_net_price_unit"`
 	TotalNetPriceWeight float64 `json:"total_net_price_weight"`
+	ExtraPriceUnit      float64 `json:"extra_price_unit"`
+	ExtraPriceWeight    float64 `json:"extra_price_weight"`
 	DefaultUom          string  `json:"default_uom"`
 }
 
