@@ -6,6 +6,7 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
+	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
 	"time"
 
@@ -13,23 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
-
-// ============================================================================
-// Request Structures
-// ============================================================================
-
-// GetPriceDetailRequest represents the request structure
-type GetPriceDetailRequest struct {
-	CompanyCode       string     `json:"company_code"`
-	SiteCodes         []string   `json:"site_codes"`
-	GroupCodes        []string   `json:"group_codes"`
-	EffectiveDateFrom *time.Time `json:"effective_date_from"`
-	EffectiveDateTo   *time.Time `json:"effective_date_to"`
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
 
 // getGroupAndItemMappings gets group and group item mappings for value name resolution
 func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]models.GetGroupItemResponse, map[string]GetPaymentTermResponse, error) {
@@ -99,7 +83,7 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 }
 
 // loadPriceData loads price list data from database using GetPriceList
-func loadPriceData(sqlx *sqlx.DB, req GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
+func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
 	// Build GetPriceListGroupRequest from GetPriceDetailRequest
 	priceListReq := GetPriceListGroupRequest{
 		CompanyCode:       req.CompanyCode,
@@ -239,7 +223,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Parse request
-	var req GetPriceDetailRequest
+	var req priceDomain.GetPriceDetailRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request JSON: %w", err)
 	}
