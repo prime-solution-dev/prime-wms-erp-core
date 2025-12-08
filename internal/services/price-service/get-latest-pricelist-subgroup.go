@@ -52,7 +52,7 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			}
 		}
 
-		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupID(subGroup.ID)
+		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCode(subGroup.SubgroupKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 		}

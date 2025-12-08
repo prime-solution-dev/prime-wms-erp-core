@@ -34,3 +34,10 @@ func EscapeSQLString(val string) string {
 	return strings.ReplaceAll(val, "'", "''")
 }
 
+// FormatJSONB formats a JSON string for SQL JSONB insertion
+// Escapes single quotes and wraps in quotes with ::jsonb cast
+func FormatJSONB(val string) string {
+	// Escape single quotes for SQL
+	escaped := strings.ReplaceAll(val, "'", "''")
+	return fmt.Sprintf("'%s'::jsonb", escaped)
+}

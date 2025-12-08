@@ -106,7 +106,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 					Uom:         "kg",
 					FormulaType: "price_calc",
 					Expression:  stringPtr("base_price + extra"),
-					Params:      stringPtr(`{"required": ["base_price", "extra"]}`),
+					Params:      jsonRawMessage(`{"required": ["base_price", "extra"]}`),
 					Rounding:    2,
 				},
 			},
@@ -120,7 +120,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 					Uom:         "pcs",
 					FormulaType: "input",
 					Expression:  nil,
-					Params:      nil,
+					Params:      nil, // nil is valid for json.RawMessage
 					Rounding:    2,
 				},
 			},
@@ -134,7 +134,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 					Uom:         "kg",
 					FormulaType: "price_calc",
 					Expression:  stringPtr("base_price + extra"),
-					Params:      stringPtr(`{"required": ["base_price"]}`),
+					Params:      jsonRawMessage(`{"required": ["base_price"]}`),
 					Rounding:    2,
 				},
 				{
@@ -142,7 +142,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 					Uom:         "pcs",
 					FormulaType: "price_calc",
 					Expression:  stringPtr("kg * weight_spec"),
-					Params:      stringPtr(`{"required": ["kg", "weight_spec"]}`),
+					Params:      jsonRawMessage(`{"required": ["kg", "weight_spec"]}`),
 					Rounding:    0,
 				},
 			},
@@ -156,7 +156,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 					Uom:         "kg",
 					FormulaType: "price_calc",
 					Expression:  stringPtr("base_price + extra"),
-					Params:      stringPtr(`{"required": ["base_price"]}`),
+					Params:      jsonRawMessage(`{"required": ["base_price"]}`),
 					Rounding:    2,
 				},
 			},
@@ -204,7 +204,7 @@ func TestGenerateSQLStatementsIncludesFormulaCode(t *testing.T) {
 		Uom:         "kg",
 		FormulaType: "price_calc",
 		Expression:  stringPtr("base_price"),
-		Params:      stringPtr("{}"),
+		Params:      jsonRawMessage("{}"),
 		Rounding:    2,
 	}
 
@@ -227,7 +227,7 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 			Uom:         "kg",
 			FormulaType: "price_calc",
 			Expression:  stringPtr("base_price + extra"),
-			Params:      stringPtr(`{"required": ["base_price", "extra"], "description": "kg = Base price + Extra"}`),
+			Params:      jsonRawMessage(`{"required": ["base_price", "extra"], "description": "kg = Base price + Extra"}`),
 			Rounding:    2,
 		},
 		{
@@ -243,7 +243,7 @@ func TestGeneratedSQLExecutesAgainstPostgres(t *testing.T) {
 			Uom:         "pcs",
 			FormulaType: "price_calc",
 			Expression:  stringPtr("kg * weight_spec"),
-			Params:      stringPtr(`{"required": ["kg", "weight_spec"], "description": "Pcs = [kg] x [Weight Spec]"}`),
+			Params:      jsonRawMessage(`{"required": ["kg", "weight_spec"], "description": "Pcs = [kg] x [Weight Spec]"}`),
 			Rounding:    0,
 		},
 	}
@@ -292,7 +292,7 @@ func TestGeneratedSQLHandlesOnConflict(t *testing.T) {
 		Uom:         "kg",
 		FormulaType: "price_calc",
 		Expression:  stringPtr("base_price"),
-		Params:      stringPtr("{}"),
+		Params:      jsonRawMessage("{}"),
 		Rounding:    2,
 	}
 
@@ -317,7 +317,7 @@ func TestGenerateSQLStatementsWithComplexExpression(t *testing.T) {
 		Uom:         "pcs",
 		FormulaType: "price_calc",
 		Expression:  stringPtr("(base_price + 1.4) * avg_kg_stock * 1.02"),
-		Params:      stringPtr(`{"required": ["base_price", "avg_kg_stock"], "description": "Pcs = ( [Base price] + 1.4 ) x [Avg kg. stock] x (1+2%)"}`),
+		Params:      jsonRawMessage(`{"required": ["base_price", "avg_kg_stock"], "description": "Pcs = ( [Base price] + 1.4 ) x [Avg kg. stock] x (1+2%)"}`),
 		Rounding:    0,
 	}
 
@@ -336,7 +336,7 @@ func TestGenerateSQLStatementsWithJSONParams(t *testing.T) {
 		Uom:         "kg",
 		FormulaType: "price_calc",
 		Expression:  stringPtr("pcs / avg_kg_stock"),
-		Params:      stringPtr(`{"required": ["pcs", "avg_kg_stock"], "description": "kg = [Pcs] / [Avg. kg stock]"}`),
+		Params:      jsonRawMessage(`{"required": ["pcs", "avg_kg_stock"], "description": "kg = [Pcs] / [Avg. kg stock]"}`),
 		Rounding:    2,
 	}
 
@@ -408,7 +408,7 @@ func TestGenerateSQLStatementsWithCustomFormulaCode(t *testing.T) {
 		Uom:         "kg",
 		FormulaType: "price_calc",
 		Expression:  stringPtr("base_price"),
-		Params:      stringPtr("{}"),
+		Params:      jsonRawMessage("{}"),
 		Rounding:    2,
 	}
 
@@ -419,4 +419,8 @@ func TestGenerateSQLStatementsWithCustomFormulaCode(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func jsonRawMessage(s string) json.RawMessage {
+	return json.RawMessage(s)
 }

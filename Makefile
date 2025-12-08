@@ -33,5 +33,5 @@ seed-price-list-formulas:
 		$(if $(INPUT),--input=$(INPUT),) \
 		$(if $(OUTPUT),--output=$(OUTPUT),) \
 		$(if $(EXECUTE),--execute=$(EXECUTE),) \
-		$(if $(DATABASE),--database=$(DATABASE),) \
-		$(if $(CONNECTION_STRING),--connection-string=$(CONNECTION_STRING),)
+		$(if $(database),--connection-string=$(CONNECTION_STRING),)
+		
