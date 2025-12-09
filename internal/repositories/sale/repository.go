@@ -126,15 +126,18 @@ type SaleWithInvoiceItems struct {
 	InvoiceItems []models.InvoiceItem
 }
 
-func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, error) {
+func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithInvoiceItems, error) {
 
 	sqlx, err := db.ConnectSqlx(`prime_erp`)
 	if err != nil {
 		return nil, err
 	}
-	searchCustomerCode := ""
+	search := ""
 	if customerCode != "" {
-		searchCustomerCode = fmt.Sprintf(` and s.customer_code  = '%s'`, customerCode)
+		search += fmt.Sprintf(` and s.customer_code  = '%s'`, customerCode)
+	}
+	if saleCode != "" {
+		search += fmt.Sprintf(` and s.sale_code  = '%s'`, saleCode)
 	}
 
 	query := fmt.Sprintf(`
@@ -147,14 +150,15 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
         it.id as item_id, 
         it.document_ref, 
         it.total_amount as invoice_total_amount,
-		i.invoice_code 
+		i.invoice_code,
+		i.invoice_type
     FROM sale s
-    LEFT JOIN invoice_item it ON s.sale_code = it.document_ref
-	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and i.invoice_type = 'AR'
+    LEFT JOIN invoice_item it ON s.sale_code = it.document_ref 
+	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR')
 		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
 		%s
 		 ORDER BY s.sale_code
-	`, searchCustomerCode)
+	`, search)
 
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
@@ -175,25 +179,31 @@ func GetSalesWithInvoiceItems(customerCode string) ([]SaleWithInvoiceItems, erro
 		sale := models.Sale{
 			ID:            idSale,
 			SaleCode:      saleCode,
-			CompanyCode:   row["customer_code"].(string),
+			CustomerCode:  row["customer_code"].(string),
 			TotalAmount:   row["total_amount"].(float64),
 			StatusPayment: row["status_payment"].(string),
 		}
 
 		// สร้าง InvoiceItem object
 		var invoiceItem models.InvoiceItem
-		idStr, _ := row["item_id"].(string)
-
-		id, _ := uuid.Parse(idStr)
+		id := uuid.Nil
+		if row["item_id"] != nil {
+			idStr, _ := row["item_id"].(string)
+			id, _ = uuid.Parse(idStr)
+		}
 
 		if id != uuid.Nil { // ถ้ามี invoice item จริง
-			invoiceItem = models.InvoiceItem{
-				ID:          id,
-				InvoiceCode: row["invoice_code"].(string),
-				DocumentRef: row["document_ref"].(string),
-				TotalAmount: row["invoice_total_amount"].(float64),
-			}
 			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
+			if row["invoice_code"] != nil {
+				invoiceItem = models.InvoiceItem{
+					ID:          id,
+					InvoiceCode: row["invoice_code"].(string),
+					DocumentRef: row["document_ref"].(string),
+					TotalAmount: row["invoice_total_amount"].(float64),
+					InvoiceType: row["invoice_type"].(string),
+				}
+			}
+
 		}
 
 		// group by sale_code

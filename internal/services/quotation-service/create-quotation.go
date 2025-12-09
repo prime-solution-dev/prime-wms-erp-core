@@ -9,6 +9,7 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
 	"github.com/gin-gonic/gin"
@@ -80,7 +81,13 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	createQuotationItems := []models.QuotationItem{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
-	for _, quotationReq := range req.Quotations {
+	// Generate all quotation codes first
+	quotationCodes, err := generateQuotationCodes(ctx, len(req.Quotations))
+	if err != nil {
+		return nil, err
+	}
+
+	for i, quotationReq := range req.Quotations {
 
 		tempQuotation := quotationReq.Quotation
 		tempQuotation.ID = uuid.New()
@@ -89,7 +96,8 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, fmt.Errorf("effective date is required for quotation %s", quotationReq.QuotationCode)
 		}
 
-		quotationCode := uuid.New().String()
+		// Use pre-generated quotation code
+		quotationCode := quotationCodes[i]
 
 		if tempQuotation.QuotationCode == "" {
 			tempQuotation.QuotationCode = quotationCode
@@ -187,13 +195,15 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					QuotationCode: doc.DocRef,
 				})
 
-				for _, quotation := range createQuotations {
-					if !doc.IsPassPrice {
-						quotation.IsApproved = false
-						quotation.StatusApprove = "PENDING"
-					} else {
-						quotation.IsApproved = true
-						quotation.StatusApprove = "COMPLETED"
+				for i := range createQuotations {
+					if createQuotations[i].QuotationCode == doc.DocRef {
+						if !doc.IsPassPrice {
+							createQuotations[i].IsApproved = false
+							createQuotations[i].StatusApprove = "PENDING"
+						} else {
+							createQuotations[i].IsApproved = true
+							createQuotations[i].StatusApprove = "COMPLETED"
+						}
 					}
 				}
 			}
@@ -259,5 +269,64 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, err
 	}
 
+	// Update running number after successful creation
+	if err := updateQuotationRunningConfig(ctx, len(createQuotations)); err != nil {
+		// Log error but don't fail the transaction as quotations are already created
+		fmt.Printf("Warning: failed to update running config: %v\n", err)
+	}
+
 	return res, nil
+}
+
+// updateQuotationRunningConfig updates the running number configuration for quotations
+func updateQuotationRunningConfig(ctx *gin.Context, count int) error {
+	if count <= 0 {
+		return nil // No quotations created, nothing to update
+	}
+
+	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_QU",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update request: %v", err)
+	}
+
+	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return fmt.Errorf("failed to update running config: %v", err)
+	}
+
+	return nil
+}
+
+// generateQuotationCodes generates quotation codes using system config
+func generateQuotationCodes(ctx *gin.Context, count int) ([]string, error) {
+	if count <= 0 {
+		return []string{}, nil // No quotations to generate codes for
+	}
+
+	getReq := systemConfigService.GetRunningSystemConfigRequest{
+		ConfigCode: "RUNNING_QU",
+		Count:      count,
+	}
+
+	reqJSON, err := json.Marshal(getReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+	}
+
+	quotationCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate quotation codes: %v", err)
+	}
+
+	quotationResult, ok := quotationCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
+	if !ok || len(quotationResult.Data) != count {
+		return nil, errors.New("failed to get correct number of quotation codes from system config")
+	}
+
+	return quotationResult.Data, nil
 }

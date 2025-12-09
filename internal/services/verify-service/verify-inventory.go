@@ -71,7 +71,7 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 	remainingATP := map[string]float64{}
 	for _, atp := range resAtp.ProductAtps {
 		atpKey := fmt.Sprintf(`%s|%s|%s`, atp.CompanyCode, atp.SiteCode, atp.ProductCode)
-		remainingATP[atpKey] += float64(atp.TodayAtpQty)
+		remainingATP[atpKey] += float64(atp.TotalAtpQty)
 
 		res.ProductAtps = append(res.ProductAtps, VerifyInventoryProductAtp{
 			CompanyCode:   atp.CompanyCode,
