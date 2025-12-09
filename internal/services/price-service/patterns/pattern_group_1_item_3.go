@@ -92,10 +92,9 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 
 		tabs = append(tabs, tab)
 	}
-
 	return PriceListDetailApiResponse{
 		Id:   uuid.MustParse(priceListData[0].ID),
-		Name: "Price List Detail",
+		Name: groupCode,
 		Tabs: tabs,
 	}, nil
 }

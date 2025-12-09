@@ -108,26 +108,33 @@
           }
         },
         {
-          "field": "extra_price_unit",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 130,
-          "dataMapping": "extra_price_unit",
+          "dataMapping": "extra_price_weight",
           "cellStyle": {
             "textAlign": "left"
           }
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "applicableCategories": [
         "GROUP_1_ITEM_9"
       ],
       "editable_suffixes": [
-        "price_weight",
-        "extra_price_unit",
-        "remark"
+        "total_net_price_weight",
+        "remark",
+        "inactive"
       ],
       "fetchable_suffixes": [
-        "price_weight",
-        "extra_price_unit"
+        "total_net_price_weight"
       ]
     }
   ],

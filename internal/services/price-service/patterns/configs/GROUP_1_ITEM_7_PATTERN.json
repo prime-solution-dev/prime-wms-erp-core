@@ -95,10 +95,10 @@
           "dataMapping": "before_price_weight"
         },
         {
-          "field": "price_weight",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย after",
           "width": 150,
-          "dataMapping": "price_weight"
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "extra",
@@ -119,8 +119,8 @@
           "dataMapping": ""
         },
         {
-          "field": "avg_kg_stock",
-          "headerName": "Avg.kg stock",
+          "field": "avg_kg_stock_ton",
+          "headerName": "Avg.kg stock (Tons)",
           "width": 150,
           "dataMapping": ""
         },
@@ -135,7 +135,8 @@
           "headerName": "Inactive",
           "width": 110,
           "dataMapping": "inactive",
-          "cellRenderer": "agCheckboxCellRenderer"
+          "cellRenderer": "agCheckboxCellRenderer",
+          "hide": true
         }
       ],
       "applicableCategories": [
@@ -145,12 +146,11 @@
       "editable_suffixes": [
         "code",
         "is_highlight",
-        "price_weight",
-        "remark",
+        "total_net_price_weight",
         "inactive"
       ],
       "fetchable_suffixes": [
-        "price_weight"
+        "total_net_price_weight"
       ]
     }
   ],

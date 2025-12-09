@@ -99,36 +99,51 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 
 func buildGroup1Item5Columns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
-	uniqueValues := make(map[string]bool)
+	type columnGroupValue struct {
+		Label string
+		Code  string
+	}
+	uniqueValues := make(map[string]columnGroupValue)
 	for _, sg := range subGroups {
-		key := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-		if key != "" {
-			uniqueValues[key] = true
+		label := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
+		if label == "" {
+			continue
+		}
+		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+		mapKey := fmt.Sprintf("%s|%s", label, code)
+		uniqueValues[mapKey] = columnGroupValue{
+			Label: label,
+			Code:  code,
 		}
 	}
 
-	sizeLabels := make([]string, 0, len(uniqueValues))
-	for label := range uniqueValues {
-		sizeLabels = append(sizeLabels, label)
+	// Sort keys to ensure consistent column order by label
+	sortedKeys := make([]string, 0, len(uniqueValues))
+	for key := range uniqueValues {
+		sortedKeys = append(sortedKeys, key)
 	}
-	sort.Strings(sizeLabels)
+	sort.Slice(sortedKeys, func(i, j int) bool {
+		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+	})
 
-	columns := make([]ColumnDef, 0, len(sizeLabels))
-	for _, label := range sizeLabels {
-		sanitized := sanitizeFieldName(label)
+	columns := make([]ColumnDef, 0, len(sortedKeys))
+	for _, key := range sortedKeys {
+		value := uniqueValues[key]
+		groupIdentifier := sanitizeIdentifier(value.Code, value.Label)
+
 		colGroup := ColumnDef{
-			HeaderName:    label,
-			GroupID:       fmt.Sprintf("size_%s", sanitized),
+			HeaderName:    value.Label,
+			GroupID:       groupIdentifier,
 			OpenByDefault: boolPtr(true),
 			Children:      []ColumnDef{},
 		}
 
 		for _, colConfig := range pattern.Columns {
-			colGroup.Children = append(colGroup.Children, buildItem5ColumnDef(colConfig, sanitized))
+			colGroup.Children = append(colGroup.Children, buildItem5ColumnDef(colConfig, groupIdentifier))
 		}
 
 		for _, nestedGroup := range pattern.ColumnGroups {
-			colGroup.Children = append(colGroup.Children, buildItem5NestedGroup(nestedGroup, sanitized))
+			colGroup.Children = append(colGroup.Children, buildItem5NestedGroup(nestedGroup, groupIdentifier))
 		}
 
 		columns = append(columns, colGroup)

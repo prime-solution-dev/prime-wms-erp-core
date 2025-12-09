@@ -92,6 +92,7 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 		}
 
 		summaryRows := buildSummaryRows(pattern, rows)
+		summaryField := buildSummaryField(summaryRows)
 
 		tab := PriceListDetailTabConfig{
 			ID:    uuid.New(),
@@ -116,6 +117,7 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 			},
 			TableData:         tableData,
 			SummaryRows:       summaryRows,
+			SummaryField:      summaryField,
 			EditableSuffixes:  pattern.EditableSuffixes,
 			FetchableSuffixes: pattern.FetchableSuffixes,
 		}

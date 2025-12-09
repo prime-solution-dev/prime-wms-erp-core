@@ -36,7 +36,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
@@ -45,7 +45,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "od",
@@ -82,13 +82,13 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "extra_price_unit",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 130,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "remark",
@@ -101,7 +101,8 @@
           "headerName": "Inactive",
           "width": 120,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [],
@@ -186,18 +187,18 @@
         },
         {
           "headerName": "ขาย",
-          "groupId": "sale",
+          "groupId": "selling",
           "openByDefault": true,
           "children": [
             {
-              "field": "sale_fast",
+              "field": "selling_fast",
               "headerName": "เร็ว",
               "width": 110,
               "cellRenderer": "agCheckboxCellRenderer",
               "dataMapping": "fast"
             },
             {
-              "field": "sale_slow",
+              "field": "selling_slow",
               "headerName": "ช้า",
               "width": 110,
               "cellRenderer": "agCheckboxCellRenderer",
@@ -208,30 +209,18 @@
       ],
       "applicableCategories": [],
       "editable_suffixes": [
-        "row_number",
-        "weight_spec",
-        "avg_kg_stock",
-        "od",
-        "line_bundle",
-        "stock",
-        "import_date",
-        "ton",
-        "producer",
         "is_highlight",
-        "price_kg_after",
-        "price_line_after",
-        "extra_price_unit",
-        "sale_fast",
-        "sale_slow",
-        "note",
+        "line_bundle",
+        "price_kg_total_net_price_weight",
+        "price_line_total_net_price_unit",
+        "selling_fast",
+        "selling_slow",
+        "remark",
         "inactive"
       ],
       "fetchable_suffixes": [
-        "price_kg_before",
-        "price_kg_after",
-        "price_line_before",
-        "price_line_after",
-        "extra_price_unit"
+        "price_kg_total_net_price_weight",
+        "price_line_total_net_price_weight"
       ]
     }
   ],

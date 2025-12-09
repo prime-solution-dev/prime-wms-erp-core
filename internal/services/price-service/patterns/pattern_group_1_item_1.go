@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -47,80 +48,195 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(pattern, subGroups)
+			utils.PrintJSON(rowData)
 
-			// Merge rows with the same row_group_value into a single row
-			// This groups all column group columns into one row per row key
-			mergedRowMap := make(map[string]AGGridRowData)
+			// Regroup rows to prevent data loss when the same column_group_key appears
+			// multiple times for a given row_group_value (e.g., multiple subgroup_ids
+			// under the same PRODUCT_GROUP5 and thickness).
+			//
+			// Strategy:
+			//   1. Group raw rows by row_group_value.
+			//   2. Inside each row group, group again by column_group_key.
+			//   3. For each row group, compute the maximum number of entries across all
+			//      column groups (maxCount). Then build maxCount logical rows by taking
+			//      the i-th entry from each column group (if present) and merging their
+			//      column-specific fields into a single AGGrid row.
+			rowFields := strings.Split(pattern.Grouping.Rows, "|")
+
+			// 1) Group by row_group_value using the same composite logic as before
+			rowsByRowGroup := make(map[string][]AGGridRowData)
 			for _, row := range rowData {
-				rowGroupValue := fmt.Sprintf("%v", row["row_group_value"])
+				mergeKeyParts := make([]string, 0, len(rowFields))
+				for _, field := range rowFields {
+					fieldName := convertGroupCodeToFieldName(field)
+					if val, ok := row[fieldName]; ok {
+						valStr := strings.TrimSpace(fmt.Sprintf("%v", val))
+						if valStr != "" {
+							mergeKeyParts = append(mergeKeyParts, valStr)
+						}
+					}
+				}
+
+				rowGroupValue := strings.Join(mergeKeyParts, "|")
+				if rowGroupValue == "" {
+					if v, ok := row["row_group_value"]; ok {
+						rowGroupValue = strings.TrimSpace(fmt.Sprintf("%v", v))
+					}
+				}
 				if rowGroupValue == "" {
 					continue
 				}
 
-				mergedRow, exists := mergedRowMap[rowGroupValue]
-				if !exists {
-					// Create new merged row with common fields
-					mergedRow = make(AGGridRowData)
-					// Copy common fields (only once)
-					if val, ok := row["id"]; ok {
-						mergedRow["id"] = val
+				rowsByRowGroup[rowGroupValue] = append(rowsByRowGroup[rowGroupValue], row)
+			}
+
+			// Sort row_group_value keys for deterministic row order
+			rowGroupKeys := make([]string, 0, len(rowsByRowGroup))
+			for k := range rowsByRowGroup {
+				rowGroupKeys = append(rowGroupKeys, k)
+			}
+			sort.Strings(rowGroupKeys)
+
+			mergedRows := make([]AGGridRowData, 0, len(rowData))
+
+			for _, rowGroupValue := range rowGroupKeys {
+				groupRows := rowsByRowGroup[rowGroupValue]
+				if len(groupRows) == 0 {
+					continue
+				}
+
+				// 2) Group rows in this thickness group by column_group_key
+				columnsByKey := make(map[string][]AGGridRowData)
+				for _, row := range groupRows {
+					colKey := strings.TrimSpace(fmt.Sprintf("%v", row["column_group_key"]))
+					if colKey == "" {
+						continue
 					}
-					// Copy row grouping fields (these are the same for all rows being merged)
-					for _, field := range strings.Split(pattern.Grouping.Rows, "|") {
+					columnsByKey[colKey] = append(columnsByKey[colKey], row)
+				}
+
+				if len(columnsByKey) == 0 {
+					continue
+				}
+
+				// Sort column keys for deterministic merge order
+				columnKeys := make([]string, 0, len(columnsByKey))
+				for k := range columnsByKey {
+					columnKeys = append(columnKeys, k)
+				}
+				sort.Strings(columnKeys)
+
+				// Optional: sort each column's rows by its own row_number to keep visual order stable
+				for _, colKey := range columnKeys {
+					rowsForCol := columnsByKey[colKey]
+					rowNumberField := fmt.Sprintf("%s_row_number", colKey)
+					sort.SliceStable(rowsForCol, func(i, j int) bool {
+						vi, iOK := rowsForCol[i][rowNumberField]
+						vj, jOK := rowsForCol[j][rowNumberField]
+						if !iOK || !jOK {
+							return false
+						}
+						return fmt.Sprintf("%v", vi) < fmt.Sprintf("%v", vj)
+					})
+					columnsByKey[colKey] = rowsForCol
+				}
+
+				// 3) Determine how many logical rows we need for this row_group_value
+				maxCount := 0
+				for _, rowsForCol := range columnsByKey {
+					if len(rowsForCol) > maxCount {
+						maxCount = len(rowsForCol)
+					}
+				}
+				if maxCount == 0 {
+					continue
+				}
+
+				// Helper: get representative values for row grouping fields from the first row
+				baseRow := groupRows[0]
+
+				for i := 0; i < maxCount; i++ {
+					mergedRow := make(AGGridRowData)
+
+					// New id for each logical row
+					mergedRow["id"] = uuid.New().String()
+					mergedRow["row_group_value"] = rowGroupValue
+
+					// Copy row grouping fields (same for the whole thickness group)
+					for _, field := range rowFields {
 						fieldName := convertGroupCodeToFieldName(field)
-						if val, ok := row[fieldName]; ok {
+						if val, ok := baseRow[fieldName]; ok {
 							mergedRow[fieldName] = val
 						}
 					}
-					if val, ok := row["row_group_value"]; ok {
-						mergedRow["row_group_value"] = val
-					}
-					if val, ok := row["is_trading"]; ok {
-						mergedRow["is_trading"] = val
-					}
-					if val, ok := row["subgroup_id"]; ok {
-						mergedRow["subgroup_id"] = val
-					}
-				}
 
-				// Merge all column-specific fields from this row
-				for key, value := range row {
-					// Skip common fields that we already set (these have the same value across all rows being merged)
-					if key == "id" || key == "row_group_value" || key == "is_trading" || key == "subgroup_id" {
-						continue
-					}
-					// Skip row grouping fields
-					skipField := false
-					for _, field := range strings.Split(pattern.Grouping.Rows, "|") {
-						fieldName := convertGroupCodeToFieldName(field)
-						if key == fieldName {
-							skipField = true
-							break
+					// Track whether we've set top-level subgroup_id / is_trading
+					mainSubgroupSet := false
+
+					// Merge column-specific data for each PRODUCT_GROUP5 column
+					for _, colKey := range columnKeys {
+						rowsForCol := columnsByKey[colKey]
+						if len(rowsForCol) <= i {
+							continue
+						}
+						src := rowsForCol[i]
+
+						// Preserve a representative column_group_key/value (first non-empty wins)
+						if _, ok := mergedRow["column_group_key"]; !ok {
+							if v, ok := src["column_group_key"]; ok {
+								mergedRow["column_group_key"] = v
+							}
+						}
+						if _, ok := mergedRow["column_group_value"]; !ok {
+							if v, ok := src["column_group_value"]; ok {
+								mergedRow["column_group_value"] = v
+							}
+						}
+
+						for key, value := range src {
+							// Skip fields that are common or handled separately
+							if key == "id" || key == "row_group_value" ||
+								key == "column_group_key" || key == "column_group_value" {
+								continue
+							}
+
+							// Skip row grouping fields
+							skipField := false
+							for _, field := range rowFields {
+								fieldName := convertGroupCodeToFieldName(field)
+								if key == fieldName {
+									skipField = true
+									break
+								}
+							}
+							if skipField {
+								continue
+							}
+
+							// Set top-level subgroup_id / is_trading from the first column that has them
+							if !mainSubgroupSet && (key == "subgroup_id" || key == "is_trading") {
+								mergedRow[key] = value
+								if key == "subgroup_id" {
+									mainSubgroupSet = true
+								}
+								continue
+							}
+							if key == "subgroup_id" || key == "is_trading" {
+								// Other occurrences of these keys are column-specific; keep them as-is
+								mergedRow[key] = value
+								continue
+							}
+
+							// Copy all remaining fields (column group–specific fields, tooltips, UDFs, etc.)
+							mergedRow[key] = value
 						}
 					}
-					if skipField {
-						continue
-					}
-					// For column_group_key and column_group_value, keep the last value (they differ per column group)
-					// This maintains some metadata while avoiding true duplicates
-					if key == "column_group_key" || key == "column_group_value" {
-						mergedRow[key] = value
-						continue
-					}
-					// Copy all other fields (column group specific fields)
-					mergedRow[key] = value
+
+					mergedRows = append(mergedRows, mergedRow)
 				}
-
-				mergedRowMap[rowGroupValue] = mergedRow
 			}
 
-			// Convert merged rows to slice and sort
-			mergedRows := make([]AGGridRowData, 0, len(mergedRowMap))
-			for _, row := range mergedRowMap {
-				mergedRows = append(mergedRows, row)
-			}
-
-			// Sort merged rows by row_group_value
+			// Sort final merged rows by row_group_value to keep the previous behavior
 			sort.SliceStable(mergedRows, func(i, j int) bool {
 				rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
 				rowGroupJ := fmt.Sprintf("%v", mergedRows[j]["row_group_value"])
@@ -163,8 +279,9 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 						},
 						Columns: columns,
 					},
-					TableData:        tableData,
-					EditableSuffixes: pattern.EditableSuffixes,
+					TableData:         tableData,
+					EditableSuffixes:  pattern.EditableSuffixes,
+					FetchableSuffixes: pattern.FetchableSuffixes,
 				},
 				patternID:     pattern.ID,
 				patternIdx:    patternIdx,
