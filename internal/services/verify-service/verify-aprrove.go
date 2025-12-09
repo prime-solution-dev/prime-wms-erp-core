@@ -125,7 +125,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	inventoryReq.CompanyCode = req.CompanyCode
 	inventoryReq.SiteCode = req.SiteCode
 	inventoryReq.StorageTypes = req.StorageType
-	inventoryReq.ToDate = &req.SaleDate
+	//inventoryReq.ToDate = &req.SaleDate
 
 	for _, document := range req.Documents {
 		//Build Res
@@ -294,14 +294,14 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	if req.IsVerifyInventory {
 		res.IsPassInventory = true
 
-		// invenRes, err := VerifyInventoryLogic(inventoryReq)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		invenRes, err := VerifyInventoryLogic(inventoryReq)
+		if err != nil {
+			return nil, err
+		}
 
-		// if res.IsPassInventory && !invenRes.IsPassInventory {
-		// 	res.IsPassInventory = false
-		// }
+		if res.IsPassInventory && !invenRes.IsPassInventory {
+			res.IsPassInventory = false
+		}
 	}
 
 	return &res, nil

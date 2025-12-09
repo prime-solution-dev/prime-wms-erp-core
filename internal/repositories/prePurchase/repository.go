@@ -85,10 +85,15 @@ func GetPOBigLotList(
 		Preload("PrePurchaseItems").
 		Order(`
         CASE
-            WHEN status_approve = 'PENDING' AND status = 'PENDING' THEN 1
-            WHEN status_approve = 'PROCESS' THEN 2
-            WHEN status_approve = 'COMPLETED' THEN 3
-            ELSE 4
+            WHEN status = 'PENDING' AND status_approve = 'PENDING' THEN 1
+            WHEN status = 'PENDING' AND status_approve = 'PROCESS' THEN 2
+            WHEN status = 'PENDING' AND status_approve = 'COMPLETED' THEN 3
+						WHEN status = 'PENDING' AND status_approve = 'REVIEW' THEN 4
+						WHEN status = 'PENDING' AND status_approve = 'REJECT' THEN 5
+						WHEN status = 'CANCELLED' THEN 6
+						WHEN status = 'COMPLETED' THEN 7
+						WHEN status = 'TEMP' THEN 8
+						ELSE 9
         END ASC,
 				create_dtm DESC
     `).

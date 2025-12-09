@@ -31,6 +31,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
+          "spanRows": true,
           "cellStyle": {
             "fontWeight": "600"
           }
@@ -81,13 +82,13 @@
           "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "total_net_price_weight",
+          "field": "extra_price_weight",
           "headerName": "Extra",
           "width": 110,
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "weight_spec",
@@ -111,7 +112,7 @@
           "field": "institute",
           "headerName": "สถาบัน",
           "width": 140,
-          "dataMapping": "warehouse"
+          "dataMapping": "institute"
         },
         {
           "field": "stock",
@@ -184,7 +185,8 @@
           "headerName": "Inactive",
           "width": 120,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "applicableCategories": [
@@ -231,14 +233,14 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {
       "suppressMovableColumns": false,
-      "suppressMenuHide": true,
-      "enableCellSpan": false
+      "suppressMenuHide": false,
+      "enableCellSpan": true
     }
   },
   "metadata": {

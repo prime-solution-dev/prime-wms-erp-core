@@ -12,35 +12,35 @@
       },
       "columns": [
         {
-          "field": "grade",
+          "field": "product_group_3",
           "headerName": "เกรด",
-          "width": 80,
+          "width": 50,
           "dataMapping": "product_group_3"
         },
         {
           "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
-          "width": 100,
+          "width": 50,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_unit",
+          "field": "before_price_weight",
           "headerName": "ราคาขาย Before",
-          "width": 130,
+          "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_unit"
+          "dataMapping": "before_price_weight"
         },
         {
-          "field": "total_net_price_unit",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย After",
-          "width": 130,
+          "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_unit"
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "extra",
@@ -49,28 +49,19 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight",
-          "headerName": "น.น.",
-          "width": 80,
-          "cellStyle": {
-            "textAlign": "left"
-          },
-          "dataMapping": "price_weight"
-        },
-        {
-          "field": "price_weight",
+          "field": "weight_spec",
           "headerName": "Weight-spec",
-          "width": 170,
-          "dataMapping": "price_weight"
+          "width": 150,
+          "dataMapping": ""
         },
         {
-          "field": "total_net_price_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
-          "width": 170,
-          "dataMapping": "total_net_price_weight"
+          "width": 150,
+          "dataMapping": ""
         },
         {
           "field": "remark",
@@ -83,41 +74,44 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [
         {
           "field": "#",
           "headerName": "#",
-          "width": 60,
+          "width": 40,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
           "cellStyle": {
-            "textAlign": "center",
-            "fontWeight": "500"
+            "textAlign": "left"
           }
         },
         {
           "field": "product_group_6",
           "headerName": "แผ่น mm.",
-          "width": 120,
+          "width": 100,
           "pinned": "left",
           "lockPosition": true,
+          "spanRows": true,
           "suppressMovable": true,
           "cellStyle": {
-            "fontWeight": "600"
+            "textAlign": "left"
           }
         }
       ],
       "applicableCategories": ["หมวดเหล็กแผ่น"],
-      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "inactive",
+        "total_net_price_weight", 
+        "remark"],
       "fetchable_suffixes": [
-        "price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
+        "total_net_price_weight"
       ]
     },
     {
@@ -130,31 +124,37 @@
         "rows": "PRODUCT_GROUP6",
         "columnGroups": "PRODUCT_GROUP5"
       },
-      "columns": [
+      "columns": [ 
+        {
+        "field": "product_group_3",
+        "headerName": "เกรด",
+        "width": 50,
+        "dataMapping": "product_group_3"
+        },
         {
           "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
-          "width": 100,
+          "width": 50,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_unit",
+          "field": "before_price_weight",
           "headerName": "ราคาขาย Before",
-          "width": 130,
+          "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_unit"
+          "dataMapping": "before_price_weight"
         },
         {
-          "field": "total_net_price_unit",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย After",
-          "width": 130,
+          "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_unit"
+          "dataMapping": "total_net_price_weight"
         },
         {
           "field": "extra",
@@ -163,28 +163,19 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight",
-          "headerName": "น.น.",
-          "width": 80,
-          "cellStyle": {
-            "textAlign": "left"
-          },
-          "dataMapping": "price_weight"
-        },
-        {
-          "field": "price_weight",
+          "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
-          "field": "total_net_price_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "remark",
@@ -197,7 +188,8 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [
@@ -210,8 +202,7 @@
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
           "cellStyle": {
-            "textAlign": "center",
-            "fontWeight": "500"
+            "textAlign": "left"
           }
         },
         {
@@ -220,18 +211,21 @@
           "width": 120,
           "pinned": "left",
           "lockPosition": true,
+          "spanRows": true,
           "suppressMovable": true,
           "cellStyle": {
-            "fontWeight": "600"
+            "textAlign": "left"
           }
         }
       ],
       "applicableCategories": ["หมวดเหล็กแผ่นลาย"],
-      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "total_net_price_weight", 
+        "inactive",
+        "remark"],
       "fetchable_suffixes": [
-        "price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
+        "total_net_price_weight"
       ]
     },
     {
@@ -276,53 +270,44 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "price_unit",
-          "headerName": "ราคาขาย before",
+          "field": "before_price_weight",
+          "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_unit"
+          "dataMapping": "before_price_weight"
         },
         {
-          "field": "total_net_price_unit",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย After",
           "width": 130,
           "enableTooltip": true,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_unit"
+          "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "extra",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight",
-          "headerName": "น.น.",
-          "width": 80,
-          "cellStyle": {
-            "textAlign": "left"
-          },
-          "dataMapping": "price_weight"
-        },
-        {
-          "field": "price_weight",
+          "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
-          "field": "total_net_price_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "remark",
@@ -335,7 +320,8 @@
           "headerName": "Inactive",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "fixedColumns": [
@@ -354,11 +340,13 @@
         }
       ],
       "applicableCategories": ["เหล็กแผ่น special"],
-      "editable_suffixes": ["is_highlight", "total_net_price_unit", "remark"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "total_net_price_weight", 
+        "inactive",
+        "remark"],
       "fetchable_suffixes": [
-        "price_unit",
-        "total_net_price_unit",
-        "extra_price_unit"
+        "total_net_price_weight"
       ]
     }
   ],
@@ -375,7 +363,8 @@
     },
     "gridOptions": {
       "suppressMovableColumns": false,
-      "suppressMenuHide": false
+      "suppressMenuHide": false,
+      "enableCellSpan": true
     }
   },
   "metadata": {
