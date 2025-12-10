@@ -43,7 +43,7 @@
           "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "extra",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
@@ -109,9 +109,11 @@
         "is_highlight", 
         "inactive",
         "total_net_price_weight", 
-        "remark"],
+        "remark"
+      ],
       "fetchable_suffixes": [
-        "total_net_price_weight"
+        "total_net_price_weight",
+        "extra_price_weight"
       ]
     },
     {
@@ -157,7 +159,7 @@
           "dataMapping": "total_net_price_weight"
         },
         {
-          "field": "extra",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
@@ -223,9 +225,11 @@
         "is_highlight", 
         "total_net_price_weight", 
         "inactive",
-        "remark"],
+        "remark"
+      ],
       "fetchable_suffixes": [
-        "total_net_price_weight"
+        "total_net_price_weight",
+        "extra_price_weight"
       ]
     },
     {
@@ -344,9 +348,11 @@
         "is_highlight", 
         "total_net_price_weight", 
         "inactive",
-        "remark"],
+        "remark"
+      ],
       "fetchable_suffixes": [
-        "total_net_price_weight"
+        "total_net_price_weight",
+        "extra_price_weight"
       ]
     }
   ],

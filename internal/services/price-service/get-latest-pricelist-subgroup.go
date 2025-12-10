@@ -52,7 +52,7 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			}
 		}
 
-		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCode(subGroup.SubgroupKey)
+		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCode(subGroup.SubGroupCode)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 		}
@@ -61,6 +61,8 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			Id:                  subGroup.ID.String(),
 			TotalNetPriceUnit:   subGroup.TotalNetPriceUnit,
 			TotalNetPriceWeight: subGroup.TotalNetPriceWeight,
+			ExtraPriceUnit:      subGroup.ExtraPriceUnit,
+			ExtraPriceWeight:    subGroup.ExtraPriceWeight,
 			DefaultUom:          "kg",
 		}
 
@@ -96,7 +98,10 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 				priceData := priceDomain.PriceData{
 					BasePrice:  subGroup.PriceListGroup.PriceUnit,
 					Extra:      subGroup.ExtraPriceUnit,
-					AvgKgStock: 0,
+					AvgKgStock: 0, // TODO: get avg kg stock from stock
+					WeightSpec: 0, // TODO: get weight spec from product
+					Pcs:        0, // TODO: get pcs from product
+					Kg:         0, // TODO: get kg from product
 				}
 
 				priceFormula := priceDomain.PriceFormula{
@@ -117,7 +122,10 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 				priceData := priceDomain.PriceData{
 					BasePrice:  subGroup.PriceListGroup.PriceWeight,
 					Extra:      subGroup.ExtraPriceWeight,
-					AvgKgStock: 0,
+					AvgKgStock: 0, // TODO: get avg kg stock from stock
+					WeightSpec: 0, // TODO: get weight spec from product
+					Pcs:        0, // TODO: get pcs from product
+					Kg:         0, // TODO: get kg from product
 				}
 				priceFormula := priceDomain.PriceFormula{
 					Expression: formula.PriceListFormulas.Expression,
@@ -160,6 +168,9 @@ func CalculatePrice(formula priceDomain.PriceFormula, priceData priceDomain.Pric
 		"base_price":   priceData.BasePrice,
 		"extra":        priceData.Extra,
 		"avg_kg_stock": priceData.AvgKgStock,
+		"weight_spec":  priceData.WeightSpec,
+		"pcs":          priceData.Pcs,
+		"kg":           priceData.Kg,
 	}
 
 	// รวม params → env

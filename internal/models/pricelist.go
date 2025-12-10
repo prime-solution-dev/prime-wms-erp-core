@@ -114,7 +114,7 @@ func (PriceListExtraConfig) TableName() string { return "price_list_extra_config
 type PriceListSubGroup struct {
 	ID                        uuid.UUID              `json:"id"`
 	PriceListGroupID          uuid.UUID              `json:"price_list_group_id"`
-	SubGroupCode              string                 `json:"sub_group_code"`
+	SubGroupCode              string                 `json:"subgroup_code"`
 	SubgroupKey               string                 `json:"subgroup_key"`
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
@@ -447,7 +447,7 @@ func (PriceListFormulas) TableName() string { return "price_list_formulas" }
 
 type PriceListSubGroupFormulasMap struct {
 	ID                    uuid.UUID         `json:"id" gorm:"primary_key;not null"`
-	PriceListSubGroupCode string            `json:"price_list_sub_group_code" gorm:"not null"`
+	PriceListSubGroupCode string            `json:"price_list_subgroup_code" gorm:"not null"`
 	PriceListFormulasCode string            `json:"price_list_formulas_code" gorm:"not null"`
 	IsDefault             bool              `json:"is_default" gorm:"default:false"`
 	CreateDtm             time.Time         `json:"create_dtm"`

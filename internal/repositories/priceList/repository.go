@@ -425,7 +425,7 @@ func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]model
 	// get the latest price list formulas
 	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
 	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
-		Where("price_list_sub_group_code = ?", subGroupCode).
+		Where("price_list_subgroup_code = ?", subGroupCode).
 		Order("create_dtm DESC").
 		Preload("PriceListFormulas").
 		Find(&priceListSubGroupFormulasMap).Error; err != nil {
