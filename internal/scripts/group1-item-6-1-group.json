@@ -1,0 +1,682 @@
+[
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_27"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_27"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_28"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_29"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_29"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_29"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_31"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_32"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_33"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_34"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_35"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_36"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_37"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_38"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_39"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_40"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_41"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_42"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_43"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_44"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_45"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_46"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_46"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_47"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_48"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_49"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_50"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_51"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_52"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_53"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_54"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_55"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_56"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_11"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_11"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_11"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_11"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_7"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_27"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_27"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_2"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_46"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_5"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_46"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_6"
+    ]
+  },
+  {
+    "PRODUCT_GROUP1": [
+      "GROUP_1_ITEM_6"
+    ],
+    "PRODUCT_GROUP2": [
+      "GROUP_2_ITEM_4"
+    ],
+    "PRODUCT_GROUP3": [
+      "GROUP_3_ITEM_7"
+    ],
+    "PRODUCT_GROUP4": [
+      "GROUP_4_ITEM_11"
+    ],
+    "PRODUCT_GROUP7": [
+      "GROUP_7_ITEM_1"
+    ]
+  }
+]

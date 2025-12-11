@@ -414,22 +414,3 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 		return nil
 	})
 }
-
-func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]models.PriceListSubGroupFormulasMap, error) {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return []models.PriceListSubGroupFormulasMap{}, err
-	}
-	defer db.CloseGORM(gormx)
-
-	// get the latest price list formulas
-	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
-	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
-		Where("price_list_subgroup_code = ?", subGroupCode).
-		Order("create_dtm DESC").
-		Preload("PriceListFormulas").
-		Find(&priceListSubGroupFormulasMap).Error; err != nil {
-		return priceListSubGroupFormulasMap, err
-	}
-	return priceListSubGroupFormulasMap, nil
-}
