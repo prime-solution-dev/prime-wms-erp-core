@@ -680,6 +680,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		var batchNoValue interface{}
 		var warehouseValue interface{}
 		var codeValue interface{}
+		// Track which awaiting_production and selling fields were found
+		hasAwaitingProductionImportDate := false
+		hasAwaitingProductionTon := false
+		hasAwaitingProductionProducer := false
+		hasSellingFast := false
+		hasSellingSlow := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -707,6 +713,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				if code, ok := udfData["code"]; ok {
 					codeValue = code
 				}
+
 				for key, value := range udfData {
 					if key == "is_highlight" || key == "inactive" || key == "stock_quantity" || key == "batch_no" || key == "warehouse" || key == "code" {
 						continue
@@ -716,30 +723,40 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 						stockValue = value
 					}
 
-					if key == "awaiting_production" {
-						if apMap, ok := value.(map[string]interface{}); ok {
-							if importDate, ok := apMap["import_date"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("import_date"))] = importDate
-							}
-							if ton, ok := apMap["ton"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("ton"))] = ton
-							}
-							if producer, ok := apMap["producer"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("producer"))] = producer
-							}
-						}
+					// Handle awaiting_production fields directly from udf_json
+					if key == "awaiting_production_import_date" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
+						hasAwaitingProductionImportDate = true
+						continue
+					}
+					if key == "awaiting_production_ton" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
+						hasAwaitingProductionTon = true
+						continue
+					}
+					if key == "awaiting_production_producer" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
+						hasAwaitingProductionProducer = true
 						continue
 					}
 
-					if key == "selling" {
-						if sellingMap, ok := value.(map[string]interface{}); ok {
-							if selling_fast, ok := sellingMap["selling_fast"]; ok {
-								row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = selling_fast
-							}
-							if slow, ok := sellingMap["slow"]; ok {
-								row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("slow"))] = slow
-							}
+					// Handle selling fields directly from udf_json
+					if key == "selling_fast" {
+						if sellingFast, ok := value.(bool); ok {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
+						} else {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 						}
+						hasSellingFast = true
+						continue
+					}
+					if key == "selling_slow" {
+						if sellingSlow, ok := value.(bool); ok {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
+						} else {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+						}
+						hasSellingSlow = true
 						continue
 					}
 
@@ -762,6 +779,25 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 					}
 				}
 			}
+		}
+
+		// Set default values for awaiting_production fields if they weren't found in udf_json
+		if !hasAwaitingProductionImportDate {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
+		}
+		if !hasAwaitingProductionTon {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
+		}
+		if !hasAwaitingProductionProducer {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
+		}
+
+		// Set default values for selling fields if they weren't found in udf_json
+		if !hasSellingFast {
+			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+		}
+		if !hasSellingSlow {
+			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 		}
 
 		row["is_highlight"] = isHighlightValue
@@ -940,10 +976,12 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var shipNoValue interface{}
 		var tsmValue interface{}
 		var instituteValue interface{}
-		selling_fastValue := false
-		slowValue := false
-		hasFastValue := false
-		hasSlowValue := false
+		var sellingFastValue bool
+		var sellingSlowValue bool
+		var awaitingProductionImportDateValue interface{}
+		var awaitingProductionDeliveryDateValue interface{}
+		var awaitingProductionTonValue interface{}
+		var awaitingProductionProducerValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -1017,37 +1055,25 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if institute, ok := udfData["institute"]; ok {
 					instituteValue = institute
 				}
-				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
-					if importDate, ok := apMap["import_date"]; ok {
-						importDateValue = importDate
-					}
-					if deliveryDate, ok := apMap["delivery_date"]; ok {
-						deliveryDateValue = deliveryDate
-					}
-					if ton, ok := apMap["ton"]; ok {
-						tonValue = ton
-					}
-					if producer, ok := apMap["producer"]; ok {
-						producerValue = producer
-					}
+				// Extract awaiting_production fields directly from udf_json
+				if awaiting_production_import_date, ok := udfData["awaiting_production_import_date"]; ok {
+					awaitingProductionImportDateValue = awaiting_production_import_date
 				}
+				if awaiting_production_delivery_date, ok := udfData["awaiting_production_delivery_date"]; ok {
+					awaitingProductionDeliveryDateValue = awaiting_production_delivery_date
+				}
+				if awaiting_production_ton, ok := udfData["awaiting_production_ton"]; ok {
+					awaitingProductionTonValue = awaiting_production_ton
+				}
+				if awaiting_production_producer, ok := udfData["awaiting_production_producer"]; ok {
+					awaitingProductionProducerValue = awaiting_production_producer
+				}
+				// Extract selling fields directly from udf_json
 				if selling_fast, ok := udfData["selling_fast"].(bool); ok {
-					selling_fastValue = selling_fast
-					hasFastValue = true
+					sellingFastValue = selling_fast
 				}
-				if slow, ok := udfData["slow"].(bool); ok {
-					slowValue = slow
-					hasSlowValue = true
-				}
-				if sellingMap, ok := udfData["selling"].(map[string]interface{}); ok {
-					if selling_fast, ok := sellingMap["selling_fast"].(bool); ok {
-						selling_fastValue = selling_fast
-						hasFastValue = true
-					}
-					if slow, ok := sellingMap["slow"].(bool); ok {
-						slowValue = slow
-						hasSlowValue = true
-					}
+				if selling_slow, ok := udfData["selling_slow"].(bool); ok {
+					sellingSlowValue = selling_slow
 				}
 			}
 		}
@@ -1151,6 +1177,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 
 		for _, colGroup := range pattern.ColumnGroups {
 			for _, childCol := range colGroup.Children {
+				var valueToUse interface{}
 				switch childCol.DataMapping {
 				case "before_price_weight":
 					row[childCol.Field] = sg.BeforePriceWeight
@@ -1161,24 +1188,60 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				case "total_net_price_unit":
 					row[childCol.Field] = sg.TotalNetPriceUnit
 				case "import_date":
-					row[childCol.Field] = importDateValue
-				case "delivery_date":
-					row[childCol.Field] = deliveryDateValue
-				case "ton":
-					row[childCol.Field] = tonValue
-				case "producer":
-					row[childCol.Field] = producerValue
-				case "selling_fast":
-					if hasFastValue {
-						row[childCol.Field] = selling_fastValue
+					if childCol.Field == "awaiting_production_import_date" {
+						valueToUse = awaitingProductionImportDateValue
 					} else {
-						row[childCol.Field] = false
+						valueToUse = importDateValue
 					}
-				case "slow":
-					if hasSlowValue {
-						row[childCol.Field] = slowValue
+					row[childCol.Field] = valueToUse
+				case "delivery_date":
+					if childCol.Field == "awaiting_production_delivery_date" {
+						valueToUse = awaitingProductionDeliveryDateValue
 					} else {
-						row[childCol.Field] = false
+						valueToUse = deliveryDateValue
+					}
+					row[childCol.Field] = valueToUse
+				case "ton":
+					if childCol.Field == "awaiting_production_ton" {
+						valueToUse = awaitingProductionTonValue
+					} else {
+						valueToUse = tonValue
+					}
+					row[childCol.Field] = valueToUse
+				case "producer":
+					if childCol.Field == "awaiting_production_producer" {
+						valueToUse = awaitingProductionProducerValue
+					} else {
+						valueToUse = producerValue
+					}
+					row[childCol.Field] = valueToUse
+				case "fast", "selling_fast":
+					row[childCol.Field] = sellingFastValue
+				case "slow", "selling_slow":
+					row[childCol.Field] = sellingSlowValue
+				case "awaiting_production_import_date":
+					if awaitingProductionImportDateValue != nil {
+						row[childCol.Field] = awaitingProductionImportDateValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_delivery_date":
+					if awaitingProductionDeliveryDateValue != nil {
+						row[childCol.Field] = awaitingProductionDeliveryDateValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_ton":
+					if awaitingProductionTonValue != nil {
+						row[childCol.Field] = awaitingProductionTonValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_producer":
+					if awaitingProductionProducerValue != nil {
+						row[childCol.Field] = awaitingProductionProducerValue
+					} else {
+						row[childCol.Field] = nil
 					}
 				}
 			}
@@ -1217,47 +1280,107 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			case "remark":
 				row[colConfig.Field] = sg.Remark
 			case "od":
-				row[colConfig.Field] = odValue
+				if odValue != nil {
+					row[colConfig.Field] = odValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "stock":
-				row[colConfig.Field] = stockValue
+				if stockValue != nil {
+					row[colConfig.Field] = stockValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "import_date":
-				row[colConfig.Field] = importDateValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_import_date" {
+					valueToUse = awaitingProductionImportDateValue
+				} else {
+					valueToUse = importDateValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "delivery_date":
-				row[colConfig.Field] = deliveryDateValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_delivery_date" {
+					valueToUse = awaitingProductionDeliveryDateValue
+				} else {
+					valueToUse = deliveryDateValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "ton":
-				row[colConfig.Field] = tonValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_ton" {
+					valueToUse = awaitingProductionTonValue
+				} else {
+					valueToUse = tonValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "producer":
-				row[colConfig.Field] = producerValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_producer" {
+					valueToUse = awaitingProductionProducerValue
+				} else {
+					valueToUse = producerValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "tsm":
-				row[colConfig.Field] = tsmValue
+				if tsmValue != nil {
+					row[colConfig.Field] = tsmValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "selling_fast":
-				if hasFastValue {
-					row[colConfig.Field] = selling_fastValue
-				} else {
-					row[colConfig.Field] = false
-				}
-			case "slow":
-				if hasSlowValue {
-					row[colConfig.Field] = slowValue
-				} else {
-					row[colConfig.Field] = false
-				}
+				row[colConfig.Field] = sellingFastValue
+			case "selling_slow":
+				row[colConfig.Field] = sellingSlowValue
 			case "stock_quantity":
-				row[colConfig.Field] = stockQuantityValue
+				if stockQuantityValue != nil {
+					row[colConfig.Field] = stockQuantityValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "batch_no":
-				row[colConfig.Field] = batchNoValue
+				if batchNoValue != nil {
+					row[colConfig.Field] = batchNoValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "warehouse":
-				row[colConfig.Field] = warehouseValue
+				if warehouseValue != nil {
+					row[colConfig.Field] = warehouseValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "code":
-				row[colConfig.Field] = codeValue
+				if codeValue != nil {
+					row[colConfig.Field] = codeValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "bkk":
-				row[colConfig.Field] = bkkValue
+				if bkkValue != nil {
+					row[colConfig.Field] = bkkValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "factory":
-				row[colConfig.Field] = factoryValue
+				if factoryValue != nil {
+					row[colConfig.Field] = factoryValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "country":
-				row[colConfig.Field] = countryValue
+				if countryValue != nil {
+					row[colConfig.Field] = countryValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "institute":
-				row[colConfig.Field] = instituteValue
+				if instituteValue != nil {
+					row[colConfig.Field] = instituteValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "is_highlight":
 				row[colConfig.Field] = isHighlightValue
 			case "inactive":
@@ -1265,6 +1388,30 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[colConfig.Field] = inactiveValue
 				} else {
 					row[colConfig.Field] = false
+				}
+			case "awaiting_production_ton":
+				if awaitingProductionTonValue != nil {
+					row[colConfig.Field] = awaitingProductionTonValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_producer":
+				if awaitingProductionProducerValue != nil {
+					row[colConfig.Field] = awaitingProductionProducerValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_import_date":
+				if awaitingProductionImportDateValue != nil {
+					row[colConfig.Field] = awaitingProductionImportDateValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_delivery_date":
+				if awaitingProductionDeliveryDateValue != nil {
+					row[colConfig.Field] = awaitingProductionDeliveryDateValue
+				} else {
+					row[colConfig.Field] = nil
 				}
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields

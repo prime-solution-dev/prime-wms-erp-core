@@ -114,6 +114,7 @@ func (PriceListExtraConfig) TableName() string { return "price_list_extra_config
 type PriceListSubGroup struct {
 	ID                        uuid.UUID              `json:"id"`
 	PriceListGroupID          uuid.UUID              `json:"price_list_group_id"`
+	SubGroupCode              string                 `json:"subgroup_code"`
 	SubgroupKey               string                 `json:"subgroup_key"`
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
@@ -432,6 +433,7 @@ type UpdatePriceListExtraRequest struct {
 
 type PriceListFormulas struct {
 	ID          uuid.UUID       `json:"id" gorm:"primary_key;not null"`
+	FormulaCode string          `json:"formula_code" gorm:"not null"`
 	Name        string          `json:"name" gorm:"not null"`
 	Uom         string          `json:"uom" gorm:"not null"`
 	FormulaType string          `json:"formula_type" gorm:"not null"`
@@ -444,13 +446,13 @@ type PriceListFormulas struct {
 func (PriceListFormulas) TableName() string { return "price_list_formulas" }
 
 type PriceListSubGroupFormulasMap struct {
-	ID                  uuid.UUID         `json:"id" gorm:"primary_key;not null"`
-	PriceListSubGroupID uuid.UUID         `json:"price_list_sub_group_id" gorm:"not null"`
-	PriceListFormulasID uuid.UUID         `json:"price_list_formulas_id" gorm:"not null"`
-	IsDefault           bool              `json:"is_default" gorm:"default:false"`
-	CreateDtm           time.Time         `json:"create_dtm"`
-	PriceListFormulas   PriceListFormulas `gorm:"foreignKey:PriceListFormulasID;references:ID" json:"price_list_formulas"`
-	PriceListSubGroup   PriceListSubGroup `gorm:"foreignKey:PriceListSubGroupID;references:ID" json:"price_list_sub_group"`
+	ID                    uuid.UUID         `json:"id" gorm:"primary_key;not null"`
+	PriceListSubGroupCode string            `json:"price_list_subgroup_code" gorm:"not null"`
+	PriceListFormulasCode string            `json:"price_list_formulas_code" gorm:"not null"`
+	IsDefault             bool              `json:"is_default" gorm:"default:false"`
+	CreateDtm             time.Time         `json:"create_dtm"`
+	PriceListFormulas     PriceListFormulas `gorm:"foreignKey:PriceListFormulasCode;references:FormulaCode" json:"price_list_formulas"`
+	PriceListSubGroup     PriceListSubGroup `gorm:"foreignKey:PriceListSubGroupCode;references:SubgroupKey" json:"price_list_sub_group"`
 }
 
 func (PriceListSubGroupFormulasMap) TableName() string {
