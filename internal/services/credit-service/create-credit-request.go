@@ -22,11 +22,11 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	creditRequestValue := []models.CreditRequest{}
 	approvalValue := []models.Approval{}
 	approvalIDForReturn := []uuid.UUID{}
-	createdAt := time.Now()
+	//createdAt := time.Now()
 	for i := range req {
 		creditID := uuid.New()
 		req[i].ID = creditID
-		req[i].ActionDate = &createdAt
+		//req[i].ActionDate = &createdAt
 
 		approvalIDForReturn = append(approvalIDForReturn, creditID)
 
