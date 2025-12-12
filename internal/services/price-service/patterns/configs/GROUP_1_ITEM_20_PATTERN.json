@@ -44,7 +44,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_2",
+          "dataMapping": "PRODUCT_GROUP2",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -58,7 +58,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_1",
+          "dataMapping": "PRODUCT_GROUP1",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -66,20 +66,20 @@
           }
         },
         {
-          "field": "type",
+          "field": "product_group_8",
           "headerName": "Type",
           "width": 120,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_8",
+          "dataMapping": "PRODUCT_GROUP8",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center"
           }
         },
         {
-          "field": "size",
+          "field": "item",
           "headerName": "ขนาด",
           "width": 140,
           "pinned": "left",

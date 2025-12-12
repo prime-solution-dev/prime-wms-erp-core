@@ -244,6 +244,71 @@ func ExtractRequiredGroupCodes(config *PriceTableConfiguration) []string {
 	return result
 }
 
+// convertDataMappingToGroupCode converts a dataMapping value to a group code format.
+// Handles both "product_group_2" -> "PRODUCT_GROUP2" and "PRODUCT_GROUP2" -> "PRODUCT_GROUP2"
+// Returns empty string if the dataMapping is not a product group reference.
+func convertDataMappingToGroupCode(dataMapping string) string {
+	if dataMapping == "" {
+		return ""
+	}
+
+	// If already in uppercase format (PRODUCT_GROUP2), return as is
+	if strings.HasPrefix(dataMapping, "PRODUCT_GROUP") {
+		return dataMapping
+	}
+
+	// Convert lowercase format (product_group_2) to uppercase (PRODUCT_GROUP2)
+	if strings.HasPrefix(dataMapping, "product_group_") {
+		parts := strings.Split(dataMapping, "_")
+		if len(parts) >= 3 {
+			// Extract the number part (e.g., "2" from "product_group_2")
+			groupNum := parts[2]
+			return fmt.Sprintf("PRODUCT_GROUP%s", groupNum)
+		}
+	}
+
+	// For composite fields or other mappings, return empty string
+	// The caller should handle these separately
+	return ""
+}
+
+// extractGroupCodesFromCompositeMapping extracts group codes from composite dataMapping values.
+// For example, "product_group_6_x_product_group_7" returns ["PRODUCT_GROUP6", "PRODUCT_GROUP7"]
+func extractGroupCodesFromCompositeMapping(dataMapping string) []string {
+	if dataMapping == "" {
+		return nil
+	}
+
+	// Handle composite fields like "product_group_6_x_product_group_7" or "product_group_4_x_product_group_3"
+	if strings.Contains(dataMapping, "_x_") {
+		parts := strings.Split(dataMapping, "_x_")
+		if len(parts) == 2 {
+			code1 := convertDataMappingToGroupCode(parts[0])
+			code2 := convertDataMappingToGroupCode(parts[1])
+			if code1 != "" && code2 != "" {
+				return []string{code1, code2}
+			}
+		}
+	}
+
+	// Handle composite fields without separator like "product_group_5_product_group_3"
+	// This is trickier - we need to find where one group code ends and another begins
+	// Pattern: product_group_<num>product_group_<num>
+	re := regexp.MustCompile(`product_group_(\d+)`)
+	matches := re.FindAllStringSubmatch(dataMapping, -1)
+	if len(matches) >= 2 {
+		result := make([]string, len(matches))
+		for i, match := range matches {
+			if len(match) >= 2 {
+				result[i] = fmt.Sprintf("PRODUCT_GROUP%s", match[1])
+			}
+		}
+		return result
+	}
+
+	return nil
+}
+
 func getValueNameByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {
 	for _, sgk := range subGroupKeys {
 		if sgk.GroupCode == groupCode {
@@ -834,17 +899,27 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
 
+			// Check if dataMapping is a product group reference
+			groupCode := convertDataMappingToGroupCode(colConfig.DataMapping)
+			if groupCode != "" {
+				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
+				continue
+			}
+
+			// Check if dataMapping is a composite product group reference
+			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
+			if len(compositeGroupCodes) == 2 {
+				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
+				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
+				if strings.Contains(colConfig.DataMapping, "_x_") {
+					row[fieldName] = fmt.Sprintf("%s x %s", val1, val2)
+				} else {
+					row[fieldName] = val1 + val2
+				}
+				continue
+			}
+
 			switch colConfig.DataMapping {
-			case "product_group_3":
-				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-			case "product_group_4":
-				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-			case "product_group_8":
-				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
-			case "product_group_7":
-				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
-			case "product_group_6":
-				row[fieldName] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 			case "price_list_group_id":
 				row[fieldName] = sg.PriceListGroupID
 			case "subgroup_key":
@@ -1106,26 +1181,34 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		}
 		row["item"] = buildItemValue(pattern, sg)
 		for _, fixedCol := range pattern.FixedColumns {
+			// Handle "type" as a special case that maps to PRODUCT_GROUP9
+			if fixedCol.DataMapping == "type" {
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+				continue
+			}
+
+			// Check if dataMapping is a product group reference
+			groupCode := convertDataMappingToGroupCode(fixedCol.DataMapping)
+			if groupCode != "" {
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
+				continue
+			}
+
+			// Check if dataMapping is a composite product group reference
+			compositeGroupCodes := extractGroupCodesFromCompositeMapping(fixedCol.DataMapping)
+			if len(compositeGroupCodes) == 2 {
+				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
+				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
+				if strings.Contains(fixedCol.DataMapping, "_x_") {
+					row[fixedCol.Field] = fmt.Sprintf("%s x %s", val1, val2)
+				} else {
+					row[fixedCol.Field] = val1 + val2
+				}
+				continue
+			}
+
 			switch fixedCol.DataMapping {
 			case "item":
-			case "type":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
-			case "product_group_5":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
-			case "product_group_2":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
-			case "product_group_3":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-			case "product_group_4":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-			case "product_group_6":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
-			case "product_group_7":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
-			case "product_group_8":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
-			case "product_group_9":
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
 			case "ship_no":
 				row[fixedCol.Field] = shipNoValue
 			case "price_weight":
@@ -1158,21 +1241,6 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
 				row[fixedCol.Field] = sg.Remark
-			case "product_group_6_x_product_group_7":
-				// Composite field: PRODUCT_GROUP6 " x " PRODUCT_GROUP7
-				pg6 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
-				pg7 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
-				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg6, pg7)
-			case "product_group_4_x_product_group_3":
-				// Composite field: PRODUCT_GROUP4 " x " PRODUCT_GROUP3
-				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
-			case "product_group_5_product_group_3":
-				// Composite field: PRODUCT_GROUP5 + PRODUCT_GROUP3 (no separator)
-				pg5 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
-				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-				row[fixedCol.Field] = pg5 + pg3
 			}
 
 			if fixedCol.DataMapping == "" {
@@ -1181,15 +1249,12 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[fixedCol.Field] = 0.0
 				case "avg_kg_stock":
 					row[fixedCol.Field] = 0.0
-				case "product_group_6":
-					row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 				default:
 					// For other fields without dataMapping, try to infer from field name
 					if strings.HasPrefix(fixedCol.Field, "product_group_") {
 						// Convert "product_group_6" to "PRODUCT_GROUP6"
-						parts := strings.Split(fixedCol.Field, "_")
-						if len(parts) >= 3 {
-							groupCode := fmt.Sprintf("PRODUCT_GROUP%s", parts[2])
+						groupCode := convertDataMappingToGroupCode(fixedCol.Field)
+						if groupCode != "" {
 							row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
 						} else {
 							row[fixedCol.Field] = ""
@@ -1275,23 +1340,29 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		}
 
 		for _, colConfig := range pattern.Columns {
+			// Check if dataMapping is a product group reference
+			groupCode := convertDataMappingToGroupCode(colConfig.DataMapping)
+			if groupCode != "" {
+				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
+				continue
+			}
+
+			// Check if dataMapping is a composite product group reference
+			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
+			if len(compositeGroupCodes) == 2 {
+				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
+				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
+				if strings.Contains(colConfig.DataMapping, "_x_") {
+					row[colConfig.Field] = fmt.Sprintf("%s x %s", val1, val2)
+				} else {
+					row[colConfig.Field] = val1 + val2
+				}
+				continue
+			}
+
 			switch colConfig.DataMapping {
-			case "product_group_4_x_product_group_3":
-				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
-				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-				row[colConfig.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
 			case "extra_price_unit":
 				row[colConfig.Field] = sg.ExtraPriceUnit
-			case "product_group_3":
-				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
-			case "product_group_5":
-				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
-			case "product_group_6":
-				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
-			case "product_group_8":
-				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP8")
-			case "product_group_9":
-				row[colConfig.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
 			case "before_price_weight":
 				row[colConfig.Field] = sg.BeforePriceWeight
 			case "total_net_price_weight":

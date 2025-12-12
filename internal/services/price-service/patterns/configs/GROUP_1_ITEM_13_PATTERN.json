@@ -1,27 +1,15 @@
 {
   "patterns": [
     {
-      "id": "pattern_group1_item13_nested",
-      "name": "GROUP_1_ITEM_13 Nested Matrix",
-      "description": "Nested PRODUCT_GROUP9 -> PRODUCT_GROUP7 matrix with fixed PG2/PG1/Type/Size columns",
+      "id": "pattern_group1_item13_i_beams",
+      "name": "I-Beams Pattern",
+      "description": "Single-tab layout for I-Beams matching the provided price list grid",
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP1|PRODUCT_GROUP4|PRODUCT_GROUP3",
+        "rows": "PRODUCT_GROUP4|PRODUCT_GROUP3",
         "columnGroups": ""
       },
-      "columnLevels": [
-        {
-          "level": 1,
-          "field": "PRODUCT_GROUP9",
-          "examples": ["Sys", "จีน"]
-        },
-        {
-          "level": 2,
-          "field": "PRODUCT_GROUP7",
-          "examples": ["6m", "9m", "12m"]
-        }
-      ],
       "fixedColumns": [
         {
           "field": "#",
@@ -37,23 +25,9 @@
           }
         },
         {
-          "field": "product_group_2",
-          "headerName": "Product Group 2",
-          "width": 150,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "dataMapping": "product_group_2",
-          "spanRows": true,
-          "cellStyle": {
-            "textAlign": "center",
-            "fontWeight": "600"
-          }
-        },
-        {
-          "field": "product_group_1",
-          "headerName": "Product Group 1",
-          "width": 150,
+          "field": "product_group",
+          "headerName": "Product Group",
+          "width": 140,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -65,13 +39,27 @@
           }
         },
         {
-          "field": "type",
-          "headerName": "Type",
-          "width": 120,
+          "field": "length",
+          "headerName": "ความยาว",
+          "width": 100,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_8",
+          "dataMapping": "product_group_7",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "thickness_length",
+          "headerName": "หนา x ยาว",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "product_group_6_x_product_group_7",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -79,7 +67,7 @@
         {
           "field": "size",
           "headerName": "ขนาด",
-          "width": 140,
+          "width": 120,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -89,73 +77,79 @@
           }
         },
         {
-          "field": "line_bundle",
-          "headerName": "เส้น/มัด",
-          "width": 120,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "dataMapping": "line_bundle",
-          "cellStyle": {
-            "textAlign": "center"
-          }
-        },
-        {
-          "field": "is_highlight",
+          "field": "highlight_blue",
           "headerName": "Highlight สีฟ้า",
-          "width": 120,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
+          "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
-        {
-          "field": "stock",
-          "headerName": "Stock",
-          "width": 110,
-          "dataMapping": "stock"
         },
         {
           "field": "weight_spec",
-          "headerName": "Weight-Spec",
-          "width": 120,
+          "headerName": "Weight-spec",
+          "width": 110,
           "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
-          "headerName": "Avg.kg Stock",
+          "headerName": "Avg. kg stock",
           "width": 130,
           "dataMapping": ""
         },
         {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 110,
+          "dataMapping": "line_bundle"
+        },
+        {
           "field": "before_price_weight",
-          "headerName": "ราคาขาย Before",
+          "headerName": "ราคาขาย before",
           "width": 140,
           "dataMapping": "before_price_weight"
         },
         {
           "field": "total_net_price_weight",
-          "headerName": "ราคาขาย After",
+          "headerName": "ราคาขาย after",
           "width": 140,
           "dataMapping": "total_net_price_weight"
         },
         {
           "field": "extra_price_weight",
-          "headerName": "Extra",
+          "headerName": "Extra (THB)",
           "width": 120,
           "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "delivery_date",
+          "headerName": "ส่งมอบ ว/ด/ป",
+          "width": 150,
+          "dataMapping": "delivery_date"
+        },
+        {
+          "field": "remark_next_production",
+          "headerName": "ผลิตงวดต่อไป SYS",
+          "width": 180,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
-      "applicableCategories": [],
+      "columnGroups": [],
+      "columns": [],
+      "applicableCategories": ["I-Beams"],
       "editable_suffixes": [
         "is_highlight",
-        "line_bundle",
         "total_net_price_weight",
-        "extra_price_weight",
+        "delivery_date",
+        "line_bundle",
         "remark",
+        "remark_next_production",
         "inactive"
       ],
       "fetchable_suffixes": [
@@ -163,7 +157,7 @@
       ]
     }
   ],
-  "defaultPattern": "pattern_group1_item13_nested",
+  "defaultPattern": "pattern_group1_item13_i_beams",
   "tableConfig": {
     "groupHeaderHeight": 50,
     "headerHeight": 40,
