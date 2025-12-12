@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ALTER TABLE public.price_list_sub_group ADD udf_json json NULL;
-
 type PriceListGroup struct {
 	ID                   uuid.UUID             `gorm:"primary_key;not null" json:"id"`
 	CompanyCode          string                `json:"company_code"`
@@ -116,6 +114,7 @@ func (PriceListExtraConfig) TableName() string { return "price_list_extra_config
 type PriceListSubGroup struct {
 	ID                        uuid.UUID              `json:"id"`
 	PriceListGroupID          uuid.UUID              `json:"price_list_group_id"`
+	SubGroupCode              string                 `json:"subgroup_code"`
 	SubgroupKey               string                 `json:"subgroup_key"`
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
@@ -406,7 +405,7 @@ type UpdatePriceListSubGroupRequest struct {
 }
 
 type GetLatestPriceListSubGroupRequest struct {
-	SubGroupID string `json:"subgroup_id" binding:"required,uuid4"`
+	SubGroupIDs []string `json:"subgroup_ids" binding:"required,dive,uuid4"`
 }
 
 type UpdatePriceListGroupExtraKeyRequest struct {
@@ -430,4 +429,32 @@ type UpdatePriceListExtraRequest struct {
 	CreateBy                string                                `json:"create_by"`
 	CreateDtm               time.Time                             `json:"create_dtm"`
 	PriceListGroupExtraKeys []UpdatePriceListGroupExtraKeyRequest `json:"price_list_group_extra_keys"`
+}
+
+type PriceListFormulas struct {
+	ID          uuid.UUID       `json:"id" gorm:"primary_key;not null"`
+	FormulaCode string          `json:"formula_code" gorm:"not null"`
+	Name        string          `json:"name" gorm:"not null"`
+	Uom         string          `json:"uom" gorm:"not null"`
+	FormulaType string          `json:"formula_type" gorm:"not null"`
+	Expression  string          `json:"expression" gorm:"not null"`
+	Params      json.RawMessage `json:"params" gorm:"not null"`
+	Rounding    int             `json:"rounding" gorm:"not null"`
+	CreateDtm   time.Time       `json:"create_dtm"`
+}
+
+func (PriceListFormulas) TableName() string { return "price_list_formulas" }
+
+type PriceListSubGroupFormulasMap struct {
+	ID                    uuid.UUID         `json:"id" gorm:"primary_key;not null"`
+	PriceListSubGroupCode string            `json:"price_list_subgroup_code" gorm:"not null"`
+	PriceListFormulasCode string            `json:"price_list_formulas_code" gorm:"not null"`
+	IsDefault             bool              `json:"is_default" gorm:"default:false"`
+	CreateDtm             time.Time         `json:"create_dtm"`
+	PriceListFormulas     PriceListFormulas `gorm:"foreignKey:PriceListFormulasCode;references:FormulaCode" json:"price_list_formulas"`
+	PriceListSubGroup     PriceListSubGroup `gorm:"foreignKey:PriceListSubGroupCode;references:SubgroupKey" json:"price_list_sub_group"`
+}
+
+func (PriceListSubGroupFormulasMap) TableName() string {
+	return "price_list_sub_group_formulas_map"
 }

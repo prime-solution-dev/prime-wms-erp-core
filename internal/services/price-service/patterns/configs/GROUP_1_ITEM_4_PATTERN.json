@@ -69,7 +69,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
@@ -81,7 +81,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "market_weight",
@@ -96,7 +96,7 @@
           "dataMapping": "market_weight"
         },
         {
-          "field": "highlight_blue",
+          "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 150,
           "pinned": "left",
@@ -106,7 +106,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "extra_price_unit",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 140,
           "pinned": "right",
@@ -115,7 +115,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "line_bundle",
@@ -146,13 +146,14 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "inactive"
+          "dataMapping": "inactive",
+          "hide": true
         }
       ],
       "columnGroups": [
         {
           "headerName": "กก.(C)",
-          "groupId": "price_weight_group",
+          "groupId": "price_kg",
           "openByDefault": true,
           "children": [
             {
@@ -177,26 +178,26 @@
         },
         {
           "headerName": "เส้น",
-          "groupId": "price_line_group",
+          "groupId": "price_line",
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before_price_unit",
+              "field": "price_line_before_price_weight",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_unit"
+              "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_line_total_net_price_unit",
+              "field": "price_line_total_net_price_weight",
               "headerName": "ราคาขาย after",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "total_net_price_unit"
+              "dataMapping": "total_net_price_weight"
             }
           ]
         }
@@ -206,6 +207,19 @@
         "ท่อเหลี่ยม",
         "ท่อแบน",
         "ท่อดำ"
+      ],
+      "editable_suffixes": [
+        "is_highlight",
+        "line_bundle",
+        "price_kg_before_price_weight",
+        "price_kg_total_net_price_weight",
+        "price_line_before_price_weight",
+        "price_line_total_net_price_weight",
+        "remark",
+        "inactive"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight"
       ]
     }
   ],

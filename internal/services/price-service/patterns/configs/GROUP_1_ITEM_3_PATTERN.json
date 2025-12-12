@@ -27,7 +27,6 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 120,
-
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -45,7 +44,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": ""
         },
         {
           "field": "avg_kg_stock",
@@ -57,7 +56,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": ""
         },
         {
           "field": "od",
@@ -87,7 +86,6 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 120,
-
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
@@ -106,7 +104,7 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "extra_price_unit",
+          "field": "extra_price_weight",
           "headerName": "Extra (THB)",
           "width": 120,
 
@@ -115,13 +113,12 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "extra_price_unit"
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "remark",
-          "headerName": "Notes",
+          "headerName": "หมายเหตุ",
           "width": 200,
-
           "lockPosition": true,
           "suppressMovable": true,
           "dataMapping": "remark"
@@ -130,11 +127,11 @@
       "columnGroups": [
         {
           "headerName": "รอผลิต",
-          "groupId": "waiting_production",
+          "groupId": "awaiting_production",
           "openByDefault": true,
           "children": [
             {
-              "field": "waiting_production_import_date",
+              "field": "awaiting_production_import_date",
               "headerName": "วัน เข้า",
               "width": 120,
               "cellStyle": {
@@ -143,7 +140,7 @@
               "dataMapping": "import_date"
             },
             {
-              "field": "waiting_production_ton",
+              "field": "awaiting_production_ton",
               "headerName": "ตัน",
               "width": 120,
               "cellStyle": {
@@ -152,7 +149,7 @@
               "dataMapping": "ton"
             },
             {
-              "field": "waiting_production_producer",
+              "field": "awaiting_production_producer",
               "headerName": "ผู้ผลิต",
               "width": 120,
               "cellStyle": {
@@ -234,30 +231,33 @@
           ]
         }
       ],
-      "columns": [],
+      "columns": [
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
       "applicableCategories": [],
       "editable_suffixes": [
         "is_highlight",
         "line_bundle",
-        "stock",
-        "od",
-        "import_date",
-        "ton",
-        "producer",
-        "fast",
-        "slow",
-        "total_net_price_weight",
-        "total_net_price_unit",
-        "remark"
+        "awaiting_production_import_date",
+        "awaiting_production_ton",
+        "awaiting_production_producer",
+        "price_kg_total_net_price_weight",
+        "price_line_total_net_price_unit",
+        "selling_fast",
+        "selling_slow",
+        "remark",
+        "inactive"
       ],
       "fetchable_suffixes": [
-        "price_unit",
-        "price_weight",
         "total_net_price_unit",
-        "total_net_price_weight",
-        "extra_price_unit",
-        "before_price_unit",
-        "before_price_weight"
+        "total_net_price_weight"
       ]
     }
   ],

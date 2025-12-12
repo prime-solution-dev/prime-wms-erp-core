@@ -49,6 +49,7 @@ type ColumnConfigItem struct {
 	Field           string                 `json:"field"`
 	HeaderName      string                 `json:"headerName"`
 	Width           int                    `json:"width"`
+	Hide            bool                   `json:"hide,omitempty"`
 	Pinned          string                 `json:"pinned,omitempty"`
 	LockPosition    bool                   `json:"lockPosition,omitempty"`
 	SuppressMovable bool                   `json:"suppressMovable,omitempty"`
@@ -106,6 +107,7 @@ type PriceListDetailTabConfig struct {
 	TableConfig       TableConfig              `json:"tableConfig"`
 	TableData         []map[string]interface{} `json:"tableData"`
 	SummaryRows       []SummaryRow             `json:"summaryRows,omitempty"`
+	SummaryField      map[string]interface{}   `json:"summaryField,omitempty"`
 	EditableSuffixes  []string                 `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes []string                 `json:"fetchable_suffixes,omitempty"`
 }
@@ -149,7 +151,7 @@ type SummaryColumnConfig struct {
 
 type SummaryRow struct {
 	RowGroupValue string                 `json:"row_group_value"`
-	Label         string                 `json:"label"`
+	Label         string                 `json:"label,omitempty"`
 	Data          map[string]interface{} `json:"data"`
 }
 
@@ -157,6 +159,7 @@ type ColumnDef struct {
 	Field           string      `json:"field,omitempty"`
 	HeaderName      string      `json:"headerName,omitempty"`
 	Width           *int        `json:"width,omitempty"`
+	Hide            *bool       `json:"hide,omitempty"`
 	Pinned          string      `json:"pinned,omitempty"`
 	LockPosition    *bool       `json:"lockPosition,omitempty"`
 	SuppressMovable *bool       `json:"suppressMovable,omitempty"`
@@ -373,6 +376,7 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 			Field:           fixedCol.Field,
 			HeaderName:      fixedCol.HeaderName,
 			Width:           intPtr(fixedCol.Width),
+			Hide:            boolPtr(fixedCol.Hide),
 			Pinned:          fixedCol.Pinned,
 			LockPosition:    boolPtr(fixedCol.LockPosition),
 			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
@@ -397,7 +401,7 @@ func buildDynamicColumns(pattern *PatternConfig, subGroups []models.PriceListSub
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
 
 	if len(pattern.ColumnLevels) > 0 {
-		columns = append(columns, buildMultiLevelColumns(pattern, subGroups, columnGroupFields)...)
+		columns = append(columns, buildMultiLevelColumns(pattern, subGroups)...)
 	} else {
 		columns = append(columns, buildSingleLevelColumns(pattern, subGroups, columnGroupFields)...)
 	}
@@ -451,6 +455,7 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
 				HeaderName:   colConfig.HeaderName,
 				Width:        intPtr(colConfig.Width),
+				Hide:         boolPtr(colConfig.Hide),
 				CellRenderer: colConfig.CellRenderer,
 			}
 
@@ -552,6 +557,7 @@ func buildColumnGroupsRecursive(
 					Field:        fmt.Sprintf("%s_%s", fieldPrefix, colConfig.Field),
 					HeaderName:   colConfig.HeaderName,
 					Width:        intPtr(colConfig.Width),
+					Hide:         boolPtr(colConfig.Hide),
 					CellRenderer: colConfig.CellRenderer,
 				}
 
@@ -583,7 +589,7 @@ func buildColumnGroupsRecursive(
 	return columns
 }
 
-func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, columnGroupFields []string) []ColumnDef {
+func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
 	if len(pattern.ColumnLevels) == 0 {
 		return []ColumnDef{}
 	}
@@ -674,6 +680,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		var batchNoValue interface{}
 		var warehouseValue interface{}
 		var codeValue interface{}
+		// Track which awaiting_production and selling fields were found
+		hasAwaitingProductionImportDate := false
+		hasAwaitingProductionTon := false
+		hasAwaitingProductionProducer := false
+		hasSellingFast := false
+		hasSellingSlow := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -701,6 +713,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				if code, ok := udfData["code"]; ok {
 					codeValue = code
 				}
+
 				for key, value := range udfData {
 					if key == "is_highlight" || key == "inactive" || key == "stock_quantity" || key == "batch_no" || key == "warehouse" || key == "code" {
 						continue
@@ -710,30 +723,40 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 						stockValue = value
 					}
 
-					if key == "awaiting_production" {
-						if apMap, ok := value.(map[string]interface{}); ok {
-							if importDate, ok := apMap["import_date"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("import_date"))] = importDate
-							}
-							if ton, ok := apMap["ton"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("ton"))] = ton
-							}
-							if producer, ok := apMap["producer"]; ok {
-								row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("producer"))] = producer
-							}
-						}
+					// Handle awaiting_production fields directly from udf_json
+					if key == "awaiting_production_import_date" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
+						hasAwaitingProductionImportDate = true
+						continue
+					}
+					if key == "awaiting_production_ton" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
+						hasAwaitingProductionTon = true
+						continue
+					}
+					if key == "awaiting_production_producer" {
+						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
+						hasAwaitingProductionProducer = true
 						continue
 					}
 
-					if key == "sale" {
-						if saleMap, ok := value.(map[string]interface{}); ok {
-							if fast, ok := saleMap["fast"]; ok {
-								row[fmt.Sprintf("%s_sale_%s", columnKey, sanitizeFieldName("fast"))] = fast
-							}
-							if slow, ok := saleMap["slow"]; ok {
-								row[fmt.Sprintf("%s_sale_%s", columnKey, sanitizeFieldName("slow"))] = slow
-							}
+					// Handle selling fields directly from udf_json
+					if key == "selling_fast" {
+						if sellingFast, ok := value.(bool); ok {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
+						} else {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 						}
+						hasSellingFast = true
+						continue
+					}
+					if key == "selling_slow" {
+						if sellingSlow, ok := value.(bool); ok {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
+						} else {
+							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+						}
+						hasSellingSlow = true
 						continue
 					}
 
@@ -756,6 +779,25 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 					}
 				}
 			}
+		}
+
+		// Set default values for awaiting_production fields if they weren't found in udf_json
+		if !hasAwaitingProductionImportDate {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
+		}
+		if !hasAwaitingProductionTon {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
+		}
+		if !hasAwaitingProductionProducer {
+			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
+		}
+
+		// Set default values for selling fields if they weren't found in udf_json
+		if !hasSellingFast {
+			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+		}
+		if !hasSellingSlow {
+			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 		}
 
 		row["is_highlight"] = isHighlightValue
@@ -933,10 +975,13 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var countryValue interface{}
 		var shipNoValue interface{}
 		var tsmValue interface{}
-		fastValue := false
-		slowValue := false
-		hasFastValue := false
-		hasSlowValue := false
+		var instituteValue interface{}
+		var sellingFastValue bool
+		var sellingSlowValue bool
+		var awaitingProductionImportDateValue interface{}
+		var awaitingProductionDeliveryDateValue interface{}
+		var awaitingProductionTonValue interface{}
+		var awaitingProductionProducerValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
@@ -1007,37 +1052,28 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if tsm, ok := udfData["tsm"]; ok {
 					tsmValue = tsm
 				}
-				if apMap, ok := udfData["awaiting_production"].(map[string]interface{}); ok {
-					if importDate, ok := apMap["import_date"]; ok {
-						importDateValue = importDate
-					}
-					if deliveryDate, ok := apMap["delivery_date"]; ok {
-						deliveryDateValue = deliveryDate
-					}
-					if ton, ok := apMap["ton"]; ok {
-						tonValue = ton
-					}
-					if producer, ok := apMap["producer"]; ok {
-						producerValue = producer
-					}
+				if institute, ok := udfData["institute"]; ok {
+					instituteValue = institute
 				}
-				if fast, ok := udfData["fast"].(bool); ok {
-					fastValue = fast
-					hasFastValue = true
+				// Extract awaiting_production fields directly from udf_json
+				if awaiting_production_import_date, ok := udfData["awaiting_production_import_date"]; ok {
+					awaitingProductionImportDateValue = awaiting_production_import_date
 				}
-				if slow, ok := udfData["slow"].(bool); ok {
-					slowValue = slow
-					hasSlowValue = true
+				if awaiting_production_delivery_date, ok := udfData["awaiting_production_delivery_date"]; ok {
+					awaitingProductionDeliveryDateValue = awaiting_production_delivery_date
 				}
-				if saleMap, ok := udfData["sale"].(map[string]interface{}); ok {
-					if fast, ok := saleMap["fast"].(bool); ok {
-						fastValue = fast
-						hasFastValue = true
-					}
-					if slow, ok := saleMap["slow"].(bool); ok {
-						slowValue = slow
-						hasSlowValue = true
-					}
+				if awaiting_production_ton, ok := udfData["awaiting_production_ton"]; ok {
+					awaitingProductionTonValue = awaiting_production_ton
+				}
+				if awaiting_production_producer, ok := udfData["awaiting_production_producer"]; ok {
+					awaitingProductionProducerValue = awaiting_production_producer
+				}
+				// Extract selling fields directly from udf_json
+				if selling_fast, ok := udfData["selling_fast"].(bool); ok {
+					sellingFastValue = selling_fast
+				}
+				if selling_slow, ok := udfData["selling_slow"].(bool); ok {
+					sellingSlowValue = selling_slow
 				}
 			}
 		}
@@ -1100,6 +1136,11 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				pg6 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
 				pg7 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
 				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg6, pg7)
+			case "product_group_4_x_product_group_3":
+				// Composite field: PRODUCT_GROUP4 " x " PRODUCT_GROUP3
+				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[fixedCol.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
 			case "product_group_5_product_group_3":
 				// Composite field: PRODUCT_GROUP5 + PRODUCT_GROUP3 (no separator)
 				pg5 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
@@ -1136,6 +1177,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 
 		for _, colGroup := range pattern.ColumnGroups {
 			for _, childCol := range colGroup.Children {
+				var valueToUse interface{}
 				switch childCol.DataMapping {
 				case "before_price_weight":
 					row[childCol.Field] = sg.BeforePriceWeight
@@ -1146,24 +1188,60 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				case "total_net_price_unit":
 					row[childCol.Field] = sg.TotalNetPriceUnit
 				case "import_date":
-					row[childCol.Field] = importDateValue
-				case "delivery_date":
-					row[childCol.Field] = deliveryDateValue
-				case "ton":
-					row[childCol.Field] = tonValue
-				case "producer":
-					row[childCol.Field] = producerValue
-				case "fast":
-					if hasFastValue {
-						row[childCol.Field] = fastValue
+					if childCol.Field == "awaiting_production_import_date" {
+						valueToUse = awaitingProductionImportDateValue
 					} else {
-						row[childCol.Field] = false
+						valueToUse = importDateValue
 					}
-				case "slow":
-					if hasSlowValue {
-						row[childCol.Field] = slowValue
+					row[childCol.Field] = valueToUse
+				case "delivery_date":
+					if childCol.Field == "awaiting_production_delivery_date" {
+						valueToUse = awaitingProductionDeliveryDateValue
 					} else {
-						row[childCol.Field] = false
+						valueToUse = deliveryDateValue
+					}
+					row[childCol.Field] = valueToUse
+				case "ton":
+					if childCol.Field == "awaiting_production_ton" {
+						valueToUse = awaitingProductionTonValue
+					} else {
+						valueToUse = tonValue
+					}
+					row[childCol.Field] = valueToUse
+				case "producer":
+					if childCol.Field == "awaiting_production_producer" {
+						valueToUse = awaitingProductionProducerValue
+					} else {
+						valueToUse = producerValue
+					}
+					row[childCol.Field] = valueToUse
+				case "fast", "selling_fast":
+					row[childCol.Field] = sellingFastValue
+				case "slow", "selling_slow":
+					row[childCol.Field] = sellingSlowValue
+				case "awaiting_production_import_date":
+					if awaitingProductionImportDateValue != nil {
+						row[childCol.Field] = awaitingProductionImportDateValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_delivery_date":
+					if awaitingProductionDeliveryDateValue != nil {
+						row[childCol.Field] = awaitingProductionDeliveryDateValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_ton":
+					if awaitingProductionTonValue != nil {
+						row[childCol.Field] = awaitingProductionTonValue
+					} else {
+						row[childCol.Field] = nil
+					}
+				case "awaiting_production_producer":
+					if awaitingProductionProducerValue != nil {
+						row[childCol.Field] = awaitingProductionProducerValue
+					} else {
+						row[childCol.Field] = nil
 					}
 				}
 			}
@@ -1171,6 +1249,10 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 
 		for _, colConfig := range pattern.Columns {
 			switch colConfig.DataMapping {
+			case "product_group_4_x_product_group_3":
+				pg4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+				pg3 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+				row[colConfig.Field] = fmt.Sprintf("%s x %s", pg4, pg3)
 			case "extra_price_unit":
 				row[colConfig.Field] = sg.ExtraPriceUnit
 			case "product_group_3":
@@ -1198,45 +1280,107 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 			case "remark":
 				row[colConfig.Field] = sg.Remark
 			case "od":
-				row[colConfig.Field] = odValue
+				if odValue != nil {
+					row[colConfig.Field] = odValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "stock":
-				row[colConfig.Field] = stockValue
+				if stockValue != nil {
+					row[colConfig.Field] = stockValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "import_date":
-				row[colConfig.Field] = importDateValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_import_date" {
+					valueToUse = awaitingProductionImportDateValue
+				} else {
+					valueToUse = importDateValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "delivery_date":
-				row[colConfig.Field] = deliveryDateValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_delivery_date" {
+					valueToUse = awaitingProductionDeliveryDateValue
+				} else {
+					valueToUse = deliveryDateValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "ton":
-				row[colConfig.Field] = tonValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_ton" {
+					valueToUse = awaitingProductionTonValue
+				} else {
+					valueToUse = tonValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "producer":
-				row[colConfig.Field] = producerValue
+				var valueToUse interface{}
+				if colConfig.Field == "awaiting_production_producer" {
+					valueToUse = awaitingProductionProducerValue
+				} else {
+					valueToUse = producerValue
+				}
+				row[colConfig.Field] = valueToUse
 			case "tsm":
-				row[colConfig.Field] = tsmValue
-			case "fast":
-				if hasFastValue {
-					row[colConfig.Field] = fastValue
+				if tsmValue != nil {
+					row[colConfig.Field] = tsmValue
 				} else {
-					row[colConfig.Field] = false
+					row[colConfig.Field] = nil
 				}
-			case "slow":
-				if hasSlowValue {
-					row[colConfig.Field] = slowValue
-				} else {
-					row[colConfig.Field] = false
-				}
+			case "selling_fast":
+				row[colConfig.Field] = sellingFastValue
+			case "selling_slow":
+				row[colConfig.Field] = sellingSlowValue
 			case "stock_quantity":
-				row[colConfig.Field] = stockQuantityValue
+				if stockQuantityValue != nil {
+					row[colConfig.Field] = stockQuantityValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "batch_no":
-				row[colConfig.Field] = batchNoValue
+				if batchNoValue != nil {
+					row[colConfig.Field] = batchNoValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "warehouse":
-				row[colConfig.Field] = warehouseValue
+				if warehouseValue != nil {
+					row[colConfig.Field] = warehouseValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "code":
-				row[colConfig.Field] = codeValue
+				if codeValue != nil {
+					row[colConfig.Field] = codeValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "bkk":
-				row[colConfig.Field] = bkkValue
+				if bkkValue != nil {
+					row[colConfig.Field] = bkkValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "factory":
-				row[colConfig.Field] = factoryValue
+				if factoryValue != nil {
+					row[colConfig.Field] = factoryValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "country":
-				row[colConfig.Field] = countryValue
+				if countryValue != nil {
+					row[colConfig.Field] = countryValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "institute":
+				if instituteValue != nil {
+					row[colConfig.Field] = instituteValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "is_highlight":
 				row[colConfig.Field] = isHighlightValue
 			case "inactive":
@@ -1244,6 +1388,30 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[colConfig.Field] = inactiveValue
 				} else {
 					row[colConfig.Field] = false
+				}
+			case "awaiting_production_ton":
+				if awaitingProductionTonValue != nil {
+					row[colConfig.Field] = awaitingProductionTonValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_producer":
+				if awaitingProductionProducerValue != nil {
+					row[colConfig.Field] = awaitingProductionProducerValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_import_date":
+				if awaitingProductionImportDateValue != nil {
+					row[colConfig.Field] = awaitingProductionImportDateValue
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "awaiting_production_delivery_date":
+				if awaitingProductionDeliveryDateValue != nil {
+					row[colConfig.Field] = awaitingProductionDeliveryDateValue
+				} else {
+					row[colConfig.Field] = nil
 				}
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
@@ -1317,6 +1485,7 @@ func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.P
 				Field:        fmt.Sprintf("%s_%s", groupIdentifier, colConfig.Field),
 				HeaderName:   colConfig.HeaderName,
 				Width:        intPtr(colConfig.Width),
+				Hide:         boolPtr(colConfig.Hide),
 				CellRenderer: colConfig.CellRenderer,
 			}
 
@@ -1496,24 +1665,33 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 
 		summaryRow, exists := summaryMap[rowGroupValue]
 		if !exists {
-			data := map[string]interface{}{
-				"row_group_value": rowGroupValue,
-				"is_summary_row":  true,
-			}
-			if cfg.RowGroupField != "" {
-				if val, ok := row[cfg.RowGroupField]; ok {
-					data[cfg.RowGroupField] = val
-				} else {
-					data[cfg.RowGroupField] = rowGroupValue
+			// Initialize data map with all aggregated fields set to 0
+			data := make(map[string]interface{})
+
+			// Initialize all summary column fields to 0
+			for _, column := range cfg.Columns {
+				if column.Field == "" {
+					continue
 				}
-			}
-			if cfg.LabelField != "" && cfg.LabelValue != "" {
-				data[cfg.LabelField] = cfg.LabelValue
+
+				applyToColumnGroups := true
+				if column.ApplyToColumnGroups != nil {
+					applyToColumnGroups = *column.ApplyToColumnGroups
+				}
+
+				fieldName := column.Field
+				if applyToColumnGroups {
+					// For column groups, we'll initialize when we encounter the first row with that column group
+					// For now, we'll handle it in the aggregation loop
+					continue
+				} else {
+					// Initialize non-column-group fields to 0
+					data[fieldName] = float64(0)
+				}
 			}
 
 			summaryRow = &SummaryRow{
 				RowGroupValue: rowGroupValue,
-				Label:         cfg.LabelValue,
 				Data:          data,
 			}
 			summaryMap[rowGroupValue] = summaryRow
@@ -1547,6 +1725,27 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 		return nil
 	}
 
+	// Ensure all summary fields are present in data, initializing to 0 if missing
+	for _, summaryRow := range summaryMap {
+		for _, column := range cfg.Columns {
+			if column.Field == "" {
+				continue
+			}
+
+			applyToColumnGroups := true
+			if column.ApplyToColumnGroups != nil {
+				applyToColumnGroups = *column.ApplyToColumnGroups
+			}
+
+			if !applyToColumnGroups {
+				// For non-column-group fields, ensure they exist in data
+				if _, exists := summaryRow.Data[column.Field]; !exists {
+					summaryRow.Data[column.Field] = float64(0)
+				}
+			}
+		}
+	}
+
 	result := make([]SummaryRow, 0, len(summaryMap))
 	for _, key := range order {
 		if sr, ok := summaryMap[key]; ok {
@@ -1555,6 +1754,42 @@ func buildSummaryRows(pattern *PatternConfig, rows []AGGridRowData) []SummaryRow
 	}
 
 	return result
+}
+
+func buildSummaryField(summaryRows []SummaryRow) map[string]interface{} {
+	if len(summaryRows) == 0 {
+		return nil
+	}
+
+	summaryField := make(map[string]interface{})
+
+	// Iterate through all summaryRows
+	for _, summaryRow := range summaryRows {
+		if summaryRow.Data == nil {
+			continue
+		}
+
+		// For each field in the summaryRow's Data, sum the numeric values
+		for fieldName, fieldValue := range summaryRow.Data {
+			// Try to convert to float64
+			value, ok := toFloat64(fieldValue)
+			if !ok {
+				// Skip non-numeric values
+				continue
+			}
+
+			// Get current value in summaryField (default to 0 if not present)
+			current, _ := toFloat64(summaryField[fieldName])
+			summaryField[fieldName] = current + value
+		}
+	}
+
+	// Return nil if no numeric fields were found
+	if len(summaryField) == 0 {
+		return nil
+	}
+
+	return summaryField
 }
 
 func getRowGroupValue(row AGGridRowData, cfg *SummaryConfig) string {
@@ -1633,6 +1868,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 			Field:           fixedCol.Field,
 			HeaderName:      fixedCol.HeaderName,
 			Width:           intPtr(fixedCol.Width),
+			Hide:            boolPtr(fixedCol.Hide),
 			Pinned:          fixedCol.Pinned,
 			LockPosition:    boolPtr(fixedCol.LockPosition),
 			SuppressMovable: boolPtr(fixedCol.SuppressMovable),
@@ -1667,6 +1903,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 				Field:      childColConfig.Field,
 				HeaderName: childColConfig.HeaderName,
 				Width:      intPtr(childColConfig.Width),
+				Hide:       boolPtr(childColConfig.Hide),
 			}
 
 			if childColConfig.CellStyle != nil {
@@ -1696,6 +1933,7 @@ func buildFixedColumns(pattern *PatternConfig) []ColumnDef {
 			Field:      colConfig.Field,
 			HeaderName: colConfig.HeaderName,
 			Width:      intPtr(colConfig.Width),
+			Hide:       boolPtr(colConfig.Hide),
 		}
 
 		if colConfig.CellStyle != nil {
