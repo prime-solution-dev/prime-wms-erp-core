@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
 	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
@@ -40,22 +40,14 @@ func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, group
 
 	columns := buildDynamicColumns(pattern, allSubGroups)
 	rowData := buildDynamicRows(pattern, allSubGroups)
+	fmt.Println("rowData", len(rowData))
 	mergedRows := mergeGroup1Item9Rows(rowData)
+	fmt.Println("mergedRows", len(mergedRows))
 
 	sort.SliceStable(mergedRows, func(i, j int) bool {
-		productGroupI := fmt.Sprintf("%v", mergedRows[i]["product_group_2"])
-		productGroupJ := fmt.Sprintf("%v", mergedRows[j]["product_group_2"])
-		if productGroupI == productGroupJ {
-			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
-			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
-			if lengthI == lengthJ {
-				sizeI := fmt.Sprintf("%v", mergedRows[i]["product_group_6"])
-				sizeJ := fmt.Sprintf("%v", mergedRows[j]["product_group_6"])
-				return sizeI < sizeJ
-			}
-			return lengthI < lengthJ
-		}
-		return productGroupI < productGroupJ
+		rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
+		rowGroupJ := fmt.Sprintf("%v", mergedRows[j]["row_group_value"])
+		return rowGroupI < rowGroupJ
 	})
 
 	tableData := make([]map[string]interface{}, len(mergedRows))
@@ -63,9 +55,11 @@ func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, group
 		tableData[i] = map[string]interface{}(row)
 	}
 
-	tabLabel := pattern.Name
-	if tabLabel == "" {
-		tabLabel = groupCode
+	tabLabel := "Price List Detail"
+	if len(mergedRows) > 0 {
+		if pg2 := fmt.Sprintf("%v", mergedRows[0]["product_group_2"]); pg2 != "" {
+			tabLabel = pg2
+		}
 	}
 
 	tab := PriceListDetailTabConfig{
@@ -99,46 +93,4 @@ func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, group
 		Name: "Price List Detail",
 		Tabs: []PriceListDetailTabConfig{tab},
 	}, nil
-}
-
-func mergeGroup1Item9Rows(rows []AGGridRowData) []AGGridRowData {
-	if len(rows) == 0 {
-		return rows
-	}
-
-	mergedMap := make(map[string]AGGridRowData)
-	order := make([]string, 0)
-
-	for _, row := range rows {
-		rowGroup := fmt.Sprintf("%v", row["row_group_value"])
-		if rowGroup == "" {
-			continue
-		}
-
-		if existing, ok := mergedMap[rowGroup]; ok {
-			for key, value := range row {
-				if key == "id" {
-					continue
-				}
-				existing[key] = value
-			}
-			continue
-		}
-
-		cloned := make(AGGridRowData, len(row))
-		for key, value := range row {
-			cloned[key] = value
-		}
-		mergedMap[rowGroup] = cloned
-		order = append(order, rowGroup)
-	}
-
-	mergedRows := make([]AGGridRowData, 0, len(order))
-	for _, key := range order {
-		if row, ok := mergedMap[key]; ok {
-			mergedRows = append(mergedRows, row)
-		}
-	}
-
-	return mergedRows
 }
