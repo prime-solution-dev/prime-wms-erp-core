@@ -83,7 +83,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_4_x_product_group_3",
+          "dataMapping": "item",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -154,7 +154,6 @@
         "is_highlight",
         "line_bundle",
         "total_net_price_weight",
-        "extra_price_weight",
         "remark",
         "inactive"
       ],
@@ -181,4 +180,3 @@
     }
   }
 }
-
