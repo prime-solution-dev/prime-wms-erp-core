@@ -66,27 +66,11 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 				Message: "Price list sub group not found",
 			}
 		}
-	}
 
-	// Collect all sub group codes for batch formula fetching
-	subGroupCodes := make([]string, 0, len(subGroups))
-	for _, subGroup := range subGroups {
-		if subGroup.SubGroupCode != "" {
-			subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
+		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupID(subGroup.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 		}
-	}
-
-	// Fetch all formulas in one batch query
-	formulasMap, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
-	}
-
-	// Process each sub group using the maps
-	for _, subGroupID := range subGroupUUIDs {
-		subGroup := subGroupMap[subGroupID]
-
-		priceListFormulas := formulasMap[subGroup.SubGroupCode]
 
 		price := priceDomain.Price{
 			Id:                  subGroup.ID.String(),
