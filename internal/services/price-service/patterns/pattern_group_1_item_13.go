@@ -5,13 +5,12 @@ import (
 	"sort"
 
 	"prime-erp-core/internal/models"
-	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
 
 func BuildGroup1Item13Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
@@ -39,41 +38,38 @@ func BuildGroup1Item13Response(priceListData []models.GetPriceListResponse, grou
 		}, nil
 	}
 
-	columns := buildDynamicColumns(pattern, allSubGroups)
-	rowData := buildDynamicRows(pattern, allSubGroups)
-	utils.PrintJSON(rowData)
-	mergedRows := mergeGroup1Item9Rows(rowData)
-
-	sort.SliceStable(mergedRows, func(i, j int) bool {
-		pg2I := fmt.Sprintf("%v", mergedRows[i]["product_group_2"])
-		pg2J := fmt.Sprintf("%v", mergedRows[j]["product_group_2"])
-		if pg2I == pg2J {
-			pg1I := fmt.Sprintf("%v", mergedRows[i]["product_group_1"])
-			pg1J := fmt.Sprintf("%v", mergedRows[j]["product_group_1"])
-			if pg1I == pg1J {
-				size4I := fmt.Sprintf("%v", mergedRows[i]["product_group_4"])
-				size4J := fmt.Sprintf("%v", mergedRows[j]["product_group_4"])
+	sort.SliceStable(allSubGroups, func(i, j int) bool {
+		pg1I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP1")
+		pg1J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP1")
+		if pg1I == pg1J {
+			lengthI := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP7")
+			lengthJ := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP7")
+			if lengthI == lengthJ {
+				size4I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
+				size4J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
 				if size4I == size4J {
-					size3I := fmt.Sprintf("%v", mergedRows[i]["product_group_3"])
-					size3J := fmt.Sprintf("%v", mergedRows[j]["product_group_3"])
+					size3I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP3")
+					size3J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP3")
 					return size3I < size3J
 				}
 				return size4I < size4J
 			}
-			return pg1I < pg1J
+			return lengthI < lengthJ
 		}
-		return pg2I < pg2J
+		return pg1I < pg1J
 	})
 
-	tableData := make([]map[string]interface{}, len(mergedRows))
-	for i, row := range mergedRows {
+	columns := buildFixedColumns(pattern)
+	rowData := buildDirectRows(pattern, allSubGroups)
+	tableData := make([]map[string]interface{}, len(rowData))
+	for i, row := range rowData {
 		tableData[i] = map[string]interface{}(row)
 	}
 
-	tabLabel := "Price List Detail"
-	if len(mergedRows) > 0 {
-		if pg2 := fmt.Sprintf("%v", mergedRows[0]["product_group_2"]); pg2 != "" {
-			tabLabel = pg2
+	tabLabel := "I-Beams"
+	if len(allSubGroups) > 0 {
+		if pg1 := getValueNameByGroupCode(allSubGroups[0].SubGroupKeys, "PRODUCT_GROUP1"); pg1 != "" {
+			tabLabel = pg1
 		}
 	}
 

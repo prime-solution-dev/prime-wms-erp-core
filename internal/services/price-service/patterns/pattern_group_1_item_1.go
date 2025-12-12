@@ -26,7 +26,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 	tabsWithOrder := []tabWithOrder{}
 
 	for groupKey, productGroup2Map := range groupedData {
-		config, err := loadConfiguration(groupKey)
+		config, err := LoadConfiguration(groupKey)
 		if err != nil {
 			loadErr = fmt.Errorf("load configuration for %s: %w", groupKey, err)
 			continue

@@ -31,6 +31,7 @@ type PatternConfig struct {
 	EditableSuffixes     []string            `json:"editable_suffixes,omitempty"`
 	FetchableSuffixes    []string            `json:"fetchable_suffixes,omitempty"`
 	ItemFormat           []ItemFormatPart    `json:"itemFormat,omitempty"`
+	RequiredGroupCodes   []string            `json:"requiredGroupCodes,omitempty"`
 }
 
 type GroupingConfig struct {
@@ -197,7 +198,8 @@ var defaultItemFormat = []ItemFormatPart{
 	{Type: "group", Value: "PRODUCT_GROUP7"},
 }
 
-func loadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
+// LoadConfiguration loads a pattern configuration file for the given groupCode
+func LoadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
 	if groupCode == "" {
 		return nil, fmt.Errorf("groupCode is required")
 	}
@@ -215,6 +217,31 @@ func loadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
 	}
 
 	return &config, nil
+}
+
+// ExtractRequiredGroupCodes extracts all requiredGroupCodes from enabled patterns in the configuration
+func ExtractRequiredGroupCodes(config *PriceTableConfiguration) []string {
+	if config == nil {
+		return []string{}
+	}
+
+	groupCodeMap := make(map[string]bool)
+
+	for _, pattern := range config.Patterns {
+		if pattern.Enabled && len(pattern.RequiredGroupCodes) > 0 {
+			for _, groupCode := range pattern.RequiredGroupCodes {
+				groupCodeMap[groupCode] = true
+			}
+		}
+	}
+
+	// Convert map to slice
+	result := make([]string, 0, len(groupCodeMap))
+	for groupCode := range groupCodeMap {
+		result = append(result, groupCode)
+	}
+
+	return result
 }
 
 func getValueNameByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCode string) string {

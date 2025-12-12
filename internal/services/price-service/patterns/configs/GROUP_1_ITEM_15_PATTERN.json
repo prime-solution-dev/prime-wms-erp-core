@@ -5,9 +5,10 @@
       "name": "GROUP_1_ITEM_13 Nested Matrix",
       "description": "Nested PRODUCT_GROUP9 -> PRODUCT_GROUP7 matrix with fixed PG2/PG1/Type/Size columns",
       "enabled": true,
+      "requiredGroupCodes": ["GROUP_1_ITEM_12", "GROUP_1_ITEM_14", "GROUP_1_ITEM_15", "GROUP_1_ITEM_16", "GROUP_1_ITEM_17", "GROUP_1_ITEM_18", "GROUP_1_ITEM_19", "GROUP_1_ITEM_20" ],
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP1|PRODUCT_GROUP4|PRODUCT_GROUP3",
+        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP1|PRODUCT_GROUP8|PRODUCT_GROUP4|PRODUCT_GROUP3",
         "columnGroups": ""
       },
       "columnLevels": [
@@ -72,6 +73,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "dataMapping": "product_group_8",
+          "spanRows": true,
           "cellStyle": {
             "textAlign": "center"
           }
@@ -83,7 +85,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_4_x_product_group_3",
+          "dataMapping": "item",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -154,7 +156,6 @@
         "is_highlight",
         "line_bundle",
         "total_net_price_weight",
-        "extra_price_weight",
         "remark",
         "inactive"
       ],
