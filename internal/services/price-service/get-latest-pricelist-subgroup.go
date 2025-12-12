@@ -41,21 +41,52 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 	var prices []priceDomain.Price
 
+	// Convert all SubGroupIDs to UUIDs upfront
+	subGroupUUIDs := make([]uuid.UUID, 0, len(req.SubGroupIDs))
 	for _, subGroupID := range req.SubGroupIDs {
-		subGroup, err := getLatestSubGroupFunc(uuid.MustParse(subGroupID))
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch latest price list sub group: %w", err)
-		}
-		if subGroup == nil {
+		subGroupUUIDs = append(subGroupUUIDs, uuid.MustParse(subGroupID))
+	}
+
+	// Fetch all sub groups in one batch query
+	subGroups, err := priceListRepository.GetPriceListSubGroupsByIDs(subGroupUUIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest price list sub groups: %w", err)
+	}
+
+	// Create a map of sub groups by ID for efficient lookup
+	subGroupMap := make(map[uuid.UUID]*models.PriceListSubGroup, len(subGroups))
+	for i := range subGroups {
+		subGroupMap[subGroups[i].ID] = &subGroups[i]
+	}
+
+	// Verify all requested sub groups were found
+	for _, subGroupID := range subGroupUUIDs {
+		if _, found := subGroupMap[subGroupID]; !found {
 			return nil, &utils.BindingError{
 				Message: "Price list sub group not found",
 			}
 		}
+	}
 
-		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCode(subGroup.SubGroupCode)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
+	// Collect all sub group codes for batch formula fetching
+	subGroupCodes := make([]string, 0, len(subGroups))
+	for _, subGroup := range subGroups {
+		if subGroup.SubGroupCode != "" {
+			subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
 		}
+	}
+
+	// Fetch all formulas in one batch query
+	formulasMap, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
+	}
+
+	// Process each sub group using the maps
+	for _, subGroupID := range subGroupUUIDs {
+		subGroup := subGroupMap[subGroupID]
+
+		priceListFormulas := formulasMap[subGroup.SubGroupCode]
 
 		price := priceDomain.Price{
 			Id:                  subGroup.ID.String(),
