@@ -12,7 +12,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -85,6 +85,14 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchDocRef = fmt.Sprintf(` and invoice.document_ref IN (%s)`, whereInClause)
+	}
+	if len(invoiceItemDocRef) > 0 {
+		quotedStrings := make([]string, len(invoiceItemDocRef))
+		for i, s := range invoiceItemDocRef {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchDocRef += fmt.Sprintf(` and invoice_item.document_ref IN (%s)`, whereInClause)
 	}
 
 	var invoiceID []uuid.UUID
