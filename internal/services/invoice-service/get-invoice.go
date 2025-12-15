@@ -14,17 +14,18 @@ import (
 )
 
 type GetInvoiceRequest struct {
-	ID           []uuid.UUID `json:"id"`
-	InvoiceCode  []string    `json:"invoice_code"`
-	InvoiceRef   []string    `json:"invoice_ref"`
-	InvoiceType  []string    `json:"invoice_type"`
-	CustomerCode []string    `json:"customer_code"`
-	Status       []string    `json:"status"`
-	DocRef       []string    `json:"document_ref"`
-	CompanyCode  string      `json:"company_code"`
-	SiteCode     string      `json:"site_code"`
-	Page         int         `json:"page"`
-	PageSize     int         `json:"page_size"`
+	ID                []uuid.UUID `json:"id"`
+	InvoiceCode       []string    `json:"invoice_code"`
+	InvoiceRef        []string    `json:"invoice_ref"`
+	InvoiceType       []string    `json:"invoice_type"`
+	CustomerCode      []string    `json:"customer_code"`
+	Status            []string    `json:"status"`
+	DocRef            []string    `json:"document_ref"`
+	InvoiceItemDocRef []string    `json:"invoice_item_document_ref"`
+	CompanyCode       string      `json:"company_code"`
+	SiteCode          string      `json:"site_code"`
+	Page              int         `json:"page"`
+	PageSize          int         `json:"page_size"`
 }
 type ResultInvoice struct {
 	Total      int              `json:"total"`
@@ -42,7 +43,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.Page, req.PageSize)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
