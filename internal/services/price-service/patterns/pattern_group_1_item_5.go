@@ -11,7 +11,7 @@ import (
 )
 
 func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}

@@ -6,6 +6,7 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -147,6 +148,7 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
         s.customer_code, 
 		s.status_payment,
         s.total_amount,
+		s.delivery_date,
         it.id as item_id, 
         it.document_ref, 
         it.total_amount as invoice_total_amount,
@@ -176,9 +178,18 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 
 		idSale, _ := uuid.Parse(idStrSale)
 		// สร้าง Sale object
+		var deliveryDate *time.Time
+
+		if row["delivery_date"] != nil {
+			t := row["delivery_date"].(time.Time)
+			deliveryDate = &t
+		} else {
+			deliveryDate = nil
+		}
 		sale := models.Sale{
 			ID:            idSale,
 			SaleCode:      saleCode,
+			DeliveryDate:  deliveryDate,
 			CustomerCode:  row["customer_code"].(string),
 			TotalAmount:   row["total_amount"].(float64),
 			StatusPayment: row["status_payment"].(string),

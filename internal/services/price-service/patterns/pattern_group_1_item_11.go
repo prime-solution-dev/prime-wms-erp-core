@@ -10,11 +10,10 @@ import (
 )
 
 func BuildGroup1Item11Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
-
 	var pattern *PatternConfig
 	for i := range config.Patterns {
 		if config.Patterns[i].ID == config.DefaultPattern && config.Patterns[i].Enabled {
