@@ -772,6 +772,9 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 		var batchNoValue interface{}
 		var warehouseValue interface{}
 		var codeValue interface{}
+		var deliveryDateValue interface{}
+		var tonValue interface{}
+		var nextProductionValue interface{}
 		// Track which awaiting_production and selling fields were found
 		hasAwaitingProductionImportDate := false
 		hasAwaitingProductionTon := false
@@ -804,6 +807,15 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				}
 				if code, ok := udfData["code"]; ok {
 					codeValue = code
+				}
+				if deliveryDate, ok := udfData["delivery_date"]; ok {
+					deliveryDateValue = deliveryDate
+				}
+				if ton, ok := udfData["ton"]; ok {
+					tonValue = ton
+				}
+				if nextProduction, ok := udfData["next_production"]; ok {
+					nextProductionValue = nextProduction
 				}
 
 				for key, value := range udfData {
@@ -938,6 +950,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 				row[fieldName] = sg.TermPriceWeight
 			case "total_net_price_weight":
 				row[fieldName] = sg.TotalNetPriceWeight
+			case "delivery_date":
+				row[fieldName] = deliveryDateValue
+			case "ton":
+				row[fieldName] = tonValue
+			case "next_production":
+				row[fieldName] = nextProductionValue
 			case "before_price_unit":
 				row[fieldName] = sg.BeforePriceUnit
 			case "before_extra_price_unit":
@@ -1066,6 +1084,7 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 		var stockValue interface{}
 		var importDateValue interface{}
 		var deliveryDateValue interface{}
+		var nextProductionValue interface{}
 		var tonValue interface{}
 		var producerValue interface{}
 		var stockQuantityValue interface{}
@@ -1177,6 +1196,9 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				if selling_slow, ok := udfData["selling_slow"].(bool); ok {
 					sellingSlowValue = selling_slow
 				}
+				if next_production, ok := udfData["next_production"]; ok {
+					nextProductionValue = next_production
+				}
 			}
 		}
 		row["item"] = buildItemValue(pattern, sg)
@@ -1269,7 +1291,6 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 
 		for _, colGroup := range pattern.ColumnGroups {
 			for _, childCol := range colGroup.Children {
-				var valueToUse interface{}
 				switch childCol.DataMapping {
 				case "before_price_weight":
 					row[childCol.Field] = sg.BeforePriceWeight
@@ -1280,61 +1301,27 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				case "total_net_price_unit":
 					row[childCol.Field] = sg.TotalNetPriceUnit
 				case "import_date":
-					if childCol.Field == "awaiting_production_import_date" {
-						valueToUse = awaitingProductionImportDateValue
-					} else {
-						valueToUse = importDateValue
-					}
-					row[childCol.Field] = valueToUse
+					row[childCol.Field] = importDateValue
 				case "delivery_date":
-					if childCol.Field == "awaiting_production_delivery_date" {
-						valueToUse = awaitingProductionDeliveryDateValue
-					} else {
-						valueToUse = deliveryDateValue
-					}
-					row[childCol.Field] = valueToUse
+					row[childCol.Field] = deliveryDateValue
 				case "ton":
-					if childCol.Field == "awaiting_production_ton" {
-						valueToUse = awaitingProductionTonValue
-					} else {
-						valueToUse = tonValue
-					}
-					row[childCol.Field] = valueToUse
+					row[childCol.Field] = tonValue
 				case "producer":
-					if childCol.Field == "awaiting_production_producer" {
-						valueToUse = awaitingProductionProducerValue
-					} else {
-						valueToUse = producerValue
-					}
-					row[childCol.Field] = valueToUse
+					row[childCol.Field] = producerValue
+				case "next_production":
+					row[childCol.Field] = nextProductionValue
 				case "fast", "selling_fast":
 					row[childCol.Field] = sellingFastValue
 				case "slow", "selling_slow":
 					row[childCol.Field] = sellingSlowValue
 				case "awaiting_production_import_date":
-					if awaitingProductionImportDateValue != nil {
-						row[childCol.Field] = awaitingProductionImportDateValue
-					} else {
-						row[childCol.Field] = nil
-					}
+					row[childCol.Field] = awaitingProductionImportDateValue
 				case "awaiting_production_delivery_date":
-					if awaitingProductionDeliveryDateValue != nil {
-						row[childCol.Field] = awaitingProductionDeliveryDateValue
-					} else {
-						row[childCol.Field] = nil
-					}
+					row[childCol.Field] = awaitingProductionDeliveryDateValue
 				case "awaiting_production_ton":
-					if awaitingProductionTonValue != nil {
-						row[childCol.Field] = awaitingProductionTonValue
-					} else {
-						row[childCol.Field] = nil
-					}
+					row[childCol.Field] = awaitingProductionTonValue
 				case "awaiting_production_producer":
-					if awaitingProductionProducerValue != nil {
-						row[childCol.Field] = awaitingProductionProducerValue
-					} else {
-						row[childCol.Field] = nil
-					}
+					row[childCol.Field] = awaitingProductionProducerValue
 				}
 			}
 		}
@@ -1390,37 +1377,35 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 					row[colConfig.Field] = nil
 				}
 			case "import_date":
-				var valueToUse interface{}
-				if colConfig.Field == "awaiting_production_import_date" {
-					valueToUse = awaitingProductionImportDateValue
+				if importDateValue != nil {
+					row[colConfig.Field] = importDateValue
 				} else {
-					valueToUse = importDateValue
+					row[colConfig.Field] = nil
 				}
-				row[colConfig.Field] = valueToUse
 			case "delivery_date":
-				var valueToUse interface{}
-				if colConfig.Field == "awaiting_production_delivery_date" {
-					valueToUse = awaitingProductionDeliveryDateValue
+				if deliveryDateValue != nil {
+					row[colConfig.Field] = deliveryDateValue
 				} else {
-					valueToUse = deliveryDateValue
+					row[colConfig.Field] = nil
 				}
-				row[colConfig.Field] = valueToUse
 			case "ton":
-				var valueToUse interface{}
-				if colConfig.Field == "awaiting_production_ton" {
-					valueToUse = awaitingProductionTonValue
+				if tonValue != nil {
+					row[colConfig.Field] = tonValue
 				} else {
-					valueToUse = tonValue
+					row[colConfig.Field] = nil
 				}
-				row[colConfig.Field] = valueToUse
 			case "producer":
-				var valueToUse interface{}
-				if colConfig.Field == "awaiting_production_producer" {
-					valueToUse = awaitingProductionProducerValue
+				if producerValue != nil {
+					row[colConfig.Field] = producerValue
 				} else {
-					valueToUse = producerValue
+					row[colConfig.Field] = nil
 				}
-				row[colConfig.Field] = valueToUse
+			case "next_production":
+				if nextProductionValue != nil {
+					row[colConfig.Field] = nextProductionValue
+				} else {
+					row[colConfig.Field] = nil
+				}
 			case "tsm":
 				if tsmValue != nil {
 					row[colConfig.Field] = tsmValue
