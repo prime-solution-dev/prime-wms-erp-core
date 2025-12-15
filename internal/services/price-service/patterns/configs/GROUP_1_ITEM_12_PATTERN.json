@@ -1,0 +1,205 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item13_nested",
+      "name": "GROUP_1_ITEM_13 Nested Matrix",
+      "description": "Nested PRODUCT_GROUP9 -> PRODUCT_GROUP7 matrix with fixed PG2/PG1/Type/Size columns",
+      "enabled": true,
+      "requiredGroupCodes": ["GROUP_1_ITEM_12", "GROUP_1_ITEM_14", "GROUP_1_ITEM_15", "GROUP_1_ITEM_16", "GROUP_1_ITEM_17", "GROUP_1_ITEM_18", "GROUP_1_ITEM_19", "GROUP_1_ITEM_20" ],
+      "grouping": {
+        "tabs": "",
+        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP1|PRODUCT_GROUP8|PRODUCT_GROUP4|PRODUCT_GROUP3",
+        "columnGroups": ""
+      },
+      "columnLevels": [
+        {
+          "level": 1,
+          "field": "PRODUCT_GROUP9",
+          "examples": ["Sys", "จีน"]
+        },
+        {
+          "level": 2,
+          "field": "PRODUCT_GROUP7",
+          "examples": ["6m", "9m", "12m"]
+        }
+      ],
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "product_group_2",
+          "headerName": "Product Group 2",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PRODUCT_GROUP2",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "product_group_1",
+          "headerName": "Product Group 1",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PRODUCT_GROUP1",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "product_group_8",
+          "headerName": "Type",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PRODUCT_GROUP8",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "item",
+          "headerName": "ขนาด",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "item",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "line_bundle",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        }
+      ],
+      "columns": [
+        {
+          "field": "stock",
+          "headerName": "Stock",
+          "width": 110,
+          "dataMapping": "stock"
+        },
+        {
+          "field": "weight_spec",
+          "headerName": "Weight-Spec",
+          "width": 120,
+          "dataMapping": ""
+        },
+        {
+          "field": "avg_kg_stock",
+          "headerName": "Avg.kg Stock",
+          "width": 130,
+          "dataMapping": ""
+        },
+        {
+          "field": "before_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 140,
+          "dataMapping": "before_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 140,
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra",
+          "width": 120,
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "delivery_date",
+          "headerName": "ส่งมอบ ว/ด/ป",
+          "width": 150,
+          "dataMapping": "delivery_date"
+        },
+        {
+          "field": "ton",
+          "headerName": "จำนวนตัน",
+          "width": 130,
+          "dataMapping": "ton"
+        },
+        {
+          "field": "next_production",
+          "headerName": "ผลิตงวดต่อไป",
+          "width": 180,
+          "dataMapping": "next_production"
+        }
+      ],
+      "applicableCategories": [],
+      "editable_suffixes": [
+        "is_highlight",
+        "line_bundle",
+        "total_net_price_weight",
+        "remark",
+        "inactive",
+        "next_production",
+        "delivery_date",
+        "ton"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item13_nested",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": false,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  }
+}

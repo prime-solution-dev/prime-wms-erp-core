@@ -8,13 +8,13 @@ import (
 	"math/rand"
 	"os"
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/scripts/shared"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -88,39 +88,39 @@ func main() {
 	flag.Parse()
 
 	if *groupIDRaw == "" {
-		exitWithError(errors.New("flag --group-id is required"))
+		shared.ExitWithError(errors.New("flag --group-id is required"))
 	}
 	groupID, err := uuid.Parse(*groupIDRaw)
 	if err != nil {
-		exitWithError(fmt.Errorf("invalid --group-id: %w", err))
+		shared.ExitWithError(fmt.Errorf("invalid --group-id: %w", err))
 	}
 
 	if *count <= 0 {
-		exitWithError(errors.New("flag --count must be greater than zero"))
+		shared.ExitWithError(errors.New("flag --count must be greater than zero"))
 	}
 
 	if *priceMin < 0 || *priceMax < 0 {
-		exitWithError(errors.New("--price-min and --price-max must be non-negative"))
+		shared.ExitWithError(errors.New("--price-min and --price-max must be non-negative"))
 	}
 
 	if *priceMin > *priceMax {
-		exitWithError(fmt.Errorf("--price-min cannot be greater than --price-max (%.2f > %.2f)", *priceMin, *priceMax))
+		shared.ExitWithError(fmt.Errorf("--price-min cannot be greater than --price-max (%.2f > %.2f)", *priceMin, *priceMax))
 	}
 
 	groupItems, groupItemCombinations, err := parseGroupItems(*groupItemsRaw)
 	if err != nil {
-		exitWithError(err)
+		shared.ExitWithError(err)
 	}
 
 	productGroups, err := parseProductGroups(*productGroupsRaw, groupItems)
 	if err != nil {
-		exitWithError(err)
+		shared.ExitWithError(err)
 	}
 
 	explicitKeys := mergeSubgroupKeys(*subgroupKeysCSV, repeatedKeys)
 
 	if len(productGroups) == 0 && len(explicitKeys) == 0 {
-		exitWithError(errors.New("either --product-groups or --subgroup-key/--subgroup-keys must be provided"))
+		shared.ExitWithError(errors.New("either --product-groups or --subgroup-key/--subgroup-keys must be provided"))
 	}
 
 	// If groupItemCombinations is provided, use the array length as count
@@ -143,14 +143,14 @@ func main() {
 
 	result, err := GenerateSeedStatements(cfg)
 	if err != nil {
-		exitWithError(err)
+		shared.ExitWithError(err)
 	}
 
 	writer := os.Stdout
 	if *outputPath != "" {
 		file, err := os.Create(*outputPath)
 		if err != nil {
-			exitWithError(fmt.Errorf("failed to create output file: %w", err))
+			shared.ExitWithError(fmt.Errorf("failed to create output file: %w", err))
 		}
 		defer file.Close()
 		writer = file
@@ -166,7 +166,7 @@ func main() {
 
 	if *executeSeed {
 		if err := executeSeedStatements(*databaseName, *connectionString, result); err != nil {
-			exitWithError(err)
+			shared.ExitWithError(err)
 		}
 		fmt.Fprintf(os.Stderr, "Executed seed statements against database\n")
 	}
@@ -222,34 +222,34 @@ func GenerateSeedStatements(cfg SeedConfig) (SeedResult, error) {
 
 		subGroupStmt := fmt.Sprintf(
 			"INSERT INTO public.price_list_sub_group (id, price_list_group_id, subgroup_key, is_trading, price_unit, extra_price_unit, total_net_price_unit, price_weight, extra_price_weight, term_price_weight, total_net_price_weight, before_price_unit, before_extra_price_unit, before_total_net_price_unit, before_price_weight, before_extra_price_weight, before_term_price_weight, before_total_net_price_weight) VALUES (%s, %s, %s, %t, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);",
-			formatUUID(record.ID),
-			formatUUID(record.PriceListGroupID),
-			formatString(record.SubGroupKey),
+			shared.FormatUUID(record.ID),
+			shared.FormatUUID(record.PriceListGroupID),
+			shared.FormatString(record.SubGroupKey),
 			record.IsTrading,
-			formatFloat(record.PriceUnit),
-			formatFloat(record.ExtraPriceUnit),
-			formatFloat(record.TotalNetPriceUnit),
-			formatFloat(record.PriceWeight),
-			formatFloat(record.ExtraPriceWeight),
-			formatFloat(record.TermPriceWeight),
-			formatFloat(record.TotalNetPriceWeight),
-			formatFloat(record.BeforePriceUnit),
-			formatFloat(record.BeforeExtraPriceUnit),
-			formatFloat(record.BeforeTotalNetPriceUnit),
-			formatFloat(record.BeforePriceWeight),
-			formatFloat(record.BeforeExtraPriceWeight),
-			formatFloat(record.BeforeTermPriceWeight),
-			formatFloat(record.BeforeTotalNetPriceWeight),
+			shared.FormatFloat(record.PriceUnit),
+			shared.FormatFloat(record.ExtraPriceUnit),
+			shared.FormatFloat(record.TotalNetPriceUnit),
+			shared.FormatFloat(record.PriceWeight),
+			shared.FormatFloat(record.ExtraPriceWeight),
+			shared.FormatFloat(record.TermPriceWeight),
+			shared.FormatFloat(record.TotalNetPriceWeight),
+			shared.FormatFloat(record.BeforePriceUnit),
+			shared.FormatFloat(record.BeforeExtraPriceUnit),
+			shared.FormatFloat(record.BeforeTotalNetPriceUnit),
+			shared.FormatFloat(record.BeforePriceWeight),
+			shared.FormatFloat(record.BeforeExtraPriceWeight),
+			shared.FormatFloat(record.BeforeTermPriceWeight),
+			shared.FormatFloat(record.BeforeTotalNetPriceWeight),
 		)
 		result.SubGroupStatements = append(result.SubGroupStatements, subGroupStmt)
 
 		for _, entry := range keyEntries {
 			keyStmt := fmt.Sprintf(
 				"INSERT INTO public.price_list_sub_group_key (id, sub_group_id, code, value, seq) VALUES (%s, %s, %s, %s, %d);",
-				formatUUID(uuid.New()),
-				formatUUID(record.ID),
-				formatString(entry.Code),
-				formatString(entry.Value),
+				shared.FormatUUID(uuid.New()),
+				shared.FormatUUID(record.ID),
+				shared.FormatString(entry.Code),
+				shared.FormatString(entry.Value),
 				entry.Seq,
 			)
 			result.SubGroupKeyStatements = append(result.SubGroupKeyStatements, keyStmt)
@@ -397,18 +397,6 @@ func randomPrice(r *rand.Rand, min, max float64) float64 {
 	return min + r.Float64()*(max-min)
 }
 
-func formatUUID(id uuid.UUID) string {
-	return fmt.Sprintf("'%s'::uuid", id.String())
-}
-
-func formatFloat(val float64) string {
-	return fmt.Sprintf("%.2f", val)
-}
-
-func formatString(val string) string {
-	escaped := strings.ReplaceAll(val, "'", "''")
-	return fmt.Sprintf("'%s'", escaped)
-}
 
 type multiStringFlag []string
 
@@ -570,33 +558,13 @@ func parseGroupItems(raw string) (map[string][]string, []map[string][]string, er
 }
 
 func executeSeedStatements(databaseName string, connectionString string, result SeedResult) error {
-	var gormDB *gorm.DB
-	var err error
-
-	if connectionString != "" {
-		// Use direct connection string
-		gormDB, err = connectWithString(connectionString)
-		if err != nil {
-			return fmt.Errorf("failed to connect with connection string: %w", err)
-		}
-	} else {
-		// Use environment variable approach
-		gormDB, err = db.ConnectGORM(databaseName)
-		if err != nil {
-			return fmt.Errorf("failed to connect database_gorm_url_%s: %w", databaseName, err)
-		}
+	gormDB, err := shared.GetDatabaseConnection(databaseName, connectionString)
+	if err != nil {
+		return err
 	}
 	defer db.CloseGORM(gormDB)
 
 	return ApplySeedStatements(gormDB, result)
-}
-
-func connectWithString(connectionString string) (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %w", err)
-	}
-	return db, nil
 }
 
 // ApplySeedStatements persists generated statements inside a transaction.
@@ -610,12 +578,12 @@ func ApplySeedStatements(gormDB *gorm.DB, result SeedResult) error {
 		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
 	}
 
-	if err := execStatements(tx, result.SubGroupStatements, "price_list_sub_group"); err != nil {
+	if err := shared.ExecuteStatementsWithLabel(tx, result.SubGroupStatements, "price_list_sub_group"); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	if err := execStatements(tx, result.SubGroupKeyStatements, "price_list_sub_group_key"); err != nil {
+	if err := shared.ExecuteStatementsWithLabel(tx, result.SubGroupKeyStatements, "price_list_sub_group_key"); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -626,14 +594,6 @@ func ApplySeedStatements(gormDB *gorm.DB, result SeedResult) error {
 	return nil
 }
 
-func execStatements(tx *gorm.DB, statements []string, label string) error {
-	for _, stmt := range statements {
-		if err := tx.Exec(stmt).Error; err != nil {
-			return fmt.Errorf("failed to execute %s statement: %w", label, err)
-		}
-	}
-	return nil
-}
 
 func parseGroupItemsArray(raw string) (map[string][]string, error) {
 	var entries []map[string]interface{}
@@ -742,7 +702,3 @@ func deduplicate(values []string) []string {
 	return result
 }
 
-func exitWithError(err error) {
-	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	os.Exit(1)
-}

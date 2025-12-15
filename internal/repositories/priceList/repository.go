@@ -62,6 +62,31 @@ func GetPriceListSubGroupByID(subGroupID uuid.UUID) (*models.PriceListSubGroup, 
 	return &subGroup, nil
 }
 
+// GetPriceListSubGroupsByIDs loads multiple price list sub groups (with keys) by sub group IDs.
+func GetPriceListSubGroupsByIDs(subGroupIDs []uuid.UUID) ([]models.PriceListSubGroup, error) {
+	if len(subGroupIDs) == 0 {
+		return []models.PriceListSubGroup{}, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroups := []models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Where("id IN ?", subGroupIDs).
+		Preload("PriceListGroup").
+		Preload("PriceListSubGroupKeys").
+		Find(&subGroups).Error; err != nil {
+		return nil, err
+	}
+
+	return subGroups, nil
+}
+
 func GetPriceListExtraConfig(groupCodes []string) ([]models.PriceListExtraConfig, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -415,8 +440,7 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 	})
 }
 
-
-func GetPriceListSubGroupFormulasMapBySubGroupID(subGroupID uuid.UUID) ([]models.PriceListSubGroupFormulasMap, error) {
+func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]models.PriceListSubGroupFormulasMap, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return []models.PriceListSubGroupFormulasMap{}, err
@@ -426,11 +450,44 @@ func GetPriceListSubGroupFormulasMapBySubGroupID(subGroupID uuid.UUID) ([]models
 	// get the latest price list formulas
 	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
 	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
-		Where("price_list_sub_group_id = ?", subGroupID).
+		Where("price_list_subgroup_code = ?", subGroupCode).
 		Order("create_dtm DESC").
 		Preload("PriceListFormulas").
 		Find(&priceListSubGroupFormulasMap).Error; err != nil {
 		return priceListSubGroupFormulasMap, err
 	}
 	return priceListSubGroupFormulasMap, nil
+}
+
+// GetPriceListSubGroupFormulasMapBySubGroupCodes loads price list formulas for multiple sub group codes.
+// Returns a map keyed by sub group code for efficient lookup.
+func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+	result := make(map[string][]models.PriceListSubGroupFormulasMap)
+
+	if len(subGroupCodes) == 0 {
+		return result, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	// get the latest price list formulas for all sub group codes
+	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
+	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
+		Where("price_list_subgroup_code IN ?", subGroupCodes).
+		Order("create_dtm DESC").
+		Preload("PriceListFormulas").
+		Find(&priceListSubGroupFormulasMap).Error; err != nil {
+		return nil, err
+	}
+
+	// Group formulas by sub group code
+	for _, formula := range priceListSubGroupFormulasMap {
+		result[formula.PriceListSubGroupCode] = append(result[formula.PriceListSubGroupCode], formula)
+	}
+
+	return result, nil
 }

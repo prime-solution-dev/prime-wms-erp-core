@@ -101,10 +101,10 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	creditRequestUpdate := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
 		if creditRequestValue.ExpireDtm != nil {
-			/*now := time.Now()
+			now := time.Now()
 			exp := creditRequestValue.ExpireDtm
 			if exp.Before(now) {
-				 creditTransaction = append(creditTransaction, models.CreditTransaction{
+				creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
 					Amount:          creditRequestValue.Amount,
@@ -136,7 +136,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 					IsAction:                     creditRequestValue.IsAction,
 				})
 
-			}*/
+			}
 		}
 		if creditRequestValue.EffectiveDtm != nil {
 			fmt.Println("Now:", time.Now().Format(time.RFC3339))

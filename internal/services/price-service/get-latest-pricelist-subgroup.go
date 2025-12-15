@@ -41,26 +41,59 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 	var prices []priceDomain.Price
 
+	// Convert all SubGroupIDs to UUIDs upfront
+	subGroupUUIDs := make([]uuid.UUID, 0, len(req.SubGroupIDs))
 	for _, subGroupID := range req.SubGroupIDs {
-		subGroup, err := getLatestSubGroupFunc(uuid.MustParse(subGroupID))
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch latest price list sub group: %w", err)
-		}
-		if subGroup == nil {
+		subGroupUUIDs = append(subGroupUUIDs, uuid.MustParse(subGroupID))
+	}
+
+	// Fetch all sub groups in one batch query
+	subGroups, err := priceListRepository.GetPriceListSubGroupsByIDs(subGroupUUIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch latest price list sub groups: %w", err)
+	}
+
+	// Create a map of sub groups by ID for efficient lookup
+	subGroupMap := make(map[uuid.UUID]*models.PriceListSubGroup, len(subGroups))
+	for i := range subGroups {
+		subGroupMap[subGroups[i].ID] = &subGroups[i]
+	}
+
+	// Verify all requested sub groups were found
+	for _, subGroupID := range subGroupUUIDs {
+		if _, found := subGroupMap[subGroupID]; !found {
 			return nil, &utils.BindingError{
 				Message: "Price list sub group not found",
 			}
 		}
+	}
 
-		priceListFormulas, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupID(subGroup.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
+	// Collect all sub group codes for batch formula fetching
+	subGroupCodes := make([]string, 0, len(subGroups))
+	for _, subGroup := range subGroups {
+		if subGroup.SubGroupCode != "" {
+			subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
 		}
+	}
+
+	// Fetch all formulas in one batch query
+	formulasMap, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
+	}
+
+	// Process each sub group using the maps
+	for _, subGroupID := range subGroupUUIDs {
+		subGroup := subGroupMap[subGroupID]
+
+		priceListFormulas := formulasMap[subGroup.SubGroupCode]
 
 		price := priceDomain.Price{
 			Id:                  subGroup.ID.String(),
 			TotalNetPriceUnit:   subGroup.TotalNetPriceUnit,
 			TotalNetPriceWeight: subGroup.TotalNetPriceWeight,
+			ExtraPriceUnit:      subGroup.ExtraPriceUnit,
+			ExtraPriceWeight:    subGroup.ExtraPriceWeight,
 			DefaultUom:          "kg",
 		}
 
@@ -74,6 +107,8 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		for _, formula := range priceListFormulas {
 			if formula.PriceListFormulas.FormulaType == "input" && formula.IsDefault {
 				price.DefaultUom = formula.PriceListFormulas.Uom
+				price.ExtraPriceUnit = subGroup.ExtraPriceUnit
+				price.ExtraPriceWeight = subGroup.ExtraPriceWeight
 				prices = append(prices, price)
 				foundDefaultInput = true
 				break
@@ -93,8 +128,11 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			case "pcs":
 				priceData := priceDomain.PriceData{
 					BasePrice:  subGroup.PriceListGroup.PriceUnit,
-					Extra:      0,
-					AvgKgStock: 0,
+					Extra:      subGroup.ExtraPriceUnit,
+					AvgKgStock: 0, // TODO: get avg kg stock from stock
+					WeightSpec: 0, // TODO: get weight spec from product
+					Pcs:        0, // TODO: get pcs from product
+					Kg:         0, // TODO: get kg from product
 				}
 
 				priceFormula := priceDomain.PriceFormula{
@@ -107,14 +145,18 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					return nil, fmt.Errorf("failed to calculate total net price unit: %w", err)
 				}
 				price.TotalNetPriceUnit = totalNetPriceUnit
+				price.ExtraPriceUnit = subGroup.ExtraPriceUnit
 				if formula.IsDefault {
 					price.DefaultUom = "pcs"
 				}
 			case "kg":
 				priceData := priceDomain.PriceData{
 					BasePrice:  subGroup.PriceListGroup.PriceWeight,
-					Extra:      0,
-					AvgKgStock: 0,
+					Extra:      subGroup.ExtraPriceWeight,
+					AvgKgStock: 0, // TODO: get avg kg stock from stock
+					WeightSpec: 0, // TODO: get weight spec from product
+					Pcs:        0, // TODO: get pcs from product
+					Kg:         0, // TODO: get kg from product
 				}
 				priceFormula := priceDomain.PriceFormula{
 					Expression: formula.PriceListFormulas.Expression,
@@ -126,6 +168,7 @@ func GetLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					return nil, fmt.Errorf("failed to calculate total net price weight: %w", err)
 				}
 				price.TotalNetPriceWeight = totalNetPriceWeight
+				price.ExtraPriceWeight = subGroup.ExtraPriceWeight
 				if formula.IsDefault {
 					price.DefaultUom = "kg"
 				}
@@ -156,6 +199,9 @@ func CalculatePrice(formula priceDomain.PriceFormula, priceData priceDomain.Pric
 		"base_price":   priceData.BasePrice,
 		"extra":        priceData.Extra,
 		"avg_kg_stock": priceData.AvgKgStock,
+		"weight_spec":  priceData.WeightSpec,
+		"pcs":          priceData.Pcs,
+		"kg":           priceData.Kg,
 	}
 
 	// รวม params → env

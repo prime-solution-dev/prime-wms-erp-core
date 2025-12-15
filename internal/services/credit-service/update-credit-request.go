@@ -23,6 +23,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	creditTransaction := []models.CreditTransaction{}
 	credit := []models.Credit{}
 	customerCode := []string{}
+	now := time.Now()
 	for _, credit := range req {
 		customerCode = append(customerCode, credit.CustomerCode)
 	}
@@ -86,7 +87,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					creditIDForDelete = append(creditIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
 				}
 			}
-
+			req[i].ActionDate = &now
 		}
 		if req[i].Status == "COMPLETED" {
 			creditExtra := []models.CreditExtra{}
@@ -103,7 +104,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					//ApproveDate:  "",
 				})
 			} else {
-				now := time.Now()
+
 				credit = append(credit, models.Credit{
 					ID:                 CreditID,
 					CustomerCode:       req[i].CustomerCode,
