@@ -1,0 +1,108 @@
+{
+  "price_list_formulas": [
+    {
+      "name": "kg = [Pcs] / [Avg. kg stock]",
+      "uom": "kg",
+      "formula_type": "price_calc",
+      "expression": "pcs/avg_kg_stock",
+      "params": {
+        "required": ["pcs", "avg_kg_stock"],
+        "description": "kg = [Pcs] / [Avg. kg stock]"
+      },
+      "rounding": 2
+    },
+    {
+      "name": "Pcs = ( [Base price] + 1.4 ) x [Avg kg. stock] x (1+2%)",
+      "uom": "pcs",
+      "formula_type": "price_calc",
+      "expression": "(base_price+1.4)*avg_kg_stock*1.02",
+      "params": {
+        "required": ["base_price", "avg_kg_stock"],
+        "description": "Pcs = ( [Base price] + 1.4 ) x [Avg kg. stock] x (1+2%)"
+      },
+      "rounding": 0
+    },
+    {
+      "name": "pcs = input",
+      "uom": "pcs",
+      "formula_type": "input",
+      "expression": null,
+      "params": null,
+      "rounding": 2
+    },
+    {
+      "name": "kg = input",
+      "uom": "kg",
+      "formula_type": "input",
+      "expression": null,
+      "params": null,
+      "rounding": 0
+    },
+    {
+      "name": "Pcs = ( [Base price] + 2.1 ) x [Avg kg. stock] x (1+2%)",
+      "uom": "pcs",
+      "formula_type": "price_calc",
+      "expression": "(base_price+2.1)*avg_kg_stock*1.02",
+      "params": {
+        "required": ["base_price", "avg_kg_stock"],
+        "description": "Pcs = ( [Base price] + 2.1 ) x [Avg kg. stock] x (1+2%)"
+      },
+      "rounding": 0
+    },
+    {
+      "name": "Pcs = [kg]  x [Weight Spec]",
+      "uom": "pcs",
+      "formula_type": "price_calc",
+      "expression": "kg*weight_spec",
+      "params": {
+        "required": ["kg", "weight_spec"],
+        "description": "Pcs = [kg]  x [Weight Spec]"
+      },
+      "rounding": 0
+    },
+    {
+      "name": "Pcs = [kg]  x [Avg. kg stock]",
+      "uom": "pcs",
+      "formula_type": "price_calc",
+      "expression": "kg*avg_kg_stock",
+      "params": {
+        "required": ["kg", "avg_kg_stock"],
+        "description": "Pcs = [kg]  x [Avg. kg stock]"
+      },
+      "rounding": 0
+    },
+    {
+      "name": "kg = Base price + Extra",
+      "uom": "kg",
+      "formula_type": "price_calc",
+      "expression": "base_price+extra",
+      "params": {
+        "required": ["base_price", "extra"],
+        "description": "kg = Base price + Extra"
+      },
+      "rounding": 2
+    },
+    {
+      "name": "Pcs = (Base price + Extra) x [Weight Spec]",
+      "uom": "pcs",
+      "formula_type": "price_calc",
+      "expression": "(base_price+extra)*weight_spec",
+      "params": {
+        "required": ["base_price", "extra", "weight_spec"],
+        "description": "Pcs = (Base price + Extra) x [Weight Spec]"
+      },
+      "rounding": 0
+    },
+    {
+      "name": "kg = [Pcs] / [Weight Spec]",
+      "uom": "kg",
+      "formula_type": "price_calc",
+      "expression": "pcs*weight_spec",
+      "params": {
+        "required": ["pcs", "weight_spec"],
+        "description": "kg = [Pcs] / [Weight Spec]"
+      },
+      "rounding": 0
+    }
+  ]
+}

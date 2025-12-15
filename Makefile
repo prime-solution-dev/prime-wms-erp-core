@@ -1,6 +1,6 @@
 SHELL := /usr/bin/fish
 
-.PHONY: test test-integration tidy seed-price-list-test
+.PHONY: test test-integration tidy seed-price-list-test seed-price-list-formulas
 
 test:
 	go test ./...
@@ -11,11 +11,11 @@ test-integration:
 tidy:
 	go mod tidy
 
-.PHONY: seed-price-list seed-price-list-test
+.PHONY: seed-price-list seed-price-list-test seed-price-list-formulas
 
 seed-price-list:
 	@test -n "$(GROUP_ID)"; or begin; echo "GROUP_ID is required. Usage: make seed-price-list GROUP_ID=<uuid>"; exit 1; end
-	go run ./internal/scripts/seed-price-list.go --group-id=$(GROUP_ID) \
+	go run ./internal/scripts/price_list_sub_group/seed-price-list.go --group-id=$(GROUP_ID) \
 		$(if $(COUNT),--count=$(COUNT),) \
 		$(if $(PRICE_MIN),--price-min=$(PRICE_MIN),) \
 		$(if $(PRICE_MAX),--price-max=$(PRICE_MAX),) \
@@ -27,3 +27,11 @@ seed-price-list:
 		$(if $(SEED),"--seed=$(SEED)",) \
 		$(if $(EXECUTE),"--execute=$(EXECUTE)",) \
 		$(if $(DATABASE),"--connection-string=$(DATABASE)",)
+
+seed-price-list-formulas:
+	go run ./internal/scripts/price_list_formulas/seed-price-list-formulas.go \
+		$(if $(INPUT),--input=$(INPUT),) \
+		$(if $(OUTPUT),--output=$(OUTPUT),) \
+		$(if $(EXECUTE),--execute=$(EXECUTE),) \
+		$(if $(database),--connection-string=$(CONNECTION_STRING),)
+		

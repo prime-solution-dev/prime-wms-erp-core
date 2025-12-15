@@ -239,6 +239,28 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, fmt.Errorf("group_codes is required")
 	}
 
+	// Load configuration using the first groupCode to extract requiredGroupCodes
+	groupCode := req.GroupCodes[0]
+	config, err := pricePatterns.LoadConfiguration(groupCode)
+	if err != nil {
+		// If config loading fails, continue with original groupCodes
+		// This ensures backward compatibility
+	} else {
+		// Extract requiredGroupCodes from configuration
+		requiredGroupCodes := pricePatterns.ExtractRequiredGroupCodes(config)
+		// Merge requiredGroupCodes into req.GroupCodes (avoid duplicates)
+		groupCodeMap := make(map[string]bool)
+		for _, gc := range req.GroupCodes {
+			groupCodeMap[gc] = true
+		}
+		for _, gc := range requiredGroupCodes {
+			if !groupCodeMap[gc] {
+				req.GroupCodes = append(req.GroupCodes, gc)
+				groupCodeMap[gc] = true
+			}
+		}
+	}
+
 	// Connect to database
 	sqlx, err := db.ConnectSqlx(`prime_erp`)
 	if err != nil {
@@ -261,8 +283,8 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Determine the pattern handler from the group's code
-	groupCode := priceListData[0].GroupCode
-	if groupCode == "" {
+	dataGroupCode := priceListData[0].GroupCode
+	if dataGroupCode == "" {
 		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
 
@@ -284,15 +306,23 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			return pricePatterns.BuildGroup1Item10Response(data, code)
 		},
 		"GROUP_1_ITEM_11": pricePatterns.BuildGroup1Item11Response,
+		"GROUP_1_ITEM_12": pricePatterns.BuildGroup1Item12Response,
 		"GROUP_1_ITEM_13": pricePatterns.BuildGroup1Item13Response,
+		"GROUP_1_ITEM_14": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_15": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_16": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_17": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_18": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_19": pricePatterns.BuildGroup1Item12Response,
+		"GROUP_1_ITEM_20": pricePatterns.BuildGroup1Item12Response,
 	}
 
-	handler, ok := handlers[groupCode]
+	handler, ok := handlers[dataGroupCode]
 	if !ok {
-		return nil, fmt.Errorf("unsupported GroupCode: %s", groupCode)
+		return nil, fmt.Errorf("unsupported GroupCode: %s", dataGroupCode)
 	}
 
-	response, err := handler(priceListData, groupCode)
+	response, err := handler(priceListData, dataGroupCode)
 	if err != nil {
 		return nil, err
 	}
