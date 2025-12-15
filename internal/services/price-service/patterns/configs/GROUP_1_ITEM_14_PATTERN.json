@@ -149,6 +149,24 @@
           "headerName": "Extra",
           "width": 120,
           "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "delivery_date",
+          "headerName": "ส่งมอบ ว/ด/ป",
+          "width": 150,
+          "dataMapping": "delivery_date"
+        },
+        {
+          "field": "ton",
+          "headerName": "จำนวนตัน",
+          "width": 130,
+          "dataMapping": "ton"
+        },
+        {
+          "field": "next_production",
+          "headerName": "ผลิตงวดต่อไป",
+          "width": 180,
+          "dataMapping": "next_production"
         }
       ],
       "applicableCategories": [],
@@ -157,7 +175,10 @@
         "line_bundle",
         "total_net_price_weight",
         "remark",
-        "inactive"
+        "inactive",
+        "next_production",
+        "delivery_date",
+        "ton"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight"
