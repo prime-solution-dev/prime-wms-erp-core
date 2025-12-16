@@ -156,9 +156,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 						SaleCode:         doc.DocRef,
 					})
 					// Return immediately - don't update sale if critical validations fail
-					// return res, nil
-					updateSales[0].IsApproved = false
-					updateSales[0].StatusApprove = "PENDING"
+					return res, nil
 				} else {
 					updateSales[0].IsApproved = true
 					updateSales[0].StatusApprove = "COMPLETED"
