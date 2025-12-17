@@ -5,14 +5,14 @@ meta {
 }
 
 post {
-  url: http://localhost:9115/price/SubGroup/Latest
+  url: {{URL_ERP}}/SubGroup/Latest
   body: json
   auth: inherit
 }
 
 body:json {
   {
-    "subgroup_id": "031ec421-2d97-4590-b0b4-e62dea7fcddc"
+    "subgroup_ids": ["031ec421-2d97-4590-b0b4-e62dea7fcddc"]
   }
 }
 
