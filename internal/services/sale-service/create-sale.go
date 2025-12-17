@@ -162,51 +162,49 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			return nil, err
 		}
 
-		for _, doc := range verifyRes.Documents {
-			// Check if critical validations fail - don't allow creation if they fail
-			// if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassExpiryPrice {
-			// 	res = append(res, CreateSaleResponse{
-			// 		IsPass:           false,
-			// 		IsPassPrice:      doc.IsPassPrice,
-			// 		IsPassCredit:     doc.IsPassCredit,
-			// 		IsPassInventory:  doc.IsPassInventory,
-			// 		IsPassExpiryDate: doc.IsPassExpiryPrice,
-			// 		SaleCode:         doc.DocRef,
-			// 	})
-			// 	// Return immediately - don't create sale if critical validations fail
-			// 	return res, nil
-			// }
-
+		// Check if critical validations fail - don't allow creation if they fail
+		if !verifyRes.IsPassCredit || !verifyRes.IsPassInventory || !verifyRes.IsPassExpiryPrice {
 			res = append(res, CreateSaleResponse{
-				IsPass:           doc.IsPassPrice && doc.IsPassCredit && doc.IsPassInventory && doc.IsPassExpiryPrice,
-				IsPassPrice:      doc.IsPassPrice,
-				IsPassCredit:     doc.IsPassCredit,
-				IsPassInventory:  doc.IsPassInventory,
-				IsPassExpiryDate: doc.IsPassExpiryPrice,
-				SaleCode:         doc.DocRef,
+				IsPass:           false,
+				IsPassPrice:      verifyRes.IsPassPrice,
+				IsPassCredit:     verifyRes.IsPassCredit,
+				IsPassInventory:  verifyRes.IsPassInventory,
+				IsPassExpiryDate: verifyRes.IsPassExpiryPrice,
+				SaleCode:         verifyRes.Documents[0].DocRef,
 			})
+			// Return immediately - don't create sale if critical validations fail
+			return res, nil
+		}
 
-			for _, sale := range createSales {
-				if doc.IsPassPrice {
-					sale.PassPriceList = "Y"
-				} else {
-					sale.PassPriceList = "N"
-				}
-				if doc.IsPassExpiryPrice {
-					sale.PassPriceExpire = "Y"
-				} else {
-					sale.PassPriceExpire = "N"
-				}
-				if doc.IsPassCredit {
-					sale.PassCreditLimit = "Y"
-				} else {
-					sale.PassCreditLimit = "N"
-				}
-				if doc.IsPassInventory {
-					sale.PassAtpCheck = "Y"
-				} else {
-					sale.PassAtpCheck = "N"
-				}
+		res = append(res, CreateSaleResponse{
+			IsPass:           verifyRes.IsPassPrice && verifyRes.IsPassCredit && verifyRes.IsPassInventory && verifyRes.IsPassExpiryPrice,
+			IsPassPrice:      verifyRes.IsPassPrice,
+			IsPassCredit:     verifyRes.IsPassCredit,
+			IsPassInventory:  verifyRes.IsPassInventory,
+			IsPassExpiryDate: verifyRes.IsPassExpiryPrice,
+			SaleCode:         verifyRes.Documents[0].DocRef,
+		})
+
+		for _, sale := range createSales {
+			if verifyRes.IsPassPrice {
+				sale.PassPriceList = "Y"
+			} else {
+				sale.PassPriceList = "N"
+			}
+			if verifyRes.IsPassExpiryPrice {
+				sale.PassPriceExpire = "Y"
+			} else {
+				sale.PassPriceExpire = "N"
+			}
+			if verifyRes.IsPassCredit {
+				sale.PassCreditLimit = "Y"
+			} else {
+				sale.PassCreditLimit = "N"
+			}
+			if verifyRes.IsPassInventory {
+				sale.PassAtpCheck = "Y"
+			} else {
+				sale.PassAtpCheck = "N"
 			}
 		}
 	}
