@@ -339,7 +339,7 @@ func GeneratePrePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
 		return []string{}, nil // No pre-purchase to generate codes for
 	}
 
-	configCode := "RUNNING_POB"
+	configCode := "RUNNING_PB"
 
 	getReq := systemConfigService.GetRunningSystemConfigRequest{
 		ConfigCode: configCode,
