@@ -103,6 +103,7 @@ func MapPurchaseFormRequestToPurchaseModel(req models.PurchaseFormRequest) model
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
+		CreditTerm:      req.CreditTerm,
 		UpdateBy:        "system",
 		UpdateDtm:       now,
 	}
@@ -181,6 +182,7 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		StatusApprove:   purchase.StatusApprove,
 		StatusPayment:   purchase.StatusPayment,
 		Remark:          purchase.Remark,
+		CreditTerm:      purchase.CreditTerm,
 		CreateBy:        purchase.CreateBy,
 		CreateDtm:       purchase.CreateDtm.Format(time.RFC3339),
 		UpdateBy:        purchase.UpdateBy,
