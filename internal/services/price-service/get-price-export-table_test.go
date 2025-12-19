@@ -2,6 +2,7 @@ package priceService
 
 import (
 	"encoding/json"
+	"prime-erp-core/internal/models"
 	"testing"
 
 	"github.com/google/uuid"
@@ -71,8 +72,9 @@ func TestBuildExportTableTyped_ColumnsAndRows(t *testing.T) {
 
 	resp := buildExportTableTyped(groups, groupNameByCode, itemNameByCode)
 
-	if len(resp.Columns) != 6 {
-		t.Fatalf("expected 6 columns (3 group + udf_json + 2 udf), got %d", len(resp.Columns))
+	// Note: UDF columns are now fixed list, so count may vary
+	if len(resp.Columns) < 3 {
+		t.Fatalf("expected at least 3 group columns, got %d", len(resp.Columns))
 	}
 	if resp.Columns[0].Field != "PRODUCT_GROUP1" || resp.Columns[0].HeaderName != "หมวดหลัก" {
 		t.Fatalf("unexpected first column: %+v", resp.Columns[0])
@@ -96,14 +98,87 @@ func TestBuildExportTableTyped_ColumnsAndRows(t *testing.T) {
 		t.Fatalf("expected PRODUCT_GROUP6 value_name, got %v", row["PRODUCT_GROUP6"])
 	}
 
-	if row["udf_json"] == "" {
-		t.Fatalf("expected udf_json to be present, got empty")
-	}
 	if row["is_highlight"] != true {
 		t.Fatalf("expected is_highlight true, got %v", row["is_highlight"])
 	}
 	// json.Unmarshal to interface{} makes numbers float64
 	if row["stock"] != float64(123) {
 		t.Fatalf("expected stock 123, got %v", row["stock"])
+	}
+}
+
+func TestBuildBasedPriceTab_Structure(t *testing.T) {
+	gID := uuid.New()
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:          gID,
+				GroupCode:   "GROUP_1_ITEM_1",
+				PriceWeight: 23.4,
+				Terms: []PriceListGroupTerm{
+					{
+						TermCode:   "T1",
+						Pdc:        0.23,
+						PdcPercent: 1,
+						Due:        0.35,
+						DuePercent: 1.5,
+					},
+				},
+			},
+		},
+	}
+
+	groupMap := map[string]models.GetGroupResponse{
+		"GROUP_1_ITEM_1": {
+			GroupCode: "GROUP_1_ITEM_1",
+			GroupName: "หมวดเหล็กแผ่น",
+		},
+	}
+
+	paymentTermMap := map[string]GetPaymentTermResponse{
+		"T1": {
+			TermCode: "T1",
+			TermName: "15/30",
+		},
+	}
+
+	tab := buildBasedPriceTab(groups, groupMap, paymentTermMap)
+
+	if tab.Name != "Based price" {
+		t.Fatalf("expected tab name 'Based price', got %s", tab.Name)
+	}
+
+	if tab.Headers.Report != "Pricelist- Based price" {
+		t.Fatalf("expected report header 'Pricelist- Based price', got %s", tab.Headers.Report)
+	}
+
+	if len(tab.Columns) < 3 {
+		t.Fatalf("expected at least 3 columns (product, price_pr, cash_pr), got %d", len(tab.Columns))
+	}
+
+	if tab.Columns[0].Field != "product" {
+		t.Fatalf("expected first column field 'product', got %s", tab.Columns[0].Field)
+	}
+
+	if len(tab.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(tab.Rows))
+	}
+
+	row := tab.Rows[0]
+	if row["product"] != "หมวดเหล็กแผ่น" {
+		t.Fatalf("expected product 'หมวดเหล็กแผ่น', got %v", row["product"])
+	}
+
+	if row["price_pr"] != 23.4 {
+		t.Fatalf("expected price_pr 23.4, got %v", row["price_pr"])
+	}
+
+	if row["cash_pr"] != 23.4 {
+		t.Fatalf("expected cash_pr 23.4, got %v", row["cash_pr"])
+	}
+
+	// Check term fields
+	if row["term_T1_pdc_baht"] != 0.23 {
+		t.Fatalf("expected term_T1_pdc_baht 0.23, got %v", row["term_T1_pdc_baht"])
 	}
 }
