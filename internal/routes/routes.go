@@ -64,6 +64,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetPriceDetail", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetPriceDetail)
 	})
+	price.POST("/GetPriceExportTable", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceExportTable)
+	})
 	price.POST("/SubGroup/Latest", func(c *gin.Context) {
 		utils.ProcessRequestWithBinding(c, priceService.GetLatestPriceListSubGroup)
 	})
