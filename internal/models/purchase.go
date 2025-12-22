@@ -105,6 +105,8 @@ type Purchase struct {
 	Remark                      string         `json:"remark"`
 	CreditTerm                  int            `json:"credit_term"`
 	StatusPayment               string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	UsedType                    string         `json:"used_type"`      // GR
+	UsedStatus                  string         `json:"used_status"`    // PENDING, COMPLETED
 	CreateBy                    string         `json:"create_by"`
 	CreateDtm                   time.Time      `json:"create_dtm"`
 	UpdateBy                    string         `json:"update_by"`
@@ -508,6 +510,8 @@ type PurchaseResponse struct {
 	IsApproved                  bool                   `json:"is_approved"`
 	StatusApprove               string                 `json:"status_approve"`
 	StatusPayment               string                 `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	UsedType                    string                 `json:"used_type"`      // GR
+	UsedStatus                  string                 `json:"used_status"`    // PENDING, COMPLETED
 	Remark                      string                 `json:"remark"`
 	CreditTerm                  int                    `json:"credit_term"`
 	CreateBy                    string                 `json:"create_by"`
@@ -708,6 +712,7 @@ type GetUnitsDetailBarcodeComponent struct {
 
 // For GR or GR Plan DTOs
 type CompletePurchaseItemRequest struct {
+	UsedType          string   `json:"used_type"` // GR, GR_PLAN
 	PurchaseItemCodes []string `json:"purchase_item_codes"`
 }
 
