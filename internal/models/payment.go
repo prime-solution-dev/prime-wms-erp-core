@@ -15,10 +15,10 @@ type Payment struct {
 	Method         string           `json:"method"` // CASH, BANK_TRANSFER, CHEQUE
 	Status         string           `json:"status"` // PENDING, COMPLETED, CANCELLED
 	Remark         string           `json:"remark"`
-	CreateBy       string           `json:"create_by"`
-	CreateDtm      time.Time        `json:"create_dtm"`
-	UpdateBy       string           `json:"update_by"`
-	UpdateDate     time.Time        `json:"update_date"`
+	CreateBy       string           `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm      time.Time        `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy       string           `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate     time.Time        `gorm:"autoUpdateTime;<-" json:"update_date"`
 	ExternalID     string           `json:"external_id"`
 	PaymentInvoice []PaymentInvoice `json:"payment_invoice"`
 }

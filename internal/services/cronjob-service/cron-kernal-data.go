@@ -26,11 +26,11 @@ func GetKernal() {
 
 	go func() {
 		defer wg.Done()
-		//CreditExtra()
+		CreditRequestEffectiveDtm()
 	}()
 
 	go func() {
 		defer wg.Done()
-		CreditRequestEffectiveDtm()
+		CreditExtra()
 	}()
 }
