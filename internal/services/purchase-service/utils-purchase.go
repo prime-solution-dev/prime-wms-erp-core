@@ -181,6 +181,8 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		IsApproved:      purchase.IsApproved,
 		StatusApprove:   purchase.StatusApprove,
 		StatusPayment:   purchase.StatusPayment,
+		UsedType:        purchase.UsedType,
+		UsedStatus:      purchase.UsedStatus,
 		Remark:          purchase.Remark,
 		CreditTerm:      purchase.CreditTerm,
 		CreateBy:        purchase.CreateBy,

@@ -390,7 +390,7 @@ func CompletePO(purchaseCodes []string) (err error) {
 	})
 }
 
-func CompletePOItem(purchaseItemCodes []string) error {
+func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
@@ -419,6 +419,7 @@ func CompletePOItem(purchaseItemCodes []string) error {
 
 		for _, purchaseID := range purchaseIDs {
 			var notCompletedCount int64
+			var itemsCount int64
 
 			if err := tx.Model(&models.PurchaseItem{}).
 				Where("purchase_id = ? AND status = ?", purchaseID, "COMPLETED").
@@ -426,10 +427,31 @@ func CompletePOItem(purchaseItemCodes []string) error {
 				return err
 			}
 
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id = ?", purchaseID).
+				Count(&itemsCount).Error; err != nil {
+				return err
+			}
+
 			if notCompletedCount == 0 {
 				if err := tx.Model(&models.Purchase{}).
 					Where("id = ?", purchaseID).
-					Update("status", "COMPLETED").Error; err != nil {
+					Updates(map[string]interface{}{
+						"status":      "COMPLETED",
+						"used_type":   usedType,
+						"used_status": "COMPLETED",
+						"update_dtm":  time.Now().UTC(),
+					}).Error; err != nil {
+					return err
+				}
+			} else if notCompletedCount > 0 && notCompletedCount < itemsCount {
+				if err := tx.Model(&models.Purchase{}).
+					Where("id = ?", purchaseID).
+					Updates(map[string]interface{}{
+						"used_type":   usedType,
+						"used_status": "PARTIAL",
+						"update_dtm":  time.Now().UTC(),
+					}).Error; err != nil {
 					return err
 				}
 			}
