@@ -5,13 +5,11 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
-	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -58,18 +56,6 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	}
 
-	jsonBytesCreateInvoice, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-
-	invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
-	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
 		"topic":     []string{"AR"},
@@ -97,7 +83,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if HookInterfaceValue != nil {
 			str, _ := HookInterfaceValue.(string)
 
-			invoiceValue := []models.Invoice{}
+			/* 	invoiceValue := []models.Invoice{}
 			invoiceValue = append(invoiceValue, models.Invoice{
 				ID:         idInvoice[0],
 				ExternalID: str,
@@ -106,6 +92,16 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			_, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, []models.InvoiceItem{})
 			if errCreateApproval != nil {
 				return nil, errCreateApproval
+			} */
+			req[0].ExternalID = str
+			jsonBytesCreateInvoice, err := json.Marshal(req)
+			if err != nil {
+				return nil, err
+			}
+
+			createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+			if errCreateInvoice != nil {
+				return nil, errCreateInvoice
 			}
 
 			depositMapResult, err := interfaceService.GetDeposit(str)
@@ -146,10 +142,19 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				}
 
 			}
-
+			return createInvoiceReturn, nil
 		}
+	} else {
+		jsonBytesCreateInvoice, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
+
+		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+		if errCreateInvoice != nil {
+			return nil, errCreateInvoice
+		}
+		return createInvoiceReturn, nil
 	}
-
-	return createInvoiceReturn, nil
-
+	return nil, nil
 }
