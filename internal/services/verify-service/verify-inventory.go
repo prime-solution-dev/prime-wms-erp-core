@@ -77,10 +77,10 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 			CompanyCode:   atp.CompanyCode,
 			SiteCode:      atp.SiteCode,
 			ProductCode:   atp.ProductCode,
-			WarehouseCode: atp.WarehouseCode,
-			TodayStockQty: atp.TodayStockQty,
-			TodayAtpQty:   atp.TodayAtpQty,
-			TotalAtpQty:   atp.TotalAtpQty,
+			WarehouseCode: "",
+			TodayStockQty: int(atp.TodayStockQty),
+			TodayAtpQty:   int(atp.TodayAtpQty),
+			TotalAtpQty:   int(atp.TotalAtpQty),
 		})
 	}
 

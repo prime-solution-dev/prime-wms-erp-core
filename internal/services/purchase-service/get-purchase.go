@@ -248,6 +248,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				IsApproved:           purchase.IsApproved,
 				StatusApprove:        statusApprove,
 				Remark:               item.Remark,
+				CreditTerm:           purchase.CreditTerm,
 				CreateDtm:            item.CreateDtm.Format(time.RFC3339),
 				CreateBy:             item.CreateBy,
 				UpdateDtm:            item.UpdateDtm.Format(time.RFC3339),
