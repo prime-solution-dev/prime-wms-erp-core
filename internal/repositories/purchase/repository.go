@@ -449,7 +449,7 @@ func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 					Where("id = ?", purchaseID).
 					Updates(map[string]interface{}{
 						"used_type":   usedType,
-						"used_status": "PENDING",
+						"used_status": "PARTIAL",
 						"update_dtm":  time.Now().UTC(),
 					}).Error; err != nil {
 					return err
