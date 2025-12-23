@@ -143,6 +143,7 @@ func GetPurchaseList(
 
 func GetPurchaseListByGRFilter(
 	supplierCodes []string,
+	purchaseItemCodes []string,
 	statusApprove []string,
 	purchaseItemStatus []string,
 	productCodes []string,
@@ -167,6 +168,8 @@ func GetPurchaseListByGRFilter(
 
 	if len(purchaseItemStatus) > 0 {
 		query = query.Preload("PurchaseItems", "status IN ?", purchaseItemStatus)
+	} else if len(purchaseItemCodes) > 0 {
+		query = query.Preload("PurchaseItems", "purchase_item IN ?", purchaseItemCodes)
 	} else {
 		query = query.Preload("PurchaseItems")
 	}
