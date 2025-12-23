@@ -88,7 +88,10 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, purchase := range purchases {
 		purchaseResponse := MapPurchaseModelToPurchaseResponse(purchase)
 
-		purchaseResponse.StatusApprove = mapStatusApprove[purchase.PurchaseCode]
+		statusApprove, ok := mapStatusApprove[purchase.PurchaseCode]
+		if ok {
+			purchaseResponse.StatusApprove = statusApprove
+		}
 
 		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
 			if prePurchase, ok := mapPrePurchase[*purchase.DocRef]; ok {
