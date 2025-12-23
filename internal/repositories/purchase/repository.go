@@ -143,6 +143,7 @@ func GetPurchaseList(
 
 func GetPurchaseListByGRFilter(
 	supplierCodes []string,
+	purchaseCodes []string,
 	purchaseItemCodes []string,
 	statusApprove []string,
 	purchaseItemStatus []string,
@@ -172,6 +173,15 @@ func GetPurchaseListByGRFilter(
 		query = query.Preload("PurchaseItems", "purchase_item IN ?", purchaseItemCodes)
 	} else {
 		query = query.Preload("PurchaseItems")
+	}
+
+	if len(purchaseCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("purchase.purchase_code IN ?", purchaseCodes)
+
+		query = query.Where("EXISTS (?)", sub)
 	}
 
 	if len(notItems) > 0 {
