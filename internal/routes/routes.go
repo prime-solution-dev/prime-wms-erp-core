@@ -141,6 +141,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	payment.POST("/CreatePayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, paymentService.CreatePayment)
 	})
+	payment.POST("/DeletePayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.DeletePayment)
+	})
 
 	//sale
 	sale := ctx.Group("/sale")
