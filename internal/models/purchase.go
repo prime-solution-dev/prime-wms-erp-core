@@ -722,15 +722,16 @@ type ExceptPurchaseAndPurchaseItemRequest struct {
 }
 
 type GetPurchaseItemRequest struct {
-	NotItems        []ExceptPurchaseAndPurchaseItemRequest `json:"not_items"`
-	SupplierCodes   []string                               `json:"supplier_codes"`
-	POStatusApprove []string                               `json:"po_status_approve"`
-	POItemStatus    []string                               `json:"po_item_status"`
-	ProductCodes    []string                               `json:"product_codes"`
-	CompanyCode     string                                 `json:"company_code"`
-	SiteCode        string                                 `json:"site_code"`
-	Page            int                                    `json:"page"`
-	PageSize        int                                    `json:"page_size"`
+	NotItems          []ExceptPurchaseAndPurchaseItemRequest `json:"not_items"`
+	SupplierCodes     []string                               `json:"supplier_codes"`
+	PurchaseItemCodes []string                               `json:"purchase_item_codes"`
+	POStatusApprove   []string                               `json:"po_status_approve"`
+	POItemStatus      []string                               `json:"po_item_status"`
+	ProductCodes      []string                               `json:"product_codes"`
+	CompanyCode       string                                 `json:"company_code"`
+	SiteCode          string                                 `json:"site_code"`
+	Page              int                                    `json:"page"`
+	PageSize          int                                    `json:"page_size"`
 }
 
 type GetPurchaseItemResponse struct {

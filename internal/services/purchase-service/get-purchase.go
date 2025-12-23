@@ -122,6 +122,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Get Purchase Items
 	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
 		req.SupplierCodes,
+		req.PurchaseItemCodes,
 		req.POStatusApprove,
 		req.POItemStatus,
 		req.ProductCodes,
