@@ -404,7 +404,7 @@ type UpdatePriceListSubGroupRequest struct {
 	Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
 }
 
-type GetLatestPriceListSubGroupRequest struct {
+type UpdateLatestPriceListSubGroupRequest struct {
 	SubGroupIDs []string `json:"subgroup_ids" binding:"required,dive,uuid4"`
 }
 
@@ -456,5 +456,5 @@ type PriceListSubGroupFormulasMap struct {
 }
 
 func (PriceListSubGroupFormulasMap) TableName() string {
-	return "price_list_sub_group_formulas_map"
+	return "price_list_subgroup_formulas_map"
 }
