@@ -177,7 +177,19 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if len(toleranceErrorResponse.ToleranceError) == 0 {
 
 		if len(completePOItem) > 0 {
+			requestDataGetPO := map[string]interface{}{
+				"used_type":           "GR",
+				"purchase_item_codes": completePOItem,
+			}
 
+			jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
+			if err != nil {
+				errors.New("Error marshalling data :")
+			}
+			_, errCompletePOItem := purchaseService.CompletePOItem(ctx, string(jsonBytesGetPO))
+			if errCompletePOItem != nil {
+				return nil, errCompletePOItem
+			}
 		}
 
 		jsonBytesCreateInvoice, err := json.Marshal(req)
