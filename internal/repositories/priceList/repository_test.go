@@ -496,3 +496,213 @@ func TestGetPriceListSubGroupsByIDs_WithPriceListGroupExtraKey(t *testing.T) {
 		}
 	}
 }
+
+func TestGetPriceListSubGroupsByGroupCodes_WithExtrasAndKeys(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatalf("db connect failed: %v", err)
+	}
+	defer db.CloseGORM(gormx)
+
+	// Ensure extra tables exist
+	extraStmts := []string{
+		`CREATE TABLE IF NOT EXISTS price_list_group_extra (
+            id uuid PRIMARY KEY,
+            price_list_group_id uuid REFERENCES price_list_group(id),
+            extra_key text,
+            condition_code text,
+            value_int integer,
+            length_extra_key integer,
+            operator text,
+            cond_range_min double precision,
+            cond_range_max double precision,
+            create_by text,
+            create_dtm timestamp,
+            update_by text,
+            update_dtm timestamp
+        );`,
+		`CREATE TABLE IF NOT EXISTS price_list_group_extra_key (
+            id uuid PRIMARY KEY,
+            group_extra_id uuid REFERENCES price_list_group_extra(id),
+            code text,
+            value text,
+            seq integer
+        );`,
+	}
+	for _, s := range extraStmts {
+		if err := gormx.Exec(s).Error; err != nil {
+			t.Fatalf("failed to create extra tables: %v", err)
+		}
+	}
+
+	groupID1 := uuid.New()
+	groupID2 := uuid.New()
+	groupIDOther := uuid.New()
+	subGroupID1 := uuid.New()
+	subGroupID2 := uuid.New()
+	subGroupOtherID := uuid.New()
+	extraID1 := uuid.New()
+	extraKeyID1 := uuid.New()
+	now := time.Now()
+
+	// Create base groups
+	err = gormx.Create(&models.PriceListGroup{
+		ID:          groupID1,
+		CompanyCode: "TEST",
+		SiteCode:    "TEST",
+		GroupCode:   "GRP_CODE_1",
+		PriceUnit:   10,
+		PriceWeight: 20,
+		Currency:    "THB",
+		CreateBy:    "tester",
+		CreateDtm:   now,
+		UpdateBy:    "tester",
+		UpdateDtm:   now,
+	}).Error
+	assert.NoError(t, err, "create price list group 1")
+
+	err = gormx.Create(&models.PriceListGroup{
+		ID:          groupID2,
+		CompanyCode: "TEST",
+		SiteCode:    "TEST",
+		GroupCode:   "GRP_CODE_2",
+		PriceUnit:   15,
+		PriceWeight: 25,
+		Currency:    "THB",
+		CreateBy:    "tester",
+		CreateDtm:   now,
+		UpdateBy:    "tester",
+		UpdateDtm:   now,
+	}).Error
+	assert.NoError(t, err, "create price list group 2")
+
+	// Group that should not be returned
+	err = gormx.Create(&models.PriceListGroup{
+		ID:          groupIDOther,
+		CompanyCode: "TEST",
+		SiteCode:    "TEST",
+		GroupCode:   "GRP_CODE_OTHER",
+		PriceUnit:   20,
+		PriceWeight: 30,
+		Currency:    "THB",
+		CreateBy:    "tester",
+		CreateDtm:   now,
+		UpdateBy:    "tester",
+		UpdateDtm:   now,
+	}).Error
+	assert.NoError(t, err, "create other price list group")
+
+	// Create extra and extra key for group 1
+	err = gormx.Create(&models.PriceListGroupExtra{
+		ID:               extraID1,
+		PriceListGroupID: groupID1,
+		ExtraKey:         "EXTRA_KEY_G1",
+		ConditionCode:    "COND_G1",
+		ValueInt:         100,
+		LengthExtraKey:   5,
+		Operator:         ">",
+		CondRangeMin:     0,
+		CondRangeMax:     1000,
+		CreateBy:         "tester",
+		CreateDtm:        &now,
+		UpdateBy:         "tester",
+		UpdateDtm:        &now,
+	}).Error
+	assert.NoError(t, err, "create price list group extra 1")
+
+	err = gormx.Create(&models.PriceListGroupExtraKey{
+		ID:           extraKeyID1,
+		GroupExtraID: extraID1,
+		Code:         "EXTRA_CODE_G1",
+		Value:        "EXTRA_VALUE_G1",
+		Seq:          1,
+	}).Error
+	assert.NoError(t, err, "create price list group extra key 1")
+
+	// Create sub groups for each group
+	err = gormx.Create(&models.PriceListSubGroup{
+		ID:               subGroupID1,
+		PriceListGroupID: groupID1,
+		SubgroupKey:      "SUB_G1",
+		IsTrading:        true,
+		PriceUnit:        11,
+		CreateBy:         "tester",
+		CreateDtm:        &now,
+		UpdateBy:         "tester",
+		UpdateDtm:        &now,
+	}).Error
+	assert.NoError(t, err, "create sub group 1")
+
+	err = gormx.Create(&models.PriceListSubGroup{
+		ID:               subGroupID2,
+		PriceListGroupID: groupID2,
+		SubgroupKey:      "SUB_G2",
+		IsTrading:        true,
+		PriceUnit:        12,
+		CreateBy:         "tester",
+		CreateDtm:        &now,
+		UpdateBy:         "tester",
+		UpdateDtm:        &now,
+	}).Error
+	assert.NoError(t, err, "create sub group 2")
+
+	// Sub group for the other group (should not be included when filtering)
+	err = gormx.Create(&models.PriceListSubGroup{
+		ID:               subGroupOtherID,
+		PriceListGroupID: groupIDOther,
+		SubgroupKey:      "SUB_OTHER",
+		IsTrading:        true,
+		PriceUnit:        13,
+		CreateBy:         "tester",
+		CreateDtm:        &now,
+		UpdateBy:         "tester",
+		UpdateDtm:        &now,
+	}).Error
+	assert.NoError(t, err, "create other sub group")
+
+	// Add a subgroup key to subGroupID1 to verify Preload of PriceListSubGroupKeys
+	err = gormx.Create(&models.PriceListSubGroupKey{
+		ID:         uuid.New(),
+		SubGroupID: subGroupID1,
+		Code:       "CODE_G1",
+		Value:      "VALUE_G1",
+		Seq:        1,
+	}).Error
+	assert.NoError(t, err, "create subgroup key for group 1")
+
+	// Call repository
+	results, err := GetPriceListSubGroupsByGroupCodes([]string{"GRP_CODE_1", "GRP_CODE_2"})
+	assert.NoError(t, err, "repository fetch by group codes")
+	assert.NotEmpty(t, results, "expected results")
+
+	// Verify that only sub groups from the requested groups are returned
+	for _, r := range results {
+		assert.True(t, r.PriceListGroup.GroupCode == "GRP_CODE_1" || r.PriceListGroup.GroupCode == "GRP_CODE_2",
+			"unexpected group code in result: %s", r.PriceListGroup.GroupCode)
+	}
+
+	// Find the subgroup for group 1 and verify extras and keys are loaded
+	var foundG1 *models.PriceListSubGroup
+	for i := range results {
+		if results[i].PriceListGroup.ID == groupID1 {
+			foundG1 = &results[i]
+			break
+		}
+	}
+	if assert.NotNil(t, foundG1, "expected subgroup for group 1") {
+		assert.Equal(t, subGroupID1, foundG1.ID)
+		assert.NotEmpty(t, foundG1.PriceListGroup.PriceListGroupExtras, "PriceListGroupExtras should be loaded for group 1")
+		extra := foundG1.PriceListGroup.PriceListGroupExtras[0]
+		assert.Equal(t, extraID1, extra.ID)
+		assert.Equal(t, "EXTRA_KEY_G1", extra.ExtraKey)
+		assert.NotEmpty(t, extra.PriceListGroupExtraKeys, "PriceListGroupExtraKeys should be loaded for group 1")
+		extraKey := extra.PriceListGroupExtraKeys[0]
+		assert.Equal(t, extraKeyID1, extraKey.ID)
+		assert.Equal(t, "EXTRA_CODE_G1", extraKey.Code)
+		assert.Equal(t, "EXTRA_VALUE_G1", extraKey.Value)
+
+		assert.NotEmpty(t, foundG1.PriceListSubGroupKeys, "PriceListSubGroupKeys should be loaded for subgroup 1")
+		assert.Equal(t, "CODE_G1", foundG1.PriceListSubGroupKeys[0].Code)
+		assert.Equal(t, "VALUE_G1", foundG1.PriceListSubGroupKeys[0].Value)
+	}
+}
