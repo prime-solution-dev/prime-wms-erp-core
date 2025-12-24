@@ -141,7 +141,7 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_kg_before_price_weight",
+              "field": "before_price_weight",
               "headerName": "ราคาขาย before",
               "width": 160,
               "cellStyle": {
@@ -150,7 +150,7 @@
               "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_kg_total_net_price_weight",
+              "field": "total_net_price_weight",
               "headerName": "ราคาขาย after",
               "width": 160,
               "cellStyle": {
@@ -166,7 +166,7 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before_price_unit",
+              "field": "before_price_unit",
               "headerName": "ราคาขาย before",
               "width": 160,
               "cellStyle": {
@@ -175,7 +175,7 @@
               "dataMapping": "before_price_unit"
             },
             {
-              "field": "price_line_total_net_price_unit",
+              "field": "total_net_price_unit",
               "headerName": "ราคาขาย after",
               "width": 160,
               "cellStyle": {
@@ -211,16 +211,16 @@
       "editable_suffixes": [
         "is_highlight",
         "line_bundle",
-        "price_kg_total_net_price_weight",
-        "price_line_total_net_price_unit",
+        "total_net_price_weight",
+        "total_net_price_unit",
         "selling_fast",
         "selling_slow",
         "remark",
         "inactive"
       ],
       "fetchable_suffixes": [
-        "price_kg_total_net_price_weight",
-        "price_line_total_net_price_weight"
+        "total_net_price_weight",
+        "total_net_price_unit"
       ]
     }
   ],
