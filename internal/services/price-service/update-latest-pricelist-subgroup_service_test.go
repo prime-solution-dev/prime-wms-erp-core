@@ -25,8 +25,10 @@ func TestUpdateLatestPriceListSubGroup_ValidationErrors(t *testing.T) {
 		assertFunc func(*testing.T, error)
 	}{
 		{
-			name:    "missing subgroup ids",
-			payload: map[string]interface{}{},
+			name: "missing subgroup ids",
+			payload: map[string]interface{}{
+				// default update_type=subgroup
+			},
 			assertFunc: func(t *testing.T, err error) {
 				assert.Error(t, err)
 				_, ok := err.(*utils.BindingError)
@@ -36,6 +38,7 @@ func TestUpdateLatestPriceListSubGroup_ValidationErrors(t *testing.T) {
 		{
 			name: "invalid uuid",
 			payload: map[string]interface{}{
+				// default update_type=subgroup
 				"subgroup_ids": []string{"not-a-uuid"},
 			},
 			assertFunc: func(t *testing.T, err error) {
@@ -45,6 +48,28 @@ func TestUpdateLatestPriceListSubGroup_ValidationErrors(t *testing.T) {
 				} else {
 					t.Fatalf("expected binding error, got %T", err)
 				}
+			},
+		},
+		{
+			name: "group update missing group_codes",
+			payload: map[string]interface{}{
+				"update_type": "group",
+			},
+			assertFunc: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				_, ok := err.(*utils.BindingError)
+				assert.True(t, ok)
+			},
+		},
+		{
+			name: "invalid update_type",
+			payload: map[string]interface{}{
+				"update_type": "unknown",
+			},
+			assertFunc: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				_, ok := err.(*utils.BindingError)
+				assert.True(t, ok)
 			},
 		},
 	}
@@ -162,6 +187,7 @@ func TestUpdateLatestPriceListSubGroup_Success(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	payload := map[string]interface{}{
+		// default update_type=subgroup
 		"subgroup_ids": []string{subGroupID.String()},
 	}
 	body, _ := json.Marshal(payload)
@@ -186,6 +212,149 @@ func TestUpdateLatestPriceListSubGroup_Success(t *testing.T) {
 	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceUnit)
 	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceWeight)
 	assert.NotNil(t, updateRequest.Changes[0].ExtraPriceWeight)
+}
+
+func TestUpdateLatestPriceListSubGroup_GroupSuccess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := uuid.New()
+	subGroupID1 := uuid.New()
+	subGroupID2 := uuid.New()
+	now := time.Now()
+
+	subGroup1 := models.PriceListSubGroup{
+		ID:               subGroupID1,
+		PriceListGroupID: groupID,
+		SubGroupCode:     "SUBG1",
+		SubgroupKey:      "KEY1",
+		IsTrading:        true,
+		PriceUnit:        100.0,
+		PriceWeight:      50.0,
+		ExtraPriceUnit:   10.0,
+		ExtraPriceWeight: 5.0,
+		TotalNetPriceUnit:   90.0,
+		TotalNetPriceWeight: 45.0,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
+		PriceListGroup: models.PriceListGroup{
+			ID:          groupID,
+			GroupCode:   "GRP001",
+			PriceUnit:   100.0,
+			PriceWeight: 50.0,
+		},
+		PriceListSubGroupKeys: []models.PriceListSubGroupKey{
+			{
+				ID:         uuid.New(),
+				SubGroupID: subGroupID1,
+				Code:       "CODE1",
+				Value:      "VAL1",
+				Seq:        1,
+			},
+		},
+	}
+
+	subGroup2 := models.PriceListSubGroup{
+		ID:               subGroupID2,
+		PriceListGroupID: groupID,
+		SubGroupCode:     "SUBG2",
+		SubgroupKey:      "KEY2",
+		IsTrading:        true,
+		PriceUnit:        120.0,
+		PriceWeight:      60.0,
+		ExtraPriceUnit:   12.0,
+		ExtraPriceWeight: 6.0,
+		TotalNetPriceUnit:   110.0,
+		TotalNetPriceWeight: 55.0,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
+		PriceListGroup: models.PriceListGroup{
+			ID:          groupID,
+			GroupCode:   "GRP001",
+			PriceUnit:   120.0,
+			PriceWeight: 60.0,
+		},
+		PriceListSubGroupKeys: []models.PriceListSubGroupKey{
+			{
+				ID:         uuid.New(),
+				SubGroupID: subGroupID2,
+				Code:       "CODE2",
+				Value:      "VAL2",
+				Seq:        1,
+			},
+		},
+	}
+
+	// Mock GetPriceListSubGroupsByGroupCodes to return two subgroups
+	originalGetByGroupCodes := getPriceListSubGroupsByGroupCodesFunc
+	getPriceListSubGroupsByGroupCodesFunc = func(groupCodes []string) ([]models.PriceListSubGroup, error) {
+		return []models.PriceListSubGroup{subGroup1, subGroup2}, nil
+	}
+	defer func() { getPriceListSubGroupsByGroupCodesFunc = originalGetByGroupCodes }()
+
+	// Mock GetPriceListSubGroupFormulasMapBySubGroupCodes to return empty (no formulas)
+	originalGetFormulas := getPriceListSubGroupFormulasMapBySubGroupCodesFunc
+	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func([]string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+		return map[string][]models.PriceListSubGroupFormulasMap{}, nil
+	}
+	defer func() { getPriceListSubGroupFormulasMapBySubGroupCodesFunc = originalGetFormulas }()
+
+	// Mock UpdatePriceListSubGroups to capture request
+	updateCalled := false
+	var updateRequest models.UpdatePriceListSubGroupRequest
+	originalUpdate := updateLatestSubGroupFunc
+	updateLatestSubGroupFunc = func(req models.UpdatePriceListSubGroupRequest) error {
+		updateCalled = true
+		updateRequest = req
+		return nil
+	}
+	defer func() { updateLatestSubGroupFunc = originalUpdate }()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	payload := map[string]interface{}{
+		"update_type": "group",
+		"group_codes": []string{"GRP001"},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/price/SubGroup/UpdateLatest", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	resp, err := UpdateLatestPriceListSubGroup(c)
+	assert.NoError(t, err)
+
+	// Verify success response
+	result, ok := resp.(map[string]interface{})
+	if assert.True(t, ok, "expected map[string]interface{}") {
+		assert.True(t, result["success"].(bool))
+		assert.Contains(t, result["message"].(string), "updated successfully")
+	}
+
+	// Verify update was called for both subgroups
+	assert.True(t, updateCalled, "UpdatePriceListSubGroups should have been called")
+	assert.Len(t, updateRequest.Changes, 2)
+
+	// Ensure both subgroup IDs are included in changes
+	found1, found2 := false, false
+	for _, ch := range updateRequest.Changes {
+		if ch.SubGroupID == subGroupID1 {
+			found1 = true
+		}
+		if ch.SubGroupID == subGroupID2 {
+			found2 = true
+		}
+		// All calculated fields should be set
+		assert.NotNil(t, ch.TotalNetPriceUnit)
+		assert.NotNil(t, ch.TotalNetPriceWeight)
+		assert.NotNil(t, ch.ExtraPriceWeight)
+	}
+	assert.True(t, found1, "expected subgroup 1 in changes")
+	assert.True(t, found2, "expected subgroup 2 in changes")
 }
 
 func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
@@ -276,6 +445,7 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	payload := map[string]interface{}{
+		// default update_type=subgroup
 		"subgroup_ids": []string{subGroupID.String()},
 	}
 	body, _ := json.Marshal(payload)
@@ -302,6 +472,36 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 	
 	// Verify calculated values (base_price + extra = 50.0 + 5.0 = 55.0)
 	assert.Equal(t, 55.0, *updateRequest.Changes[0].TotalNetPriceWeight)
+}
+
+func TestUpdateLatestPriceListSubGroup_GroupCodesNotFound(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// Mock GetPriceListSubGroupsByGroupCodes to return no subgroups
+	originalGetByGroupCodes := getPriceListSubGroupsByGroupCodesFunc
+	getPriceListSubGroupsByGroupCodesFunc = func(groupCodes []string) ([]models.PriceListSubGroup, error) {
+		return []models.PriceListSubGroup{}, nil
+	}
+	defer func() { getPriceListSubGroupsByGroupCodesFunc = originalGetByGroupCodes }()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	payload := map[string]interface{}{
+		"update_type": "group",
+		"group_codes": []string{"GRP_UNKNOWN"},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/price/SubGroup/UpdateLatest", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	_, err := UpdateLatestPriceListSubGroup(c)
+	if assert.Error(t, err) {
+		bindingErr, ok := err.(*utils.BindingError)
+		assert.True(t, ok, "expected BindingError")
+		assert.Contains(t, bindingErr.Message, "No price list sub groups found for the provided group_codes")
+	}
 }
 
 func TestUpdateLatestPriceListSubGroup_PriceListGroupExtraKeyLoaded(t *testing.T) {
@@ -378,6 +578,7 @@ func TestUpdateLatestPriceListSubGroup_PriceListGroupExtraKeyLoaded(t *testing.T
 	c, _ := gin.CreateTestContext(w)
 
 	payload := map[string]interface{}{
+		// default update_type=subgroup
 		"subgroup_ids": []string{subGroupID.String()},
 	}
 	body, _ := json.Marshal(payload)
