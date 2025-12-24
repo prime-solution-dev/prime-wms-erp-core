@@ -96,7 +96,7 @@ func createSchema() error {
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group (
             id uuid PRIMARY KEY,
             price_list_group_id uuid REFERENCES price_list_group(id),
-            sub_group_code text,
+            subgroup_code text,
             subgroup_key text,
             is_trading boolean,
             price_unit double precision,
