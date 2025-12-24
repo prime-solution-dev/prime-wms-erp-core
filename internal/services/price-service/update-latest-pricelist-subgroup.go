@@ -21,6 +21,7 @@ import (
 var updateLatestSubGroupFunc = priceListRepository.UpdatePriceListSubGroups
 var getPriceListSubGroupsByIDsFunc = priceListRepository.GetPriceListSubGroupsByIDs
 var getPriceListSubGroupFormulasMapBySubGroupCodesFunc = priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCodes
+var getPriceListSubGroupsByGroupCodesFunc = priceListRepository.GetPriceListSubGroupsByGroupCodes
 
 // UpdateLatestPriceListSubGroup calculates and updates the price list sub group data in the database.
 func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
@@ -36,36 +37,90 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 				Message: fmt.Sprintf("Validation failed: %v", errorMessages),
 			}
 		}
-		return nil, &utils.BindingError{
-			Message: fmt.Sprintf("Invalid request: %v", err.Error()),
+		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
+	}
+
+	// Determine update type, defaulting to "subgroup" for backward compatibility
+	updateType := req.UpdateType
+
+	var (
+		subGroupUUIDs []uuid.UUID
+		subGroups     []models.PriceListSubGroup
+		err           error
+	)
+
+	switch updateType {
+	case "subgroup":
+		// Validate subgroup_ids presence
+		if len(req.SubGroupIDs) == 0 {
+			return nil, &utils.BindingError{
+				Message: "subgroup_ids is required when update_type is 'subgroup'",
+			}
+		}
+
+		// Convert all SubGroupIDs to UUIDs upfront with validation
+		subGroupUUIDs = make([]uuid.UUID, 0, len(req.SubGroupIDs))
+		for _, subGroupID := range req.SubGroupIDs {
+			parsed, parseErr := uuid.Parse(subGroupID)
+			if parseErr != nil {
+				return nil, &utils.BindingError{
+					Message: "Validation failed: subgroup_ids must be valid UUID",
+				}
+			}
+			subGroupUUIDs = append(subGroupUUIDs, parsed)
+		}
+
+		// Fetch all sub groups in one batch query
+		subGroups, err = getPriceListSubGroupsByIDsFunc(subGroupUUIDs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch latest price list sub groups: %w", err)
+		}
+
+		// Create a map of sub groups by ID for efficient lookup
+		subGroupMap := make(map[uuid.UUID]*models.PriceListSubGroup, len(subGroups))
+		for i := range subGroups {
+			subGroupMap[subGroups[i].ID] = &subGroups[i]
+		}
+
+		// Verify all requested sub groups were found
+		for _, subGroupID := range subGroupUUIDs {
+			if _, found := subGroupMap[subGroupID]; !found {
+				return nil, &utils.BindingError{
+					Message: "Price list sub group not found",
+				}
+			}
+		}
+	case "group":
+		// Validate group_codes presence
+		if len(req.GroupCodes) == 0 {
+			return nil, &utils.BindingError{
+				Message: "group_codes is required when update_type is 'group'",
+			}
+		}
+
+		// Fetch all sub groups for the given group codes
+		subGroups, err = getPriceListSubGroupsByGroupCodesFunc(req.GroupCodes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch latest price list sub groups by group codes: %w", err)
+		}
+
+		if len(subGroups) == 0 {
+			return nil, &utils.BindingError{
+				Message: "No price list sub groups found for the provided group_codes",
+			}
+		}
+
+		// Build subGroupUUIDs from fetched sub groups
+		subGroupUUIDs = make([]uuid.UUID, 0, len(subGroups))
+		for i := range subGroups {
+			subGroupUUIDs = append(subGroupUUIDs, subGroups[i].ID)
 		}
 	}
 
-	// Convert all SubGroupIDs to UUIDs upfront
-	subGroupUUIDs := make([]uuid.UUID, 0, len(req.SubGroupIDs))
-	for _, subGroupID := range req.SubGroupIDs {
-		subGroupUUIDs = append(subGroupUUIDs, uuid.MustParse(subGroupID))
-	}
-
-	// Fetch all sub groups in one batch query
-	subGroups, err := getPriceListSubGroupsByIDsFunc(subGroupUUIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch latest price list sub groups: %w", err)
-	}
-
-	// Create a map of sub groups by ID for efficient lookup
+	// Create a map of sub groups by ID for efficient lookup (for both modes)
 	subGroupMap := make(map[uuid.UUID]*models.PriceListSubGroup, len(subGroups))
 	for i := range subGroups {
 		subGroupMap[subGroups[i].ID] = &subGroups[i]
-	}
-
-	// Verify all requested sub groups were found
-	for _, subGroupID := range subGroupUUIDs {
-		if _, found := subGroupMap[subGroupID]; !found {
-			return nil, &utils.BindingError{
-				Message: "Price list sub group not found",
-			}
-		}
 	}
 
 	// Collect all sub group codes for batch formula fetching

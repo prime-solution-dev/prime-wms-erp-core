@@ -88,6 +88,34 @@ func GetPriceListSubGroupsByIDs(subGroupIDs []uuid.UUID) ([]models.PriceListSubG
 	return subGroups, nil
 }
 
+// GetPriceListSubGroupsByGroupCodes loads price list sub groups (with keys and extras)
+// for all price list groups matching the given group codes.
+func GetPriceListSubGroupsByGroupCodes(groupCodes []string) ([]models.PriceListSubGroup, error) {
+	if len(groupCodes) == 0 {
+		return []models.PriceListSubGroup{}, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroups := []models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Joins("JOIN price_list_group ON price_list_group.id = price_list_sub_group.price_list_group_id").
+		Where("price_list_group.group_code IN ?", groupCodes).
+		Preload("PriceListGroup").
+		Preload("PriceListGroup.PriceListGroupExtras.PriceListGroupExtraKeys").
+		Preload("PriceListSubGroupKeys").
+		Find(&subGroups).Error; err != nil {
+		return nil, err
+	}
+
+	return subGroups, nil
+}
+
 // GetGroupItemValueInt looks up group_item.value_int for a given group_code (mapped from condition_code)
 // and subgroup key value. It returns (valueInt, found, error).
 func GetGroupItemValueInt(groupCode, value string) (float64, bool, error) {
