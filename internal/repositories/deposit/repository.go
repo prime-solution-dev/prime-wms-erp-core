@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func GetDepositPreload(id []uuid.UUID, customerCode []string, status []string, page int, pageSize int) ([]models.Deposit, int, int, error) {
+func GetDepositPreload(id []uuid.UUID, customerCode []string, status []string, depositCode []string, page int, pageSize int) ([]models.Deposit, int, int, error) {
 	deposit := []models.Deposit{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -28,6 +28,10 @@ func GetDepositPreload(id []uuid.UUID, customerCode []string, status []string, p
 	if len(status) > 0 {
 		query = query.Where("status in (?)", status)
 	}
+	if len(depositCode) > 0 {
+		query = query.Where("deposit_code in (?)", status)
+	}
+
 	var count int64
 	query.Count(&count)
 

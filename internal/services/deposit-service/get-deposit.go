@@ -34,7 +34,7 @@ func GetDeposit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	deposit, totalPages, totalRecords, errDeposit := repositoryDeposit.GetDepositPreload(req.ID, req.CustomerCode, req.Status, req.Page, req.PageSize)
+	deposit, totalPages, totalRecords, errDeposit := repositoryDeposit.GetDepositPreload(req.ID, req.CustomerCode, req.Status, req.DepositCode, req.Page, req.PageSize)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
