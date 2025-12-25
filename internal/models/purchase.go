@@ -724,6 +724,7 @@ type ExceptPurchaseAndPurchaseItemRequest struct {
 type GetPurchaseItemRequest struct {
 	NotItems          []ExceptPurchaseAndPurchaseItemRequest `json:"not_items"`
 	SupplierCodes     []string                               `json:"supplier_codes"`
+	PurchaseCodes     []string                               `json:"purchase_codes"`
 	PurchaseItemCodes []string                               `json:"purchase_item_codes"`
 	POStatusApprove   []string                               `json:"po_status_approve"`
 	POItemStatus      []string                               `json:"po_item_status"`

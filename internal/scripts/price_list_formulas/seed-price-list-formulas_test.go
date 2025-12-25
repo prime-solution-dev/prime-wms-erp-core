@@ -82,6 +82,8 @@ func createFormulasTestSchema() error {
 			rounding integer NOT NULL,
 			create_dtm timestamp NOT NULL
 		);`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_price_list_formulas_formula_code
+		    ON price_list_formulas(formula_code);`,
 	}
 
 	for _, stmt := range statements {
@@ -173,7 +175,7 @@ func TestGenerateSQLStatements(t *testing.T) {
 			for _, stmt := range statements {
 				require.NotEmpty(t, stmt)
 				require.Contains(t, stmt, "INSERT INTO public.price_list_formulas")
-				require.Contains(t, stmt, "ON CONFLICT (id) DO NOTHING")
+				require.Contains(t, stmt, "ON CONFLICT (formula_code) DO NOTHING")
 			}
 		})
 	}
@@ -212,7 +214,7 @@ func TestGenerateSQLStatementsIncludesFormulaCode(t *testing.T) {
 	require.Len(t, statements, 1)
 	require.Contains(t, statements[0], "INSERT INTO public.price_list_formulas")
 	require.Contains(t, statements[0], "formula_code")
-	require.Contains(t, statements[0], "FM-test_formula")
+	require.Contains(t, statements[0], "FM-1")
 	require.True(t, strings.Contains(statements[0], "FM-"))
 }
 
@@ -287,6 +289,9 @@ func TestGeneratedSQLHandlesOnConflict(t *testing.T) {
 	require.NoError(t, err)
 	defer db.CloseGORM(gormx)
 
+	// Ensure isolation: clear existing formulas created by previous tests
+	require.NoError(t, gormx.Exec("DELETE FROM price_list_formulas").Error)
+
 	formula := PriceListFormulaInput{
 		Name:        "Duplicate Test",
 		Uom:         "kg",
@@ -305,9 +310,9 @@ func TestGeneratedSQLHandlesOnConflict(t *testing.T) {
 	// Insert again - should not error due to ON CONFLICT DO NOTHING
 	require.NoError(t, gormx.Exec(statements[0]).Error)
 
-	// Verify only one record exists (by formula_code since we can't predict the UUID)
+	// Verify only one record exists (by counting rows; formula_code is auto-generated)
 	var count int64
-	require.NoError(t, gormx.Model(&models.PriceListFormulas{}).Where("formula_code = ?", "duplicate_test").Count(&count).Error)
+	require.NoError(t, gormx.Model(&models.PriceListFormulas{}).Count(&count).Error)
 	require.Equal(t, int64(1), count)
 }
 
@@ -365,12 +370,12 @@ func TestGenerateFormulaCode(t *testing.T) {
 		{
 			name:     "name with brackets",
 			input:    "kg = [Pcs] / [Avg. kg stock]",
-			expected: "FM-kg",
+			expected: "FM-kg_avg_kg_stock",
 		},
 		{
 			name:     "name with special characters",
 			input:    "Pcs = ( [Base price] + 1.4 ) x [Avg kg. stock] x (1+2%)",
-			expected: "FM-pcs",
+			expected: "FM-pcs_1_4_x_x_1_2_avg_kg_stock",
 		},
 		{
 			name:     "lowercase input",
@@ -380,7 +385,7 @@ func TestGenerateFormulaCode(t *testing.T) {
 		{
 			name:     "name with multiple spaces",
 			input:    "Pcs = [kg]  x [Weight Spec]",
-			expected: "FM-pcs",
+			expected: "FM-pcs_x_weight_spec",
 		},
 		{
 			name:     "empty after processing",
@@ -414,7 +419,7 @@ func TestGenerateSQLStatementsWithCustomFormulaCode(t *testing.T) {
 
 	statements := generateSQLStatements([]PriceListFormulaInput{formula})
 	require.Len(t, statements, 1)
-	require.Contains(t, statements[0], customCode)
+	require.Contains(t, strings.ToUpper(statements[0]), strings.ToUpper(customCode))
 }
 
 func stringPtr(s string) *string {

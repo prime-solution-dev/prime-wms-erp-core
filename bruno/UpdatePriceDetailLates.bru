@@ -1,0 +1,25 @@
+meta {
+  name: UpdatePriceDetailLates
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{URL_ERP}}/SubGroup/UpdateLatest
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+  //   "update_type": "subgroup",
+  //   "subgroup_ids": ["8c0c4546-09ad-4d32-b40b-da5c4dbce9fa"]
+    "update_type": "group",
+    "group_codes": ["GROUP_1_ITEM_1"]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
