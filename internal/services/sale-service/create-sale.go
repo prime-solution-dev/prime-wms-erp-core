@@ -79,7 +79,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if req.Status == "APPROVED" {
 		statusApprove = "COMPLETED"
 		isApproved = true
-		status = "COMPLETED"
+		status = "PENDING"
 	}
 
 	for i, saleReq := range req.Sales {
