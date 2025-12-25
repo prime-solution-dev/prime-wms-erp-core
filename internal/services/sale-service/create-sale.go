@@ -75,9 +75,11 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// ใช้ status ที่หน้าบ้านส่งมา
 	statusApprove := "PENDING"
 	isApproved := false
+	status := "PENDING"
 	if req.Status == "APPROVED" {
 		statusApprove = "COMPLETED"
 		isApproved = true
+		status = "COMPLETED"
 	}
 
 	for i, saleReq := range req.Sales {
@@ -96,7 +98,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		tempSale.UpdateDate = &nowDateOnly
 		tempSale.UpdateBy = user
 		// ใช้ status จากหน้าบ้าน
-		tempSale.Status = req.Status
+		tempSale.Status = status
 		tempSale.StatusApprove = statusApprove
 		tempSale.IsApproved = isApproved
 
