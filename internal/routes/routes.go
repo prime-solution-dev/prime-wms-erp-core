@@ -64,8 +64,11 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetPriceDetail", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetPriceDetail)
 	})
-	price.POST("/SubGroup/Latest", func(c *gin.Context) {
-		utils.ProcessRequestWithBinding(c, priceService.GetLatestPriceListSubGroup)
+	price.POST("/GetPriceExportTable", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceExportTable)
+	})
+	price.POST("/SubGroup/UpdateLatest", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.UpdateLatestPriceListSubGroup)
 	})
 	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.UpdateExtras)
@@ -137,6 +140,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	payment.POST("/CreatePayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, paymentService.CreatePayment)
+	})
+	payment.POST("/DeletePayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.DeletePayment)
 	})
 
 	//sale

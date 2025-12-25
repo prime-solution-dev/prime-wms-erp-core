@@ -135,3 +135,23 @@ func CreatePayment(payment []models.Payment, paymentInvoice []models.PaymentInvo
 	err = tx.Commit().Error
 	return err
 }
+func DeletePayment(paymentID []uuid.UUID, invoiceCode []string) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+	resultPayment := gormx.Where("id IN (?)", paymentID).Delete(&models.Payment{})
+	if resultPayment.Error != nil {
+		gormx.Rollback()
+		return resultPayment.Error
+	}
+
+	resultconfirm := gormx.Where("invoice_code IN (?)", invoiceCode).Delete(&models.PaymentInvoice{})
+	if resultconfirm.Error != nil {
+		gormx.Rollback()
+		return resultconfirm.Error
+	}
+
+	return
+}

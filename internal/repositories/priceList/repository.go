@@ -79,12 +79,75 @@ func GetPriceListSubGroupsByIDs(subGroupIDs []uuid.UUID) ([]models.PriceListSubG
 	if err := gormx.Model(&models.PriceListSubGroup{}).
 		Where("id IN ?", subGroupIDs).
 		Preload("PriceListGroup").
+		Preload("PriceListGroup.PriceListGroupExtras.PriceListGroupExtraKeys").
 		Preload("PriceListSubGroupKeys").
 		Find(&subGroups).Error; err != nil {
 		return nil, err
 	}
 
 	return subGroups, nil
+}
+
+// GetPriceListSubGroupsByGroupCodes loads price list sub groups (with keys and extras)
+// for all price list groups matching the given group codes.
+func GetPriceListSubGroupsByGroupCodes(groupCodes []string) ([]models.PriceListSubGroup, error) {
+	if len(groupCodes) == 0 {
+		return []models.PriceListSubGroup{}, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroups := []models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Joins("JOIN price_list_group ON price_list_group.id = price_list_sub_group.price_list_group_id").
+		Where("price_list_group.group_code IN ?", groupCodes).
+		Preload("PriceListGroup").
+		Preload("PriceListGroup.PriceListGroupExtras.PriceListGroupExtraKeys").
+		Preload("PriceListSubGroupKeys").
+		Find(&subGroups).Error; err != nil {
+		return nil, err
+	}
+
+	return subGroups, nil
+}
+
+// GetGroupItemValueInt looks up group_item.value_int for a given group_code (mapped from condition_code)
+// and subgroup key value. It returns (valueInt, found, error).
+func GetGroupItemValueInt(groupCode, value string) (float64, bool, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return 0, false, err
+	}
+	defer db.CloseGORM(gormx)
+
+	// 1) find group by group_code
+	var grp models.Group
+	if err := gormx.Model(&models.Group{}).
+		Where("group_code = ?", groupCode).
+		First(&grp).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+
+	// 2) find group_item by group_id + item_code
+	var item models.GroupItem
+	if err := gormx.Model(&models.GroupItem{}).
+		Where("group_id = ? AND item_code = ?", grp.ID, value).
+		First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+
+	return item.ValueInt, true, nil
 }
 
 func GetPriceListExtraConfig(groupCodes []string) ([]models.PriceListExtraConfig, error) {
