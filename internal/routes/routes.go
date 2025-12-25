@@ -170,6 +170,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/GetSalePack", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.GetSalePack)
 	})
+
+	sale.POST("/ValidateSaleOrder", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.ValidateSale)
+	})
 	//delivery
 	delivery := ctx.Group("/delivery")
 	delivery.POST("/CreateDelivery", func(c *gin.Context) {
