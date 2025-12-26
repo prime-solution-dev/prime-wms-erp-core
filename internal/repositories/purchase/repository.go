@@ -421,7 +421,6 @@ func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 		}
 
 		purchaseIDs := []uuid.UUID{}
-
 		if err := tx.Model(&models.PurchaseItem{}).
 			Select("purchase_id").
 			Where("purchase_item IN ?", purchaseItemCodes).
@@ -431,12 +430,12 @@ func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 		}
 
 		for _, purchaseID := range purchaseIDs {
-			var notCompletedCount int64
+			var completedCount int64
 			var itemsCount int64
 
 			if err := tx.Model(&models.PurchaseItem{}).
 				Where("purchase_id = ? AND status = ?", purchaseID, "COMPLETED").
-				Count(&notCompletedCount).Error; err != nil {
+				Count(&completedCount).Error; err != nil {
 				return err
 			}
 
@@ -446,7 +445,7 @@ func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 				return err
 			}
 
-			if notCompletedCount == 0 {
+			if completedCount == itemsCount {
 				if err := tx.Model(&models.Purchase{}).
 					Where("id = ?", purchaseID).
 					Updates(map[string]interface{}{
@@ -457,7 +456,7 @@ func CompletePOItem(usedType string, purchaseItemCodes []string) error {
 					}).Error; err != nil {
 					return err
 				}
-			} else if notCompletedCount > 0 && notCompletedCount < itemsCount {
+			} else if completedCount != itemsCount {
 				if err := tx.Model(&models.Purchase{}).
 					Where("id = ?", purchaseID).
 					Updates(map[string]interface{}{
