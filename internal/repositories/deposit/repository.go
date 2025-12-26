@@ -29,7 +29,7 @@ func GetDepositPreload(id []uuid.UUID, customerCode []string, status []string, d
 		query = query.Where("status in (?)", status)
 	}
 	if len(depositCode) > 0 {
-		query = query.Where("deposit_code in (?)", status)
+		query = query.Where("deposit_code in (?)", depositCode)
 	}
 
 	var count int64
