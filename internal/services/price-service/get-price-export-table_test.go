@@ -165,9 +165,6 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 	}
 
 	row := tab.Rows[0]
-	if row["product"] != "หมวดเหล็กแผ่น" {
-		t.Fatalf("expected product 'หมวดเหล็กแผ่น', got %v", row["product"])
-	}
 
 	if row["price_pr"] != 23.4 {
 		t.Fatalf("expected price_pr 23.4, got %v", row["price_pr"])

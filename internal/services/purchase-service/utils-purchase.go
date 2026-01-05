@@ -37,12 +37,11 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
-	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
+	t := time.Now()
+	purchaseItem := fmt.Sprintf("%s-%v", purchaseCode, t.UnixNano())
 	if req.PurchaseItem != nil {
 		purchaseItem = *req.PurchaseItem
 	}
-
-	fmt.Println(purchaseItem)
 
 	docRefItem := ""
 	if req.DocRefItem != nil {
@@ -181,6 +180,8 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		IsApproved:      purchase.IsApproved,
 		StatusApprove:   purchase.StatusApprove,
 		StatusPayment:   purchase.StatusPayment,
+		UsedType:        purchase.UsedType,
+		UsedStatus:      purchase.UsedStatus,
 		Remark:          purchase.Remark,
 		CreditTerm:      purchase.CreditTerm,
 		CreateBy:        purchase.CreateBy,
@@ -251,7 +252,7 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 			Status:        p.StatusApprove,
 			Remark:        "-",
 			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
+			MDItemCode:    "CTM-CTM3",
 			CreateBy:      user,
 		})
 	}

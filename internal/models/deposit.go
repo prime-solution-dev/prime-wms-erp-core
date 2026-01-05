@@ -18,10 +18,10 @@ type Deposit struct {
 	AmountRemain float64    `json:"amount_remain"`
 	Status       string     `json:"status"`
 	Remark       string     `json:"remark"`
-	CreateBy     string     `json:"create_by"`
-	CreateDtm    *time.Time `json:"create_dtm"`
-	UpdateBy     string     `json:"update_by"`
-	UpdateDate   *time.Time `json:"update_date"`
+	CreateBy     string     `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm    time.Time  `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy     string     `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDate   time.Time  `gorm:"autoUpdateTime;<-" json:"update_date"`
 }
 
 func (Deposit) TableName() string { return "deposit" }
