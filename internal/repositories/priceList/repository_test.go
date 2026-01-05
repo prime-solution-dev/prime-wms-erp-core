@@ -79,6 +79,7 @@ func createSchema() error {
             company_code text,
             site_code text,
             group_code text,
+            group_name text,
             price_unit double precision,
             price_weight double precision,
             before_price_unit double precision,

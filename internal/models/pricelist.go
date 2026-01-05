@@ -114,7 +114,7 @@ func (PriceListExtraConfig) TableName() string { return "price_list_extra_config
 type PriceListSubGroup struct {
 	ID                        uuid.UUID              `json:"id"`
 	PriceListGroupID          uuid.UUID              `json:"price_list_group_id"`
-	SubGroupCode              string                 `json:"subgroup_code"`
+	SubGroupCode              string                 `json:"subgroup_code" gorm:"column:subgroup_code"`
 	SubgroupKey               string                 `json:"subgroup_key"`
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
@@ -404,8 +404,14 @@ type UpdatePriceListSubGroupRequest struct {
 	Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
 }
 
-type GetLatestPriceListSubGroupRequest struct {
-	SubGroupIDs []string `json:"subgroup_ids" binding:"required,dive,uuid4"`
+type UpdateLatestPriceListSubGroupRequest struct {
+	// UpdateType determines how the latest price list subgroup update will be performed.
+	// Allowed values:
+	// - "subgroup": update by explicit subgroup_ids (default when empty for backward compatibility)
+	// - "group"   : update all subgroups under the given group_codes
+	UpdateType  string   `json:"update_type" binding:"oneof=subgroup group"`
+	GroupCodes  []string `json:"group_codes" binding:"omitempty,dive"`
+	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid4"`
 }
 
 type UpdatePriceListGroupExtraKeyRequest struct {
@@ -456,5 +462,5 @@ type PriceListSubGroupFormulasMap struct {
 }
 
 func (PriceListSubGroupFormulasMap) TableName() string {
-	return "price_list_sub_group_formulas_map"
+	return "price_list_subgroup_formulas_map"
 }

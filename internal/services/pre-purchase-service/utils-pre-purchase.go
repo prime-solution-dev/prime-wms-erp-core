@@ -236,7 +236,7 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 			Status:        pp.StatusApprove,
 			Remark:        "-",
 			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
+			MDItemCode:    "CTM-CTM3",
 			CreateBy:      user,
 		})
 	}

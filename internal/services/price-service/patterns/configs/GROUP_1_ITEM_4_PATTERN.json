@@ -157,7 +157,7 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_kg_before_price_weight",
+              "field": "before_price_weight",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
@@ -166,7 +166,7 @@
               "dataMapping": "before_price_weight"
             },
             {
-              "field": "price_kg_total_net_price_weight",
+              "field": "total_net_price_weight",
               "headerName": "ราคาขาย after",
               "width": 150,
               "cellStyle": {
@@ -182,22 +182,22 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before_price_weight",
+              "field": "before_price_unit",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_price_unit"
             },
             {
-              "field": "price_line_total_net_price_weight",
+              "field": "total_net_price_unit",
               "headerName": "ราคาขาย after",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "total_net_price_weight"
+              "dataMapping": "total_net_price_unit"
             }
           ]
         }
@@ -211,15 +211,14 @@
       "editable_suffixes": [
         "is_highlight",
         "line_bundle",
-        "price_kg_before_price_weight",
-        "price_kg_total_net_price_weight",
-        "price_line_before_price_weight",
-        "price_line_total_net_price_weight",
+        "total_net_price_weight",
+        "total_net_price_unit",
         "remark",
         "inactive"
       ],
       "fetchable_suffixes": [
-        "total_net_price_weight"
+        "total_net_price_weight",
+        "total_net_price_unit"
       ]
     }
   ],
