@@ -147,7 +147,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					})
 
 				}
-				if invoiceItem.Qty == poQTY {
+				if invoiceItem.Qty == poQTYMapResult.QTY {
 					completePOItem = append(completePOItem, invoiceItem.DocumentRefItem)
 				}
 				if invoiceItem.Qty < poQTY {

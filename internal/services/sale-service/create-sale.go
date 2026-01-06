@@ -73,7 +73,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// ใช้ status ที่หน้าบ้านส่งมา
-	statusApprove := "PENDING"
+	statusApprove := "PROCESS"
 	isApproved := false
 	status := "PENDING"
 	if req.Status == "APPROVED" {
@@ -235,6 +235,25 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err := updateSaleRunningConfig(ctx, len(createSales)); err != nil {
 		// Log error but don't fail the transaction as sales are already created
 		fmt.Printf("Warning: failed to update running config: %v\n", err)
+	}
+
+	// ถ้า status เป็น WAIT_FOR_APPROVED ให้ส่ง sale id ไปสร้าง RequestApproveSale
+	if req.Status == "WAIT_FOR_APPROVED" {
+		for _, sale := range createSales {
+			requestApproveReq := RequestApproveSaleRequest{
+				ID: sale.ID,
+			}
+			approvePayload, err := json.Marshal(requestApproveReq)
+			if err != nil {
+				fmt.Printf("Warning: failed to marshal request approve sale: %v\n", err)
+				continue
+			}
+
+			_, err = RequestApproveSale(ctx, string(approvePayload))
+			if err != nil {
+				fmt.Printf("Warning: failed to create approval request for sale %s: %v\n", sale.SaleCode, err)
+			}
+		}
 	}
 
 	return res, nil
