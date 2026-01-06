@@ -37,12 +37,11 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
-	purchaseItem := fmt.Sprintf("%s-%s", purchaseCode, time.Now().Format("150405"))
+	t := time.Now()
+	purchaseItem := fmt.Sprintf("%s-%v", purchaseCode, t.UnixNano())
 	if req.PurchaseItem != nil {
 		purchaseItem = *req.PurchaseItem
 	}
-
-	fmt.Println(purchaseItem)
 
 	docRefItem := ""
 	if req.DocRefItem != nil {
@@ -103,6 +102,7 @@ func MapPurchaseFormRequestToPurchaseModel(req models.PurchaseFormRequest) model
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
+		CreditTerm:      req.CreditTerm,
 		UpdateBy:        "system",
 		UpdateDtm:       now,
 	}
@@ -180,7 +180,10 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		IsApproved:      purchase.IsApproved,
 		StatusApprove:   purchase.StatusApprove,
 		StatusPayment:   purchase.StatusPayment,
+		UsedType:        purchase.UsedType,
+		UsedStatus:      purchase.UsedStatus,
 		Remark:          purchase.Remark,
+		CreditTerm:      purchase.CreditTerm,
 		CreateBy:        purchase.CreateBy,
 		CreateDtm:       purchase.CreateDtm.Format(time.RFC3339),
 		UpdateBy:        purchase.UpdateBy,
@@ -249,7 +252,7 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 			Status:        p.StatusApprove,
 			Remark:        "-",
 			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
+			MDItemCode:    "CTM-CTM3",
 			CreateBy:      user,
 		})
 	}

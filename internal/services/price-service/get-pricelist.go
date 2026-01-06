@@ -36,6 +36,7 @@ type PriceListGroup struct {
 	CompanyCode       string                `json:"company_code"`
 	SiteCode          string                `json:"site_code"`
 	GroupCode         string                `json:"group_code"`
+	GroupName         string                `json:"group_name"`
 	PriceUnit         float64               `json:"price_unit"`
 	PriceWeight       float64               `json:"price_weight"`
 	BeforePriceUnit   float64               `json:"before_price_unit"`
@@ -297,6 +298,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 		SELECT 
 			plg.id as group_id,
 			plg.company_code,
+			plg.group_name,
 			plg.site_code,
 			plg.group_code,
 			COALESCE(plg.price_unit, 0) AS group_price_unit,
@@ -347,6 +349,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			group = &PriceListGroup{
 				ID:                parseUUID(groupID),
 				CompanyCode:       toString(row["company_code"]),
+				GroupName:         toString(row["group_name"]),
 				SiteCode:          toString(row["site_code"]),
 				GroupCode:         toString(row["group_code"]),
 				PriceUnit:         toFloat64(row["group_price_unit"]),

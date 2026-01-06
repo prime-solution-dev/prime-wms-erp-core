@@ -88,7 +88,10 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, purchase := range purchases {
 		purchaseResponse := MapPurchaseModelToPurchaseResponse(purchase)
 
-		purchaseResponse.StatusApprove = mapStatusApprove[purchase.PurchaseCode]
+		statusApprove, ok := mapStatusApprove[purchase.PurchaseCode]
+		if ok {
+			purchaseResponse.StatusApprove = statusApprove
+		}
 
 		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
 			if prePurchase, ok := mapPrePurchase[*purchase.DocRef]; ok {
@@ -122,6 +125,8 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Get Purchase Items
 	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
 		req.SupplierCodes,
+		req.PurchaseCodes,
+		req.PurchaseItemCodes,
 		req.POStatusApprove,
 		req.POItemStatus,
 		req.ProductCodes,
@@ -248,6 +253,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				IsApproved:           purchase.IsApproved,
 				StatusApprove:        statusApprove,
 				Remark:               item.Remark,
+				CreditTerm:           purchase.CreditTerm,
 				CreateDtm:            item.CreateDtm.Format(time.RFC3339),
 				CreateBy:             item.CreateBy,
 				UpdateDtm:            item.UpdateDtm.Format(time.RFC3339),
