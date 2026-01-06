@@ -6,7 +6,6 @@ import (
 	"prime-erp-core/internal/models"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -403,65 +402,65 @@ func CompletePO(purchaseCodes []string) (err error) {
 	})
 }
 
-func CompletePOItem(usedType string, purchaseItemCodes []string) error {
+func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
 	}
 	defer db.CloseGORM(gormx)
 
+	purchaseItemCodes := []string{}
+	for _, usedPurchase := range purchaseItemUsed {
+		purchaseItemCodes = append(purchaseItemCodes, usedPurchase.PurchaseItemCode)
+	}
+
 	return gormx.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.PurchaseItem{}).
-			Where("purchase_item IN ?", purchaseItemCodes).
-			Updates(map[string]interface{}{
-				"status":     "COMPLETED",
-				"update_dtm": time.Now().UTC(),
-			}).Error; err != nil {
-			return err
-		}
+		for _, poItemUsed := range purchaseItemUsed {
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_item = ? AND purchase_qty = ?", poItemUsed.PurchaseItemCode, poItemUsed.QTY).
+				Updates(map[string]interface{}{
+					"status":     "COMPLETED",
+					"update_dtm": time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
 
-		purchaseIDs := []uuid.UUID{}
-		if err := tx.Model(&models.PurchaseItem{}).
-			Select("purchase_id").
-			Where("purchase_item IN ?", purchaseItemCodes).
-			Group("purchase_id").
-			Scan(&purchaseIDs).Error; err != nil {
-			return err
-		}
+			subQuery := tx.Model(&models.PurchaseItem{}).
+				Select("purchase_id").
+				Where("purchase_item = ?", poItemUsed.PurchaseItemCode)
 
-		for _, purchaseID := range purchaseIDs {
+			if err := tx.Model(&models.Purchase{}).
+				Where("id IN (?)", subQuery).
+				Updates(map[string]interface{}{
+					"used_type":   usedType,
+					"used_status": "PARTIAL",
+					"update_dtm":  time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
+
 			var completedCount int64
 			var itemsCount int64
 
 			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = ? AND status = ?", purchaseID, "COMPLETED").
+				Where("purchase_id = (?) AND status = ?", subQuery, "COMPLETED").
 				Count(&completedCount).Error; err != nil {
 				return err
 			}
 
 			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = ?", purchaseID).
+				Where("purchase_id = (?)", subQuery).
 				Count(&itemsCount).Error; err != nil {
 				return err
 			}
 
 			if completedCount == itemsCount {
 				if err := tx.Model(&models.Purchase{}).
-					Where("id = ?", purchaseID).
+					Where("id = (?)", subQuery).
 					Updates(map[string]interface{}{
 						"status":      "COMPLETED",
 						"used_type":   usedType,
 						"used_status": "COMPLETED",
-						"update_dtm":  time.Now().UTC(),
-					}).Error; err != nil {
-					return err
-				}
-			} else if completedCount != itemsCount {
-				if err := tx.Model(&models.Purchase{}).
-					Where("id = ?", purchaseID).
-					Updates(map[string]interface{}{
-						"used_type":   usedType,
-						"used_status": "PARTIAL",
 						"update_dtm":  time.Now().UTC(),
 					}).Error; err != nil {
 					return err
