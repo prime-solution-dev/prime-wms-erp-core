@@ -115,7 +115,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 
 	toleranceErrorResponse := ToleranceErrorResponse{}
-	completePOItem := []string{}
+	completePOItem := []models.PurchaseItemUsed{}
 	partialPOItem := []string{}
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
@@ -147,9 +147,13 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					})
 
 				}
-				if invoiceItem.Qty == poQTYMapResult.QTY {
-					completePOItem = append(completePOItem, invoiceItem.DocumentRefItem)
-				}
+				/* if invoiceItem.Qty == poQTYMapResult.QTY {
+
+				} */
+				completePOItem = append(completePOItem, models.PurchaseItemUsed{
+					PurchaseItemCode: invoiceItem.DocumentRefItem,
+					QTY:              invoiceItem.Qty,
+				})
 				if invoiceItem.Qty < poQTY {
 					partialPOItem = append(partialPOItem, invoiceItem.DocumentRefItem)
 				}
