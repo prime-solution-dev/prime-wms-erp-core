@@ -180,7 +180,7 @@ func CreateInvoice(invoice []models.Invoice, invoiceItem []models.InvoiceItem, d
 	defer func() {
 		if rc := recover(); rc != nil {
 			tx.Rollback()
-			err = errors.New("panic error cant't save approval")
+			err = errors.New("panic error cant't save approval.")
 		}
 	}()
 	if err = tx.Error; err != nil {
