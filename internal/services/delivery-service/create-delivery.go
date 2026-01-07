@@ -312,6 +312,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	createOrderRequest.Orders = createOrderdetail
 
 	fmt.Println("createOrderRequest : ", createOrderRequest)
+
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
