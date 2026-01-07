@@ -182,8 +182,8 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 		if len(completePOItem) > 0 {
 			requestDataGetPO := map[string]interface{}{
-				"used_type":           "GR",
-				"purchase_item_codes": completePOItem,
+				"used_type":          "GR",
+				"purchase_item_used": completePOItem,
 			}
 
 			jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
