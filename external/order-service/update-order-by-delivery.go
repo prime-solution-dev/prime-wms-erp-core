@@ -19,6 +19,7 @@ type UpdateOrderByDeliveryRequest struct {
 	Tel              string                            `json:"tel"`
 	LicensePlate     string                            `json:"license_plate"`
 	ContactName      string                            `json:"contact_name"`
+	Remark           string                            `json:"remark"`
 	OrderItem        []UpdateOrderByDeliveryItemDetail `json:"order_item"`
 }
 

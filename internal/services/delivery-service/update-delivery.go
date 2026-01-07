@@ -357,6 +357,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 		Tel:              deliveryReq.Tel,
 		LicensePlate:     deliveryReq.LicensePlate,
 		ContactName:      deliveryReq.ContactName,
+		Remark:           deliveryReq.Remark,
 		OrderItem:        orderItems,
 	}
 
