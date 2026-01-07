@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	externalService "prime-erp-core/external/order-service"
 	orderExternalService "prime-erp-core/external/order-service"
 	"time"
 
@@ -182,6 +183,16 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// Call UpdateOrderByDelivery for each non-draft delivery
+	for _, deliveryReq := range req.Deliveries {
+		if !deliveryReq.IsDraft {
+			err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
+			}
+		}
+	}
+
 	// Update response with order code if available
 	for i := range res {
 		if orderCode != "" {
@@ -266,6 +277,21 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			DocumentRefType:     "DELIVERY",
 			DocumentRef:         deliveryCode,
 			Remark:              deliveryReq.Remark,
+			CompanyCode:         deliveryReq.CompanyCode,
+			SiteCode:            deliveryReq.SiteCode,
+			DocumentRef2:        "",
+			DocumentRefType2:    "",
+			PartyCode:           "",
+			PartyName:           "",
+			PartyType:           "",
+			Reason:              "",
+			ShippingAddress:     "",
+			DeliveryMethod:      deliveryReq.DeliveryMethod,
+			BookingDate:         deliveryReq.DeliveryDate,
+			DeliveryTimeCode:    deliveryReq.DeliveryTimeCode,
+			Tel:                 deliveryReq.Tel,
+			LicensePlate:        deliveryReq.LicensePlate,
+			ContactName:         deliveryReq.ContactName,
 			OrderItem:           createOrderItemDetail,
 		}
 
@@ -281,4 +307,65 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
+}
+
+func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+	// Find the corresponding delivery from updateDeliveries
+	var delivery models.Delivery
+	for _, d := range updateDeliveries {
+		if d.DocumentRef == deliveryReq.DocumentRef {
+			delivery = d
+			break
+		}
+	}
+
+	// Create order items from the new items only
+	orderItems := []externalService.UpdateOrderByDeliveryItemDetail{}
+	for _, item := range deliveryReq.Items {
+		orderItem := externalService.UpdateOrderByDeliveryItemDetail{
+			OrderItem:            "",
+			DocumentRefItem:      item.DocumentRefItem,
+			ProductCode:          item.ProductCode,
+			ProductType:          "normal",
+			InterfaceOrderQty:    item.Qty,
+			Qty:                  item.Qty,
+			UnitCode:             item.UnitCode,
+			IsFocGwp:             false,
+			WarehouseCode:        "",
+			BatchNo:              "",
+			SerialCode:           "",
+			SaleUnitCode:         item.SaleUnitCodeForOrder,
+			SaleMethod:           item.SaleMethodForOrder,
+			InterfaceOrderWeight: item.Weight,
+			Weight:               item.Weight,
+			WeightUnit:           item.WeightUnit,
+			MfgDate:              nil,
+			ExpDate:              nil,
+			LocationCode:         "",
+			StorageType:          "",
+			Remark:               "",
+			Status:               "PENDING",
+		}
+		orderItems = append(orderItems, orderItem)
+	}
+
+	updateOrderReq := externalService.UpdateOrderByDeliveryRequest{
+		DocumentRef:      delivery.DeliveryCode,
+		DeliveryMethod:   deliveryReq.DeliveryMethod,
+		BookingDate:      deliveryReq.DeliveryDate,
+		DeliveryTimeCode: deliveryReq.DeliveryTimeCode,
+		Tel:              deliveryReq.Tel,
+		LicensePlate:     deliveryReq.LicensePlate,
+		ContactName:      deliveryReq.ContactName,
+		Remark:           deliveryReq.Remark,
+		OrderItem:        orderItems,
+	}
+
+	// Call UpdateOrderByDelivery
+	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	if err != nil {
+		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
+	}
+
+	return nil
 }
