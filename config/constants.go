@@ -17,6 +17,7 @@ var (
 	UPDATE_ORDER_BY_DELIVERY_ENDPOINT string
 	CANCEL_ORDER_ENDPOINT             string
 	GET_PACK_SO_ENDPOINT              string
+	GET_INBOUND_ENDPOINT              string
 )
 
 // Initialize sets the endpoint values (call after loading .env)
@@ -26,6 +27,7 @@ func Initialize() {
 	UPDATE_ORDER_BY_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/UpdateOrderByDelivery"
 	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrders"
 	GET_PACK_SO_ENDPOINT = GetBaseURL() + "/packing/packing/get-packing-so"
+	GET_INBOUND_ENDPOINT = GetBaseURL() + "/goods-receive/get-inbounds"
 }
 
 // HTTP Configuration
