@@ -162,12 +162,19 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
-	// Check if any delivery is not a draft before calling external service
+	// Check if any delivery is not a draft and was previously a draft before calling external service
 	hasNonDraftDelivery := false
 	for _, deliveryReq := range req.Deliveries {
 		if !deliveryReq.IsDraft {
-			hasNonDraftDelivery = true
-			break
+			// Check previous status from database
+			var previousDelivery models.Delivery
+			if err := gormx.Where("id = ?", deliveryReq.Delivery.ID).First(&previousDelivery).Error; err == nil {
+				// Only create order if previous status was draft (TEMP) and current is not draft
+				if previousDelivery.Status == "TEMP" {
+					hasNonDraftDelivery = true
+					break
+				}
+			}
 		}
 	}
 
@@ -362,10 +369,11 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	resp, err := externalService.UpdateOrderByDelivery(updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}
 
+	fmt.Println("updateOrderResponse : ", resp)
 	return nil
 }
