@@ -163,15 +163,25 @@ func GetPurchaseListByGRFilter(
 	var totalRecords int64
 
 	// Build base query
-	query := gormx.Model(&models.Purchase{}).
+	baseQuery := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
 
 	if len(purchaseItemStatus) > 0 {
-		query = query.Preload("PurchaseItems", "status IN ?", purchaseItemStatus)
-	} else if len(purchaseItemCodes) > 0 {
-		query = query.Preload("PurchaseItems", "purchase_item IN ?", purchaseItemCodes)
-	} else {
-		query = query.Preload("PurchaseItems")
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("status IN ?", purchaseItemStatus)
+
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
+	}
+
+	if len(purchaseItemCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("purchase_item IN ?", purchaseItemCodes)
+
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	if len(purchaseCodes) > 0 {
@@ -180,7 +190,7 @@ func GetPurchaseListByGRFilter(
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("purchase.purchase_code IN ?", purchaseCodes)
 
-		query = query.Where("EXISTS (?)", sub)
+		baseQuery = baseQuery.Where("purchase_code IN ?", sub)
 	}
 
 	if len(notItems) > 0 {
@@ -190,16 +200,16 @@ func GetPurchaseListByGRFilter(
 				Where("purchase.id = purchase_item.purchase_id").
 				Where("purchase_item.purchase_item IN ?", notItem.PurchaseItemCodes)
 
-			query = query.Where("NOT EXISTS (?)", subQuery)
+			baseQuery = baseQuery.Where("NOT EXISTS (?)", subQuery)
 		}
 	}
 
 	if len(supplierCodes) > 0 {
-		query = query.Where("supplier_code IN ?", supplierCodes)
+		baseQuery = baseQuery.Where("supplier_code IN ?", supplierCodes)
 	}
 
 	if len(statusApprove) > 0 {
-		query = query.Where("status_approve IN ?", statusApprove)
+		baseQuery = baseQuery.Where("status_approve IN ?", statusApprove)
 	}
 
 	if len(productCodes) > 0 {
@@ -208,11 +218,11 @@ func GetPurchaseListByGRFilter(
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_code IN ?", productCodes)
 
-		query = query.Where("EXISTS (?)", sub)
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	// Count total records (no preload needed)
-	if err := query.Count(&totalRecords).Error; err != nil {
+	if err := baseQuery.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -222,7 +232,8 @@ func GetPurchaseListByGRFilter(
 
 	// Apply pagination
 	offset := (page - 1) * pageSize
-	if err := query.
+	if err := baseQuery.
+		Preload("PurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&purchases).Error; err != nil {

@@ -788,6 +788,7 @@ type GetPurchaseItemResponse struct {
 	RefBigLot            *GetPOBigLotResponse `json:"ref_big_lot"`
 	RemainQty            float64              `json:"remain_qty"`
 	RemainWeight         float64              `json:"remain_weight"`
+	InboundRemainQty     float64              `json:"inbound_remain_qty"`
 }
 
 type GetPurchaseItemListResponse struct {
