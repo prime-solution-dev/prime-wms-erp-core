@@ -124,7 +124,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Get Purchase Items
-	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
+	filterPurchases, _, _, _, _, err := purchaseRepository.GetPurchaseListByGRFilter(
 		req.SupplierCodes,
 		req.PurchaseCodes,
 		req.PurchaseItemCodes,
@@ -134,8 +134,8 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.NotItems,
 		req.CompanyCode,
 		req.SiteCode,
-		req.Page,
-		req.PageSize,
+		0,
+		0,
 	)
 
 	if err != nil {
@@ -144,7 +144,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	purchaseCodes := []string{}
 	purchaseItemCodes := []string{}
-	for _, purchase := range purchases {
+	for _, purchase := range filterPurchases {
 		purchaseCodes = append(purchaseCodes, purchase.PurchaseCode)
 
 		for _, item := range purchase.PurchaseItems {
@@ -170,9 +170,21 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	newReq := req
+	newReq := models.GetPurchaseItemRequest{
+		NotItems:          req.NotItems,
+		SupplierCodes:     req.SupplierCodes,
+		PurchaseCodes:     req.PurchaseCodes,
+		PurchaseItemCodes: req.PurchaseItemCodes,
+		POStatusApprove:   req.POStatusApprove,
+		POItemStatus:      req.POItemStatus,
+		ProductCodes:      req.ProductCodes,
+		CompanyCode:       req.CompanyCode,
+		SiteCode:          req.SiteCode,
+		Page:              req.Page,
+		PageSize:          req.PageSize,
+	}
 	notItems := []models.ExceptPurchaseAndPurchaseItemRequest{}
-	for _, p := range purchases {
+	for _, p := range filterPurchases {
 		notPOItemCodes := []string{}
 		for _, pItem := range p.PurchaseItems {
 			usedQty, ok := inboundMap[pItem.PurchaseItem]
@@ -192,10 +204,10 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	if len(notItems) > 0 {
-		newReq.NotItems = notItems
+		newReq.NotItems = append(newReq.NotItems, notItems...)
 	}
 
-	purchases, total, page, pageSize, totalPage, err = purchaseRepository.GetPurchaseListByGRFilter(
+	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
 		newReq.SupplierCodes,
 		newReq.PurchaseCodes,
 		newReq.PurchaseItemCodes,
