@@ -15,6 +15,7 @@ import (
 type GetRunningSystemConfigRequest struct {
 	ConfigCode string `json:"config_code"`
 	Count      int    `json:"count"`
+	Prefix     string `json:"prefix"`
 }
 
 type GetRunningSystemConfigResponse struct {
@@ -73,6 +74,10 @@ func GetRunningSystemConfig(ctx *gin.Context, jsonPayload string) (interface{}, 
 	// Generate running codes
 	var generatedCodes []string
 	startRunning := configJSON.CurrentRunning + 1
+
+	if req.Prefix != "" {
+		configJSON.Prefix = req.Prefix
+	}
 
 	for i := 0; i < req.Count; i++ {
 		runningNumber := startRunning + i
