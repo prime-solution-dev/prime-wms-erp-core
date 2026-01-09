@@ -247,7 +247,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				SaleMethod:        item.SaleMethodForOrder,
 				Weight:            item.Weight,
 				WeightUnit:        item.WeightUnit,
-				Remark:            "",
+				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
@@ -350,7 +350,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 			ExpDate:              nil,
 			LocationCode:         "",
 			StorageType:          "",
-			Remark:               "",
+			Remark:               item.Remark,
 			Status:               "PENDING",
 		}
 		orderItems = append(orderItems, orderItem)
