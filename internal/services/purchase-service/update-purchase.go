@@ -102,7 +102,7 @@ func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	if err := purchaseRepository.CompletePOItem(req.UsedType, req.PurchaseItemCodes); err != nil {
+	if err := purchaseRepository.CompletePOItem(req.UsedType, req.PurchaseItemUsed); err != nil {
 		return nil, errors.New("failed to complete PO item: " + err.Error())
 	}
 

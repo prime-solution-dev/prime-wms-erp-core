@@ -3,6 +3,7 @@ package purchaseService
 import (
 	"encoding/json"
 	"errors"
+	goodsReceiveService "prime-erp-core/external/goods-receive-service"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -123,7 +124,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Get Purchase Items
-	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
+	filterPurchases, _, _, _, _, err := purchaseRepository.GetPurchaseListByGRFilter(
 		req.SupplierCodes,
 		req.PurchaseCodes,
 		req.PurchaseItemCodes,
@@ -133,12 +134,110 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.NotItems,
 		req.CompanyCode,
 		req.SiteCode,
-		req.Page,
-		req.PageSize,
+		0,
+		0,
 	)
 
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())
+	}
+
+	purchaseCodes := []string{}
+	purchaseItemCodes := []string{}
+	for _, purchase := range filterPurchases {
+		purchaseCodes = append(purchaseCodes, purchase.PurchaseCode)
+
+		for _, item := range purchase.PurchaseItems {
+			purchaseItemCodes = append(purchaseItemCodes, item.PurchaseItem)
+		}
+	}
+
+	// Calculate Used qty from Inbound
+	reqInboundFilter := goodsReceiveService.InboundFilter{
+		InboundItemDocumentRefItem: purchaseItemCodes,
+	}
+
+	inbounds, err := goodsReceiveService.GetInbounds(reqInboundFilter)
+	if err != nil {
+		return nil, errors.New("failed to get used qty from inbound: " + err.Error())
+	}
+
+	// map purchase item code to used qty
+	inboundMap := make(map[string]float64)
+	for _, inbound := range inbounds.InboundRes {
+		for _, inboundItem := range inbound.InboundItemRes {
+			inboundMap[inboundItem.DocumentRefItem] += inboundItem.Qty
+		}
+	}
+
+	newReq := models.GetPurchaseItemRequest{
+		NotItems:          req.NotItems,
+		SupplierCodes:     req.SupplierCodes,
+		PurchaseCodes:     req.PurchaseCodes,
+		PurchaseItemCodes: req.PurchaseItemCodes,
+		POStatusApprove:   req.POStatusApprove,
+		POItemStatus:      req.POItemStatus,
+		ProductCodes:      req.ProductCodes,
+		CompanyCode:       req.CompanyCode,
+		SiteCode:          req.SiteCode,
+		Page:              req.Page,
+		PageSize:          req.PageSize,
+	}
+	notItems := []models.ExceptPurchaseAndPurchaseItemRequest{}
+	for _, p := range filterPurchases {
+		notPOItemCodes := []string{}
+		for _, pItem := range p.PurchaseItems {
+			usedQty, ok := inboundMap[pItem.PurchaseItem]
+			if ok {
+				if pItem.PurchaseQty-usedQty == 0 {
+					notPOItemCodes = append(notPOItemCodes, pItem.PurchaseItem)
+				}
+			}
+		}
+
+		if len(notPOItemCodes) > 0 {
+			notItems = append(notItems, models.ExceptPurchaseAndPurchaseItemRequest{
+				PurchaseCode:      p.PurchaseCode,
+				PurchaseItemCodes: notPOItemCodes,
+			})
+		}
+	}
+
+	if len(notItems) > 0 {
+		newReq.NotItems = append(newReq.NotItems, notItems...)
+	}
+
+	purchases, total, page, pageSize, totalPage, err := purchaseRepository.GetPurchaseListByGRFilter(
+		newReq.SupplierCodes,
+		newReq.PurchaseCodes,
+		newReq.PurchaseItemCodes,
+		newReq.POStatusApprove,
+		newReq.POItemStatus,
+		newReq.ProductCodes,
+		newReq.NotItems,
+		newReq.CompanyCode,
+		newReq.SiteCode,
+		newReq.Page,
+		newReq.PageSize,
+	)
+
+	if err != nil {
+		return nil, errors.New("failed to get purchase list: " + err.Error())
+	}
+
+	purchaseCodes = []string{}
+	purchaseItemCodes = []string{}
+	prePurchaseCodes := []string{}
+	for _, purchase := range purchases {
+		purchaseCodes = append(purchaseCodes, purchase.PurchaseCode)
+
+		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
+			prePurchaseCodes = append(prePurchaseCodes, *purchase.DocRef)
+		}
+
+		for _, item := range purchase.PurchaseItems {
+			purchaseItemCodes = append(purchaseItemCodes, item.PurchaseItem)
+		}
 	}
 
 	result := models.GetPurchaseItemListResponse{
@@ -151,21 +250,6 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if len(purchases) == 0 {
 		result.DataList = []models.GetPurchaseItemResponse{}
 		return result, nil
-	}
-
-	purchaseCodes := []string{}
-	purchaseItemCodes := []string{}
-	prePurchaseCodes := []string{}
-	for _, purchase := range purchases {
-		purchaseCodes = append(purchaseCodes, purchase.PurchaseCode)
-
-		if purchase.PurchaseType == "PRE" && purchase.DocRef != nil {
-			prePurchaseCodes = append(prePurchaseCodes, *purchase.DocRef)
-		}
-
-		for _, item := range purchase.PurchaseItems {
-			purchaseItemCodes = append(purchaseItemCodes, item.PurchaseItem)
-		}
 	}
 
 	// Get Approvals
@@ -199,8 +283,8 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to get used qty and weight from invoice: " + err.Error())
 	}
 
-	itemsResp := []models.GetPurchaseItemResponse{}
 	// Create Result
+	itemsResp := []models.GetPurchaseItemResponse{}
 	for _, purchase := range purchases {
 		statusApprove := mapStatusApprove[purchase.PurchaseCode]
 
@@ -266,6 +350,10 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if used, ok := usedMap[item.PurchaseItem]; ok {
 				itemResp.RemainQty = item.Qty - used.Qty
 				itemResp.RemainWeight = item.TotalWeight - used.Weight
+			}
+
+			if usedInbound, ok := inboundMap[item.PurchaseItem]; ok {
+				itemResp.InboundRemainQty = item.PurchaseQty - usedInbound
 			}
 
 			itemsResp = append(itemsResp, itemResp)

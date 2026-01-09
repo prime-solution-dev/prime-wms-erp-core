@@ -291,6 +291,19 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Remark:              deliveryReq.Remark,
 			CompanyCode:         deliveryReq.CompanyCode,
 			SiteCode:            deliveryReq.SiteCode,
+			DocumentRef2:        "",
+			DocumentRefType2:    "",
+			PartyCode:           "",
+			PartyName:           "",
+			PartyType:           "",
+			Reason:              "",
+			ShippingAddress:     "",
+			DeliveryMethod:      deliveryReq.DeliveryMethod,
+			BookingDate:         deliveryReq.DeliveryDate,
+			DeliveryTimeCode:    deliveryReq.DeliveryTimeCode,
+			Tel:                 deliveryReq.Tel,
+			LicensePlate:        deliveryReq.LicensePlate,
+			ContactName:         deliveryReq.ContactName,
 			OrderItem:           createOrderItemDetail,
 		}
 
@@ -299,6 +312,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	createOrderRequest.Orders = createOrderdetail
 
 	fmt.Println("createOrderRequest : ", createOrderRequest)
+
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
