@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
+	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	customerService "prime-erp-core/internal/services/customer-service"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -63,11 +66,11 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errCreateInvoice
 	}
 
-	/* invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
+	invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
-		"topic":     []string{"AP"},
+		"topic":     []string{"CN"},
 		"sub_topic": []string{"CREATE"},
 	}
 
@@ -103,7 +106,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errCreateApproval
 			}
 		}
-	} */
+	}
 
 	return createInvoiceReturn, nil
 
