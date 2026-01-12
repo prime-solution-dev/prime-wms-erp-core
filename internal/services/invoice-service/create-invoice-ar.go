@@ -207,7 +207,7 @@ func GeneratePurchaseCodes(ctx *gin.Context, count int, prefix string) ([]string
 		return nil, fmt.Errorf("failed to marshal update request: %v", err)
 	}
 
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
+	_, err = systemConfigService.UpdateRunningSystemConfigInvoice(ctx, string(reqUpdateJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to update running config: %v", err)
 	}
