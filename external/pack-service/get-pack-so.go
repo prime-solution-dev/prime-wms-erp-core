@@ -259,6 +259,7 @@ type SalePack struct {
 	TotalWeight   float64              `json:"total_weight"`
 	Status        string               `json:"status"`
 	StatusPayment string               `json:"status_payment"`
+	RefPoDoc      string               `json:"ref_po_doc"`
 	CreateDate    *time.Time           `json:"create_date"`
 	CreateBy      string               `json:"create_by"`
 	UpdateDate    *time.Time           `json:"update_date"`
