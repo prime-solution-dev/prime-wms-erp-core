@@ -164,7 +164,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SaleCode:         verifyRes.Documents[0].DocRef,
 				})
 				// Return immediately - don't update sale if critical validations fail
-				return res, nil // Uncomment this line if you want to stop the update on failure
+				// return res, nil // Uncomment this line if you want to stop the update on failure
 			} else {
 				updateSales[0].IsApproved = true
 				updateSales[0].StatusApprove = "COMPLETED"
