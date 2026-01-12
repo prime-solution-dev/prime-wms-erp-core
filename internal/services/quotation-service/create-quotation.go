@@ -138,7 +138,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:             quotationCode,
+			DocRef:             tempQuotation.QuotationCode,
 			CustomerCode:       quotationReq.CustomerCode,
 			EffectiveDatePrice: *quotationReq.EffectiveDatePrice,
 			Items:              []verifyService.VerifyApproveItem{},
