@@ -190,7 +190,7 @@ func GetPurchaseListByGRFilter(
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("purchase.purchase_code IN ?", purchaseCodes)
 
-		baseQuery = baseQuery.Where("purchase_code IN ?", sub)
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	if len(notItems) > 0 {
