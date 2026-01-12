@@ -135,6 +135,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		for _, deposit := range saleReq.SaleDeposit {
 			// Ensure deposit belongs to this sale
+			deposit.ID = uuid.New()
 			deposit.SaleID = tempSale.ID
 			updateSaleDeposits = append(updateSaleDeposits, deposit)
 		}
