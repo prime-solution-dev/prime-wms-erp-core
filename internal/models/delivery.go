@@ -47,6 +47,7 @@ type DeliveryItem struct {
 	Status          string    `json:"status"`
 	Weight          float64   `json:"weight"`
 	WeightUnit      float64   `json:"weight_unit"`
+	Remark          string    `json:"remark"`
 	CreateDate      time.Time `json:"create_date"`
 	CreateBy        string    `json:"create_by"`
 	UpdateDate      time.Time `json:"update_date"`
