@@ -25,7 +25,8 @@ type CreateSaleRequest struct {
 
 type SaleDocument struct {
 	models.Sale
-	Items []models.SaleItem
+	Items       []models.SaleItem
+	SaleDeposit []models.SaleDeposit
 }
 
 type CreateSaleResponse struct {

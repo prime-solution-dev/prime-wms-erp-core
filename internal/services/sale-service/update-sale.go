@@ -24,8 +24,9 @@ type UpdateSaleRequest struct {
 
 type SaleDocumentUpdate struct {
 	models.Sale
-	Items       []models.SaleItem `json:"items"`        // Items to update
-	DeleteItems []uuid.UUID       `json:"delete_items"` // Item IDs to delete
+	Items       []models.SaleItem    `json:"items"`        // Items to update
+	SaleDeposit []models.SaleDeposit `json:"sale_deposit"` // Sale deposits to update
+	DeleteItems []uuid.UUID          `json:"delete_items"` // Item IDs to delete
 }
 
 type UpdateSaleResponse struct {
