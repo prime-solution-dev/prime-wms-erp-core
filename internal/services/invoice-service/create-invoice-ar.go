@@ -69,7 +69,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 		}
-
+		req[i].InvoiceCode = purchaseCodes[i]
 	}
 
 	requestData := map[string]interface{}{
@@ -192,7 +192,7 @@ func GeneratePurchaseCodes(ctx *gin.Context, count int, prefix string) ([]string
 		return nil, fmt.Errorf("failed to marshal get request: %v", err)
 	}
 
-	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfigInvoice(ctx, string(reqJSON))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate purchase order codes: %v", err)
 	}
