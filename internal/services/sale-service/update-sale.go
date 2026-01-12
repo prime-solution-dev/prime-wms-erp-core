@@ -65,6 +65,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	updateSales := []models.Sale{}
 	updateSaleItems := []models.SaleItem{}
+	updateSaleDeposits := []models.SaleDeposit{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	for _, saleReq := range req.Sales {
@@ -130,6 +131,12 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
+		}
+
+		for _, deposit := range saleReq.SaleDeposit {
+			// Ensure deposit belongs to this sale
+			deposit.SaleID = tempSale.ID
+			updateSaleDeposits = append(updateSaleDeposits, deposit)
 		}
 
 		//Approval
@@ -246,6 +253,24 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Updates(item).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update sale item %s: %v", item.SaleItem, err)
+		}
+	}
+
+	// delete existing deposits
+	for _, saleReq := range req.Sales {
+		if len(saleReq.SaleDeposit) > 0 {
+			if err := tx.Where("sale_id = ?", saleReq.Sale.ID).Delete(&models.SaleDeposit{}).Error; err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to delete existing sale deposits: %v", err)
+			}
+		}
+	}
+
+	// Update existing deposits
+	for _, deposit := range updateSaleDeposits {
+		if err := tx.Create(&deposit).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to insert sale deposit for sale ID %s: %v", deposit.SaleID, err)
 		}
 	}
 
