@@ -68,6 +68,8 @@ type GetQuotationResponse struct {
 	SubtotalExclVat             float64                    `gorm:"type:numeric" json:"subtotal_excl_vat"`
 	TotalTransportCostVat       float64                    `gorm:"type:numeric" json:"total_transport_cost_vat"`
 	RemarkApproval              string                     `gorm:"type:varchar(255)" json:"remark_approval"`
+	Revision                    float64                    `gorm:"type:numeric" json:"revision"`
+	QuotationCodeRef            string                     `gorm:"type:varchar(50)" json:"quotation_code_ref"`
 	CreateDate                  *time.Time                 `gorm:"type:date" json:"create_date"`
 	CreateBy                    string                     `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate                  *time.Time                 `gorm:"type:date" json:"update_date"`
