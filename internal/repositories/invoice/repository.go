@@ -257,3 +257,18 @@ func DeleteInvoice(id []uuid.UUID) (err error) {
 
 	return
 }
+func DeleteInvoiceItem(id []uuid.UUID) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+
+	resultBatch := gormx.Table("invoice_item").Where("invoice_id IN (?)", id).Delete(models.InvoiceItem{})
+	if resultBatch.Error != nil {
+		gormx.Rollback()
+		return resultBatch.Error
+	}
+
+	return
+}

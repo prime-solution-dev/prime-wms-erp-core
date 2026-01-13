@@ -5,8 +5,10 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -21,14 +23,27 @@ func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for i, invoice := range req {
 
 		for o := range invoice.InvoiceItem {
+			invoiceItemID := uuid.New()
+			req[i].InvoiceItem[o].ID = invoiceItemID
+			req[i].InvoiceItem[o].InvoiceID = invoice.ID
+			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
 		req[i].InvoiceItem = []models.InvoiceItem{}
 		req[i].InvoiceDeposit = []models.InvoiceDeposit{}
 		invoiceValue = append(invoiceValue, req[i])
 	}
+	invoiceId := []uuid.UUID{req[0].ID}
+	errDeleteInvoiceItem := repositoryInvoice.DeleteInvoiceItem(invoiceId)
+	if errDeleteInvoiceItem != nil {
+		return nil, errDeleteInvoiceItem
+	}
+	errCreateApproval := repositoryInvoice.CreateInvoice([]models.Invoice{}, invoiceItemValue, []models.InvoiceDeposit{})
+	if errCreateApproval != nil {
+		return nil, errCreateApproval
+	}
 
-	rowsAffected, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, invoiceItemValue)
+	rowsAffected, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, []models.InvoiceItem{})
 	if errCreateApproval != nil {
 		return nil, errCreateApproval
 	}
