@@ -24,8 +24,9 @@ type UpdateSaleRequest struct {
 
 type SaleDocumentUpdate struct {
 	models.Sale
-	Items       []models.SaleItem `json:"items"`        // Items to update
-	DeleteItems []uuid.UUID       `json:"delete_items"` // Item IDs to delete
+	Items       []models.SaleItem    `json:"items"`        // Items to update
+	SaleDeposit []models.SaleDeposit `json:"sale_deposit"` // Sale deposits to update
+	DeleteItems []uuid.UUID          `json:"delete_items"` // Item IDs to delete
 }
 
 type UpdateSaleResponse struct {
@@ -64,6 +65,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	updateSales := []models.Sale{}
 	updateSaleItems := []models.SaleItem{}
+	updateSaleDeposits := []models.SaleDeposit{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	for _, saleReq := range req.Sales {
@@ -131,6 +133,13 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
 		}
 
+		for _, deposit := range saleReq.SaleDeposit {
+			// Ensure deposit belongs to this sale
+			deposit.ID = uuid.New()
+			deposit.SaleID = tempSale.ID
+			updateSaleDeposits = append(updateSaleDeposits, deposit)
+		}
+
 		//Approval
 		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
 		verifyReqMap[verifyReqKey] = verifyReq
@@ -155,7 +164,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SaleCode:         verifyRes.Documents[0].DocRef,
 				})
 				// Return immediately - don't update sale if critical validations fail
-				return res, nil
+				// return res, nil // Uncomment this line if you want to stop the update on failure
 			} else {
 				updateSales[0].IsApproved = true
 				updateSales[0].StatusApprove = "COMPLETED"
@@ -245,6 +254,24 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Updates(item).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update sale item %s: %v", item.SaleItem, err)
+		}
+	}
+
+	// delete existing deposits
+	for _, saleReq := range req.Sales {
+		if len(saleReq.SaleDeposit) > 0 {
+			if err := tx.Where("sale_id = ?", saleReq.Sale.ID).Delete(&models.SaleDeposit{}).Error; err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to delete existing sale deposits: %v", err)
+			}
+		}
+	}
+
+	// Update existing deposits
+	for _, deposit := range updateSaleDeposits {
+		if err := tx.Create(&deposit).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to insert sale deposit for sale ID %s: %v", deposit.SaleID, err)
 		}
 	}
 
