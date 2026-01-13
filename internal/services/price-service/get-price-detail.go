@@ -1,12 +1,8 @@
 package priceService
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
@@ -14,35 +10,12 @@ import (
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
 	"time"
 
+	externalService "prime-erp-core/external/warehouse-service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
-
-// InventoryServiceRequest represents the request structure for inventory service
-type InventoryServiceRequest struct {
-	CompanyCode []string            `json:"company_code"`
-	SiteCode    []string            `json:"site_code"`
-	KeyValue    []InventoryKeyValue `json:"key_value"`
-}
-
-// InventoryKeyValue represents a key-value pair in the inventory service request
-type InventoryKeyValue struct {
-	ID         string `json:"id"`
-	GroupCode  string `json:"group_code"`
-	GroupValue string `json:"group_value"`
-	Seq        int    `json:"seq"`
-}
-
-// InventoryServiceResponse represents the response structure from inventory service
-type InventoryServiceResponse struct {
-	ID              string                           `json:"id"`
-	GroupCodeKeys   string                           `json:"group_code_keys"`
-	GroupValueKeys  string                           `json:"group_value_keys"`
-	ProductCode     string                           `json:"product_code"`
-	SupplierCode    string                           `json:"supplier_code"`
-	InventoryWeight []models.InventoryWeightResponse `json:"inventory_weight"`
-}
 
 // getGroupAndItemMappings gets group and group item mappings for value name resolution
 func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]models.GetGroupItemResponse, map[string]GetPaymentTermResponse, error) {
@@ -109,65 +82,6 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 	}
 
 	return groupMap, groupItemMap, paymentTermMap, nil
-}
-
-// getInventoryByProductCode calls the external inventory service to get inventory weight data
-func getInventoryByProductCode(companyCode string, siteCodes []string, keyValues []InventoryKeyValue) ([]InventoryServiceResponse, error) {
-	// Get inventory service URL from environment variable, default to localhost:9103
-	inventoryServiceURL := os.Getenv("INVENTORY_SERVICE_URL")
-	if inventoryServiceURL == "" {
-		inventoryServiceURL = "http://localhost:9103"
-	}
-
-	// Build request body
-	reqBody := InventoryServiceRequest{
-		CompanyCode: []string{companyCode},
-		SiteCode:    siteCodes,
-		KeyValue:    keyValues,
-	}
-
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal inventory request: %w", err)
-	}
-
-	// Create HTTP request
-	url := inventoryServiceURL + "/Inventory/get/inventory-by-product-code"
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	// Execute request
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	// Check HTTP status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("inventory service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse JSON response
-	var inventoryResponse []InventoryServiceResponse
-	if err := json.Unmarshal(body, &inventoryResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal inventory response: %w", err)
-	}
-
-	return inventoryResponse, nil
 }
 
 // loadPriceData loads price list data from database using GetPriceList
@@ -322,11 +236,11 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	}
 
 	// Collect all key values from all subgroups for inventory service request
-	keyValues := []InventoryKeyValue{}
+	keyValues := []externalService.InventoryByProductCodeKeyValue{}
 	for _, resp := range responses {
 		for _, sg := range resp.SubGroups {
 			for _, sgk := range sg.GroupKeys {
-				keyValues = append(keyValues, InventoryKeyValue{
+				keyValues = append(keyValues, externalService.InventoryByProductCodeKeyValue{
 					ID:         sg.ID.String(),
 					GroupCode:  sgk.Code,
 					GroupValue: sgk.Value,
@@ -355,7 +269,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		}
 
 		// Call inventory service
-		inventoryResponse, err := getInventoryByProductCode(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
