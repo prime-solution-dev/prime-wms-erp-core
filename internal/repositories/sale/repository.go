@@ -80,6 +80,7 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 	var saleID []uuid.UUID
 	gormx.Table("sale").Select("sale.id").
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
+		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
 		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusPayment + "" + searchIsApproved + "").
 		Group("sale.id").Scan(&saleID)
 
@@ -87,7 +88,7 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 
 		var count = len(saleID)
 
-		query := gormx.Preload("SaleItem")
+		query := gormx.Preload("SaleItem").Preload("SaleDeposit")
 
 		query = query.Where("id in (?)", saleID)
 

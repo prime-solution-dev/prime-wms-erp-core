@@ -352,6 +352,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				itemResp.RemainWeight = item.TotalWeight - used.Weight
 			}
 
+			itemResp.InboundRemainQty = item.PurchaseQty
 			if usedInbound, ok := inboundMap[item.PurchaseItem]; ok {
 				itemResp.InboundRemainQty = item.PurchaseQty - usedInbound
 			}
