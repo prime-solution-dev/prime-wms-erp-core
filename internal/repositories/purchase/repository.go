@@ -6,7 +6,6 @@ import (
 	"prime-erp-core/internal/models"
 	"time"
 
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -164,15 +163,25 @@ func GetPurchaseListByGRFilter(
 	var totalRecords int64
 
 	// Build base query
-	query := gormx.Model(&models.Purchase{}).
+	baseQuery := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
 
 	if len(purchaseItemStatus) > 0 {
-		query = query.Preload("PurchaseItems", "status IN ?", purchaseItemStatus)
-	} else if len(purchaseItemCodes) > 0 {
-		query = query.Preload("PurchaseItems", "purchase_item IN ?", purchaseItemCodes)
-	} else {
-		query = query.Preload("PurchaseItems")
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("status IN ?", purchaseItemStatus)
+
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
+	}
+
+	if len(purchaseItemCodes) > 0 {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("purchase_item IN ?", purchaseItemCodes)
+
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	if len(purchaseCodes) > 0 {
@@ -181,7 +190,7 @@ func GetPurchaseListByGRFilter(
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("purchase.purchase_code IN ?", purchaseCodes)
 
-		query = query.Where("EXISTS (?)", sub)
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	if len(notItems) > 0 {
@@ -191,16 +200,16 @@ func GetPurchaseListByGRFilter(
 				Where("purchase.id = purchase_item.purchase_id").
 				Where("purchase_item.purchase_item IN ?", notItem.PurchaseItemCodes)
 
-			query = query.Where("NOT EXISTS (?)", subQuery)
+			baseQuery = baseQuery.Where("NOT EXISTS (?)", subQuery)
 		}
 	}
 
 	if len(supplierCodes) > 0 {
-		query = query.Where("supplier_code IN ?", supplierCodes)
+		baseQuery = baseQuery.Where("supplier_code IN ?", supplierCodes)
 	}
 
 	if len(statusApprove) > 0 {
-		query = query.Where("status_approve IN ?", statusApprove)
+		baseQuery = baseQuery.Where("status_approve IN ?", statusApprove)
 	}
 
 	if len(productCodes) > 0 {
@@ -209,11 +218,11 @@ func GetPurchaseListByGRFilter(
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_code IN ?", productCodes)
 
-		query = query.Where("EXISTS (?)", sub)
+		baseQuery = baseQuery.Where("EXISTS (?)", sub)
 	}
 
 	// Count total records (no preload needed)
-	if err := query.Count(&totalRecords).Error; err != nil {
+	if err := baseQuery.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -223,7 +232,8 @@ func GetPurchaseListByGRFilter(
 
 	// Apply pagination
 	offset := (page - 1) * pageSize
-	if err := query.
+	if err := baseQuery.
+		Preload("PurchaseItems").
 		Limit(pageSize).
 		Offset(offset).
 		Find(&purchases).Error; err != nil {
@@ -403,66 +413,65 @@ func CompletePO(purchaseCodes []string) (err error) {
 	})
 }
 
-func CompletePOItem(usedType string, purchaseItemCodes []string) error {
+func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed) error {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return err
 	}
 	defer db.CloseGORM(gormx)
 
+	purchaseItemCodes := []string{}
+	for _, usedPurchase := range purchaseItemUsed {
+		purchaseItemCodes = append(purchaseItemCodes, usedPurchase.PurchaseItemCode)
+	}
+
 	return gormx.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.PurchaseItem{}).
-			Where("purchase_item IN ?", purchaseItemCodes).
-			Updates(map[string]interface{}{
-				"status":     "COMPLETED",
-				"update_dtm": time.Now().UTC(),
-			}).Error; err != nil {
-			return err
-		}
+		for _, poItemUsed := range purchaseItemUsed {
+			if err := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_item = ? AND purchase_qty = ?", poItemUsed.PurchaseItemCode, poItemUsed.QTY).
+				Updates(map[string]interface{}{
+					"status":     "COMPLETED",
+					"update_dtm": time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
 
-		purchaseIDs := []uuid.UUID{}
+			subQuery := tx.Model(&models.PurchaseItem{}).
+				Select("purchase_id").
+				Where("purchase_item = ?", poItemUsed.PurchaseItemCode)
 
-		if err := tx.Model(&models.PurchaseItem{}).
-			Select("purchase_id").
-			Where("purchase_item IN ?", purchaseItemCodes).
-			Group("purchase_id").
-			Scan(&purchaseIDs).Error; err != nil {
-			return err
-		}
+			if err := tx.Model(&models.Purchase{}).
+				Where("id IN (?)", subQuery).
+				Updates(map[string]interface{}{
+					"used_type":   usedType,
+					"used_status": "PARTIAL",
+					"update_dtm":  time.Now().UTC(),
+				}).Error; err != nil {
+				return err
+			}
 
-		for _, purchaseID := range purchaseIDs {
-			var notCompletedCount int64
+			var completedCount int64
 			var itemsCount int64
 
 			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = ? AND status = ?", purchaseID, "COMPLETED").
-				Count(&notCompletedCount).Error; err != nil {
+				Where("purchase_id = (?) AND status = ?", subQuery, "COMPLETED").
+				Count(&completedCount).Error; err != nil {
 				return err
 			}
 
 			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = ?", purchaseID).
+				Where("purchase_id = (?)", subQuery).
 				Count(&itemsCount).Error; err != nil {
 				return err
 			}
 
-			if notCompletedCount == 0 {
+			if completedCount == itemsCount {
 				if err := tx.Model(&models.Purchase{}).
-					Where("id = ?", purchaseID).
+					Where("id = (?)", subQuery).
 					Updates(map[string]interface{}{
 						"status":      "COMPLETED",
 						"used_type":   usedType,
 						"used_status": "COMPLETED",
-						"update_dtm":  time.Now().UTC(),
-					}).Error; err != nil {
-					return err
-				}
-			} else if notCompletedCount > 0 && notCompletedCount < itemsCount {
-				if err := tx.Model(&models.Purchase{}).
-					Where("id = ?", purchaseID).
-					Updates(map[string]interface{}{
-						"used_type":   usedType,
-						"used_status": "PARTIAL",
 						"update_dtm":  time.Now().UTC(),
 					}).Error; err != nil {
 					return err
