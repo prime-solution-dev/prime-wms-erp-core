@@ -39,6 +39,7 @@ type GetSalePackResponse struct {
 	TotalWeight      float64                      `json:"total_weight"`
 	Status           string                       `json:"status"`
 	StatusPayment    string                       `json:"status_payment"`
+	CreditTerm       string                       `json:"credit_term"`
 	RefPoDoc         string                       `json:"ref_po_doc"`
 	CreateDate       *time.Time                   `json:"create_date"`
 	CreateBy         string                       `json:"create_by"`
@@ -184,6 +185,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			TotalWeight:   sale.TotalWeight,
 			Status:        sale.Status,
 			StatusPayment: sale.StatusPayment,
+			CreditTerm:    sale.CreditTerm,
 			RefPoDoc:      sale.RefPoDoc,
 			CreateDate:    sale.CreateDate,
 			CreateBy:      sale.CreateBy,
@@ -368,6 +370,7 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 						TotalWeight:   saleData.TotalWeight,
 						Status:        saleData.Status,
 						StatusPayment: saleData.StatusPayment,
+						CreditTerm:    saleData.CreditTerm,
 						RefPoDoc:      saleData.RefPoDoc,
 						CreateDate:    saleData.CreateDate,
 						CreateBy:      saleData.CreateBy,
