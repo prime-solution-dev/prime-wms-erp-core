@@ -248,22 +248,24 @@ type OrderedDeliveryItem struct {
 }
 
 type SalePack struct {
-	ID            string            `json:"id"`
-	SaleCode      string            `json:"sale_code"`
-	CompanyCode   string            `json:"company_code"`
-	SiteCode      string            `json:"site_code"`
-	CustomerCode  string            `json:"customer_code"`
-	CustomerName  string            `json:"customer_name"`
-	DeliveryDate  *time.Time        `json:"delivery_date"`
-	TotalAmount   float64           `json:"total_amount"`
-	TotalWeight   float64           `json:"total_weight"`
-	Status        string            `json:"status"`
-	StatusPayment string            `json:"status_payment"`
-	CreateDate    *time.Time        `json:"create_date"`
-	CreateBy      string            `json:"create_by"`
-	UpdateDate    *time.Time        `json:"update_date"`
-	UpdateBy      string            `json:"update_by"`
-	SaleItem      []models.SaleItem `json:"sale_item"`
+	ID            string               `json:"id"`
+	SaleCode      string               `json:"sale_code"`
+	CompanyCode   string               `json:"company_code"`
+	SiteCode      string               `json:"site_code"`
+	CustomerCode  string               `json:"customer_code"`
+	CustomerName  string               `json:"customer_name"`
+	DeliveryDate  *time.Time           `json:"delivery_date"`
+	TotalAmount   float64              `json:"total_amount"`
+	TotalWeight   float64              `json:"total_weight"`
+	Status        string               `json:"status"`
+	StatusPayment string               `json:"status_payment"`
+	RefPoDoc      string               `json:"ref_po_doc"`
+	CreateDate    *time.Time           `json:"create_date"`
+	CreateBy      string               `json:"create_by"`
+	UpdateDate    *time.Time           `json:"update_date"`
+	UpdateBy      string               `json:"update_by"`
+	SaleDeposit   []models.SaleDeposit `json:"sale_deposit"`
+	SaleItem      []models.SaleItem    `json:"sale_item"`
 }
 
 type ResultPackingResponse struct {
