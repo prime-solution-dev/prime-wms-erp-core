@@ -1201,6 +1201,20 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 			}
 		}
+
+		// Use inventory_weight data for ship_no and factory if available
+		// ship_no: Use batch_no from first inventory_weight item
+		if len(sg.InventoryWeight) > 0 && sg.InventoryWeight[0].BatchNo != "" {
+			shipNoValue = sg.InventoryWeight[0].BatchNo
+		}
+		// factory: Use supplier_code from inventory response
+		if sg.SupplierCode != "" {
+			factoryValue = sg.SupplierCode
+		} else if factoryValue == nil && producerValue != nil {
+			// Fallback to producer from UDF if supplier_code not available
+			factoryValue = producerValue
+		}
+
 		row["item"] = buildItemValue(pattern, sg)
 		for _, fixedCol := range pattern.FixedColumns {
 			// Handle "type" as a special case that maps to PRODUCT_GROUP9
