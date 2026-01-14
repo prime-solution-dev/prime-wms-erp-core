@@ -39,7 +39,7 @@ func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, grou
 	}
 
 	columns := buildDynamicColumns(pattern, allSubGroups)
-	rowData := buildDynamicRows(pattern, allSubGroups)
+	rowData := buildDynamicRows(config, pattern, allSubGroups)
 	fmt.Println("rowData", len(rowData))
 	mergedRows := mergeGroup1Item9Rows(rowData)
 	fmt.Println("mergedRows", len(mergedRows))

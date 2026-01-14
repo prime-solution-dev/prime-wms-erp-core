@@ -38,9 +38,10 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
+	productGroup1Code := getGroupCodeFromConfig(config, pattern, "productGroup1", "PRODUCT_GROUP1")
 	groupedByProductGroup1 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP1")
+		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, productGroup1Code)
 		if tabKey == "" {
 			tabKey = "อื่นๆ"
 		}
@@ -73,7 +74,7 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 			continue
 		}
 
-		rows := buildDirectRows(pattern, subGroups)
+		rows := buildDirectRows(config, pattern, subGroups)
 
 		sort.SliceStable(rows, func(i, j int) bool {
 			thicknessI := fmt.Sprintf("%v", rows[i]["product_group_6"])

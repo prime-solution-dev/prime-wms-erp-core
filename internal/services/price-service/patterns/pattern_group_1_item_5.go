@@ -39,9 +39,10 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
+	productGroup2Code := getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2")
 	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		if productGroup2 == "" {
 			productGroup2 = "อื่นๆ"
 		}
@@ -54,7 +55,7 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 	for _, tabLabel := range tabOrder {
 		subGroups := groupedByProductGroup2[tabLabel]
 		columns := buildGroup1Item5Columns(pattern, subGroups)
-		rowData := buildDynamicRows(pattern, subGroups)
+		rowData := buildDynamicRows(config, pattern, subGroups)
 
 		tableData := make([]map[string]interface{}, len(rowData))
 		for i, row := range rowData {
