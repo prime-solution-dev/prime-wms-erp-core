@@ -10,6 +10,8 @@ import (
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
 	"time"
 
+	externalService "prime-erp-core/external/warehouse-service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -129,6 +131,11 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	}
 
 	result := []models.GetPriceListResponse{}
+
+	// Collect unique company codes and site codes
+	companyCodeSet := make(map[string]bool)
+	siteCodeSet := make(map[string]bool)
+
 	for _, resp := range responses {
 		// Extract GroupKey from first subgroup's subgroup_key (first part before "|")
 		groupKey := ""
@@ -166,6 +173,14 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 			priceListResp.EffectiveDate = &effectiveDate
 		}
 
+		// Collect company code and site code
+		if resp.CompanyCode != "" {
+			companyCodeSet[resp.CompanyCode] = true
+		}
+		if resp.SiteCode != "" {
+			siteCodeSet[resp.SiteCode] = true
+		}
+
 		// Transform subgroups
 		subGroups := []models.PriceListSubGroupResponse{}
 		for _, sg := range resp.SubGroups {
@@ -187,7 +202,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				sgEffectiveDate = sg.EffectiveDate.Format(time.RFC3339)
 			}
 
-			subGroups = append(subGroups, models.PriceListSubGroupResponse{
+			subGroup := models.PriceListSubGroupResponse{
 				ID:                        sg.ID.String(),
 				PriceListGroupID:          resp.ID.String(),
 				SubgroupKey:               sg.SubGroupKey,
@@ -211,11 +226,74 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				Remark:                    sg.Remark,
 				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,
-			})
+			}
+
+			subGroups = append(subGroups, subGroup)
 		}
 
 		priceListResp.SubGroups = subGroups
 		result = append(result, priceListResp)
+	}
+
+	// Collect all key values from all subgroups for inventory service request
+	keyValues := []externalService.InventoryByProductCodeKeyValue{}
+	for _, resp := range responses {
+		for _, sg := range resp.SubGroups {
+			for _, sgk := range sg.GroupKeys {
+				keyValues = append(keyValues, externalService.InventoryByProductCodeKeyValue{
+					ID:         sg.ID.String(),
+					GroupCode:  sgk.Code,
+					GroupValue: sgk.Value,
+					Seq:        sgk.Seq,
+				})
+			}
+		}
+	}
+
+	// Call inventory service if we have key values
+	if len(keyValues) > 0 {
+		// Convert sets to slices
+		companyCodes := []string{}
+		for code := range companyCodeSet {
+			companyCodes = append(companyCodes, code)
+		}
+		siteCodes := []string{}
+		for code := range siteCodeSet {
+			siteCodes = append(siteCodes, code)
+		}
+
+		// Use first company code for the request (as per example, it's a single value array)
+		companyCode := ""
+		if len(companyCodes) > 0 {
+			companyCode = companyCodes[0]
+		}
+
+		// Call inventory service
+		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
+		if err != nil {
+			// Log error but continue without inventory data
+			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
+		} else {
+			// Create a map of inventory data by ID for quick lookup
+			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			supplierCodeMap := make(map[string]string)
+			for _, invItem := range inventoryResponse {
+				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+			}
+
+			// Match inventory response to subgroups by ID and enrich
+			for i := range result {
+				for j := range result[i].SubGroups {
+					if inventoryWeight, ok := inventoryMap[result[i].SubGroups[j].ID]; ok {
+						result[i].SubGroups[j].InventoryWeight = inventoryWeight
+					}
+					if supplierCode, ok := supplierCodeMap[result[i].SubGroups[j].ID]; ok {
+						result[i].SubGroups[j].SupplierCode = supplierCode
+					}
+				}
+			}
+		}
 	}
 
 	return result, nil

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	externalService "prime-erp-core/external/order-service"
 	orderExternalService "prime-erp-core/external/order-service"
 	"time"
 
@@ -161,12 +162,19 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
-	// Check if any delivery is not a draft before calling external service
+	// Check if any delivery is not a draft and was previously a draft before calling external service
 	hasNonDraftDelivery := false
 	for _, deliveryReq := range req.Deliveries {
 		if !deliveryReq.IsDraft {
-			hasNonDraftDelivery = true
-			break
+			// Check previous status from database
+			var previousDelivery models.Delivery
+			if err := gormx.Where("id = ?", deliveryReq.Delivery.ID).First(&previousDelivery).Error; err == nil {
+				// Only create order if previous status was draft (TEMP) and current is not draft
+				if previousDelivery.Status == "TEMP" {
+					hasNonDraftDelivery = true
+					break
+				}
+			}
 		}
 	}
 
@@ -179,6 +187,16 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 		if len(orderRes.OrderCode) > 0 {
 			orderCode = orderRes.OrderCode[0] // Use first order code
+		}
+	}
+
+	// Call UpdateOrderByDelivery for each non-draft delivery
+	for _, deliveryReq := range req.Deliveries {
+		if !deliveryReq.IsDraft {
+			err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
+			}
 		}
 	}
 
@@ -229,7 +247,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				SaleMethod:        item.SaleMethodForOrder,
 				Weight:            item.Weight,
 				WeightUnit:        item.WeightUnit,
-				Remark:            "",
+				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
@@ -266,6 +284,21 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			DocumentRefType:     "DELIVERY",
 			DocumentRef:         deliveryCode,
 			Remark:              deliveryReq.Remark,
+			CompanyCode:         deliveryReq.CompanyCode,
+			SiteCode:            deliveryReq.SiteCode,
+			DocumentRef2:        "",
+			DocumentRefType2:    "",
+			PartyCode:           "",
+			PartyName:           "",
+			PartyType:           "",
+			Reason:              "",
+			ShippingAddress:     "",
+			DeliveryMethod:      deliveryReq.DeliveryMethod,
+			BookingDate:         deliveryReq.DeliveryDate,
+			DeliveryTimeCode:    deliveryReq.DeliveryTimeCode,
+			Tel:                 deliveryReq.Tel,
+			LicensePlate:        deliveryReq.LicensePlate,
+			ContactName:         deliveryReq.ContactName,
 			OrderItem:           createOrderItemDetail,
 		}
 
@@ -281,4 +314,66 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
+}
+
+func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+	// Find the corresponding delivery from updateDeliveries
+	var delivery models.Delivery
+	for _, d := range updateDeliveries {
+		if d.DocumentRef == deliveryReq.DocumentRef {
+			delivery = d
+			break
+		}
+	}
+
+	// Create order items from the new items only
+	orderItems := []externalService.UpdateOrderByDeliveryItemDetail{}
+	for _, item := range deliveryReq.Items {
+		orderItem := externalService.UpdateOrderByDeliveryItemDetail{
+			OrderItem:            "",
+			DocumentRefItem:      item.DocumentRefItem,
+			ProductCode:          item.ProductCode,
+			ProductType:          "normal",
+			InterfaceOrderQty:    item.Qty,
+			Qty:                  item.Qty,
+			UnitCode:             item.UnitCode,
+			IsFocGwp:             false,
+			WarehouseCode:        "",
+			BatchNo:              "",
+			SerialCode:           "",
+			SaleUnitCode:         item.SaleUnitCodeForOrder,
+			SaleMethod:           item.SaleMethodForOrder,
+			InterfaceOrderWeight: item.Weight,
+			Weight:               item.Weight,
+			WeightUnit:           item.WeightUnit,
+			MfgDate:              nil,
+			ExpDate:              nil,
+			LocationCode:         "",
+			StorageType:          "",
+			Remark:               item.Remark,
+			Status:               "PENDING",
+		}
+		orderItems = append(orderItems, orderItem)
+	}
+
+	updateOrderReq := externalService.UpdateOrderByDeliveryRequest{
+		DocumentRef:      delivery.DeliveryCode,
+		DeliveryMethod:   deliveryReq.DeliveryMethod,
+		BookingDate:      deliveryReq.DeliveryDate,
+		DeliveryTimeCode: deliveryReq.DeliveryTimeCode,
+		Tel:              deliveryReq.Tel,
+		LicensePlate:     deliveryReq.LicensePlate,
+		ContactName:      deliveryReq.ContactName,
+		Remark:           deliveryReq.Remark,
+		OrderItem:        orderItems,
+	}
+
+	// Call UpdateOrderByDelivery
+	resp, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	if err != nil {
+		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
+	}
+
+	fmt.Println("updateOrderResponse : ", resp)
+	return nil
 }

@@ -91,6 +91,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	quotation.POST("/EditQuotation", func(c *gin.Context) {
 		utils.ProcessRequest(c, quotationService.EditQuotation)
 	})
+	quotation.POST("/CancelQuotation", func(c *gin.Context) {
+		utils.ProcessRequest(c, quotationService.CancelQuotation)
+	})
 
 	quotation.POST("/RequestApproveQuotation", func(c *gin.Context) {
 		utils.ProcessRequest(c, quotationService.RequestApproveQuotation)
