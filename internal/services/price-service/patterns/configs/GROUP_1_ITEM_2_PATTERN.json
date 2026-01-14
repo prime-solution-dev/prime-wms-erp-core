@@ -217,6 +217,28 @@
     "version": "1.0.0",
     "lastUpdated": "2025-01-23",
     "description": "Configuration for GROUP_1_ITEM_2 - Direct SubGroup rows pattern"
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PRODUCT_GROUP2",
+      "productGroup6": "PRODUCT_GROUP6",
+      "productGroup7": "PRODUCT_GROUP7",
+      "productGroup5": "PRODUCT_GROUP5",
+      "productGroup3": "PRODUCT_GROUP3",
+      "productGroup4": "PRODUCT_GROUP4",
+      "productGroup9": "PRODUCT_GROUP9",
+      "type": "PRODUCT_GROUP9"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_2": "BuildGroup1Item2Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PRODUCT_GROUP7"}
+    ]
   }
 }
 

@@ -38,18 +38,22 @@ func BuildGroup1Item13Response(priceListData []models.GetPriceListResponse, grou
 		}, nil
 	}
 
+	productGroup1Code := getGroupCodeFromConfig(config, pattern, "productGroup1", "PRODUCT_GROUP1")
+	productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
+	productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
+	productGroup3Code := getGroupCodeFromConfig(config, pattern, "productGroup3", "PRODUCT_GROUP3")
 	sort.SliceStable(allSubGroups, func(i, j int) bool {
-		pg1I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP1")
-		pg1J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP1")
+		pg1I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup1Code)
+		pg1J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup1Code)
 		if pg1I == pg1J {
-			lengthI := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP7")
-			lengthJ := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP7")
+			lengthI := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup7Code)
+			lengthJ := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup7Code)
 			if lengthI == lengthJ {
-				size4I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
-				size4J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
+				size4I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup4Code)
+				size4J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup4Code)
 				if size4I == size4J {
-					size3I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, "PRODUCT_GROUP3")
-					size3J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, "PRODUCT_GROUP3")
+					size3I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup3Code)
+					size3J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup3Code)
 					return size3I < size3J
 				}
 				return size4I < size4J
@@ -60,7 +64,7 @@ func BuildGroup1Item13Response(priceListData []models.GetPriceListResponse, grou
 	})
 
 	columns := buildFixedColumns(pattern)
-	rowData := buildDirectRows(pattern, allSubGroups)
+	rowData := buildDirectRows(config, pattern, allSubGroups)
 	tableData := make([]map[string]interface{}, len(rowData))
 	for i, row := range rowData {
 		tableData[i] = map[string]interface{}(row)
@@ -68,7 +72,7 @@ func BuildGroup1Item13Response(priceListData []models.GetPriceListResponse, grou
 
 	tabLabel := "I-Beams"
 	if len(allSubGroups) > 0 {
-		if pg1 := getValueNameByGroupCode(allSubGroups[0].SubGroupKeys, "PRODUCT_GROUP1"); pg1 != "" {
+		if pg1 := getValueNameByGroupCode(allSubGroups[0].SubGroupKeys, productGroup1Code); pg1 != "" {
 			tabLabel = pg1
 		}
 	}
