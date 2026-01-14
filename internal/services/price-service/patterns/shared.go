@@ -1719,14 +1719,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 	return rows
 }
 
-// buildProductGroup2ColumnGroups builds dynamic column groups from PRODUCT_GROUP2 values
-// using configuration when available. Each column group contains children columns
-// defined in pattern.Columns.
-func buildProductGroup2ColumnGroups(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
-	// Resolve PRODUCT_GROUP2 code from configuration (pattern-level overrides root-level).
-	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
-	return buildProductGroup2ColumnGroupsWithCode(pattern, subGroups, productGroup2Code)
-}
 
 // buildProductGroup2ColumnGroupsWithCode builds dynamic column groups using a configurable group code
 func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, productGroup2Code string) []ColumnDef {
@@ -1798,23 +1790,6 @@ func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []
 	}
 
 	return columns
-}
-
-// buildDirectRowsWithProductGroup2 builds rows with fixed columns and dynamic PRODUCT_GROUP2 column group data
-// using configuration when available.
-func buildDirectRowsWithProductGroup2(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
-	if root == nil {
-		// Backward compatibility: preserve previous hardcoded behavior when configuration is missing.
-		return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, "PRODUCT_GROUP2", "PRODUCT_GROUP6", "PRODUCT_GROUP7", "PRODUCT_GROUP5", "PRODUCT_GROUP3")
-	}
-
-	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
-	productGroup6Code := getGroupCodeFromConfig(root, pattern, "productGroup6", "PRODUCT_GROUP6")
-	productGroup7Code := getGroupCodeFromConfig(root, pattern, "productGroup7", "PRODUCT_GROUP7")
-	productGroup5Code := getGroupCodeFromConfig(root, pattern, "productGroup5", "PRODUCT_GROUP5")
-	productGroup3Code := getGroupCodeFromConfig(root, pattern, "productGroup3", "PRODUCT_GROUP3")
-
-	return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, productGroup2Code, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code)
 }
 
 // buildDirectRowsWithProductGroup2WithCode builds rows with fixed columns and dynamic column group data using configurable group codes
