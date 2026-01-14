@@ -1402,7 +1402,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				}
 			}
 		}
-		row["item"] = buildItemValue(pattern, sg)
+		row["item"] = buildItemValue(root, pattern, sg)
 		for _, fixedCol := range pattern.FixedColumns {
 			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			if fixedCol.DataMapping == "type" {
