@@ -17,21 +17,22 @@ import (
 var patternConfigs embed.FS
 
 type PatternConfig struct {
-	ID                   string              `json:"id"`
-	Name                 string              `json:"name"`
-	Description          string              `json:"description"`
-	Enabled              bool                `json:"enabled"`
-	Summary              *SummaryConfig      `json:"summary,omitempty"`
-	Grouping             GroupingConfig      `json:"grouping"`
-	ColumnLevels         []ColumnLevel       `json:"columnLevels,omitempty"`
-	Columns              []ColumnConfigItem  `json:"columns"`
-	FixedColumns         []ColumnConfigItem  `json:"fixedColumns"`
-	ColumnGroups         []ColumnGroupConfig `json:"columnGroups,omitempty"`
-	ApplicableCategories []string            `json:"applicableCategories"`
-	EditableSuffixes     []string            `json:"editable_suffixes,omitempty"`
-	FetchableSuffixes    []string            `json:"fetchable_suffixes,omitempty"`
-	ItemFormat           []ItemFormatPart    `json:"itemFormat,omitempty"`
-	RequiredGroupCodes   []string            `json:"requiredGroupCodes,omitempty"`
+	ID                   string               `json:"id"`
+	Name                 string               `json:"name"`
+	Description          string               `json:"description"`
+	Enabled              bool                 `json:"enabled"`
+	Summary              *SummaryConfig       `json:"summary,omitempty"`
+	Grouping             GroupingConfig       `json:"grouping"`
+	ColumnLevels         []ColumnLevel        `json:"columnLevels,omitempty"`
+	Columns              []ColumnConfigItem   `json:"columns"`
+	FixedColumns         []ColumnConfigItem   `json:"fixedColumns"`
+	ColumnGroups         []ColumnGroupConfig  `json:"columnGroups,omitempty"`
+	ApplicableCategories []string             `json:"applicableCategories"`
+	EditableSuffixes     []string             `json:"editable_suffixes,omitempty"`
+	FetchableSuffixes    []string             `json:"fetchable_suffixes,omitempty"`
+	ItemFormat           []ItemFormatPart     `json:"itemFormat,omitempty"`
+	RequiredGroupCodes   []string             `json:"requiredGroupCodes,omitempty"`
+	ValueMappings        *ValueMappingsConfig `json:"valueMappings,omitempty"`
 }
 
 type GroupingConfig struct {
@@ -91,9 +92,30 @@ type GridOptionsConfig struct {
 }
 
 type PriceTableConfiguration struct {
-	Patterns       []PatternConfig     `json:"patterns"`
-	DefaultPattern string              `json:"defaultPattern"`
-	TableConfig    TableConfigSettings `json:"tableConfig"`
+	Patterns       []PatternConfig      `json:"patterns"`
+	DefaultPattern string               `json:"defaultPattern"`
+	TableConfig    TableConfigSettings  `json:"tableConfig"`
+	ValueMappings  *ValueMappingsConfig `json:"valueMappings,omitempty"`
+}
+
+// ValueMappingsConfig defines all configurable mappings that were previously hardcoded
+// in Go code. All fields are optional; when missing, code falls back to existing defaults
+// to preserve backward compatibility.
+type ValueMappingsConfig struct {
+	// GroupCodeMappings maps semantic keys (e.g. "productGroup2") to actual group codes
+	// (e.g. "PRODUCT_GROUP2").
+	GroupCodeMappings map[string]string `json:"groupCodeMappings,omitempty"`
+
+	// HandlerMappings maps group codes (e.g. "GROUP_1_ITEM_1") to handler identifiers.
+	// The identifiers are resolved via an internal registry; they do not use reflection.
+	HandlerMappings map[string]string `json:"handlerMappings,omitempty"`
+
+	// DefaultItemFormat allows overriding the global/default item format.
+	DefaultItemFormat []ItemFormatPart `json:"defaultItemFormat,omitempty"`
+
+	// SpecialMappings is a generic bag for one-off mappings, such as mapping "type"
+	// to a particular PRODUCT_GROUP code. Prefer GroupCodeMappings when possible.
+	SpecialMappings map[string]string `json:"specialMappings,omitempty"`
 }
 
 type PriceListDetailApiResponse struct {
@@ -190,7 +212,10 @@ type ItemFormatPart struct {
 	Value string `json:"value"` // group code or literal text
 }
 
-var defaultItemFormat = []ItemFormatPart{
+// legacyDefaultItemFormat is kept for backward compatibility when no configuration
+// is provided. New behavior should prefer configuration from ValueMappingsConfig
+// or PatternConfig.ItemFormat.
+var legacyDefaultItemFormat = []ItemFormatPart{
 	{Type: "group", Value: "PRODUCT_GROUP4"},
 	{Type: "literal", Value: "x"},
 	{Type: "group", Value: "PRODUCT_GROUP6"},
@@ -199,6 +224,8 @@ var defaultItemFormat = []ItemFormatPart{
 }
 
 // LoadConfiguration loads a pattern configuration file for the given groupCode
+// Validates the configuration and logs warnings for missing optional configurations.
+// Returns the configuration even if validation warnings occur (backward compatibility).
 func LoadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
 	if groupCode == "" {
 		return nil, fmt.Errorf("groupCode is required")
@@ -216,7 +243,166 @@ func LoadConfiguration(groupCode string) (*PriceTableConfiguration, error) {
 		return nil, fmt.Errorf("failed to unmarshal pattern file %s: %w", configPath, err)
 	}
 
+	// Validate configuration (non-blocking, for backward compatibility)
+	validateConfiguration(&config, groupCode)
+
 	return &config, nil
+}
+
+// validateConfiguration validates the configuration and logs warnings for missing
+// optional configurations. This is non-blocking to ensure backward compatibility.
+func validateConfiguration(config *PriceTableConfiguration, groupCode string) {
+	if config == nil {
+		return
+	}
+
+	// Validate root-level ValueMappings if present
+	if config.ValueMappings != nil {
+		validateValueMappings(config.ValueMappings, fmt.Sprintf("root-level (groupCode: %s)", groupCode))
+	}
+
+	// Validate pattern-level ValueMappings
+	for i, pattern := range config.Patterns {
+		if pattern.ValueMappings != nil {
+			validateValueMappings(pattern.ValueMappings, fmt.Sprintf("pattern '%s' (index: %d)", pattern.ID, i))
+		}
+	}
+}
+
+// validateValueMappings validates ValueMappingsConfig and logs warnings for
+// common issues. This is non-blocking to ensure backward compatibility.
+func validateValueMappings(vm *ValueMappingsConfig, context string) {
+	if vm == nil {
+		return
+	}
+
+	// Check for empty mappings (not an error, but could indicate misconfiguration)
+	if vm.GroupCodeMappings != nil && len(vm.GroupCodeMappings) == 0 {
+		fmt.Printf("[WARN] ValueMappingsConfig (%s): GroupCodeMappings is empty\n", context)
+	}
+
+	if vm.HandlerMappings != nil && len(vm.HandlerMappings) == 0 {
+		fmt.Printf("[WARN] ValueMappingsConfig (%s): HandlerMappings is empty\n", context)
+	}
+
+	if vm.SpecialMappings != nil && len(vm.SpecialMappings) == 0 {
+		fmt.Printf("[WARN] ValueMappingsConfig (%s): SpecialMappings is empty\n", context)
+	}
+
+	// Validate DefaultItemFormat structure if present
+	if len(vm.DefaultItemFormat) > 0 {
+		for i, part := range vm.DefaultItemFormat {
+			if part.Type != "group" && part.Type != "literal" {
+				fmt.Printf("[WARN] ValueMappingsConfig (%s): DefaultItemFormat[%d] has invalid type '%s' (expected 'group' or 'literal')\n", context, i, part.Type)
+			}
+			if part.Value == "" {
+				fmt.Printf("[WARN] ValueMappingsConfig (%s): DefaultItemFormat[%d] has empty value\n", context, i)
+			}
+		}
+	}
+}
+
+// GetHandlerFunctionName returns the handler function name for a given group code
+// from the configuration, falling back to the group code itself if not configured.
+// This supports backward compatibility by allowing the caller to use the group code
+// as the handler identifier when no mapping is provided.
+func GetHandlerFunctionName(config *PriceTableConfiguration, groupCode string) string {
+	if config == nil {
+		// Backward compatibility: return group code as-is when config is missing
+		return groupCode
+	}
+
+	vm := config.ValueMappings
+	if vm == nil || vm.HandlerMappings == nil {
+		// Backward compatibility: return group code as-is when mappings are missing
+		return groupCode
+	}
+
+	if handlerName, ok := vm.HandlerMappings[groupCode]; ok && handlerName != "" {
+		return handlerName
+	}
+
+	// Backward compatibility: fall back to group code when mapping is not found
+	fmt.Printf("[WARN] ValueMappingsConfig: handler mapping for '%s' not found, using group code as handler identifier\n", groupCode)
+	return groupCode
+}
+
+// getEffectiveValueMappings returns the ValueMappingsConfig that should be used
+// for the given pattern. Pattern-level mappings override root-level mappings.
+// If neither is present, nil is returned and callers must fall back to defaults.
+func getEffectiveValueMappings(root *PriceTableConfiguration, pattern *PatternConfig) *ValueMappingsConfig {
+	if pattern != nil && pattern.ValueMappings != nil {
+		return pattern.ValueMappings
+	}
+	return root.ValueMappings
+}
+
+// getGroupCodeByMapping resolves a semantic key (e.g. "productGroup2") to an
+// actual group code (e.g. "PRODUCT_GROUP2") using ValueMappingsConfig.
+// If there is no configuration for the key, fallbackCode is returned.
+// Logs a warning when falling back to default for backward compatibility.
+func getGroupCodeByMapping(vm *ValueMappingsConfig, mappingName, fallbackCode string) string {
+	if vm == nil || vm.GroupCodeMappings == nil {
+		// Backward compatibility: silently fall back to default when config is missing
+		return fallbackCode
+	}
+	if code, ok := vm.GroupCodeMappings[mappingName]; ok && code != "" {
+		return code
+	}
+	// Backward compatibility: fall back to default when mapping is not found
+	// Only log if we have a config but the mapping is missing (not when config is nil)
+	fmt.Printf("[WARN] ValueMappingsConfig: mapping '%s' not found, falling back to default '%s'\n", mappingName, fallbackCode)
+	return fallbackCode
+}
+
+// getGroupCodeFromConfig is a convenience function for pattern files to resolve
+// a semantic mapping name (e.g. "productGroup2") to an actual group code
+// (e.g. "PRODUCT_GROUP2") using the configuration. Falls back to the
+// provided fallbackCode if no mapping is configured.
+func getGroupCodeFromConfig(config *PriceTableConfiguration, pattern *PatternConfig, mappingName, fallbackCode string) string {
+	vm := getEffectiveValueMappings(config, pattern)
+	return getGroupCodeByMapping(vm, mappingName, fallbackCode)
+}
+
+// getSpecialMapping returns a special mapping value by key, falling back to
+// the provided default if not configured.
+// Logs a warning when falling back to default for backward compatibility.
+func getSpecialMapping(vm *ValueMappingsConfig, key, fallback string) string {
+	if vm == nil || vm.SpecialMappings == nil {
+		// Backward compatibility: silently fall back to default when config is missing
+		return fallback
+	}
+	if v, ok := vm.SpecialMappings[key]; ok && v != "" {
+		return v
+	}
+	// Backward compatibility: fall back to default when mapping is not found
+	// Only log if we have a config but the mapping is missing (not when config is nil)
+	fmt.Printf("[WARN] ValueMappingsConfig: special mapping '%s' not found, falling back to default '%s'\n", key, fallback)
+	return fallback
+}
+
+// getDefaultItemFormat returns the item format to use, preferring:
+//  1. PatternConfig.ItemFormat (pattern specific)
+//  2. ValueMappings.DefaultItemFormat (root or pattern mappings)
+//  3. legacyDefaultItemFormat (hardcoded legacy default)
+//
+// Logs a warning when falling back to legacy default for backward compatibility.
+func getDefaultItemFormat(root *PriceTableConfiguration, pattern *PatternConfig) []ItemFormatPart {
+	if pattern != nil && len(pattern.ItemFormat) > 0 {
+		return pattern.ItemFormat
+	}
+
+	vm := getEffectiveValueMappings(root, pattern)
+	if vm != nil && len(vm.DefaultItemFormat) > 0 {
+		return vm.DefaultItemFormat
+	}
+
+	// Backward compatibility: fall back to legacy default
+	// Only log if we have a config but no default item format is configured
+	if root != nil {
+		fmt.Printf("[WARN] ValueMappingsConfig: DefaultItemFormat not configured, falling back to legacy default\n")
+	}
+	return legacyDefaultItemFormat
 }
 
 // ExtractRequiredGroupCodes extracts all requiredGroupCodes from enabled patterns in the configuration
@@ -432,6 +618,9 @@ func convertGroupCodeToFieldName(groupCode string) string {
 func groupDataByGroupKeyAndProductGroup2(priceListData []models.GetPriceListResponse) map[string]map[string][]models.PriceListSubGroupResponse {
 	groupedData := make(map[string]map[string][]models.PriceListSubGroupResponse)
 
+	// Cache resolved PRODUCT_GROUP2 codes per groupKey to avoid re-loading configuration
+	productGroup2CodeCache := make(map[string]string)
+
 	for _, priceList := range priceListData {
 		groupKey := priceList.GroupKey
 		if groupKey == "" {
@@ -443,8 +632,19 @@ func groupDataByGroupKeyAndProductGroup2(priceListData []models.GetPriceListResp
 			}
 		}
 
+		// Resolve the PRODUCT_GROUP2 code for this groupKey using configuration when available.
+		productGroup2Code, ok := productGroup2CodeCache[groupKey]
+		if !ok {
+			productGroup2Code = "PRODUCT_GROUP2"
+			if config, err := LoadConfiguration(groupKey); err == nil {
+				// Use root-level mappings; there is no specific pattern context at this stage.
+				productGroup2Code = getGroupCodeFromConfig(config, nil, "productGroup2", "PRODUCT_GROUP2")
+			}
+			productGroup2CodeCache[groupKey] = productGroup2Code
+		}
+
 		for _, subGroup := range priceList.SubGroups {
-			productGroup2 := getValueNameByGroupCode(subGroup.SubGroupKeys, "PRODUCT_GROUP2")
+			productGroup2 := getValueNameByGroupCode(subGroup.SubGroupKeys, productGroup2Code)
 			if productGroup2 == "" {
 				continue
 			}
@@ -695,7 +895,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 	return columns
 }
 
-func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -708,7 +908,7 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 			continue
 		}
 
-		itemValue := buildItemValue(pattern, sg)
+		itemValue := buildItemValue(root, pattern, sg)
 		var columnLabel string
 		var columnKey string
 		if len(pattern.ColumnLevels) > 0 {
@@ -1040,11 +1240,12 @@ func buildDynamicRows(pattern *PatternConfig, subGroups []models.PriceListSubGro
 	return rows
 }
 
-func buildItemValue(pattern *PatternConfig, sg models.PriceListSubGroupResponse) string {
-	format := pattern.ItemFormat
-	if len(format) == 0 {
-		format = defaultItemFormat
-	}
+func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg models.PriceListSubGroupResponse) string {
+	// Use getDefaultItemFormat to get the format with proper priority:
+	// 1. PatternConfig.ItemFormat (pattern specific)
+	// 2. ValueMappings.DefaultItemFormat (root or pattern mappings)
+	// 3. legacyDefaultItemFormat (hardcoded legacy default)
+	format := getDefaultItemFormat(root, pattern)
 
 	var builder strings.Builder
 	for _, part := range format {
@@ -1066,7 +1267,7 @@ func buildItemValue(pattern *PatternConfig, sg models.PriceListSubGroupResponse)
 	return strings.TrimSpace(builder.String())
 }
 
-func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -1201,11 +1402,13 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 				}
 			}
 		}
-		row["item"] = buildItemValue(pattern, sg)
+		row["item"] = buildItemValue(root, pattern, sg)
 		for _, fixedCol := range pattern.FixedColumns {
-			// Handle "type" as a special case that maps to PRODUCT_GROUP9
+			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			if fixedCol.DataMapping == "type" {
-				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP9")
+				vm := getEffectiveValueMappings(root, pattern)
+				groupCode := getSpecialMapping(vm, "type", "PRODUCT_GROUP9")
+				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
 				continue
 			}
 
@@ -1517,8 +1720,16 @@ func buildDirectRows(pattern *PatternConfig, subGroups []models.PriceListSubGrou
 }
 
 // buildProductGroup2ColumnGroups builds dynamic column groups from PRODUCT_GROUP2 values
-// Each column group contains children columns defined in pattern.Columns
-func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
+// using configuration when available. Each column group contains children columns
+// defined in pattern.Columns.
+func buildProductGroup2ColumnGroups(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
+	// Resolve PRODUCT_GROUP2 code from configuration (pattern-level overrides root-level).
+	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
+	return buildProductGroup2ColumnGroupsWithCode(pattern, subGroups, productGroup2Code)
+}
+
+// buildProductGroup2ColumnGroupsWithCode builds dynamic column groups using a configurable group code
+func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, productGroup2Code string) []ColumnDef {
 	type columnGroupValue struct {
 		Label string
 		Code  string
@@ -1529,11 +1740,11 @@ func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.P
 
 	// Extract unique PRODUCT_GROUP2 values
 	for _, sg := range subGroups {
-		label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		label := getValueNameByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		if label == "" {
 			continue
 		}
-		code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		code := getValueCodeByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		mapKey := fmt.Sprintf("%s|%s", label, code)
 		uniqueValues[mapKey] = columnGroupValue{
 			Label: label,
@@ -1590,7 +1801,24 @@ func buildProductGroup2ColumnGroups(pattern *PatternConfig, subGroups []models.P
 }
 
 // buildDirectRowsWithProductGroup2 builds rows with fixed columns and dynamic PRODUCT_GROUP2 column group data
-func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+// using configuration when available.
+func buildDirectRowsWithProductGroup2(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	if root == nil {
+		// Backward compatibility: preserve previous hardcoded behavior when configuration is missing.
+		return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, "PRODUCT_GROUP2", "PRODUCT_GROUP6", "PRODUCT_GROUP7", "PRODUCT_GROUP5", "PRODUCT_GROUP3")
+	}
+
+	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
+	productGroup6Code := getGroupCodeFromConfig(root, pattern, "productGroup6", "PRODUCT_GROUP6")
+	productGroup7Code := getGroupCodeFromConfig(root, pattern, "productGroup7", "PRODUCT_GROUP7")
+	productGroup5Code := getGroupCodeFromConfig(root, pattern, "productGroup5", "PRODUCT_GROUP5")
+	productGroup3Code := getGroupCodeFromConfig(root, pattern, "productGroup3", "PRODUCT_GROUP3")
+
+	return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, productGroup2Code, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code)
+}
+
+// buildDirectRowsWithProductGroup2WithCode builds rows with fixed columns and dynamic column group data using configurable group codes
+func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, productGroup2Code, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code string) []AGGridRowData {
 	if len(subGroups) == 0 {
 		return nil
 	}
@@ -1603,8 +1831,8 @@ func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models
 
 	pg2Map := make(map[string]string) // code -> label
 	for _, sg := range subGroups {
-		code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
-		label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		code := getValueCodeByGroupCode(sg.SubGroupKeys, productGroup2Code)
+		label := getValueNameByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		if code != "" {
 			pg2Map[code] = label
 		}
@@ -1623,12 +1851,12 @@ func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models
 	rowOrder := []string{}
 
 	for _, sg := range subGroups {
-		thickness := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP6")
-		length := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP7")
+		thickness := getValueNameByGroupCode(sg.SubGroupKeys, productGroup6Code)
+		length := getValueNameByGroupCode(sg.SubGroupKeys, productGroup7Code)
 		thicknessLength := strings.TrimSpace(fmt.Sprintf("%s x %s", thickness, length))
 
-		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP5")
-		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP3")
+		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup5Code)
+		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup3Code)
 		size := strings.TrimSpace(fmt.Sprintf("%s%s", sizePart1, sizePart2))
 
 		rowKey := fmt.Sprintf("%s|%s", thicknessLength, size)
@@ -1643,7 +1871,7 @@ func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models
 				"thickness_x_length": thicknessLength,
 				"size":               size,
 			}
-			if itemValue := buildItemValue(pattern, sg); itemValue != "" {
+			if itemValue := buildItemValue(root, pattern, sg); itemValue != "" {
 				row["item"] = itemValue
 			}
 
@@ -1676,8 +1904,8 @@ func buildDirectRowsWithProductGroup2(pattern *PatternConfig, subGroups []models
 			}
 		}
 
-		pg2Code := getValueCodeByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
-		pg2Label := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		pg2Code := getValueCodeByGroupCode(sg.SubGroupKeys, productGroup2Code)
+		pg2Label := getValueNameByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		if pg2Code == "" {
 			continue
 		}
@@ -2054,4 +2282,91 @@ func convertCellStyle(styleMap map[string]interface{}) *CellStyle {
 	}
 
 	return style
+}
+
+// PriceTableHandler is the standard signature for all price table handlers
+// All handlers must accept (data, groupCode) even if they don't use groupCode
+type PriceTableHandler func([]models.GetPriceListResponse, string) (PriceListDetailApiResponse, error)
+
+// handlerRegistry maps handler identifiers (e.g., "BuildGroup1Item1Response") to handler functions
+var handlerRegistry = map[string]PriceTableHandler{
+	"BuildGroup1Item1Response": func(data []models.GetPriceListResponse, _ string) (PriceListDetailApiResponse, error) {
+		return BuildGroup1Item1Response(data)
+	},
+	"BuildGroup1Item2Response":  BuildGroup1Item2Response,
+	"BuildGroup1Item3Response":  BuildGroup1Item3Response,
+	"BuildGroup1Item4Response":  BuildGroup1Item4Response,
+	"BuildGroup1Item5Response":  BuildGroup1Item5Response,
+	"BuildGroup1Item6Response":  BuildGroup1Item6Response,
+	"BuildGroup1Item7Response":  BuildGroup1Item7Response,
+	"BuildGroup1Item8Response":  BuildGroup1Item8Response,
+	"BuildGroup1Item9Response":  BuildGroup1Item9Response,
+	"BuildGroup1Item10Response": BuildGroup1Item10Response,
+	"BuildGroup1Item11Response": BuildGroup1Item11Response,
+	"BuildGroup1Item12Response": BuildGroup1Item12Response,
+	"BuildGroup1Item13Response": BuildGroup1Item13Response,
+}
+
+// ResolveHandler resolves a handler function from configuration.
+// It checks both root-level and pattern-level HandlerMappings in the configuration.
+// Returns the handler function and true if found, or nil and false if not found.
+// Callers should fall back to GetDefaultHandlers() if this returns false.
+func ResolveHandler(config *PriceTableConfiguration, groupCode string) (PriceTableHandler, bool) {
+	if config == nil {
+		return nil, false
+	}
+
+	// Check root-level ValueMappings first
+	if config.ValueMappings != nil && config.ValueMappings.HandlerMappings != nil {
+		if handlerID, ok := config.ValueMappings.HandlerMappings[groupCode]; ok && handlerID != "" {
+			if handler, found := handlerRegistry[handlerID]; found {
+				return handler, true
+			}
+		}
+	}
+
+	// Check pattern-level ValueMappings
+	for _, pattern := range config.Patterns {
+		if pattern.ValueMappings != nil && pattern.ValueMappings.HandlerMappings != nil {
+			if handlerID, ok := pattern.ValueMappings.HandlerMappings[groupCode]; ok && handlerID != "" {
+				if handler, found := handlerRegistry[handlerID]; found {
+					return handler, true
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
+// GetDefaultHandlers returns the default hardcoded handlers map for backward compatibility.
+// This is used when configuration is not available or doesn't specify handler mappings.
+func GetDefaultHandlers() map[string]PriceTableHandler {
+	return map[string]PriceTableHandler{
+		"GROUP_1_ITEM_1": func(data []models.GetPriceListResponse, _ string) (PriceListDetailApiResponse, error) {
+			return BuildGroup1Item1Response(data)
+		},
+		"GROUP_1_ITEM_2":  BuildGroup1Item2Response,
+		"GROUP_1_ITEM_3":  BuildGroup1Item3Response,
+		"GROUP_1_ITEM_4":  BuildGroup1Item4Response,
+		"GROUP_1_ITEM_5":  BuildGroup1Item5Response,
+		"GROUP_1_ITEM_6":  BuildGroup1Item6Response,
+		"GROUP_1_ITEM_7":  BuildGroup1Item7Response,
+		"GROUP_1_ITEM_8":  BuildGroup1Item8Response,
+		"GROUP_1_ITEM_9":  BuildGroup1Item9Response,
+		"GROUP_1_ITEM_10": BuildGroup1Item10Response,
+		"GROUP_1_ITEM_11": BuildGroup1Item11Response,
+		"GROUP_1_ITEM_12": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_13": BuildGroup1Item13Response,
+		"GROUP_1_ITEM_14": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_15": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_16": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_17": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_18": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_19": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_20": BuildGroup1Item12Response,
+		"GROUP_1_ITEM_21": func(data []models.GetPriceListResponse, _ string) (PriceListDetailApiResponse, error) {
+			return BuildGroup1Item1Response(data)
+		},
+	}
 }
