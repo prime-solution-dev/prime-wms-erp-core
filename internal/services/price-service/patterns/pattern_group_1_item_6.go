@@ -38,9 +38,10 @@ func BuildGroup1Item6Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
+	productGroup2Code := getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2")
 	groupedByProductGroup2 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP2")
+		productGroup2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup2Code)
 		if productGroup2 == "" {
 			productGroup2 = "อื่นๆ"
 		}
@@ -54,18 +55,20 @@ func BuildGroup1Item6Response(priceListData []models.GetPriceListResponse, group
 	for _, tabLabel := range tabOrder {
 		subGroups := groupedByProductGroup2[tabLabel]
 
+		productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
+		productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
 		sort.SliceStable(subGroups, func(i, j int) bool {
-			group4I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP4")
-			group4J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP4")
+			group4I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup4Code)
+			group4J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup4Code)
 			if group4I == group4J {
-				group7I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, "PRODUCT_GROUP7")
-				group7J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, "PRODUCT_GROUP7")
+				group7I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup7Code)
+				group7J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup7Code)
 				return group7I < group7J
 			}
 			return group4I < group4J
 		})
 
-		rowData := buildDirectRows(pattern, subGroups)
+		rowData := buildDirectRows(config, pattern, subGroups)
 		tableData := make([]map[string]interface{}, len(rowData))
 		for i, row := range rowData {
 			tableData[i] = map[string]interface{}(row)
