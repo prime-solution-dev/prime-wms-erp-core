@@ -31,7 +31,7 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 	}
 
 	columns := buildFixedColumns(pattern)
-	rowData := buildDirectRows(pattern, subGroups)
+	rowData := buildDirectRows(config, pattern, subGroups)
 
 	tableData := make([]map[string]interface{}, len(rowData))
 	for i, row := range rowData {
