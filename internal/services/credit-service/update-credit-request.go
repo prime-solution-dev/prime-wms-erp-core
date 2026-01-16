@@ -84,7 +84,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 						Reason:          "",
 					})
 					req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].DocRef
-					creditIDForDelete = append(creditIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
+					creditIDForDelete = append(creditIDForDelete, req[i].ID)
 				}
 			}
 			req[i].ActionDate = &now
