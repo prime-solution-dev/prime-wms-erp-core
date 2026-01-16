@@ -75,7 +75,10 @@ func CreditExtra() (interface{}, error) {
 		}
 	}
 	if len(creditExtraID) > 0 {
-		jsonBytesDeleteCreditExtra, err := json.Marshal(creditExtraID)
+		requestDeleteCreditExtra := map[string][]uuid.UUID{
+			"id": creditExtraID,
+		}
+		jsonBytesDeleteCreditExtra, err := json.Marshal(requestDeleteCreditExtra)
 		if err != nil {
 			return nil, err
 		}
