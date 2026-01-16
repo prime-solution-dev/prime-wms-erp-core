@@ -13,3 +13,8 @@ func PrintJSON(v any) {
 	}
 	fmt.Println(string(bytes))
 }
+
+// PrintJson is an alias for PrintJSON to support alternative naming.
+func PrintJson(v any) {
+	PrintJSON(v)
+}

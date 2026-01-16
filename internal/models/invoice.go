@@ -38,8 +38,8 @@ type Invoice struct {
 	UpdateDTM              time.Time        `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 	InvoiceItem            []InvoiceItem    `json:"invoice_item"`
 	InvoiceDeposit         []InvoiceDeposit `json:"invoice_deposit"`
-	CompanyCode            string           `gorm:"-" json:"company_code"`
-	SiteCode               string           `gorm:"-" json:"site_code"`
+	CompanyCode            string           `json:"company_code"`
+	SiteCode               string           `json:"site_code"`
 	ExternalID             string           `json:"external_id"`
 	SubtotalExclVat        float64          `json:"subtotal_excl_vat"`
 	SubtotalExclVatDeposit float64          `json:"subtotal_excl_vat_deposit"`

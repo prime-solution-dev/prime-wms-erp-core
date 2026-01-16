@@ -366,37 +366,24 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
 
-	type priceTableHandler func([]models.GetPriceListResponse, string) (pricePatterns.PriceListDetailApiResponse, error)
+	// Try to load configuration for handler mapping using dataGroupCode
+	// This ensures we load the correct config file for the actual data group code
+	handlerConfig, err := pricePatterns.LoadConfiguration(dataGroupCode)
+	var handler pricePatterns.PriceTableHandler
+	var handlerFound bool
 
-	handlers := map[string]priceTableHandler{
-		"GROUP_1_ITEM_1": func(data []models.GetPriceListResponse, _ string) (pricePatterns.PriceListDetailApiResponse, error) {
-			return pricePatterns.BuildGroup1Item1Response(data)
-		},
-		"GROUP_1_ITEM_2": pricePatterns.BuildGroup1Item2Response,
-		"GROUP_1_ITEM_3": pricePatterns.BuildGroup1Item3Response,
-		"GROUP_1_ITEM_4": pricePatterns.BuildGroup1Item4Response,
-		"GROUP_1_ITEM_5": pricePatterns.BuildGroup1Item5Response,
-		"GROUP_1_ITEM_6": pricePatterns.BuildGroup1Item6Response,
-		"GROUP_1_ITEM_7": pricePatterns.BuildGroup1Item7Response,
-		"GROUP_1_ITEM_8": pricePatterns.BuildGroup1Item8Response,
-		"GROUP_1_ITEM_9": pricePatterns.BuildGroup1Item9Response,
-		"GROUP_1_ITEM_10": func(data []models.GetPriceListResponse, code string) (pricePatterns.PriceListDetailApiResponse, error) {
-			return pricePatterns.BuildGroup1Item10Response(data, code)
-		},
-		"GROUP_1_ITEM_11": pricePatterns.BuildGroup1Item11Response,
-		"GROUP_1_ITEM_12": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_13": pricePatterns.BuildGroup1Item13Response,
-		"GROUP_1_ITEM_14": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_15": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_16": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_17": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_18": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_19": pricePatterns.BuildGroup1Item12Response,
-		"GROUP_1_ITEM_20": pricePatterns.BuildGroup1Item12Response,
+	if err == nil && handlerConfig != nil {
+		// Try to resolve handler from configuration
+		handler, handlerFound = pricePatterns.ResolveHandler(handlerConfig, dataGroupCode)
 	}
 
-	handler, ok := handlers[dataGroupCode]
-	if !ok {
+	// Fall back to default handlers if config resolution failed
+	if !handlerFound {
+		defaultHandlers := pricePatterns.GetDefaultHandlers()
+		handler, handlerFound = defaultHandlers[dataGroupCode]
+	}
+
+	if !handlerFound {
 		return nil, fmt.Errorf("unsupported GroupCode: %s", dataGroupCode)
 	}
 
