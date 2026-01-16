@@ -39,7 +39,7 @@ func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, group
 	}
 
 	columns := buildDynamicColumns(pattern, allSubGroups)
-	rowData := buildDynamicRows(pattern, allSubGroups)
+	rowData := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rowData)
 
 	sort.SliceStable(mergedRows, func(i, j int) bool {

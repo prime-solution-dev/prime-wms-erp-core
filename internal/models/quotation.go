@@ -48,6 +48,10 @@ type Quotation struct {
 	SubtotalExclVat             float64    `json:"subtotal_excl_vat"`
 	TotalTransportCostVat       float64    `json:"total_transport_cost_vat"`
 	RemarkApproval              string     `json:"remark_approval"`
+	Revision                    float64    `json:"revision"`
+	QuotationCodeRef            string     `json:"quotation_code_ref"`
+	CreditTerm                  string     `json:"credit_term"`
+	PayerTerm                   string     `json:"payer_term"`
 	CreateDate                  *time.Time `json:"create_date"`
 	CreateBy                    string     `json:"create_by"`
 	UpdateDate                  *time.Time `json:"update_date"`

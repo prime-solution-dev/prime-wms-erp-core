@@ -50,6 +50,7 @@ type CreateDeliveryItemsRequest struct {
 	DocumentRefItem string  `json:"document_ref_item"`
 	SaleUnitCode    string  `json:"sale_unit_code"`
 	SaleMethod      string  `json:"sale_method"`
+	Remark          string  `json:"remark"`
 }
 
 func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -149,6 +150,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				WeightUnit:      deliveryItem.WeightUnit,
 				Status:          "PENDING",
 				DocumentRefItem: deliveryItem.DocumentRefItem,
+				Remark:          deliveryItem.Remark,
 				CreateDate:      nowDateOnly, // date-only format
 				CreateBy:        user,
 				UpdateDate:      nowDateOnly, // date-only format
@@ -247,7 +249,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				SaleMethod:        item.SaleMethod,
 				Weight:            item.Weight,
 				WeightUnit:        item.WeightUnit,
-				Remark:            "",
+				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
@@ -291,6 +293,19 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Remark:              deliveryReq.Remark,
 			CompanyCode:         deliveryReq.CompanyCode,
 			SiteCode:            deliveryReq.SiteCode,
+			DocumentRef2:        deliveryReq.DocumentRef,
+			DocumentRefType2:    "SALES_ORDER",
+			PartyCode:           "",
+			PartyName:           "",
+			PartyType:           "",
+			Reason:              "",
+			ShippingAddress:     "",
+			DeliveryMethod:      deliveryReq.DeliveryMethod,
+			BookingDate:         deliveryReq.DeliveryDate,
+			DeliveryTimeCode:    deliveryReq.DeliveryTimeCode,
+			Tel:                 deliveryReq.Tel,
+			LicensePlate:        deliveryReq.LicensePlate,
+			ContactName:         deliveryReq.ContactName,
 			OrderItem:           createOrderItemDetail,
 		}
 
@@ -299,6 +314,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	createOrderRequest.Orders = createOrderdetail
 
 	fmt.Println("createOrderRequest : ", createOrderRequest)
+
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())

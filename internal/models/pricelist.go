@@ -280,6 +280,18 @@ type PriceListSubGroupKeyResponse struct {
 	Seq        int    `json:"seq"`
 }
 
+type InventoryWeightResponse struct {
+	InventoryWeightKeyCode string  `json:"inventory_weightkey_code"`
+	ProductCode            string  `json:"product_code"`
+	CompanyCode            string  `json:"company_code"`
+	SiteCode               string  `json:"site_code"`
+	BatchNo                string  `json:"batch_no"`
+	SerialCode             string  `json:"serial_code"`
+	AvgProduct             float64 `json:"avg_product"`
+	AvgBatch               float64 `json:"avg_batch"`
+	AvgSerial              float64 `json:"avg_serial"`
+}
+
 type PriceListSubGroupResponse struct {
 	ID                        string                         `json:"id"`
 	PriceListGroupID          string                         `json:"price_list_group_id"`
@@ -308,6 +320,8 @@ type PriceListSubGroupResponse struct {
 	UpdateDtm                 string                         `json:"update_dtm"`
 	UdfJson                   json.RawMessage                `json:"udf_json,omitempty"`
 	SubGroupKeys              []PriceListSubGroupKeyResponse `json:"sub_group_keys"`
+	InventoryWeight           []InventoryWeightResponse      `json:"inventory_weight,omitempty"`
+	SupplierCode              string                         `json:"supplier_code,omitempty"`
 }
 
 type GetPriceListResponse struct {

@@ -25,7 +25,8 @@ type CreateSaleRequest struct {
 
 type SaleDocument struct {
 	models.Sale
-	Items []models.SaleItem
+	Items       []models.SaleItem
+	SaleDeposit []models.SaleDeposit
 }
 
 type CreateSaleResponse struct {
@@ -65,6 +66,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	createSales := []models.Sale{}
 	createSaleItems := []models.SaleItem{}
+	createSaleDeposits := []models.SaleDeposit{}
 
 	// Generate all sale codes first
 	saleCodes, err := generateSaleCodes(ctx, len(req.Sales))
@@ -126,6 +128,13 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			item.UpdateBy = user
 
 			createSaleItems = append(createSaleItems, item)
+		}
+
+		for _, deposit := range saleReq.SaleDeposit {
+			deposit.ID = uuid.New()
+			deposit.SaleID = tempSale.ID
+
+			createSaleDeposits = append(createSaleDeposits, deposit)
 		}
 
 		// เพิ่มข้อมูลใน response
