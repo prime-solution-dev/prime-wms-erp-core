@@ -16,6 +16,7 @@ type GetSaleRequest struct {
 	SaleCode       []string    `json:"sale_code"`
 	CustomerCode   []string    `json:"customer_code"`
 	Status         []string    `json:"status"`
+	StatusApprove  []string    `json:"status_approve"`
 	StatusPayment  []string    `json:"status_payment"`
 	IsApproved     []bool      `json:"is_approved"`
 	IsAvailableQty bool        `json:"is_available_qty"`
@@ -45,7 +46,7 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Normal flow without qty filtering
-	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusPayment, req.IsApproved, req.Page, req.PageSize)
+	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusApprove, req.StatusPayment, req.IsApproved, req.Page, req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -63,7 +64,7 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 	// Get all sales without pagination first
-	sale, _, _, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusPayment, req.IsApproved, 1, 0) // pageSize=0 means get all
+	sale, _, _, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusApprove, req.StatusPayment, req.IsApproved, 1, 0) // pageSize=0 means get all
 	if errApproval != nil {
 		return nil, errApproval
 	}
