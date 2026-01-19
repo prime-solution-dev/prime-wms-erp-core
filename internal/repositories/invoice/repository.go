@@ -105,7 +105,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 
 		var count = len(invoiceID)
 
-		query := gormx.Preload("InvoiceItem")
+		query := gormx.Preload("InvoiceItem").Preload("InvoiceDeposit")
 
 		query = query.Where("id in (?)", invoiceID)
 

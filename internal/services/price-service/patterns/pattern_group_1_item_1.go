@@ -6,11 +6,13 @@ import (
 	"strings"
 
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
 
 func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (PriceListDetailApiResponse, error) {
+	utils.PrintJson(priceListData)
 	groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 	tabs := make([]PriceListDetailTabConfig, 0)
 	var loadErr error
@@ -46,7 +48,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			}
 
 			columns := buildDynamicColumns(pattern, subGroups)
-			rowData := buildDynamicRows(pattern, subGroups)
+			rowData := buildDynamicRows(config, pattern, subGroups)
 
 			// Regroup rows to prevent data loss when the same column_group_key appears
 			// multiple times for a given row_group_value (e.g., multiple subgroup_ids

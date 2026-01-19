@@ -161,8 +161,27 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	// Build base query for counting
+	countQuery := gormx.Model(&GetQuotationResponse{})
+
+	if len(req.ID) > 0 {
+		countQuery = countQuery.Where("id IN ?", req.ID)
+	}
+
+	if len(req.QuotationCode) > 0 {
+		countQuery = countQuery.Where("quotation_code IN ?", req.QuotationCode)
+	}
+
+	if len(req.SiteCode) > 0 {
+		countQuery = countQuery.Where("site_code IN ?", req.SiteCode)
+	}
+
+	if len(req.CompanyCode) > 0 {
+		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+	}
+
 	var count int64
-	gormx.Model(&GetQuotationResponse{}).Count(&count)
+	countQuery.Count(&count)
 
 	totalRecords := count
 	totalPages := 0
