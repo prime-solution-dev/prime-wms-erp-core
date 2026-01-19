@@ -12,7 +12,7 @@ import (
 )
 
 // Create
-func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -67,6 +67,15 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchStatusPayment = fmt.Sprintf(` and sale.status_payment IN (%s)`, whereInClause)
 	}
+	searchStatusApprove := ""
+	if len(statusApprove) > 0 {
+		quotedStrings := make([]string, len(statusApprove))
+		for i, s := range statusApprove {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchStatusApprove = fmt.Sprintf(` and sale.status_approve IN (%s)`, whereInClause)
+	}
 	searchIsApproved := ""
 	if len(isApproved) > 0 {
 		boolStrings := make([]string, len(isApproved))
@@ -81,7 +90,7 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 	gormx.Table("sale").Select("sale.id").
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
 		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
-		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusPayment + "" + searchIsApproved + "").
+		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "").
 		Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {

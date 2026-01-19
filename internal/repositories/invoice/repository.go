@@ -105,7 +105,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 
 		var count = len(invoiceID)
 
-		query := gormx.Preload("InvoiceItem")
+		query := gormx.Preload("InvoiceItem").Preload("InvoiceDeposit")
 
 		query = query.Where("id in (?)", invoiceID)
 
@@ -249,6 +249,21 @@ func DeleteInvoice(id []uuid.UUID) (err error) {
 		gormx.Rollback()
 		return resultSuggest.Error
 	}
+	resultBatch := gormx.Table("invoice_item").Where("invoice_id IN (?)", id).Delete(models.InvoiceItem{})
+	if resultBatch.Error != nil {
+		gormx.Rollback()
+		return resultBatch.Error
+	}
+
+	return
+}
+func DeleteInvoiceItem(id []uuid.UUID) (err error) {
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	defer db.CloseGORM(gormx)
+	if err != nil {
+		return err
+	}
+
 	resultBatch := gormx.Table("invoice_item").Where("invoice_id IN (?)", id).Delete(models.InvoiceItem{})
 	if resultBatch.Error != nil {
 		gormx.Rollback()
