@@ -32,6 +32,8 @@ type VerifyApproveDocument struct {
 	EffectiveDatePrice           time.Time           `json:"effective_date_price"`
 	TransportCost                float64             `json:"transport_cost"`
 	TransportType                string              `json:"transport_type"`
+	TotalAmount                  float64             `json:"total_amount"`
+	TotalWeight                  float64             `json:"total_weight"`
 	IsVerifyWithOldTransportCost bool                `json:"is_verify_with_old_transport_cost"`
 	Items                        []VerifyApproveItem `json:"items"`
 
@@ -142,6 +144,10 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		newPriceReq := priceService.GetComparePriceRequest{}
 		newPriceReq.UnitCode = `PC`       //TODO: get from config
 		newPriceReq.UnitCodeWeight = `KG` //TODO: get from config
+		newPriceReq.TransportType = document.TransportType
+		newPriceReq.TotalTransportCost = document.TransportCost
+		newPriceReq.TotalAmount = document.TotalAmount
+		newPriceReq.TotalWeight = document.TotalWeight
 
 		//Expiry
 		expPriceReq = append(expPriceReq, VerifyExpiryPriceRequest{
