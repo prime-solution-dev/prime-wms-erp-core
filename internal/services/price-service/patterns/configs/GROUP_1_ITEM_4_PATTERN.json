@@ -214,7 +214,8 @@
         "total_net_price_weight",
         "total_net_price_unit",
         "remark",
-        "inactive"
+        "inactive",
+        "market_weight"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight",
