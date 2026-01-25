@@ -1495,6 +1495,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 
 		for _, fixedCol := range pattern.FixedColumns {
 			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
+			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			if fixedCol.DataMapping == "type" {
 				vm := getEffectiveValueMappings(root, pattern)
 				groupCode := getSpecialMapping(vm, "type", "PG09")
