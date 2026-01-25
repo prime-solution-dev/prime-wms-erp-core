@@ -6,13 +6,12 @@ import (
 	"strings"
 
 	"prime-erp-core/internal/models"
-	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
 
 func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (PriceListDetailApiResponse, error) {
-	utils.PrintJson(priceListData)
+	// utils.PrintJson(priceListData)
 	groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 	tabs := make([]PriceListDetailTabConfig, 0)
 	var loadErr error
@@ -42,6 +41,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 		for _, productGroup2 := range productGroup2Keys {
 			subGroups := productGroup2Map[productGroup2]
+
 			pattern := selectPatternForCategory(config, productGroup2)
 			if pattern == nil {
 				continue
@@ -49,6 +49,8 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(config, pattern, subGroups)
+
+			fmt.Printf("[DEBUG] Built %d columns and %d raw rows\n", len(columns), len(rowData))
 
 			// Regroup rows to prevent data loss when the same column_group_key appears
 			// multiple times for a given row_group_value (e.g., multiple subgroup_ids
@@ -65,6 +67,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 			// 1) Group by row_group_value using the same composite logic as before
 			rowsByRowGroup := make(map[string][]AGGridRowData)
+			skippedRowsEmptyGroup := 0
 			for _, row := range rowData {
 				mergeKeyParts := make([]string, 0, len(rowFields))
 				for _, field := range rowFields {
@@ -84,6 +87,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 					}
 				}
 				if rowGroupValue == "" {
+					skippedRowsEmptyGroup++
 					continue
 				}
 
@@ -107,9 +111,11 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 				// 2) Group rows in this thickness group by column_group_key
 				columnsByKey := make(map[string][]AGGridRowData)
+				skippedRowsEmptyColKey := 0
 				for _, row := range groupRows {
 					colKey := strings.TrimSpace(fmt.Sprintf("%v", row["column_group_key"]))
 					if colKey == "" {
+						skippedRowsEmptyColKey++
 						continue
 					}
 					columnsByKey[colKey] = append(columnsByKey[colKey], row)

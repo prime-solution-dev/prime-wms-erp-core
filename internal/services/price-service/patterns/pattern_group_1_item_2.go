@@ -9,6 +9,10 @@ import (
 )
 
 func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+	fmt.Printf("[DEBUG] BuildGroup1Item2Response: Processing %d price list entries\n", len(priceListData))
+	fmt.Printf("[DEBUG] GroupCode: %s\n", groupCode)
+	fmt.Printf("[DEBUG] PriceListData: %+v\n", priceListData)
+
 	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
