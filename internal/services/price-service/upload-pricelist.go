@@ -21,13 +21,20 @@ var (
 )
 
 type CreatePricelistRequest struct {
-	Groups       []PriceListGroupCreateDTO
-	Terms        []PriceListGroupTermCreateDTO
-	Extras       []PriceListGroupExtraCreateDTO
-	SubGroups    []PriceListSubGroupCreateDTO
-	GroupKeys    []PriceListGroupKeyDTO
-	SubGroupKeys []PriceListSubGroupKeyDTO
-	ExtraKeys    []PriceListGroupExtraKeyDTO
+	Groups           []PriceListGroupCreateDTO
+	Terms            []PriceListGroupTermCreateDTO
+	Extras           []PriceListGroupExtraCreateDTO
+	SubGroups        []PriceListSubGroupCreateDTO
+	GroupKeys        []PriceListGroupKeyDTO
+	SubGroupKeys     []PriceListSubGroupKeyDTO
+	ExtraKeys        []PriceListGroupExtraKeyDTO
+	SubGroupFormulas []PriceListSubGroupFormulasCreateDTO
+}
+
+type PriceListSubGroupFormulasCreateDTO struct {
+	SubGroupCode string `json:"subgroup_code"`
+	FormulaCode  string `json:"formula_code"`
+	IsDefault    bool   `json:"is_default"`
 }
 
 type PriceListGroupCreateDTO struct {
@@ -97,6 +104,7 @@ type PriceListSubGroupCreateDTO struct {
 	Remark                    string
 	UdfJson                   json.RawMessage
 	CreateBy                  string
+	SubGroupCode              string
 }
 
 type PriceListGroupKeyDTO struct {
@@ -299,6 +307,7 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 				"create_by":                     s.CreateBy,
 				"create_dtm":                    now,
 				"update_by":                     s.CreateBy,
+				"subgroup_code":                 s.SubGroupCode,
 				"update_dtm":                    now,
 			})
 		}
@@ -339,6 +348,16 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			})
 		}
 
+		subGroupFormulasRecs := make([]map[string]any, 0, len(req.SubGroupFormulas))
+		for _, f := range req.SubGroupFormulas {
+			subGroupFormulasRecs = append(subGroupFormulasRecs, map[string]any{
+				"id":                       uuid.New(),
+				"price_list_subgroup_code": f.SubGroupCode,
+				"price_list_formulas_code": f.FormulaCode,
+				"is_default":               f.IsDefault,
+			})
+		}
+
 		// ---------- BATCH INSERT ----------
 		if len(groupRecs) > 0 {
 			if err := tx.Table("price_list_group").CreateInBatches(groupRecs, batchSize).Error; err != nil {
@@ -372,6 +391,11 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		}
 		if len(subKeyRecs) > 0 {
 			if err := tx.Table("price_list_sub_group_key").CreateInBatches(subKeyRecs, batchSize).Error; err != nil {
+				return err
+			}
+		}
+		if len(subGroupFormulasRecs) > 0 {
+			if err := tx.Table("price_list_subgroup_formulas_map").CreateInBatches(subGroupFormulasRecs, batchSize).Error; err != nil {
 				return err
 			}
 		}
@@ -623,6 +647,7 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 			Remark:                    r["remark"],
 			UdfJson:                   udf,
 			CreateBy:                  r["create_by"],
+			SubGroupCode:              r["subgroup_code"],
 		})
 
 		for _, k := range sKeys {
@@ -636,6 +661,22 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 				Value:       k.Value,
 			})
 		}
+	}
+
+	// ---- formulas_map ----
+	formulasRows, err := readSheet("formulas_map")
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range formulasRows {
+		if r["subgroup_code"] == "" || r["formula_code"] == "" {
+			return nil, fmt.Errorf("formulas_map: subgroup_code, formula_code are required")
+		}
+		req.SubGroupFormulas = append(req.SubGroupFormulas, PriceListSubGroupFormulasCreateDTO{
+			SubGroupCode: r["subgroup_code"],
+			FormulaCode:  r["formula_code"],
+			IsDefault:    true,
+		})
 	}
 
 	return req, nil
