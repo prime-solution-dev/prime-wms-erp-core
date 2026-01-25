@@ -7,8 +7,8 @@
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP5|PRODUCT_GROUP3",
-        "columnGroups": "PRODUCT_GROUP2"
+        "rows": "PG05|PG03",
+        "columnGroups": "PG02"
       },
       "fixedColumns": [
         {
@@ -31,7 +31,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_6_x_product_group_7",
+          "dataMapping": "PG06_x_PG07",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -45,7 +45,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_5_product_group_3",
+          "dataMapping": "PG05_x_PG03",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -133,24 +133,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_11": "BuildGroup1Item11Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }

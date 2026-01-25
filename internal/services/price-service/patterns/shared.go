@@ -439,7 +439,7 @@ func convertDataMappingToGroupCode(dataMapping string) string {
 	}
 
 	// If already in uppercase format (PRODUCT_GROUP2), return as is
-	if strings.HasPrefix(dataMapping, "PRODUCT_GROUP") {
+	if strings.HasPrefix(dataMapping, "PG02") {
 		return dataMapping
 	}
 
@@ -449,7 +449,7 @@ func convertDataMappingToGroupCode(dataMapping string) string {
 		if len(parts) >= 3 {
 			// Extract the number part (e.g., "2" from "product_group_2")
 			groupNum := parts[2]
-			return fmt.Sprintf("PRODUCT_GROUP%s", groupNum)
+			return fmt.Sprintf("PG%s", groupNum)
 		}
 	}
 
@@ -568,12 +568,24 @@ func ExtractGroupKey(subgroupKey string) string {
 }
 
 func selectPatternForCategory(config *PriceTableConfiguration, productGroup2ValueName string) *PatternConfig {
+	// Normalize the input value name for flexible matching
+	normalizedValueName := strings.ToLower(strings.TrimSpace(productGroup2ValueName))
+
 	for _, pattern := range config.Patterns {
 		if !pattern.Enabled {
 			continue
 		}
 		for _, category := range pattern.ApplicableCategories {
-			if category == productGroup2ValueName {
+			// Normalize category name for comparison
+			normalizedCategory := strings.ToLower(strings.TrimSpace(category))
+
+			// Try exact match first (after normalization)
+			if normalizedCategory == normalizedValueName {
+				return &pattern
+			}
+
+			// Try partial match (contains check for flexibility)
+			if strings.Contains(normalizedValueName, normalizedCategory) || strings.Contains(normalizedCategory, normalizedValueName) {
 				return &pattern
 			}
 		}
@@ -635,7 +647,7 @@ func groupDataByGroupKeyAndProductGroup2(priceListData []models.GetPriceListResp
 		// Resolve the PRODUCT_GROUP2 code for this groupKey using configuration when available.
 		productGroup2Code, ok := productGroup2CodeCache[groupKey]
 		if !ok {
-			productGroup2Code = "PRODUCT_GROUP2"
+			productGroup2Code = "PG02"
 			if config, err := LoadConfiguration(groupKey); err == nil {
 				// Use root-level mappings; there is no specific pattern context at this stage.
 				productGroup2Code = getGroupCodeFromConfig(config, nil, "productGroup2", "PRODUCT_GROUP2")
@@ -774,17 +786,37 @@ func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevel
 
 	for _, sg := range subGroups {
 		levelKeys := make([]string, len(columnLevels))
+		hasAnyValue := false
+
 		for i, level := range columnLevels {
 			label := getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
 			code := getValueCodeByGroupCode(sg.SubGroupKeys, level.Field)
+
+			// Use placeholder if both are empty
+			if label == "" && code == "" {
+				label = "N/A"
+				code = "missing"
+			}
+
+			if label != "" || code != "" {
+				hasAnyValue = true
+			}
+
 			levelKeys[i] = composeHierarchyKey(code, label)
+		}
+
+		// Only skip if ALL levels are empty (shouldn't happen with our placeholder logic)
+		if !hasAnyValue {
+			continue
 		}
 
 		current := hierarchy
 		for i, key := range levelKeys {
+			// No longer skip empty keys - we use placeholders now
 			if key == "" {
-				continue
+				key = composeHierarchyKey("missing", "N/A")
 			}
+
 			if i == len(levelKeys)-1 {
 				if current[key] == nil {
 					current[key] = true
@@ -914,14 +946,52 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		if len(pattern.ColumnLevels) > 0 {
 			labelParts := []string{}
 			keyParts := []string{}
+
 			for _, level := range pattern.ColumnLevels {
 				valueName := getValueNameByGroupCode(sg.SubGroupKeys, level.Field)
 				valueCode := getValueCodeByGroupCode(sg.SubGroupKeys, level.Field)
+
+				// Use empty string for missing values but continue building
+				if valueName == "" {
+					valueName = "" // Keep empty for label
+				}
+				if valueCode == "" {
+					valueCode = "missing" // Use placeholder for missing codes
+				}
+
 				labelParts = append(labelParts, valueName)
 				keyParts = append(keyParts, sanitizeIdentifier(valueCode, valueName))
 			}
-			columnLabel = strings.Join(labelParts, " | ")
-			columnKey = strings.Join(keyParts, "_")
+
+			// Build column label and key, filtering out empty parts for label
+			nonEmptyLabels := []string{}
+			for _, label := range labelParts {
+				if label != "" {
+					nonEmptyLabels = append(nonEmptyLabels, label)
+				}
+			}
+			if len(nonEmptyLabels) > 0 {
+				columnLabel = strings.Join(nonEmptyLabels, " | ")
+			}
+
+			// Filter out "missing" placeholders from key parts if we have real values
+			filteredKeyParts := []string{}
+			for _, key := range keyParts {
+				if key != "missing" && key != "" {
+					filteredKeyParts = append(filteredKeyParts, key)
+				}
+			}
+			if len(filteredKeyParts) > 0 {
+				columnKey = strings.Join(filteredKeyParts, "_")
+			}
+
+			// Fallback: if all group codes are missing, use subgroup ID
+			if columnKey == "" {
+				columnKey = fmt.Sprintf("col_%s", sg.ID)
+				if columnLabel == "" {
+					columnLabel = columnKey
+				}
+			}
 		} else {
 			columnLabel = buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
 			columnCode := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
@@ -930,8 +1000,9 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		if columnLabel == "" {
 			columnLabel = columnKey
 		}
+		// No longer skip if columnKey is empty - we now always have a fallback
 		if columnKey == "" {
-			continue
+			columnKey = fmt.Sprintf("col_%s", sg.ID)
 		}
 
 		compositeKey := fmt.Sprintf("%s|%s|%s", columnKey, rowKey, sg.ID)
@@ -961,6 +1032,11 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		rowCounters[columnKey]++
 		rowNumberField := fmt.Sprintf("%s_row_number", columnKey)
 		row[rowNumberField] = rowCounters[columnKey]
+
+		// Add flattened SubGroupKey fields for direct access
+		for _, sgk := range sg.SubGroupKeys {
+			row[sgk.GroupCode] = sgk.ValueName
+		}
 
 		udfData := make(map[string]interface{})
 		isHighlightValue := false
@@ -1110,6 +1186,14 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
+
+			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
+			if colConfig.DataMapping != "" {
+				if value, exists := row[colConfig.DataMapping]; exists {
+					row[fieldName] = value
+					continue
+				}
+			}
 
 			// Check if dataMapping is a product group reference
 			groupCode := convertDataMappingToGroupCode(colConfig.DataMapping)
@@ -1403,13 +1487,28 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			}
 		}
 		row["item"] = buildItemValue(root, pattern, sg)
+
+		// Add flattened SubGroupKey fields for direct access
+		for _, sgk := range sg.SubGroupKeys {
+			row[sgk.GroupCode] = sgk.ValueName
+		}
+
 		for _, fixedCol := range pattern.FixedColumns {
+			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			if fixedCol.DataMapping == "type" {
 				vm := getEffectiveValueMappings(root, pattern)
-				groupCode := getSpecialMapping(vm, "type", "PRODUCT_GROUP9")
+				groupCode := getSpecialMapping(vm, "type", "PG09")
 				row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, groupCode)
 				continue
+			}
+
+			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
+			if fixedCol.DataMapping != "" {
+				if value, exists := row[fixedCol.DataMapping]; exists {
+					row[fixedCol.Field] = value
+					continue
+				}
 			}
 
 			// Check if dataMapping is a product group reference
@@ -1530,6 +1629,14 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		}
 
 		for _, colConfig := range pattern.Columns {
+			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
+			if colConfig.DataMapping != "" {
+				if value, exists := row[colConfig.DataMapping]; exists {
+					row[colConfig.Field] = value
+					continue
+				}
+			}
+
 			// Check if dataMapping is a product group reference
 			groupCode := convertDataMappingToGroupCode(colConfig.DataMapping)
 			if groupCode != "" {
@@ -1719,15 +1826,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 	return rows
 }
 
-// buildProductGroup2ColumnGroups builds dynamic column groups from PRODUCT_GROUP2 values
-// using configuration when available. Each column group contains children columns
-// defined in pattern.Columns.
-func buildProductGroup2ColumnGroups(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []ColumnDef {
-	// Resolve PRODUCT_GROUP2 code from configuration (pattern-level overrides root-level).
-	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
-	return buildProductGroup2ColumnGroupsWithCode(pattern, subGroups, productGroup2Code)
-}
-
 // buildProductGroup2ColumnGroupsWithCode builds dynamic column groups using a configurable group code
 func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse, productGroup2Code string) []ColumnDef {
 	type columnGroupValue struct {
@@ -1798,23 +1896,6 @@ func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []
 	}
 
 	return columns
-}
-
-// buildDirectRowsWithProductGroup2 builds rows with fixed columns and dynamic PRODUCT_GROUP2 column group data
-// using configuration when available.
-func buildDirectRowsWithProductGroup2(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
-	if root == nil {
-		// Backward compatibility: preserve previous hardcoded behavior when configuration is missing.
-		return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, "PRODUCT_GROUP2", "PRODUCT_GROUP6", "PRODUCT_GROUP7", "PRODUCT_GROUP5", "PRODUCT_GROUP3")
-	}
-
-	productGroup2Code := getGroupCodeFromConfig(root, pattern, "productGroup2", "PRODUCT_GROUP2")
-	productGroup6Code := getGroupCodeFromConfig(root, pattern, "productGroup6", "PRODUCT_GROUP6")
-	productGroup7Code := getGroupCodeFromConfig(root, pattern, "productGroup7", "PRODUCT_GROUP7")
-	productGroup5Code := getGroupCodeFromConfig(root, pattern, "productGroup5", "PRODUCT_GROUP5")
-	productGroup3Code := getGroupCodeFromConfig(root, pattern, "productGroup3", "PRODUCT_GROUP3")
-
-	return buildDirectRowsWithProductGroup2WithCode(root, pattern, subGroups, productGroup2Code, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code)
 }
 
 // buildDirectRowsWithProductGroup2WithCode builds rows with fixed columns and dynamic column group data using configurable group codes
@@ -1913,6 +1994,11 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 
 		// Set subgroup identifier for the specific PRODUCT_GROUP2 entry
 		row[fmt.Sprintf("%s_subgroup_id", identifier)] = sg.ID
+
+		// Add flattened SubGroupKey fields for direct access
+		for _, sgk := range sg.SubGroupKeys {
+			row[sgk.GroupCode] = sgk.ValueCode
+		}
 
 		// Populate dynamic column values for this PRODUCT_GROUP2
 		for _, colConfig := range pattern.Columns {
