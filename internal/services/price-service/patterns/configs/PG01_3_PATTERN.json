@@ -2,20 +2,20 @@
   "patterns": [
     {
       "id": "pattern_g6_g3_g5",
-      "name": "PRODUCT_GROUP6 | PRODUCT_GROUP3 | PRODUCT_GROUP5",
+      "name": "PG06 | PG03 | PG05",
       "description": "Pattern for Steel Sheet Category - Rows by thickness (G6), Columns by size (G5) with grade shown in cells",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6",
-        "columnGroups": "PRODUCT_GROUP5"
+        "tabs": "PG01",
+        "rows": "PG06",
+        "columnGroups": "PG05"
       },
       "columns": [
         {
-          "field": "product_group_3",
+          "field": "grade",
           "headerName": "เกรด",
           "width": 50,
-          "dataMapping": "product_group_3"
+          "dataMapping": "PG03"
         },
         {
           "field": "is_highlight",
@@ -92,7 +92,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "pg_06",
           "headerName": "แผ่น mm.",
           "width": 100,
           "pinned": "left",
@@ -118,20 +118,20 @@
     },
     {
       "id": "pattern_g6_g5",
-      "name": "PRODUCT_GROUP6 | PRODUCT_GROUP5",
+      "name": "PG06 | PG05",
       "description": "Pattern for Patterned Steel Sheet Category - Rows by thickness (G6), Columns by size (G5)",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6",
-        "columnGroups": "PRODUCT_GROUP5"
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG05"
       },
       "columns": [ 
         {
-        "field": "product_group_3",
+        "field": "grade",
         "headerName": "เกรด",
         "width": 50,
-        "dataMapping": "product_group_3"
+        "dataMapping": "PG03"
         },
         {
           "field": "is_highlight",
@@ -208,7 +208,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "pg_06",
           "headerName": "แผ่น mm.",
           "width": 120,
           "pinned": "left",
@@ -234,28 +234,23 @@
     },
     {
       "id": "pattern_g3_g8_g5",
-      "name": "PRODUCT_GROUP3 | PRODUCT_GROUP8 | PRODUCT_GROUP5",
+      "name": "PG03 | PG08 | PG05",
       "description": "Pattern for Special Steel Sheet - Multi-level nested groups: Grade(G3) > Size Type(G8) > Dimensions(G5) > Thickness(G6)",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6",
-        "columnGroups": "PRODUCT_GROUP3|PRODUCT_GROUP8|PRODUCT_GROUP5"
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG03|PG05"
       },
       "columnLevels": [
         {
           "level": 1,
-          "field": "PRODUCT_GROUP3",
+          "field": "PG03",
           "examples": ["LT", "SS400"]
         },
         {
-          "level": 2,
-          "field": "PRODUCT_GROUP8",
-          "examples": ["Go 7 = YK", "Go 7 = LPN"]
-        },
-        {
           "level": 3,
-          "field": "PRODUCT_GROUP5",
+          "field": "PG05",
           "examples": ["3090 x 6096", "3667 x 7324", "2438 x 2448"]
         }
       ],
@@ -264,7 +259,7 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 80,
-          "dataMapping": "product_group_6"
+          "dataMapping": "PG06"
         },
         {
           "field": "is_highlight",
@@ -380,24 +375,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_1": "BuildGroup1Item1Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }

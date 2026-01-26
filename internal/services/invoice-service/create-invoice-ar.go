@@ -60,7 +60,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
-			for _, soldValue := range conMapCustomer.Sold {
+			for _, soldValue := range conMapCustomer.Billing {
 				req[i].PartyBranch = soldValue.BranchID
 				req[i].PartyAddress = conMapCustomer.Address
 			}

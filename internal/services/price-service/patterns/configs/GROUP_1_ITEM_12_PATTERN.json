@@ -2,24 +2,24 @@
   "patterns": [
     {
       "id": "pattern_group1_item13_nested",
-      "name": "GROUP_1_ITEM_13 Nested Matrix",
-      "description": "Nested PRODUCT_GROUP9 -> PRODUCT_GROUP7 matrix with fixed PG2/PG1/Type/Size columns",
+      "name": "PG09 Nested Matrix",
+      "description": "Nested PG09 -> PG07 matrix with fixed PG2/PG1/Type/Size columns",
       "enabled": true,
       "requiredGroupCodes": ["GROUP_1_ITEM_12", "GROUP_1_ITEM_14", "GROUP_1_ITEM_15", "GROUP_1_ITEM_16", "GROUP_1_ITEM_17", "GROUP_1_ITEM_18", "GROUP_1_ITEM_19", "GROUP_1_ITEM_20" ],
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP1|PRODUCT_GROUP8|PRODUCT_GROUP4|PRODUCT_GROUP3",
+        "rows": "PG02|PG01|PG08|PG04|PG03",
         "columnGroups": ""
       },
       "columnLevels": [
         {
           "level": 1,
-          "field": "PRODUCT_GROUP9",
+          "field": "PG09",
           "examples": ["Sys", "จีน"]
         },
         {
           "level": 2,
-          "field": "PRODUCT_GROUP7",
+          "field": "PG07",
           "examples": ["6m", "9m", "12m"]
         }
       ],
@@ -38,13 +38,13 @@
           }
         },
         {
-          "field": "product_group_2",
+          "field": "PG02",
           "headerName": "Product Group 2",
           "width": 150,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "PRODUCT_GROUP2",
+          "dataMapping": "PG02",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -52,13 +52,13 @@
           }
         },
         {
-          "field": "product_group_1",
+          "field": "PG01",
           "headerName": "Product Group 1",
           "width": 150,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "PRODUCT_GROUP1",
+          "dataMapping": "PG01",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -66,13 +66,13 @@
           }
         },
         {
-          "field": "product_group_8",
+          "field": "PG08",
           "headerName": "Type",
           "width": 120,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "PRODUCT_GROUP8",
+          "dataMapping": "PG08",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center"
@@ -204,24 +204,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_12": "BuildGroup1Item12Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }

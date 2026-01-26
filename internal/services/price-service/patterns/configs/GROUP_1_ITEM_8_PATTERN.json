@@ -142,25 +142,25 @@
           "field": "grade",
           "headerName": "เกรด",
           "width": 120,
-          "dataMapping": "product_group_3"
+          "dataMapping": "PG03"
         },
         {
           "field": "z_value",
           "headerName": "Z",
           "width": 80,
-          "dataMapping": "product_group_8"
+          "dataMapping": "PG08"
         },
         {
           "field": "face",
           "headerName": "หน้า",
           "width": 100,
-          "dataMapping": "product_group_5"
+          "dataMapping": "PG05"
         },
         {
           "field": "coil_id",
           "headerName": "Coil ID",
           "width": 140,
-          "dataMapping": "product_group_9"
+          "dataMapping": "PG09"
         },
         {
           "field": "country",
@@ -250,24 +250,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_8": "BuildGroup1Item8Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }
