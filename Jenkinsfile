@@ -1,14 +1,14 @@
-pipeline {
+﻿pipeline {
     agent any
     environment {
         REPO_NAME = 'prime-wms-erp-core'      
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Demo' 
+        TARGET_BRANCH = 'PRDTMI' 
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '18.139.159.17'
-        SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
+        REMOTE_HOST = '54.179.75.32'
+        SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -169,3 +169,4 @@ stage('Clean Up Repository') {
         }
     }
 }
+
