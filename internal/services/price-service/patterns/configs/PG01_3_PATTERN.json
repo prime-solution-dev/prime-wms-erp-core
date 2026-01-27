@@ -240,13 +240,18 @@
       "grouping": {
         "tabs": "PG02",
         "rows": "PG06",
-        "columnGroups": "PG03|PG05"
+        "columnGroups": "PG03|PG08|PG05"
       },
       "columnLevels": [
         {
           "level": 1,
           "field": "PG03",
-          "examples": ["LT", "SS400"]
+          "examples": ["LT", "LPN"]
+        },
+        {
+          "level": 2,
+          "field": "PG08",
+          "examples": ["LT", "1.2", "1.4"]
         },
         {
           "level": 3,
