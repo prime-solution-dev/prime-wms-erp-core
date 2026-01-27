@@ -291,7 +291,7 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extra += float64(e.ValueInt)
+			extra = float64(e.ValueInt)
 		}
 	}
 
@@ -314,7 +314,7 @@ func extraConditionMatched(val float64, operator string, min, max float64) bool 
 	case ">":
 		return val > min
 	case "<>":
-		return val < min || val > max
+		return val >= min && val <= max
 	default:
 		return false
 	}
