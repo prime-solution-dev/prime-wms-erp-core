@@ -64,13 +64,13 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 140,
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -218,7 +218,7 @@
             "applyToColumnGroups": false
           },
           {
-            "field": "before_price_weight",
+            "field": "before_total_net_price_weight",
             "aggregation": "sum",
             "applyToColumnGroups": false
           }
