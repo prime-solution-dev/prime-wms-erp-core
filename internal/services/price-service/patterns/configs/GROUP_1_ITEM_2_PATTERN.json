@@ -55,7 +55,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": "weight_spec"
         },
         {
           "field": "market_weight",
@@ -79,7 +79,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": "avg_kg_stock"
         },
         {
           "field": "is_highlight",
