@@ -290,6 +290,9 @@ type InventoryWeightResponse struct {
 	AvgProduct             float64 `json:"avg_product"`
 	AvgBatch               float64 `json:"avg_batch"`
 	AvgSerial              float64 `json:"avg_serial"`
+	WeightSpec             float64 `json:"weight_spec"`
+	SumQty                 float64 `json:"sum_qty"`
+	SumWeight              float64 `json:"sum_weight"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -423,7 +426,7 @@ type UpdateLatestPriceListSubGroupRequest struct {
 	// Allowed values:
 	// - "subgroup": update by explicit subgroup_ids (default when empty for backward compatibility)
 	// - "group"   : update all subgroups under the given group_codes
-	UpdateType  string   `json:"update_type" binding:"oneof=subgroup group"`
+	UpdateType  string   `json:"update_type" binding:"omitempty,oneof=subgroup group"`
 	GroupCodes  []string `json:"group_codes" binding:"omitempty,dive"`
 	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid4"`
 }
