@@ -513,6 +513,24 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
+// getAvgProductFromInventory extracts AvgProduct from the first InventoryWeight entry
+// Returns 0.0 if inventory data is not available
+func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	if len(sg.InventoryWeight) > 0 {
+		return sg.InventoryWeight[0].AvgProduct
+	}
+	return 0.0
+}
+
+// getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry
+// Returns 0.0 if inventory data is not available
+func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	if len(sg.InventoryWeight) > 0 {
+		return sg.InventoryWeight[0].WeightSpec
+	}
+	return 0.0
+}
+
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
 	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueNameByGroupCode)
 }
@@ -1181,8 +1199,8 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		}
 
 		row["is_highlight"] = isHighlightValue
-		row["weight_spec"] = sg.PriceWeight
-		row["avg_kg_stock"] = sg.TotalNetPriceWeight
+		row["weight_spec"] = getWeightSpecFromInventory(sg)
+		row["avg_kg_stock"] = getAvgProductFromInventory(sg)
 
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
@@ -1290,10 +1308,18 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				row[fieldName] = warehouseValue
 			case "code":
 				row[fieldName] = codeValue
+			case "weight_spec":
+				row[fieldName] = getWeightSpecFromInventory(sg)
+			case "avg_product":
+				row[fieldName] = getAvgProductFromInventory(sg)
+			case "avg_kg_stock":
+				row[fieldName] = getAvgProductFromInventory(sg)
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
-				if colConfig.Field == "weight_spec" || colConfig.Field == "avg_kg_stock" {
-					row[fieldName] = 0.0
+				if colConfig.Field == "weight_spec" {
+					row[fieldName] = getWeightSpecFromInventory(sg)
+				} else if colConfig.Field == "avg_kg_stock" {
+					row[fieldName] = getAvgProductFromInventory(sg)
 				}
 			}
 		}
@@ -1570,9 +1596,9 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			if fixedCol.DataMapping == "" {
 				switch fixedCol.Field {
 				case "weight_spec":
-					row[fixedCol.Field] = 0.0
+					row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 				case "avg_kg_stock":
-					row[fixedCol.Field] = 0.0
+					row[fixedCol.Field] = getAvgProductFromInventory(sg)
 				default:
 					// For other fields without dataMapping, try to infer from field name
 					if strings.HasPrefix(fixedCol.Field, "product_group_") {
@@ -1806,10 +1832,18 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				} else {
 					row[colConfig.Field] = nil
 				}
+			case "weight_spec":
+				row[colConfig.Field] = getWeightSpecFromInventory(sg)
+			case "avg_product":
+				row[colConfig.Field] = getAvgProductFromInventory(sg)
+			case "avg_kg_stock":
+				row[colConfig.Field] = getAvgProductFromInventory(sg)
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
-				if colConfig.Field == "weight_spec" || colConfig.Field == "avg_kg_stock" {
-					row[colConfig.Field] = 0.0
+				if colConfig.Field == "weight_spec" {
+					row[colConfig.Field] = getWeightSpecFromInventory(sg)
+				} else if colConfig.Field == "avg_kg_stock" {
+					row[colConfig.Field] = getAvgProductFromInventory(sg)
 				} else {
 					// For other fields with empty dataMapping, set to empty string
 					row[colConfig.Field] = ""

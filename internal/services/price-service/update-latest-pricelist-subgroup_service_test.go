@@ -25,7 +25,7 @@ func TestUpdateLatestPriceListSubGroup_ValidationErrors(t *testing.T) {
 		assertFunc func(*testing.T, error)
 	}{
 		{
-			name: "missing subgroup ids",
+			name:    "missing subgroup ids",
 			payload: map[string]interface{}{
 				// default update_type=subgroup
 			},
@@ -127,21 +127,21 @@ func TestUpdateLatestPriceListSubGroup_Success(t *testing.T) {
 	now := time.Now()
 
 	subGroup := models.PriceListSubGroup{
-		ID:               subGroupID,
-		PriceListGroupID: groupID,
-		SubGroupCode:     "SUB001",
-		SubgroupKey:      "SUB",
-		IsTrading:         true,
-		PriceUnit:        100.0,
-		PriceWeight:      50.0,
-		ExtraPriceUnit:   10.0,
-		ExtraPriceWeight: 5.0,
-		TotalNetPriceUnit: 90.0,
+		ID:                  subGroupID,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUB001",
+		SubgroupKey:         "SUB",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
+		TotalNetPriceUnit:   90.0,
 		TotalNetPriceWeight: 45.0,
-		CreateBy:         "tester",
-		CreateDtm:        &now,
-		UpdateBy:         "tester",
-		UpdateDtm:        &now,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
 		PriceListGroup: models.PriceListGroup{
 			ID:          groupID,
 			PriceUnit:   100.0,
@@ -223,15 +223,15 @@ func TestUpdateLatestPriceListSubGroup_GroupSuccess(t *testing.T) {
 	now := time.Now()
 
 	subGroup1 := models.PriceListSubGroup{
-		ID:               subGroupID1,
-		PriceListGroupID: groupID,
-		SubGroupCode:     "SUBG1",
-		SubgroupKey:      "KEY1",
-		IsTrading:        true,
-		PriceUnit:        100.0,
-		PriceWeight:      50.0,
-		ExtraPriceUnit:   10.0,
-		ExtraPriceWeight: 5.0,
+		ID:                  subGroupID1,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUBG1",
+		SubgroupKey:         "KEY1",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
 		TotalNetPriceUnit:   90.0,
 		TotalNetPriceWeight: 45.0,
 		CreateBy:            "tester",
@@ -256,15 +256,15 @@ func TestUpdateLatestPriceListSubGroup_GroupSuccess(t *testing.T) {
 	}
 
 	subGroup2 := models.PriceListSubGroup{
-		ID:               subGroupID2,
-		PriceListGroupID: groupID,
-		SubGroupCode:     "SUBG2",
-		SubgroupKey:      "KEY2",
-		IsTrading:        true,
-		PriceUnit:        120.0,
-		PriceWeight:      60.0,
-		ExtraPriceUnit:   12.0,
-		ExtraPriceWeight: 6.0,
+		ID:                  subGroupID2,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUBG2",
+		SubgroupKey:         "KEY2",
+		IsTrading:           true,
+		PriceUnit:           120.0,
+		PriceWeight:         60.0,
+		ExtraPriceUnit:      12.0,
+		ExtraPriceWeight:    6.0,
 		TotalNetPriceUnit:   110.0,
 		TotalNetPriceWeight: 55.0,
 		CreateBy:            "tester",
@@ -365,21 +365,21 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 	now := time.Now()
 
 	subGroup := models.PriceListSubGroup{
-		ID:               subGroupID,
-		PriceListGroupID: groupID,
-		SubGroupCode:     "SUB001",
-		SubgroupKey:      "SUB",
-		IsTrading:         true,
-		PriceUnit:        100.0,
-		PriceWeight:      50.0,
-		ExtraPriceUnit:   10.0,
-		ExtraPriceWeight: 5.0,
-		TotalNetPriceUnit: 90.0,
+		ID:                  subGroupID,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUB001",
+		SubgroupKey:         "SUB",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
+		TotalNetPriceUnit:   90.0,
 		TotalNetPriceWeight: 45.0,
-		CreateBy:         "tester",
-		CreateDtm:        &now,
-		UpdateBy:         "tester",
-		UpdateDtm:        &now,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
 		PriceListGroup: models.PriceListGroup{
 			ID:          groupID,
 			PriceUnit:   100.0,
@@ -425,8 +425,8 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 						Rounding:    2,
 					},
 				},
-		},
-	}, nil
+			},
+		}, nil
 	}
 	defer func() { getPriceListSubGroupFormulasMapBySubGroupCodesFunc = originalGetFormulas }()
 
@@ -469,7 +469,7 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceUnit)
 	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceWeight)
 	assert.NotNil(t, updateRequest.Changes[0].ExtraPriceWeight)
-	
+
 	// Verify calculated values (base_price + extra = 50.0 + 5.0 = 55.0)
 	assert.Equal(t, 55.0, *updateRequest.Changes[0].TotalNetPriceWeight)
 }
@@ -514,21 +514,21 @@ func TestUpdateLatestPriceListSubGroup_PriceListGroupExtraKeyLoaded(t *testing.T
 	now := time.Now()
 
 	subGroup := models.PriceListSubGroup{
-		ID:               subGroupID,
-		PriceListGroupID: groupID,
-		SubGroupCode:     "SUB001",
-		SubgroupKey:      "SUB",
-		IsTrading:         true,
-		PriceUnit:        100.0,
-		PriceWeight:      50.0,
-		ExtraPriceUnit:   10.0,
-		ExtraPriceWeight: 5.0,
-		TotalNetPriceUnit: 90.0,
+		ID:                  subGroupID,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUB001",
+		SubgroupKey:         "SUB",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
+		TotalNetPriceUnit:   90.0,
 		TotalNetPriceWeight: 45.0,
-		CreateBy:         "tester",
-		CreateDtm:        &now,
-		UpdateBy:         "tester",
-		UpdateDtm:        &now,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
 		PriceListGroup: models.PriceListGroup{
 			ID:          groupID,
 			PriceUnit:   100.0,
@@ -598,4 +598,122 @@ func TestUpdateLatestPriceListSubGroup_PriceListGroupExtraKeyLoaded(t *testing.T
 	resp, err := UpdateLatestPriceListSubGroup(c)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
+}
+
+func TestUpdateLatestPriceListSubGroup_WithInventoryData(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := uuid.New()
+	subGroupID := uuid.New()
+	now := time.Now()
+
+	subGroup := models.PriceListSubGroup{
+		ID:                  subGroupID,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUB001",
+		SubgroupKey:         "SUB",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
+		TotalNetPriceUnit:   90.0,
+		TotalNetPriceWeight: 45.0,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
+		PriceListGroup: models.PriceListGroup{
+			ID:          groupID,
+			CompanyCode: "C001",
+			SiteCode:    "S001",
+			PriceUnit:   100.0,
+			PriceWeight: 50.0,
+		},
+		PriceListSubGroupKeys: []models.PriceListSubGroupKey{
+			{
+				ID:         uuid.New(),
+				SubGroupID: subGroupID,
+				Code:       "CODE",
+				Value:      "VALUE",
+				Seq:        1,
+			},
+		},
+	}
+
+	// Mock GetPriceListSubGroupsByIDs
+	originalGetByIDs := getPriceListSubGroupsByIDsFunc
+	getPriceListSubGroupsByIDsFunc = func([]uuid.UUID) ([]models.PriceListSubGroup, error) {
+		return []models.PriceListSubGroup{subGroup}, nil
+	}
+	defer func() { getPriceListSubGroupsByIDsFunc = originalGetByIDs }()
+
+	// Mock GetPriceListSubGroupFormulasMapBySubGroupCodes to return a formula that uses avg_kg_stock
+	originalGetFormulas := getPriceListSubGroupFormulasMapBySubGroupCodesFunc
+	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func([]string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+		formulaID := uuid.New()
+		return map[string][]models.PriceListSubGroupFormulasMap{
+			"SUB001": {
+				{
+					ID:                    uuid.New(),
+					PriceListSubGroupCode: "SUB001",
+					PriceListFormulasCode: "FORMULA001",
+					IsDefault:             false,
+					PriceListFormulas: models.PriceListFormulas{
+						ID:          formulaID,
+						FormulaCode: "FORMULA001",
+						Name:        "Test Formula with Inventory",
+						Uom:         "kg",
+						FormulaType: "calculation",
+						// Formula uses avg_kg_stock: base_price + extra + avg_kg_stock
+						Expression: "base_price + extra + avg_kg_stock",
+						Params:     json.RawMessage(`{}`),
+						Rounding:   2,
+					},
+				},
+			},
+		}, nil
+	}
+	defer func() { getPriceListSubGroupFormulasMapBySubGroupCodesFunc = originalGetFormulas }()
+
+	// Mock UpdatePriceListSubGroups
+	updateCalled := false
+	var updateRequest models.UpdatePriceListSubGroupRequest
+	originalUpdate := updateLatestSubGroupFunc
+	updateLatestSubGroupFunc = func(req models.UpdatePriceListSubGroupRequest) error {
+		updateCalled = true
+		updateRequest = req
+		return nil
+	}
+	defer func() { updateLatestSubGroupFunc = originalUpdate }()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	payload := map[string]interface{}{
+		"subgroup_ids": []string{subGroupID.String()},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/price/SubGroup/UpdateLatest", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	resp, err := UpdateLatestPriceListSubGroup(c)
+	assert.NoError(t, err)
+
+	// Verify success response
+	result, ok := resp.(map[string]interface{})
+	if assert.True(t, ok, "expected map[string]interface{}") {
+		assert.True(t, result["success"].(bool))
+	}
+
+	// Verify update was called with calculated values
+	assert.True(t, updateCalled, "UpdatePriceListSubGroups should have been called")
+	assert.Len(t, updateRequest.Changes, 1)
+	assert.Equal(t, subGroupID, updateRequest.Changes[0].SubGroupID)
+	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceWeight)
+
+	// Note: In this test, the inventory service call will fail (no mock), so avg_kg_stock=0
+	// Formula: base_price + extra + avg_kg_stock = 50.0 + 5.0 + 0.0 = 55.0
+	assert.Equal(t, 55.0, *updateRequest.Changes[0].TotalNetPriceWeight)
 }

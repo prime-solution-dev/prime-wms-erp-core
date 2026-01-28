@@ -69,7 +69,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
@@ -81,7 +81,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "market_weight",

@@ -820,6 +820,26 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 		}
 		if len(subGroupFormulasRecs) > 0 {
+			// Delete existing subgroup formulas for the subgroups being processed
+			subGroupCodesToDelete := make([]string, 0, len(subGroupFormulasRecs))
+			seenSubGroupCodes := make(map[string]bool)
+			for _, rec := range subGroupFormulasRecs {
+				if subGroupCode, ok := rec["price_list_subgroup_code"].(string); ok && subGroupCode != "" {
+					if !seenSubGroupCodes[subGroupCode] {
+						subGroupCodesToDelete = append(subGroupCodesToDelete, subGroupCode)
+						seenSubGroupCodes[subGroupCode] = true
+					}
+				}
+			}
+			if len(subGroupCodesToDelete) > 0 {
+				if err := tx.Table("price_list_subgroup_formulas_map").
+					Where("price_list_subgroup_code IN ?", subGroupCodesToDelete).
+					Delete(nil).Error; err != nil {
+					return err
+				}
+			}
+
+			// Insert new subgroup formulas
 			if err := tx.Table("price_list_subgroup_formulas_map").CreateInBatches(subGroupFormulasRecs, batchSize).Error; err != nil {
 				return err
 			}
