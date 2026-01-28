@@ -50,8 +50,6 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(config, pattern, subGroups)
 
-			fmt.Printf("[DEBUG] Built %d columns and %d raw rows\n", len(columns), len(rowData))
-
 			// Regroup rows to prevent data loss when the same column_group_key appears
 			// multiple times for a given row_group_value (e.g., multiple subgroup_ids
 			// under the same PRODUCT_GROUP5 and thickness).

@@ -90,10 +90,10 @@
       ],
       "columns": [
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 150,
-          "dataMapping": "before_price_weight",
+          "dataMapping": "before_total_net_price_weight",
           "cellStyle": {
             "textAlign": "left"
           }
