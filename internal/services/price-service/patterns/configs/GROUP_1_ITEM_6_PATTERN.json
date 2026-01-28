@@ -3,10 +3,10 @@
     {
       "id": "pattern_group1_item6_pg2_tabs",
       "name": "เหล็กฉาก / รางน้ำ",
-      "description": "Fixed-column layout grouped by PRODUCT_GROUP2 with listing, pricing, and logistics fields",
+      "description": "Fixed-column layout grouped by PG02 with listing, pricing, and logistics fields",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
+        "tabs": "PG02",
         "rows": "",
         "columnGroups": ""
       },
@@ -40,7 +40,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_3"
+          "dataMapping": "PG03"
         },
         {
           "field": "weight_spec",
@@ -71,10 +71,10 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย before",
           "width": 160,
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -123,7 +123,7 @@
       "itemFormat": [
         {
           "type": "group",
-          "value": "PRODUCT_GROUP4"
+          "value": "PG04"
         },
         {
           "type": "literal",
@@ -131,7 +131,7 @@
         },
         {
           "type": "group",
-          "value": "PRODUCT_GROUP7"
+          "value": "PG07"
         }
       ],
       "applicableCategories": [
@@ -169,24 +169,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_6": "BuildGroup1Item6Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }

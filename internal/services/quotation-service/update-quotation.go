@@ -130,6 +130,10 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			DocRef:             tempQuotation.QuotationCode,
 			CustomerCode:       quotationReq.CustomerCode,
 			EffectiveDatePrice: *quotationReq.EffectiveDatePrice,
+			TransportCost:      quotationReq.TotalTransportCost,
+			TransportType:      quotationReq.TransportCostType,
+			TotalAmount:        quotationReq.SubtotalExclVat,
+			TotalWeight:        quotationReq.TotalWeight,
 			Items:              []verifyService.VerifyApproveItem{},
 		}
 
@@ -159,7 +163,7 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				TotalWeight:   item.TotalWeight,
 				PriceUnit:     item.PriceUnit,
 				PriceListUnit: item.PriceListUnit,
-				TotalAmount:   item.TotalAmount,
+				TotalAmount:   item.SubtotalExclVat,
 				SaleUnit:      item.SaleUnit,
 				SaleUnitType:  item.SaleUnitType,
 			}

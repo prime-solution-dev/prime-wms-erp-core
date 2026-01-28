@@ -237,6 +237,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 	// Collect all key values from all subgroups for inventory service request
 	keyValues := []externalService.InventoryByProductCodeKeyValue{}
+	fmt.Println("responses", len(responses))
 	for _, resp := range responses {
 		for _, sg := range resp.SubGroups {
 			for _, sgk := range sg.GroupKeys {

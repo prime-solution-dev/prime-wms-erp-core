@@ -62,45 +62,46 @@ type Sale struct {
 func (Sale) TableName() string { return "sale" }
 
 type SaleItem struct {
-	ID                             uuid.UUID  `json:"id"`
-	SaleID                         uuid.UUID  `json:"sale_id"`
-	SaleItem                       string     `json:"sale_item"`
-	ProductCode                    string     `json:"product_code"`
-	ProductDesc                    string     `json:"product_desc"`
-	DocumentRef                    string     `json:"document_ref"`
-	DocumentRefItem                string     `json:"document_ref_item"`
-	Qty                            float64    `json:"qty"`
-	OriginQty                      float64    `json:"origin_qty"`
-	Unit                           string     `json:"unit"`
-	PriceListUnit                  float64    `json:"price_list_unit"`
-	SaleQty                        float64    `json:"sale_qty"`
-	SaleUnit                       string     `json:"sale_unit"`
-	SaleUnitType                   string     `json:"sale_unit_type"`
-	PassPriceUnit                  string     `json:"pass_price_unit"`
-	PassPriceWeight                string     `json:"pass_price_weight"`
-	PriceUnit                      float64    `json:"price_unit"`
-	TotalAmount                    float64    `json:"total_amount"` //TotalPrice
-	TransportCostUnit              float64    `json:"transport_cost_unit"`
-	SubtotalExclTransport          float64    `json:"subtotal_excl_transport"`       //TotalNetPrice
-	NetPriceUnitExclTransport      float64    `json:"net_price_unit_excl_transport"` //NetPriceUnit
-	WeightUnit                     float64    `json:"weight_unit"`
-	AvgWeightUnit                  float64    `json:"avg_weight_unit"`
-	TotalWeight                    float64    `json:"total_weight"`
-	TransportCostWeightUnit        float64    `json:"transport_cost_weight_unit"`
-	SubtotalWeightExclTransport    float64    `json:"subtotal_weight_excl_transport"`      //TotalNetPriceWeight
-	NetPricePerWeightExclTransport float64    `json:"net_price_per_weight_excl_transport"` //NetPriceWeightUnit
-	Status                         string     `json:"status"`
-	Remark                         string     `json:"remark"`
-	SubtotalExclVat                float64    `json:"subtotal_excl_vat"`
-	TotalVat                       float64    `json:"total_vat"`
-	UnitUom                        string     `json:"unit_uom"`
-	TotalDiscount                  float64    `json:"total_discount"`
-	TotalDiscountPercent           float64    `json:"total_discount_percent"`
-	OldPriceListUnit               float64    `json:"old_price_list_unit"`
-	CreateDate                     *time.Time `json:"create_date"`
-	CreateBy                       string     `json:"create_by"`
-	UpdateDate                     *time.Time `json:"update_date"`
-	UpdateBy                       string     `json:"update_by"`
+	ID                             uuid.UUID      `json:"id"`
+	SaleID                         uuid.UUID      `json:"sale_id"`
+	SaleItem                       string         `json:"sale_item"`
+	ProductCode                    string         `json:"product_code"`
+	ProductDesc                    string         `json:"product_desc"`
+	DocumentRef                    string         `json:"document_ref"`
+	DocumentRefItem                string         `json:"document_ref_item"`
+	Qty                            float64        `json:"qty"`
+	OriginQty                      float64        `json:"origin_qty"`
+	Unit                           string         `json:"unit"`
+	PriceListUnit                  float64        `json:"price_list_unit"`
+	SaleQty                        float64        `json:"sale_qty"`
+	SaleUnit                       string         `json:"sale_unit"`
+	SaleUnitType                   string         `json:"sale_unit_type"`
+	PassPriceUnit                  string         `json:"pass_price_unit"`
+	PassPriceWeight                string         `json:"pass_price_weight"`
+	PriceUnit                      float64        `json:"price_unit"`
+	TotalAmount                    float64        `json:"total_amount"` //TotalPrice
+	TransportCostUnit              float64        `json:"transport_cost_unit"`
+	SubtotalExclTransport          float64        `json:"subtotal_excl_transport"`       //TotalNetPrice
+	NetPriceUnitExclTransport      float64        `json:"net_price_unit_excl_transport"` //NetPriceUnit
+	WeightUnit                     float64        `json:"weight_unit"`
+	AvgWeightUnit                  float64        `json:"avg_weight_unit"`
+	TotalWeight                    float64        `json:"total_weight"`
+	TransportCostWeightUnit        float64        `json:"transport_cost_weight_unit"`
+	SubtotalWeightExclTransport    float64        `json:"subtotal_weight_excl_transport"`      //TotalNetPriceWeight
+	NetPricePerWeightExclTransport float64        `json:"net_price_per_weight_excl_transport"` //NetPriceWeightUnit
+	Status                         string         `json:"status"`
+	Remark                         string         `json:"remark"`
+	SubtotalExclVat                float64        `json:"subtotal_excl_vat"`
+	TotalVat                       float64        `json:"total_vat"`
+	UnitUom                        string         `json:"unit_uom"`
+	TotalDiscount                  float64        `json:"total_discount"`
+	TotalDiscountPercent           float64        `json:"total_discount_percent"`
+	OldPriceListUnit               float64        `json:"old_price_list_unit"`
+	CreateDate                     *time.Time     `json:"create_date"`
+	CreateBy                       string         `json:"create_by"`
+	UpdateDate                     *time.Time     `json:"update_date"`
+	UpdateBy                       string         `json:"update_by"`
+	DeliveryItems                  []DeliveryItem `gorm:"foreignKey:DocumentRefItem;references:SaleItem" json:"delivery_items,omitempty"`
 }
 
 func (SaleItem) TableName() string { return "sale_item" }
