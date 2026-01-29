@@ -189,7 +189,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for _, pItem := range p.PurchaseItems {
 			usedQty, ok := inboundMap[pItem.PurchaseItem]
 			if ok {
-				if pItem.PurchaseQty-usedQty == 0 {
+				if pItem.Qty-usedQty <= 0 {
 					notPOItemCodes = append(notPOItemCodes, pItem.PurchaseItem)
 				}
 			}
@@ -352,9 +352,9 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				itemResp.RemainWeight = item.TotalWeight - used.Weight
 			}
 
-			itemResp.InboundRemainQty = item.PurchaseQty
+			itemResp.InboundRemainQty = item.Qty
 			if usedInbound, ok := inboundMap[item.PurchaseItem]; ok {
-				itemResp.InboundRemainQty = item.PurchaseQty - usedInbound
+				itemResp.InboundRemainQty = item.Qty - usedInbound
 			}
 
 			itemsResp = append(itemsResp, itemResp)
