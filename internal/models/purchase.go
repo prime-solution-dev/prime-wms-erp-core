@@ -598,6 +598,10 @@ type GetProductsDetailComponent struct {
 	MinSellableDay                int64                          `json:"min_sellable_day"`
 	SiteCode                      string                         `json:"site_code"`
 	CompanyCode                   string                         `json:"company_code"`
+	ExternalID                    string                         `json:"external_id"`
+	GRTolerance                   float64                        `json:"gr_tolerance"`
+	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`
 	Component                     []GetComponentDetailComponent  `json:"component"`
