@@ -156,10 +156,60 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	reqInboundFilter := goodsReceiveService.InboundFilter{
 		InboundItemDocumentRefItem: purchaseItemCodes,
 	}
-
 	inbounds, err := goodsReceiveService.GetInbounds(reqInboundFilter)
 	if err != nil {
 		return nil, errors.New("failed to get used qty from inbound: " + err.Error())
+	}
+
+	inboundCodes := []string{}
+	inboundCodesCheck := make(map[string]bool)
+	for _, inbound := range inbounds.InboundRes {
+		if _, exists := inboundCodesCheck[inbound.InboundCode]; !exists {
+			inboundCodes = append(inboundCodes, inbound.InboundCode)
+			inboundCodesCheck[inbound.InboundCode] = true
+		}
+	}
+
+	type GoodsReceive struct {
+		InboundCode  string
+		InboundItem  string
+		ConfirmedQty float64
+	}
+
+	//Get goods receive
+	if len(inboundCodes) > 0 {
+		reqGoodsReceiveFilter := goodsReceiveService.GoodsReceiveFilter{
+			ReferenceNo: inboundCodes,
+		}
+		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(reqGoodsReceiveFilter)
+		if err != nil {
+			return nil, errors.New("failed to get goods receive: " + err.Error())
+		}
+
+		// map inboundCode|inboundItem to confirmedQty
+		grConfirmMap := map[string]float64{}
+		for _, gr := range resGoodsReceive.GoodsReceive {
+			for _, grItem := range gr.GoodsReceiveItem {
+				for _, grConfirm := range grItem.GoodsReceiveConfirm {
+					key := gr.DocumentRef + "|" + grItem.DocumentRefItem
+					grConfirmMap[key] += grConfirm.BaseQty
+				}
+			}
+		}
+
+		// map inbound item confirmed qty
+		for i, inbound := range inbounds.InboundRes {
+			if inbound.Status != "COMPLETED" {
+				continue
+			}
+
+			for ii, inboundItem := range inbound.InboundItemRes {
+				key := inbound.InboundCode + "|" + inboundItem.DocumentRefItem
+				if confirmedQty, ok := grConfirmMap[key]; ok {
+					inbounds.InboundRes[i].InboundItemRes[ii].Qty = confirmedQty
+				}
+			}
+		}
 	}
 
 	// map purchase item code to used qty
