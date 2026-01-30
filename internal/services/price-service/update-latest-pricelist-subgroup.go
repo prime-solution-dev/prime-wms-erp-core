@@ -6,6 +6,7 @@ import (
 	"maps"
 	"math"
 
+	externalService "prime-erp-core/external/warehouse-service"
 	"prime-erp-core/internal/models"
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
@@ -42,6 +43,9 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
 	updateType := req.UpdateType
+	if updateType == "" {
+		updateType = "subgroup"
+	}
 
 	var (
 		subGroupUUIDs []uuid.UUID
@@ -126,15 +130,73 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 	// Collect all sub group codes for batch formula fetching
 	subGroupCodes := make([]string, 0, len(subGroups))
 	for _, subGroup := range subGroups {
-		if subGroup.SubGroupCode != "" {
-			subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
-		}
+		// Include SubGroupCode in the list, even if it's empty string
+		subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
 	}
-
 	// Fetch all formulas in one batch query
 	formulasMap, err := getPriceListSubGroupFormulasMapBySubGroupCodesFunc(subGroupCodes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
+	}
+	// Collect all key values from all subgroups for inventory service request
+	keyValues := []externalService.InventoryByProductCodeKeyValue{}
+	companyCodeSet := make(map[string]bool)
+	siteCodeSet := make(map[string]bool)
+
+	for _, subGroup := range subGroups {
+		// Collect company code and site code
+		if subGroup.PriceListGroup.CompanyCode != "" {
+			companyCodeSet[subGroup.PriceListGroup.CompanyCode] = true
+		}
+		if subGroup.PriceListGroup.SiteCode != "" {
+			siteCodeSet[subGroup.PriceListGroup.SiteCode] = true
+		}
+
+		// Build key values from subgroup keys
+		for _, sgk := range subGroup.PriceListSubGroupKeys {
+			keyValues = append(keyValues, externalService.InventoryByProductCodeKeyValue{
+				ID:         subGroup.ID.String(),
+				GroupCode:  sgk.Code,
+				GroupValue: sgk.Value,
+				Seq:        sgk.Seq,
+			})
+		}
+	}
+
+	// Create inventory maps for quick lookup
+	inventoryMap := make(map[string][]models.InventoryWeightResponse)
+	supplierCodeMap := make(map[string]string)
+
+	// Call inventory service if we have key values
+	if len(keyValues) > 0 {
+		// Convert sets to slices
+		companyCodes := []string{}
+		for code := range companyCodeSet {
+			companyCodes = append(companyCodes, code)
+		}
+		siteCodes := []string{}
+		for code := range siteCodeSet {
+			siteCodes = append(siteCodes, code)
+		}
+
+		// Use first company code for the request
+		companyCode := ""
+		if len(companyCodes) > 0 {
+			companyCode = companyCodes[0]
+		}
+
+		// Call inventory service
+		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
+		if err != nil {
+			// Log error but continue without inventory data
+			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
+		} else {
+			// Build maps of inventory data by ID for quick lookup
+			for _, invItem := range inventoryResponse {
+				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+			}
+		}
 	}
 
 	// Prepare update requests for each sub group
@@ -145,15 +207,35 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		subGroup := subGroupMap[subGroupID]
 
 		priceListFormulas := formulasMap[subGroup.SubGroupCode]
-
 		// Initialize calculated values with current values
 		totalNetPriceUnit := subGroup.TotalNetPriceUnit
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, err := calculateExtraForSubGroup(subGroup)
+		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
+		}
+
+		// Get inventory data for this subgroup
+		avgKgStock := 1.0
+		weightSpec := 1.0
+		pcs := 0.0
+		kg := 0.0
+		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
+			// Use AvgProduct from first inventory weight response
+			if inventoryWeight[0].AvgProduct == 0 {
+				avgKgStock = 1.0
+			} else {
+				avgKgStock = inventoryWeight[0].AvgProduct
+			}
+			if inventoryWeight[0].WeightSpec == 0 {
+				weightSpec = 1.0
+			} else {
+				weightSpec = inventoryWeight[0].WeightSpec
+			}
+			pcs = inventoryWeight[0].SumQty
+			kg = inventoryWeight[0].SumWeight
 		}
 
 		if len(priceListFormulas) > 0 {
@@ -178,10 +260,10 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceUnit,
 							Extra:      extraPriceWeight,
-							AvgKgStock: 0, // TODO: get avg kg stock from stock
-							WeightSpec: 0, // TODO: get weight spec from product
-							Pcs:        0, // TODO: get pcs from product
-							Kg:         0, // TODO: get kg from product
+							AvgKgStock: avgKgStock,
+							WeightSpec: weightSpec,
+							Pcs:        pcs,
+							Kg:         kg,
 						}
 
 						priceFormula := priceDomain.PriceFormula{
@@ -197,11 +279,11 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					case "kg":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceWeight,
-							AvgKgStock: 0, // TODO: get avg kg stock from stock
-							WeightSpec: 0, // TODO: get weight spec from product
-							Pcs:        0, // TODO: get pcs from product
-							Kg:         0, // TODO: get kg from product
+							Extra:      extraPriceUnit,
+							AvgKgStock: avgKgStock,
+							WeightSpec: weightSpec,
+							Pcs:        pcs,
+							Kg:         kg,
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
@@ -224,6 +306,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			TotalNetPriceUnit:   &totalNetPriceUnit,
 			TotalNetPriceWeight: &totalNetPriceWeight,
 			ExtraPriceWeight:    &extraPriceWeight,
+			ExtraPriceUnit:      &extraPriceUnit,
 		})
 	}
 
@@ -244,7 +327,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
-func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, error) {
+func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
 	// Build a quick lookup map from subgroup keys: code -> value
 	subGroupKeyMap := make(map[string]string, len(subGroup.PriceListSubGroupKeys))
 	for _, k := range subGroup.PriceListSubGroupKeys {
@@ -253,7 +336,8 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 	// Start from existing ExtraPriceWeight so that, in absence of matching config,
 	// we preserve the current extra behavior.
-	extra := subGroup.ExtraPriceWeight
+	extraWeight := subGroup.ExtraPriceWeight
+	extraUnit := subGroup.ExtraPriceUnit
 
 	extras := subGroup.PriceListGroup.PriceListGroupExtras
 	for _, e := range extras {
@@ -283,7 +367,7 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 		valInt, found, err := priceListRepository.GetGroupItemValueInt(e.ConditionCode, condValue)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		if !found {
 			continue
@@ -291,11 +375,12 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extra = float64(e.ValueInt)
+			extraWeight = float64(e.ValueInt)
+			extraUnit = float64(e.ValueInt)
 		}
 	}
 
-	return extra, nil
+	return extraWeight, extraUnit, nil
 }
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
