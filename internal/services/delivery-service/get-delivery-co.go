@@ -68,6 +68,7 @@ type GetDeliveryItemCOResponse struct {
 	CreateBy        string                                   `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate      *time.Time                               `gorm:"type:date" json:"update_date"`
 	UpdateBy        string                                   `gorm:"type:varchar(50)" json:"update_by"`
+	Sale            models.Sale                              `gorm:"-" json:"sale"`
 	Order           externalService.GetOrderDeliveryResponse `gorm:"-" json:"order"`
 }
 
@@ -217,6 +218,28 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				if ordersByCode, exists := orderMap[delivery.DeliveryCode]; exists {
 					if matchingOrder, itemExists := ordersByCode[deliveryItem.DeliveryItem]; itemExists {
 						deliveryItem.Order = matchingOrder
+					}
+				}
+			}
+		}
+
+		// Map sales to delivery items in res
+		for i := range res {
+			delivery := &res[i]
+
+			for j := range delivery.Items {
+				deliveryItem := &delivery.Items[j]
+
+				// Find matching sale from allDeliveries
+				for _, allDelivery := range allDeliveries {
+					if allDelivery.DeliveryCode == delivery.DeliveryCode {
+						for _, allDeliveryItem := range allDelivery.Items {
+							if allDeliveryItem.DeliveryItem == deliveryItem.DeliveryItem {
+								deliveryItem.Sale = allDeliveryItem.Sale
+								break
+							}
+						}
+						break
 					}
 				}
 			}
