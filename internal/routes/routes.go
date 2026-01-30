@@ -197,6 +197,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
 	})
+	delivery.POST("/GetDeliveryCO", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.GetDeliveryCO)
+	})
 	/* 	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
 	   		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
 	   	})
