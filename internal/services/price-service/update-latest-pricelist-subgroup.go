@@ -212,7 +212,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, err := calculateExtraForSubGroup(subGroup)
+		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
 		}
@@ -279,7 +279,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					case "kg":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceWeight,
+							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
 							Pcs:        pcs,
@@ -306,6 +306,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			TotalNetPriceUnit:   &totalNetPriceUnit,
 			TotalNetPriceWeight: &totalNetPriceWeight,
 			ExtraPriceWeight:    &extraPriceWeight,
+			ExtraPriceUnit:      &extraPriceUnit,
 		})
 	}
 
@@ -326,7 +327,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
-func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, error) {
+func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
 	// Build a quick lookup map from subgroup keys: code -> value
 	subGroupKeyMap := make(map[string]string, len(subGroup.PriceListSubGroupKeys))
 	for _, k := range subGroup.PriceListSubGroupKeys {
@@ -335,7 +336,8 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 	// Start from existing ExtraPriceWeight so that, in absence of matching config,
 	// we preserve the current extra behavior.
-	extra := subGroup.ExtraPriceWeight
+	extraWeight := subGroup.ExtraPriceWeight
+	extraUnit := subGroup.ExtraPriceUnit
 
 	extras := subGroup.PriceListGroup.PriceListGroupExtras
 	for _, e := range extras {
@@ -365,7 +367,7 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 		valInt, found, err := priceListRepository.GetGroupItemValueInt(e.ConditionCode, condValue)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		if !found {
 			continue
@@ -373,11 +375,12 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, err
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extra = float64(e.ValueInt)
+			extraWeight = float64(e.ValueInt)
+			extraUnit = float64(e.ValueInt)
 		}
 	}
 
-	return extra, nil
+	return extraWeight, extraUnit, nil
 }
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
