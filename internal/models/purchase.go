@@ -560,6 +560,24 @@ type GetProductsDetailResponse struct {
 	TotalPages int                          `json:"total_pages"`
 	Products   []GetProductsDetailComponent `json:"products"`
 }
+type ResultMovingAvgCost struct {
+	Total      int             `json:"total"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+	TotalPages int             `json:"total_pages"`
+	Unit       []MovingAvgCost `json:"moving_avg_cost"`
+}
+type MovingAvgCost struct {
+	ID          uuid.UUID `json:"id"`
+	ProductCode string    `json:"product_code"`
+	ProductName string    `json:"product_name"`
+	MA          float64   `json:"ma"`
+	Balance     float64   `json:"balance"`
+	CreateBy    string    `json:"create_by"`
+	CreateDtm   time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy    string    `json:"update_by"`
+	UpdateDtm   time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+}
 
 type GetProductsDetailComponent struct {
 	ProductId                     string                         `json:"product_id"`
