@@ -6,7 +6,7 @@
       "description": "Multi-tab layout for GROUP_1_ITEM_4 grouped by PRODUCT_GROUP2 with row-spanning Size column",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
+        "tabs": "PG02",
         "rows": "",
         "columnGroups": ""
       },
@@ -31,7 +31,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_4",
+          "dataMapping": "PG04",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -45,7 +45,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_6",
+          "dataMapping": "PG06",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -57,7 +57,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_3"
+          "dataMapping": "PG03"
         },
         {
           "field": "weight_spec",
@@ -69,7 +69,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
@@ -81,7 +81,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "market_weight",
@@ -157,13 +157,13 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "before_price_weight",
+              "field": "before_total_net_price_weight",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_total_net_price_weight"
             },
             {
               "field": "total_net_price_weight",
@@ -214,7 +214,8 @@
         "total_net_price_weight",
         "total_net_price_unit",
         "remark",
-        "inactive"
+        "inactive",
+        "market_weight"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight",
@@ -241,24 +242,24 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
-      "productGroup2": "PRODUCT_GROUP2",
-      "productGroup6": "PRODUCT_GROUP6",
-      "productGroup7": "PRODUCT_GROUP7",
-      "productGroup5": "PRODUCT_GROUP5",
-      "productGroup3": "PRODUCT_GROUP3",
-      "productGroup4": "PRODUCT_GROUP4",
-      "productGroup9": "PRODUCT_GROUP9",
-      "type": "PRODUCT_GROUP9"
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
     },
     "handlerMappings": {
       "GROUP_1_ITEM_4": "BuildGroup1Item4Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PRODUCT_GROUP4"},
+      {"type": "group", "value": "PG04"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP6"},
+      {"type": "group", "value": "PG06"},
       {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PRODUCT_GROUP7"}
+      {"type": "group", "value": "PG07"}
     ]
   }
 }

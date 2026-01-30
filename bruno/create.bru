@@ -1,0 +1,23 @@
+meta {
+  name: create
+  type: http
+  seq: 8
+}
+
+post {
+  url: http://localhost:9115/price/UploadPriceList
+  body: multipartForm
+  auth: inherit
+}
+
+headers {
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  files: @file()
+}
+
+settings {
+  encodeUrl: false
+}
