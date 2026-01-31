@@ -44,8 +44,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	}
 	customerCode := []string{}
 
-	for _, creditValue := range credit {
-		customerCode = append(customerCode, creditValue.CustomerCode)
+	for i := range credit {
+		if len(req.CustomerCode) > 0 {
+			credit[i].CustomerCode = req.CustomerCode[0]
+		}
+
+		customerCode = append(customerCode, credit[i].CustomerCode)
 	}
 
 	requestData := map[string]interface{}{
