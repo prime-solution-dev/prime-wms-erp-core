@@ -8,6 +8,7 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -62,9 +63,60 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
 
-	jsonBytesGetCredit, err := json.Marshal(requestData)
+	requestDataGetCredit := map[string][]string{
+		"customer_code": customerCode,
+	}
+	jsonBytesGetCredit, err := json.Marshal(requestDataGetCredit)
 	if err != nil {
 		return nil, err
+	}
+
+	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
+	if errGetCredit != nil {
+		return nil, errGetCredit
+	}
+
+	mapCredit := map[string]float64{}
+	mapCreditExtra := map[string]float64{}
+	mapEffectiveDtm := map[string]*time.Time{}
+	mapExpireDtm := map[string]*time.Time{}
+
+	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
+		currentCreditValue, exists := mapCredit[creditValue.CustomerCode]
+		if exists {
+			mapCredit[creditValue.CustomerCode] = currentCreditValue + creditValue.Amount
+		} else {
+			mapCredit[creditValue.CustomerCode] = creditValue.Amount
+		}
+
+		for _, creditExtraValue := range creditValue.CreditExtra {
+
+			currentCreditExtraValue, exists := mapCreditExtra[creditValue.CustomerCode]
+			if exists {
+				mapCreditExtra[creditValue.CustomerCode] = currentCreditExtraValue + creditExtraValue.Amount
+			} else {
+				mapCreditExtra[creditValue.CustomerCode] = creditExtraValue.Amount
+			}
+			mapEffectiveDtm[creditValue.CustomerCode] = creditExtraValue.EffectiveDtm
+			mapExpireDtm[creditValue.CustomerCode] = creditExtraValue.ExpireDtm
+
+		}
+
+	}
+	for i := range credit {
+		credit[i].Amount = mapCredit[credit[i].CustomerCode]
+		currentCreditExtraValue, exists := mapCreditExtra[credit[i].CustomerCode]
+		if exists {
+			credit[i].TemporaryIncreaseCreditLimit = currentCreditExtraValue
+		}
+		credit[i].EffectiveDtm = mapEffectiveDtm[credit[i].CustomerCode]
+		credit[i].ExpireDtm = mapExpireDtm[credit[i].CustomerCode]
+
+	}
+
+	jsonBytesGetCredit, errMarshal := json.Marshal(requestData)
+	if errMarshal != nil {
+		return nil, errMarshal
 	}
 
 	/* 	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
