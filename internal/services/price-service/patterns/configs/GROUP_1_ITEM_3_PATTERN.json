@@ -165,13 +165,13 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "before_price_weight",
+              "field": "before_total_net_price_weight",
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_total_net_price_weight"
             },
             {
               "field": "total_net_price_weight",

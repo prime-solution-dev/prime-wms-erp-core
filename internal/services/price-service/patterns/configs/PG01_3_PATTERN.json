@@ -25,13 +25,13 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -55,13 +55,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "remark",
@@ -141,13 +141,13 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 100,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -171,13 +171,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "remark",
@@ -240,16 +240,16 @@
       "grouping": {
         "tabs": "PG02",
         "rows": "PG06",
-        "columnGroups": "PG03|PG05"
+        "columnGroups": "PG03|PG08|PG05"
       },
       "columnLevels": [
         {
           "level": 1,
           "field": "PG03",
-          "examples": ["LT", "SS400"]
+          "examples": ["LT", "LPN"]
         },
         {
-          "level": 3,
+          "level": 2,
           "field": "PG05",
           "examples": ["3090 x 6096", "3667 x 7324", "2438 x 2448"]
         }
@@ -269,13 +269,13 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -300,13 +300,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "remark",
