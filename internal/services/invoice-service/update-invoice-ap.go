@@ -151,8 +151,11 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 				} */
 				completePOItem = append(completePOItem, models.PurchaseItemUsed{
+					PurchaseCode:     invoiceItem.DocumentRef,
 					PurchaseItemCode: invoiceItem.DocumentRefItem,
 					QTY:              invoiceItem.Qty,
+					Weight:           invoiceItem.Weight,
+					Tolerance:        tolerance,
 				})
 				if invoiceItem.Qty < poQTY {
 					partialPOItem = append(partialPOItem, invoiceItem.DocumentRefItem)
