@@ -279,17 +279,19 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 		query = query.Where("is_action in (?)", isAction)
 	}
 
-	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
-		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit," +
-		"MAX(CASE WHEN request_type = 'BASE' THEN (is_approve::int) ELSE NULL END)::boolean AS is_approve," +
-		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
-		"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
-		Where("1=1").
-		Group("customer_code").Find(&creditRequest).Error
+	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
+	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit," +
+	"MAX(CASE WHEN request_type = 'BASE' THEN (is_approve::int) ELSE NULL END)::boolean AS is_approve," +
+	"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
+	"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
+	Where("1=1").
+	Group("customer_code").Find(&creditRequest).Error */
 
 	err = gormx.Model(&models.Credit{}).
-		Select("customer_code, SUM(credit_limit) AS credit_limit, SUM(credit_extra.amount) AS temporary_increase_credit_limit").
-		Joins("JOIN credit_extra ON credit_extra.credit_id = credit.id").
+		Select("customer_code, SUM(credit.amount) AS amount, SUM(credit_extra.amount) AS temporary_increase_credit_limit, " +
+			"MIN(credit_extra.effective_dtm) AS effective_dtm, " +
+			"MAX(credit_extra.expire_dtm) AS expire_dtm ").
+		Joins("LEFT JOIN credit_extra ON credit_extra.credit_id = credit.id").
 		Group("customer_code").Find(&creditRequest).Error
 
 	sqlDB, err1 := gormx.DB()
