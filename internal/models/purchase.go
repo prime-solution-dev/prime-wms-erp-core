@@ -734,8 +734,11 @@ type GetUnitsDetailBarcodeComponent struct {
 
 // For GR or GR Plan DTOs
 type PurchaseItemUsed struct {
+	PurchaseCode     string  `json:"purchase_code"`
 	PurchaseItemCode string  `json:"purchase_item_code"`
 	QTY              float64 `json:"qty"`
+	Weight           float64 `json:"weight"`
+	Tolerance        float64 `json:"tolerance"`
 }
 type CompletePurchaseItemRequest struct {
 	UsedType         string             `json:"used_type"` // GR, GR_PLAN
