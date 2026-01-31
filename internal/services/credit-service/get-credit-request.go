@@ -44,12 +44,8 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	}
 	customerCode := []string{}
 
-	for i := range credit {
-		if len(req.CustomerCode) > 0 {
-			credit[i].CustomerCode = req.CustomerCode[0]
-		}
-
-		customerCode = append(customerCode, credit[i].CustomerCode)
+	for _, creditValue := range credit {
+		customerCode = append(customerCode, creditValue.CustomerCode)
 	}
 
 	requestData := map[string]interface{}{
@@ -66,9 +62,50 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
 
-	jsonBytesGetCredit, err := json.Marshal(requestData)
+	requestDataGetCredit := map[string][]string{
+		"customer_code": customerCode,
+	}
+	jsonBytesGetCredit, err := json.Marshal(requestDataGetCredit)
 	if err != nil {
 		return nil, err
+	}
+
+	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
+	if errGetCredit != nil {
+		return nil, errGetCredit
+	}
+
+	mapCredit := map[string]float64{}
+	mapCreditExtra := map[uuid.UUID]float64{}
+
+	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
+		currentCreditValue, exists := mapCredit[creditValue.CustomerCode]
+		if exists {
+			mapCredit[creditValue.CustomerCode] = currentCreditValue + creditValue.Amount
+		} else {
+			mapCredit[creditValue.CustomerCode] = creditValue.Amount
+		}
+
+		for _, creditExtraValue := range creditValue.CreditExtra {
+
+			currentCreditExtraValue, exists := mapCreditExtra[creditValue.ID]
+			if exists {
+				mapCreditExtra[creditValue.ID] = currentCreditExtraValue + creditExtraValue.Amount
+			} else {
+				mapCreditExtra[creditValue.ID] = creditExtraValue.Amount
+			}
+
+		}
+
+	}
+	for i := range credit {
+		credit[i].Amount = mapCredit[credit[i].CustomerCode]
+		credit[i].TemporaryIncreaseCreditLimit = mapCreditExtra[credit[i].ID]
+	}
+
+	jsonBytesGetCredit, errMarshal := json.Marshal(requestData)
+	if errMarshal != nil {
+		return nil, errMarshal
 	}
 
 	/* 	GetCreditRes, errGetCredit := GetCredit(ctx, string(jsonBytesGetCredit))
