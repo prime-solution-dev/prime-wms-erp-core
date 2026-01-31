@@ -189,6 +189,10 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// map inboundCode|inboundItem to confirmedQty
 		grConfirmMap := map[string]float64{}
 		for _, gr := range resGoodsReceive.GoodsReceive {
+			if gr.Status != "COMPLETED" {
+				continue
+			}
+
 			for _, grItem := range gr.GoodsReceiveItem {
 				for _, grConfirm := range grItem.GoodsReceiveConfirm {
 					key := gr.DocumentRef + "|" + grItem.DocumentRefItem
@@ -204,7 +208,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			for ii, inboundItem := range inbound.InboundItemRes {
-				key := inbound.InboundCode + "|" + inboundItem.DocumentRefItem
+				key := inbound.InboundCode + "|" + inboundItem.InboundItem
 				if confirmedQty, ok := grConfirmMap[key]; ok {
 					inbounds.InboundRes[i].InboundItemRes[ii].Qty = confirmedQty
 				}
