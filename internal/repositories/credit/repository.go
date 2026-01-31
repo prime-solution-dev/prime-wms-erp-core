@@ -284,7 +284,14 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 		"MAX(CASE WHEN request_type = 'BASE' THEN (is_approve::int) ELSE NULL END)::boolean AS is_approve," +
 		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
 		"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
+		Where("1=1").
 		Group("customer_code").Find(&creditRequest).Error
+
+	err = gormx.Model(&models.Credit{}).
+		Select("customer_code, SUM(credit_limit) AS credit_limit, SUM(credit_extra.amount) AS temporary_increase_credit_limit").
+		Joins("JOIN credit_extra ON credit_extra.credit_id = credit.id").
+		Group("customer_code").Find(&creditRequest).Error
+
 	sqlDB, err1 := gormx.DB()
 	if err1 != nil {
 		return nil, 0, 0, err1
