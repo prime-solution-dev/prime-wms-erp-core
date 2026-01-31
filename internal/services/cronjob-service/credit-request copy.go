@@ -59,8 +59,6 @@ func CreditRequestEffectiveDtmPending() (interface{}, error) {
 			loc, _ := time.LoadLocation("Asia/Bangkok")
 			expLocal := exp.In(loc)
 			nowLocal := time.Now().In(loc)
-			fmt.Println("exp :", exp, exp.Location())
-			fmt.Println("now :", time.Now(), time.Now().Location())
 			if expLocal.Before(nowLocal) {
 				creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,

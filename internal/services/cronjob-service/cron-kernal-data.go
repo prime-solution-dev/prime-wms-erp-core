@@ -25,12 +25,12 @@ func GetKernal() {
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		//CreditRequestEffectiveDtmPending()
+		CreditRequestEffectiveDtmPending()
 	}()
 
 	go func() {
 		defer wg.Done()
-		//CreditRequestEffectiveDtm()
+		CreditRequestEffectiveDtm()
 	}()
 
 	go func() {
