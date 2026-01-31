@@ -290,7 +290,11 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	err = gormx.Model(&models.Credit{}).
 		Select("customer_code, SUM(credit.amount) AS amount, SUM(credit_extra.amount) AS temporary_increase_credit_limit, " +
 			"MIN(credit_extra.effective_dtm) AS effective_dtm, " +
-			"MAX(credit_extra.expire_dtm) AS expire_dtm ").
+			"MAX(credit_extra.expire_dtm) AS expire_dtm, " +
+			"CASE " +
+			"WHEN EXISTS (" +
+			"SELECT 1 FROM credit_request cr WHERE cr.customer_code = credit.customer_code AND cr.status = 'PENDING'" +
+			") THEN true ELSE false END AS is_approve ").
 		Joins("LEFT JOIN credit_extra ON credit_extra.credit_id = credit.id").
 		Group("customer_code").Find(&creditRequest).Error
 
