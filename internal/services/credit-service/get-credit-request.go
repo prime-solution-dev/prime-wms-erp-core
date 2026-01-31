@@ -8,6 +8,7 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -76,7 +77,9 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	}
 
 	mapCredit := map[string]float64{}
-	mapCreditExtra := map[uuid.UUID]float64{}
+	mapCreditExtra := map[string]float64{}
+	mapEffectiveDtm := map[string]*time.Time{}
+	mapExpireDtm := map[string]*time.Time{}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
 		currentCreditValue, exists := mapCredit[creditValue.CustomerCode]
@@ -88,19 +91,27 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 		for _, creditExtraValue := range creditValue.CreditExtra {
 
-			currentCreditExtraValue, exists := mapCreditExtra[creditValue.ID]
+			currentCreditExtraValue, exists := mapCreditExtra[creditValue.CustomerCode]
 			if exists {
-				mapCreditExtra[creditValue.ID] = currentCreditExtraValue + creditExtraValue.Amount
+				mapCreditExtra[creditValue.CustomerCode] = currentCreditExtraValue + creditExtraValue.Amount
 			} else {
-				mapCreditExtra[creditValue.ID] = creditExtraValue.Amount
+				mapCreditExtra[creditValue.CustomerCode] = creditExtraValue.Amount
 			}
+			mapEffectiveDtm[creditValue.CustomerCode] = creditExtraValue.EffectiveDtm
+			mapExpireDtm[creditValue.CustomerCode] = creditExtraValue.ExpireDtm
 
 		}
 
 	}
 	for i := range credit {
 		credit[i].Amount = mapCredit[credit[i].CustomerCode]
-		credit[i].TemporaryIncreaseCreditLimit = mapCreditExtra[credit[i].ID]
+		currentCreditExtraValue, exists := mapCreditExtra[credit[i].CustomerCode]
+		if exists {
+			credit[i].TemporaryIncreaseCreditLimit = currentCreditExtraValue
+		}
+		credit[i].EffectiveDtm = mapEffectiveDtm[credit[i].CustomerCode]
+		credit[i].ExpireDtm = mapExpireDtm[credit[i].CustomerCode]
+
 	}
 
 	jsonBytesGetCredit, errMarshal := json.Marshal(requestData)
