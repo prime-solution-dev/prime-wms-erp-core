@@ -344,6 +344,49 @@ func GetProductByCode(productReq models.GetProductRequest) (map[string]models.Ge
 
 	return mapProduct, nil
 }
+func GetProductInterface(productReq models.GetProductRequest) (map[string]models.ProductInterface, error) {
+	jsonData, err := json.Marshal(productReq)
+	if err != nil {
+		return nil, errors.New("failed to marshal product data to JSON: " + err.Error())
+	}
+
+	getProducts, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/get-product-interface", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, errors.New("failed to create HTTP request: " + err.Error())
+	}
+
+	getProducts.Header.Set("Content-Type", "application/json")
+
+	// Create a client and execute the request
+	client := &http.Client{}
+	resp, err := client.Do(getProducts)
+	if err != nil {
+		return nil, errors.New("failed to execute HTTP request: " + err.Error())
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
+	}
+
+	productBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.New("failed to read response body: " + err.Error())
+	}
+
+	productResponse := models.ResultProductInterface{}
+	if err := json.Unmarshal(productBody, &productResponse); err != nil {
+		return nil, errors.New("failed to decode JSON response: " + err.Error())
+	}
+
+	mapProduct := map[string]models.ProductInterface{}
+	for _, product := range productResponse.ProductInterface {
+
+		mapProduct[product.ProductCode] = product
+	}
+
+	return mapProduct, nil
+}
 func GetMovingAvgCost(productReq models.GetProductRequest) (map[string]models.MovingAvgCost, error) {
 	jsonData, err := json.Marshal(productReq)
 	if err != nil {
