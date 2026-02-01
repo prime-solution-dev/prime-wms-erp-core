@@ -578,6 +578,24 @@ type MovingAvgCost struct {
 	UpdateBy    string    `json:"update_by"`
 	UpdateDtm   time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
 }
+type ResultProductInterface struct {
+	Total            int                `json:"total"`
+	Page             int                `json:"page"`
+	PageSize         int                `json:"page_size"`
+	TotalPages       int                `json:"total_pages"`
+	ProductInterface []ProductInterface `json:"product_interface"`
+}
+type ProductInterface struct {
+	ID            uuid.UUID `json:"id"`
+	SiteCode      string    `json:"site_code"`
+	CompanyCode   string    `json:"company_code"`
+	ProductCode   string    `json:"product_code"`
+	UnitInterface string    `json:"unit_interface"`
+	CreateBy      string    `json:"create_by"`
+	CreateDtm     time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy      string    `json:"update_by"`
+	UpdateDtm     time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+}
 
 type GetProductsDetailComponent struct {
 	ProductId                     string                         `json:"product_id"`
