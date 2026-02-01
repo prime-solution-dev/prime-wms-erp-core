@@ -149,13 +149,18 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				} else {
 					req[i].InvoiceItem[it].PriceUnit = poQTYMapResult.PriceUnit
 				}
-
-				req[i].InvoiceItem[it].InvoiceUnitType = poQTYMapResult.PurchaseUnitType
-				if mapProductInterface[req[i].InvoiceItem[it].ProductCode].UnitInterface != "" {
-					req[i].InvoiceItem[it].UnitUom = mapProduct[req[i].InvoiceItem[it].ProductCode].UnitInterface
+				if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
+					req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
 				} else {
 					req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
 				}
+
+				req[i].InvoiceItem[it].InvoiceUnitType = poQTYMapResult.PurchaseUnitType
+				/* if mapProductInterface[req[i].InvoiceItem[it].ProductCode].UnitInterface != "" {
+					req[i].InvoiceItem[it].UnitUom = mapProduct[req[i].InvoiceItem[it].ProductCode].UnitInterface
+				} else {
+					req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
+				} */
 
 				req[i].InvoiceItem[it].WeightUnit = poQTYMapResult.WeightUnit
 				req[i].InvoiceItem[it].Avg_weightUnit = poQTYMapResult.WeightUnit
