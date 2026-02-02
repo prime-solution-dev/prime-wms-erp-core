@@ -1,9 +1,11 @@
 package purchaseRepository
 
 import (
+	"fmt"
 	"math"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -113,14 +115,14 @@ func GetPurchaseList(
             WHEN status = 'PENDING' AND status_approve = 'PENDING' THEN 1
             WHEN status = 'PENDING' AND status_approve = 'PROCESS' THEN 2
             WHEN status = 'PENDING' AND status_approve = 'COMPLETED' THEN 3
-						WHEN status = 'PENDING' AND status_approve = 'REVIEW' THEN 4
-						WHEN status = 'PENDING' AND status_approve = 'REJECT' THEN 5
-						WHEN status = 'CANCELLED' THEN 6
-						WHEN status = 'COMPLETED' THEN 7
-						WHEN status = 'TEMP' THEN 8
-						ELSE 9
+                        WHEN status = 'PENDING' AND status_approve = 'REVIEW' THEN 4
+                        WHEN status = 'PENDING' AND status_approve = 'REJECT' THEN 5
+                        WHEN status = 'CANCELLED' THEN 6
+                        WHEN status = 'COMPLETED' THEN 7
+                        WHEN status = 'TEMP' THEN 8
+                        ELSE 9
         END ASC,
-				create_dtm DESC
+                create_dtm DESC
     `).
 		Limit(pageSize).
 		Offset(offset).
@@ -420,65 +422,316 @@ func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed)
 	}
 	defer db.CloseGORM(gormx)
 
-	purchaseItemCodes := []string{}
-	for _, usedPurchase := range purchaseItemUsed {
-		purchaseItemCodes = append(purchaseItemCodes, usedPurchase.PurchaseItemCode)
-	}
+	poCodes := []string{}
+	poCodesCheck := map[string]bool{}
+	poItems := []string{}
+	poItemsCheck := map[string]bool{}
+	reqMap := map[string]models.PurchaseItemUsed{}
 
-	return gormx.Transaction(func(tx *gorm.DB) error {
-		for _, poItemUsed := range purchaseItemUsed {
-			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_item = ? AND purchase_qty = ?", poItemUsed.PurchaseItemCode, poItemUsed.QTY).
-				Updates(map[string]interface{}{
-					"status":     "COMPLETED",
-					"update_dtm": time.Now().UTC(),
-				}).Error; err != nil {
-				return err
-			}
+	for _, piu := range purchaseItemUsed {
+		purchaseCode := piu.PurchaseCode
+		purchaseItem := piu.PurchaseItemCode
 
-			subQuery := tx.Model(&models.PurchaseItem{}).
-				Select("purchase_id").
-				Where("purchase_item = ?", poItemUsed.PurchaseItemCode)
-
-			if err := tx.Model(&models.Purchase{}).
-				Where("id IN (?)", subQuery).
-				Updates(map[string]interface{}{
-					"used_type":   usedType,
-					"used_status": "PARTIAL",
-					"update_dtm":  time.Now().UTC(),
-				}).Error; err != nil {
-				return err
-			}
-
-			var completedCount int64
-			var itemsCount int64
-
-			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = (?) AND status = ?", subQuery, "COMPLETED").
-				Count(&completedCount).Error; err != nil {
-				return err
-			}
-
-			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id = (?)", subQuery).
-				Count(&itemsCount).Error; err != nil {
-				return err
-			}
-
-			if completedCount == itemsCount {
-				if err := tx.Model(&models.Purchase{}).
-					Where("id = (?)", subQuery).
-					Updates(map[string]interface{}{
-						"status":      "COMPLETED",
-						"used_type":   usedType,
-						"used_status": "COMPLETED",
-						"update_dtm":  time.Now().UTC(),
-					}).Error; err != nil {
-					return err
-				}
+		if purchaseCode != "" {
+			if _, ok := poCodesCheck[purchaseCode]; !ok {
+				poCodesCheck[purchaseCode] = true
+				poCodes = append(poCodes, purchaseCode)
 			}
 		}
 
+		if purchaseItem != "" {
+			if _, ok := poItemsCheck[purchaseItem]; !ok {
+				poItemsCheck[purchaseItem] = true
+				poItems = append(poItems, purchaseItem)
+			}
+		}
+
+		reqKey := fmt.Sprintf("%s|%s", purchaseCode, purchaseItem)
+		reqMap[reqKey] = piu
+	}
+
+	if len(poCodes) == 0 || len(poItems) == 0 {
 		return nil
-	})
+	}
+
+	var purchases []models.Purchase
+
+	q := gormx.
+		Model(&models.Purchase{}).
+		Select("purchase.*").
+		Joins("JOIN purchase_item pi ON pi.purchase_id = purchase.id").
+		Where("purchase.purchase_code IN ?", poCodes).
+		Where("pi.purchase_item IN ?", poItems).
+		Distinct().
+		Preload("PurchaseItems")
+
+	if err := q.Find(&purchases).Error; err != nil {
+		return err
+	}
+
+	updateCompPoItemsSet := map[string]struct{}{} // purchase_item_id ที่จะ set COMPLETED
+	updatePoPartialSet := map[string]struct{}{}   // purchase_id ที่จะ set PARTIAL
+	updatePoCompSet := map[string]struct{}{}      // purchase_id ที่จะ set COMPLETED
+	updatePoPendingSet := map[string]struct{}{}   // purchase_id ที่จะ set PENDING (optional)
+
+	for pIdx := range purchases {
+		p := &purchases[pIdx]
+
+		itemsCount := len(p.PurchaseItems)
+		if itemsCount == 0 {
+			continue
+		}
+
+		// count completed in po
+		completedCount := 0
+		for i := range p.PurchaseItems {
+			if p.PurchaseItems[i].Status == "COMPLETED" {
+				completedCount++
+			}
+		}
+
+		for piIdx := range p.PurchaseItems {
+			pi := &p.PurchaseItems[piIdx]
+
+			purchaseCode := p.PurchaseCode
+			purchaseItem := pi.PurchaseItem
+			purchaseItemID := pi.ID
+
+			poQty := pi.Qty
+			poWeight := pi.TotalWeight
+			poUnit := pi.PurchaseUnit
+
+			rKey := fmt.Sprintf("%s|%s", purchaseCode, purchaseItem)
+			r, ok := reqMap[rKey]
+			if !ok {
+				continue
+			}
+
+			// tolerance
+			tolPct := float64(r.Tolerance)
+			if tolPct <= 0 {
+				return fmt.Errorf("PurchaseCode: %s, PurchaseItem: %s tolerance is zero", purchaseCode, purchaseItem)
+			}
+
+			reqQty := r.QTY
+			reqWeight := r.Weight
+
+			if pi.Status == "COMPLETED" {
+				continue
+			}
+
+			isPass := false
+
+			if strings.EqualFold(poUnit, "KG") {
+				base := poWeight
+				input := reqWeight
+
+				if base == 0 {
+					return fmt.Errorf("PurchaseCode: %s, PurchaseItem: %s base weight is zero", purchaseCode, purchaseItem)
+				}
+
+				min := base * (1 - tolPct/100.0)
+				max := base * (1 + tolPct/100.0)
+
+				if input >= min && input <= max {
+					isPass = true
+				}
+			} else {
+				base := poQty
+				input := reqQty
+
+				if base == 0 {
+					return fmt.Errorf("PurchaseCode: %s, PurchaseItem: %s base qty is zero", purchaseCode, purchaseItem)
+				}
+
+				min := base * (1 - tolPct/100.0)
+				max := base * (1 + tolPct/100.0)
+
+				if input >= min && input <= max {
+					isPass = true
+				}
+			}
+
+			if isPass {
+				pi.Status = "COMPLETED"
+				updateCompPoItemsSet[purchaseItemID.String()] = struct{}{}
+				completedCount++
+			}
+		}
+
+		if completedCount < itemsCount {
+			updatePoPartialSet[p.ID.String()] = struct{}{}
+		} else if completedCount == itemsCount {
+			updatePoCompSet[p.ID.String()] = struct{}{}
+		}
+	}
+
+	// execute
+	if len(updateCompPoItemsSet) == 0 &&
+		len(updatePoPartialSet) == 0 &&
+		len(updatePoCompSet) == 0 &&
+		len(updatePoPendingSet) == 0 {
+		return nil
+	}
+
+	now := time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Hour(), time.Now().Minute(), time.Now().Second(), time.Now().Nanosecond(), time.UTC)
+
+	tx := gormx.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	// update purchase_item -> COMPLETED
+	if len(updateCompPoItemsSet) > 0 {
+		itemIDs := make([]string, 0, len(updateCompPoItemsSet))
+		for id := range updateCompPoItemsSet {
+			itemIDs = append(itemIDs, id)
+		}
+
+		if err := tx.Model(&models.PurchaseItem{}).
+			Where("id IN ?", itemIDs).
+			Updates(map[string]any{
+				"status":     "COMPLETED",
+				"update_dtm": now,
+			}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// update purchase -> PENDING
+	if len(updatePoPendingSet) > 0 {
+		poIDs := make([]string, 0, len(updatePoPendingSet))
+		for id := range updatePoPendingSet {
+			poIDs = append(poIDs, id)
+		}
+
+		if err := tx.Model(&models.Purchase{}).
+			Where("id IN ?", poIDs).
+			Updates(map[string]any{
+				"used_type":   usedType,
+				"used_status": "PENDING",
+				"update_dtm":  now,
+			}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// update purchase -> PARTIAL
+	if len(updatePoPartialSet) > 0 {
+		poIDs := make([]string, 0, len(updatePoPartialSet))
+		for id := range updatePoPartialSet {
+			poIDs = append(poIDs, id)
+		}
+
+		if err := tx.Model(&models.Purchase{}).
+			Where("id IN ?", poIDs).
+			Updates(map[string]any{
+				"used_type":   usedType,
+				"used_status": "PARTIAL",
+				"update_dtm":  now,
+			}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// update purchase -> COMPLETED
+	if len(updatePoCompSet) > 0 {
+		poIDs := make([]string, 0, len(updatePoCompSet))
+		for id := range updatePoCompSet {
+			poIDs = append(poIDs, id)
+		}
+
+		if err := tx.Model(&models.Purchase{}).
+			Where("id IN ?", poIDs).
+			Updates(map[string]any{
+				"status":      "COMPLETED",
+				"used_type":   usedType,
+				"used_status": "COMPLETED",
+				"update_dtm":  now,
+			}).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
 }
+
+// func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed) error {
+//  gormx, err := db.ConnectGORM("prime_erp")
+//  if err != nil {
+//      return err
+//  }
+//  defer db.CloseGORM(gormx)
+
+//  purchaseItemCodes := []string{}
+//  for _, usedPurchase := range purchaseItemUsed {
+//      purchaseItemCodes = append(purchaseItemCodes, usedPurchase.PurchaseItemCode)
+//  }
+
+//  return gormx.Transaction(func(tx *gorm.DB) error {
+//      for _, poItemUsed := range purchaseItemUsed {
+//          if err := tx.Model(&models.PurchaseItem{}).
+//              Where("purchase_item = ? AND purchase_qty = ?", poItemUsed.PurchaseItemCode, poItemUsed.QTY).
+//              Updates(map[string]interface{}{
+//                  "status":     "COMPLETED",
+//                  "update_dtm": time.Now().UTC(),
+//              }).Error; err != nil {
+//              return err
+//          }
+
+//          subQuery := tx.Model(&models.PurchaseItem{}).
+//              Select("purchase_id").
+//              Where("purchase_item = ?", poItemUsed.PurchaseItemCode)
+
+//          if err := tx.Model(&models.Purchase{}).
+//              Where("id IN (?)", subQuery).
+//              Updates(map[string]interface{}{
+//                  "used_type":   usedType,
+//                  "used_status": "PARTIAL",
+//                  "update_dtm":  time.Now().UTC(),
+//              }).Error; err != nil {
+//              return err
+//          }
+
+//          var completedCount int64
+//          var itemsCount int64
+
+//          if err := tx.Model(&models.PurchaseItem{}).
+//              Where("purchase_id = (?) AND status = ?", subQuery, "COMPLETED").
+//              Count(&completedCount).Error; err != nil {
+//              return err
+//          }
+
+//          if err := tx.Model(&models.PurchaseItem{}).
+//              Where("purchase_id = (?)", subQuery).
+//              Count(&itemsCount).Error; err != nil {
+//              return err
+//          }
+
+//          if completedCount == itemsCount {
+//              if err := tx.Model(&models.Purchase{}).
+//                  Where("id = (?)", subQuery).
+//                  Updates(map[string]interface{}{
+//                      "status":      "COMPLETED",
+//                      "used_type":   usedType,
+//                      "used_status": "COMPLETED",
+//                      "update_dtm":  time.Now().UTC(),
+//                  }).Error; err != nil {
+//                  return err
+//              }
+//          }
+//      }
+
+//      return nil
+//  })
+// }
