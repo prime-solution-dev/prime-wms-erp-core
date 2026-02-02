@@ -50,18 +50,49 @@ func buildStatusFilterConditions(statusFilters []string) string {
 	}
 
 	var conditions []string
+	var hasPartial = false
+
+	// ตรวจสอบว่ามี partial ใน filter หรือไม่
+	for _, statusFilter := range statusFilters {
+		if strings.ToLower(statusFilter) == "partial" {
+			hasPartial = true
+			break
+		}
+	}
+
 	for _, statusFilter := range statusFilters {
 		switch strings.ToLower(statusFilter) {
 		case "new":
-			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PENDING')")
+			if hasPartial {
+				// ถ้ามี partial ด้วย ต้องยกเว้น partial ออก
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PENDING' AND delivery_booking_item.document_ref_item IS NULL)")
+			} else {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PENDING')")
+			}
 		case "waitapprove":
-			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PROCESS')")
+			if hasPartial {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PROCESS' AND delivery_booking_item.document_ref_item IS NULL)")
+			} else {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PROCESS')")
+			}
 		case "approved":
-			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'COMPLETED')")
+			if hasPartial {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'COMPLETED' AND delivery_booking_item.document_ref_item IS NULL)")
+			} else {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'COMPLETED')")
+			}
 		case "reject":
-			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REJECT')")
+			if hasPartial {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REJECT' AND delivery_booking_item.document_ref_item IS NULL)")
+			} else {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REJECT')")
+			}
 		case "review":
-			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REVIEW')")
+			if hasPartial {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REVIEW' AND delivery_booking_item.document_ref_item IS NULL)")
+			} else {
+				conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REVIEW')")
+			}
 		case "canceled":
 			conditions = append(conditions, "sale.status = 'CANCELED'")
 		case "draft":
