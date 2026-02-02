@@ -61,7 +61,7 @@ func GetInventoryByProductCode(companyCode string, siteCodes []string, keyValues
 
 	// Execute request
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 60 * time.Second,
 	}
 	resp, err := client.Do(req)
 	if err != nil {

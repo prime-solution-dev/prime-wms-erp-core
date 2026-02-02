@@ -560,6 +560,42 @@ type GetProductsDetailResponse struct {
 	TotalPages int                          `json:"total_pages"`
 	Products   []GetProductsDetailComponent `json:"products"`
 }
+type ResultMovingAvgCost struct {
+	Total      int             `json:"total"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+	TotalPages int             `json:"total_pages"`
+	Unit       []MovingAvgCost `json:"moving_avg_cost"`
+}
+type MovingAvgCost struct {
+	ID          uuid.UUID `json:"id"`
+	ProductCode string    `json:"product_code"`
+	ProductName string    `json:"product_name"`
+	MA          float64   `json:"ma"`
+	Balance     float64   `json:"balance"`
+	CreateBy    string    `json:"create_by"`
+	CreateDtm   time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy    string    `json:"update_by"`
+	UpdateDtm   time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+}
+type ResultProductInterface struct {
+	Total            int                `json:"total"`
+	Page             int                `json:"page"`
+	PageSize         int                `json:"page_size"`
+	TotalPages       int                `json:"total_pages"`
+	ProductInterface []ProductInterface `json:"product_interface"`
+}
+type ProductInterface struct {
+	ID            uuid.UUID `json:"id"`
+	SiteCode      string    `json:"site_code"`
+	CompanyCode   string    `json:"company_code"`
+	ProductCode   string    `json:"product_code"`
+	UnitInterface string    `json:"unit_interface"`
+	CreateBy      string    `json:"create_by"`
+	CreateDtm     time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy      string    `json:"update_by"`
+	UpdateDtm     time.Time `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+}
 
 type GetProductsDetailComponent struct {
 	ProductId                     string                         `json:"product_id"`
@@ -598,6 +634,10 @@ type GetProductsDetailComponent struct {
 	MinSellableDay                int64                          `json:"min_sellable_day"`
 	SiteCode                      string                         `json:"site_code"`
 	CompanyCode                   string                         `json:"company_code"`
+	ExternalID                    string                         `json:"external_id"`
+	GRTolerance                   float64                        `json:"gr_tolerance"`
+	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`
 	Component                     []GetComponentDetailComponent  `json:"component"`
@@ -712,8 +752,11 @@ type GetUnitsDetailBarcodeComponent struct {
 
 // For GR or GR Plan DTOs
 type PurchaseItemUsed struct {
+	PurchaseCode     string  `json:"purchase_code"`
 	PurchaseItemCode string  `json:"purchase_item_code"`
 	QTY              float64 `json:"qty"`
+	Weight           float64 `json:"weight"`
+	Tolerance        float64 `json:"tolerance"`
 }
 type CompletePurchaseItemRequest struct {
 	UsedType         string             `json:"used_type"` // GR, GR_PLAN

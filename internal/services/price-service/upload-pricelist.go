@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -179,6 +180,64 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			groupIDs[groupKey(g.CompanyCode, g.SiteCode, g.GroupCode)] = uuid.New()
 		}
 
+		// Collect all group references from child entities
+		referencedGroupKeys := make(map[string]bool)
+		for _, t := range req.Terms {
+			referencedGroupKeys[groupKey(t.CompanyCode, t.SiteCode, t.GroupCode)] = true
+		}
+		for _, e := range req.Extras {
+			referencedGroupKeys[groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)] = true
+		}
+		for _, s := range req.SubGroups {
+			referencedGroupKeys[groupKey(s.CompanyCode, s.SiteCode, s.GroupCode)] = true
+		}
+		for _, k := range req.GroupKeys {
+			referencedGroupKeys[groupKey(k.CompanyCode, k.SiteCode, k.GroupCode)] = true
+		}
+
+		// Query existing group IDs for groups that are referenced but not being upserted
+		var missingGroupKeys []string
+		for gk := range referencedGroupKeys {
+			if _, exists := groupIDs[gk]; !exists {
+				missingGroupKeys = append(missingGroupKeys, gk)
+			}
+		}
+
+		if len(missingGroupKeys) > 0 {
+			type GroupIDResult struct {
+				ID          uuid.UUID `gorm:"column:id"`
+				CompanyCode string    `gorm:"column:company_code"`
+				SiteCode    string    `gorm:"column:site_code"`
+				GroupCode   string    `gorm:"column:group_code"`
+			}
+			var existingGroups []GroupIDResult
+			var conditions []string
+			var args []interface{}
+
+			for _, gk := range missingGroupKeys {
+				parts := strings.Split(gk, "|")
+				if len(parts) == 3 {
+					conditions = append(conditions, "(company_code = ? AND site_code = ? AND group_code = ?)")
+					args = append(args, parts[0], parts[1], parts[2])
+				}
+			}
+
+			if len(conditions) > 0 {
+				query := strings.Join(conditions, " OR ")
+				if err := tx.Table("price_list_group").
+					Select("id, company_code, site_code, group_code").
+					Where(query, args...).
+					Scan(&existingGroups).Error; err != nil {
+					return err
+				}
+
+				for _, g := range existingGroups {
+					gk := groupKey(g.CompanyCode, g.SiteCode, g.GroupCode)
+					groupIDs[gk] = g.ID
+				}
+			}
+		}
+
 		subGroupIDs := map[string]uuid.UUID{}
 		for _, s := range req.SubGroups {
 			subGroupIDs[subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)] = uuid.New()
@@ -207,11 +266,6 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			if _, ok := groupIDs[gk]; !ok {
 				return fmt.Errorf("subgroup references missing group in file: %s (subgroup_key=%s)", gk, s.SubGroupKey)
 			}
-		}
-
-		// ---------- create-only duplicate check in DB (group) ----------
-		if err := checkDuplicateGroupsCreateOnly(tx, req.Groups); err != nil {
-			return err
 		}
 
 		// ---------- BUILD batch records ----------
@@ -336,17 +390,8 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			})
 		}
 
-		subKeyRecs := make([]map[string]any, 0, len(req.SubGroupKeys))
-		for _, k := range req.SubGroupKeys {
-			sk := subKey(k.CompanyCode, k.SiteCode, k.GroupCode, k.SubGroupKey)
-			subKeyRecs = append(subKeyRecs, map[string]any{
-				"id":           uuid.New(),
-				"sub_group_id": subGroupIDs[sk],
-				"seq":          k.Seq,
-				"code":         k.Code,
-				"value":        k.Value,
-			})
-		}
+		// subKeyRecs will be built after subgroup upsert to ensure correct IDs
+		subKeyRecs := make([]map[string]any, 0)
 
 		subGroupFormulasRecs := make([]map[string]any, 0, len(req.SubGroupFormulas))
 		for _, f := range req.SubGroupFormulas {
@@ -360,8 +405,160 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 
 		// ---------- BATCH INSERT ----------
 		if len(groupRecs) > 0 {
-			if err := tx.Table("price_list_group").CreateInBatches(groupRecs, batchSize).Error; err != nil {
+			// Deduplicate groupRecs by compound key (company_code, site_code, group_code)
+			groupRecsMap := make(map[string]map[string]any)
+			for _, rec := range groupRecs {
+				companyCode := rec["company_code"].(string)
+				siteCode := rec["site_code"].(string)
+				groupCode := rec["group_code"].(string)
+				compoundKey := companyCode + "|" + siteCode + "|" + groupCode
+				groupRecsMap[compoundKey] = rec
+			}
+			deduplicatedGroupRecs := make([]map[string]any, 0, len(groupRecsMap))
+			for _, rec := range groupRecsMap {
+				deduplicatedGroupRecs = append(deduplicatedGroupRecs, rec)
+			}
+
+			if err := tx.Table("price_list_group").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{
+						{Name: "group_code"},
+					},
+					DoUpdates: clause.Assignments(map[string]interface{}{
+						"group_name":          gorm.Expr("COALESCE(NULLIF(excluded.group_name, ''), price_list_group.group_name)"),
+						"currency":            gorm.Expr("COALESCE(NULLIF(excluded.currency, ''), price_list_group.currency)"),
+						"effective_date":      gorm.Expr("COALESCE(excluded.effective_date, price_list_group.effective_date)"),
+						"price_unit":          gorm.Expr("COALESCE(NULLIF(excluded.price_unit, 0), price_list_group.price_unit)"),
+						"price_weight":        gorm.Expr("COALESCE(NULLIF(excluded.price_weight, 0), price_list_group.price_weight)"),
+						"before_price_unit":   gorm.Expr("COALESCE(NULLIF(excluded.before_price_unit, 0), price_list_group.before_price_unit)"),
+						"before_price_weight": gorm.Expr("COALESCE(NULLIF(excluded.before_price_weight, 0), price_list_group.before_price_weight)"),
+						"remark":              gorm.Expr("COALESCE(NULLIF(excluded.remark, ''), price_list_group.remark)"),
+						"update_by":           gorm.Expr("COALESCE(NULLIF(excluded.update_by, ''), price_list_group.update_by)"),
+						"update_dtm":          gorm.Expr("excluded.update_dtm"),
+					}),
+				}).
+				CreateInBatches(deduplicatedGroupRecs, batchSize).Error; err != nil {
 				return err
+			}
+
+			// Query back actual IDs after upsert to ensure we have correct IDs for foreign key references
+			type GroupIDResult struct {
+				ID          uuid.UUID `gorm:"column:id"`
+				CompanyCode string    `gorm:"column:company_code"`
+				SiteCode    string    `gorm:"column:site_code"`
+				GroupCode   string    `gorm:"column:group_code"`
+			}
+			var actualGroups []GroupIDResult
+
+			// Build conditions for querying the groups we just upserted
+			var conditions []string
+			var args []interface{}
+			for _, rec := range deduplicatedGroupRecs {
+				conditions = append(conditions, "(company_code = ? AND site_code = ? AND group_code = ?)")
+				args = append(args, rec["company_code"], rec["site_code"], rec["group_code"])
+			}
+
+			if len(conditions) > 0 {
+				query := strings.Join(conditions, " OR ")
+				if err := tx.Table("price_list_group").
+					Select("id, company_code, site_code, group_code").
+					Where(query, args...).
+					Scan(&actualGroups).Error; err != nil {
+					return err
+				}
+
+				// Update groupIDs map with actual IDs from database
+				for _, g := range actualGroups {
+					gk := groupKey(g.CompanyCode, g.SiteCode, g.GroupCode)
+					groupIDs[gk] = g.ID
+				}
+			}
+
+			// Rebuild child records with correct group IDs
+			termRecs = make([]map[string]any, 0, len(req.Terms))
+			for _, t := range req.Terms {
+				gk := groupKey(t.CompanyCode, t.SiteCode, t.GroupCode)
+				termRecs = append(termRecs, map[string]any{
+					"id":                  uuid.New(),
+					"price_list_group_id": groupIDs[gk],
+					"term_code":           t.TermCode,
+					"pdc":                 t.Pdc,
+					"pdc_percent":         t.PdcPercent,
+					"due":                 t.Due,
+					"due_percent":         t.DuePercent,
+					"create_by":           t.CreateBy,
+					"create_dtm":          now,
+					"update_by":           t.CreateBy,
+					"update_dtm":          now,
+				})
+			}
+
+			extraRecs = make([]map[string]any, 0, len(req.Extras))
+			for _, e := range req.Extras {
+				gk := groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)
+				ek := extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)
+				extraRecs = append(extraRecs, map[string]any{
+					"id":                  extraIDs[ek],
+					"price_list_group_id": groupIDs[gk],
+					"extra_key":           e.ExtraKey,
+					"condition_code":      e.ConditionCode,
+					"operator":            e.Operator,
+					"value_int":           e.ValueInt,
+					"length_extra_key":    e.LengthExtraKey,
+					"cond_range_min":      e.CondRangeMin,
+					"cond_range_max":      e.CondRangeMax,
+					"create_by":           e.CreateBy,
+					"create_dtm":          now,
+					"update_by":           e.CreateBy,
+					"update_dtm":          now,
+				})
+			}
+
+			subRecs = make([]map[string]any, 0, len(req.SubGroups))
+			for _, s := range req.SubGroups {
+				gk := groupKey(s.CompanyCode, s.SiteCode, s.GroupCode)
+				sk := subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)
+				subRecs = append(subRecs, map[string]any{
+					"id":                            subGroupIDs[sk],
+					"price_list_group_id":           groupIDs[gk],
+					"subgroup_key":                  s.SubGroupKey,
+					"is_trading":                    s.IsTrading,
+					"price_unit":                    s.PriceUnit,
+					"extra_price_unit":              s.ExtraPriceUnit,
+					"total_net_price_unit":          s.TotalNetPriceUnit,
+					"price_weight":                  s.PriceWeight,
+					"extra_price_weight":            s.ExtraPriceWeight,
+					"term_price_weight":             s.TermPriceWeight,
+					"total_net_price_weight":        s.TotalNetPriceWeight,
+					"before_price_unit":             s.BeforePriceUnit,
+					"before_extra_price_unit":       s.BeforeExtraPriceUnit,
+					"before_term_price_unit":        s.BeforeTermPriceUnit,
+					"before_total_net_price_unit":   s.BeforeTotalNetPriceUnit,
+					"before_price_weight":           s.BeforePriceWeight,
+					"before_extra_price_weight":     s.BeforeExtraPriceWeight,
+					"before_term_price_weight":      s.BeforeTermPriceWeight,
+					"before_total_net_price_weight": s.BeforeTotalNetPriceWeight,
+					"effective_date":                s.EffectiveDate,
+					"remark":                        s.Remark,
+					"udf_json":                      s.UdfJson,
+					"create_by":                     s.CreateBy,
+					"create_dtm":                    now,
+					"update_by":                     s.CreateBy,
+					"subgroup_code":                 s.SubGroupCode,
+					"update_dtm":                    now,
+				})
+			}
+
+			groupKeyRecs = make([]map[string]any, 0, len(req.GroupKeys))
+			for _, k := range req.GroupKeys {
+				gk := groupKey(k.CompanyCode, k.SiteCode, k.GroupCode)
+				groupKeyRecs = append(groupKeyRecs, map[string]any{
+					"id":                  uuid.New(),
+					"price_list_group_id": groupIDs[gk],
+					"seq":                 k.Seq,
+					"code":                k.Code,
+					"value":               k.Value,
+				})
 			}
 		}
 		if len(termRecs) > 0 {
@@ -375,11 +572,208 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 		}
 		if len(subRecs) > 0 {
-			if err := tx.Table("price_list_sub_group").CreateInBatches(subRecs, batchSize).Error; err != nil {
+			// Deduplicate subRecs by subgroup_code (keep last occurrence)
+			subRecsMap := make(map[string]map[string]any)
+			for _, rec := range subRecs {
+				subGroupCode := rec["subgroup_code"].(string)
+				subRecsMap[subGroupCode] = rec
+			}
+			deduplicatedSubRecs := make([]map[string]any, 0, len(subRecsMap))
+			for _, rec := range subRecsMap {
+				deduplicatedSubRecs = append(deduplicatedSubRecs, rec)
+			}
+
+			if err := tx.Table("price_list_sub_group").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{
+						{Name: "subgroup_code"},
+					},
+					DoUpdates: clause.Assignments(map[string]interface{}{
+						"subgroup_key":                  gorm.Expr("COALESCE(NULLIF(excluded.subgroup_key, ''), price_list_sub_group.subgroup_key)"),
+						"is_trading":                    gorm.Expr("excluded.is_trading"),
+						"price_unit":                    gorm.Expr("COALESCE(NULLIF(excluded.price_unit, 0), price_list_sub_group.price_unit)"),
+						"extra_price_unit":              gorm.Expr("COALESCE(NULLIF(excluded.extra_price_unit, 0), price_list_sub_group.extra_price_unit)"),
+						"total_net_price_unit":          gorm.Expr("COALESCE(NULLIF(excluded.total_net_price_unit, 0), price_list_sub_group.total_net_price_unit)"),
+						"price_weight":                  gorm.Expr("COALESCE(NULLIF(excluded.price_weight, 0), price_list_sub_group.price_weight)"),
+						"extra_price_weight":            gorm.Expr("COALESCE(NULLIF(excluded.extra_price_weight, 0), price_list_sub_group.extra_price_weight)"),
+						"term_price_weight":             gorm.Expr("COALESCE(NULLIF(excluded.term_price_weight, 0), price_list_sub_group.term_price_weight)"),
+						"total_net_price_weight":        gorm.Expr("COALESCE(NULLIF(excluded.total_net_price_weight, 0), price_list_sub_group.total_net_price_weight)"),
+						"before_price_unit":             gorm.Expr("COALESCE(NULLIF(excluded.before_price_unit, 0), price_list_sub_group.before_price_unit)"),
+						"before_extra_price_unit":       gorm.Expr("COALESCE(NULLIF(excluded.before_extra_price_unit, 0), price_list_sub_group.before_extra_price_unit)"),
+						"before_term_price_unit":        gorm.Expr("COALESCE(NULLIF(excluded.before_term_price_unit, 0), price_list_sub_group.before_term_price_unit)"),
+						"before_total_net_price_unit":   gorm.Expr("COALESCE(NULLIF(excluded.before_total_net_price_unit, 0), price_list_sub_group.before_total_net_price_unit)"),
+						"before_price_weight":           gorm.Expr("COALESCE(NULLIF(excluded.before_price_weight, 0), price_list_sub_group.before_price_weight)"),
+						"before_extra_price_weight":     gorm.Expr("COALESCE(NULLIF(excluded.before_extra_price_weight, 0), price_list_sub_group.before_extra_price_weight)"),
+						"before_term_price_weight":      gorm.Expr("COALESCE(NULLIF(excluded.before_term_price_weight, 0), price_list_sub_group.before_term_price_weight)"),
+						"before_total_net_price_weight": gorm.Expr("COALESCE(NULLIF(excluded.before_total_net_price_weight, 0), price_list_sub_group.before_total_net_price_weight)"),
+						"effective_date":                gorm.Expr("COALESCE(excluded.effective_date, price_list_sub_group.effective_date)"),
+						"remark":                        gorm.Expr("COALESCE(NULLIF(excluded.remark, ''), price_list_sub_group.remark)"),
+						"udf_json":                      gorm.Expr("COALESCE(excluded.udf_json, price_list_sub_group.udf_json)"),
+						"update_by":                     gorm.Expr("COALESCE(NULLIF(excluded.update_by, ''), price_list_sub_group.update_by)"),
+						"update_dtm":                    gorm.Expr("excluded.update_dtm"),
+					}),
+				}).
+				CreateInBatches(deduplicatedSubRecs, batchSize).Error; err != nil {
 				return err
+			}
+
+			// Query back actual subgroup IDs after upsert to ensure we have correct IDs for foreign key references
+			type SubGroupIDResult struct {
+				ID           uuid.UUID `gorm:"column:id"`
+				SubGroupCode string    `gorm:"column:subgroup_code"`
+			}
+			var actualSubGroups []SubGroupIDResult
+
+			// Build conditions for querying the subgroups we just upserted
+			var subConditions []string
+			var subArgs []interface{}
+			for _, rec := range deduplicatedSubRecs {
+				subConditions = append(subConditions, "subgroup_code = ?")
+				subArgs = append(subArgs, rec["subgroup_code"])
+			}
+
+			// Map subgroup_code to actual ID from database
+			subGroupCodeToID := make(map[string]uuid.UUID)
+			if len(subConditions) > 0 {
+				subQuery := strings.Join(subConditions, " OR ")
+				if err := tx.Table("price_list_sub_group").
+					Select("id, subgroup_code").
+					Where(subQuery, subArgs...).
+					Scan(&actualSubGroups).Error; err != nil {
+					return err
+				}
+
+				for _, sg := range actualSubGroups {
+					subGroupCodeToID[sg.SubGroupCode] = sg.ID
+				}
+			}
+
+			// Rebuild subKeyRecs with correct subgroup IDs from database
+			subKeyRecs = make([]map[string]any, 0, len(req.SubGroupKeys))
+			for _, k := range req.SubGroupKeys {
+				// Find the subgroup_code for this key by matching SubGroupKey
+				var subGroupCode string
+				for _, s := range req.SubGroups {
+					if s.CompanyCode == k.CompanyCode && s.SiteCode == k.SiteCode &&
+						s.GroupCode == k.GroupCode && s.SubGroupKey == k.SubGroupKey {
+						subGroupCode = s.SubGroupCode
+						break
+					}
+				}
+
+				// Only add if we found a valid subgroup_code and it exists in the database
+				if subGroupCode != "" {
+					if actualID, ok := subGroupCodeToID[subGroupCode]; ok {
+						subKeyRecs = append(subKeyRecs, map[string]any{
+							"id":           uuid.New(),
+							"sub_group_id": actualID,
+							"seq":          k.Seq,
+							"code":         k.Code,
+							"value":        k.Value,
+						})
+					}
+				}
+			}
+		} else {
+			// If no subgroups to upsert, but we have SubGroupKeys, we still need to build subKeyRecs
+			// Query existing subgroups by subgroup_code from the request
+			if len(req.SubGroupKeys) > 0 {
+				type SubGroupIDResult struct {
+					ID           uuid.UUID `gorm:"column:id"`
+					SubGroupCode string    `gorm:"column:subgroup_code"`
+				}
+				var actualSubGroups []SubGroupIDResult
+
+				// Collect unique subgroup_codes from SubGroups
+				subGroupCodes := make(map[string]bool)
+				for _, s := range req.SubGroups {
+					if s.SubGroupCode != "" {
+						subGroupCodes[s.SubGroupCode] = true
+					}
+				}
+
+				if len(subGroupCodes) > 0 {
+					var subConditions []string
+					var subArgs []interface{}
+					for code := range subGroupCodes {
+						subConditions = append(subConditions, "subgroup_code = ?")
+						subArgs = append(subArgs, code)
+					}
+
+					subQuery := strings.Join(subConditions, " OR ")
+					if err := tx.Table("price_list_sub_group").
+						Select("id, subgroup_code").
+						Where(subQuery, subArgs...).
+						Scan(&actualSubGroups).Error; err != nil {
+						return err
+					}
+
+					subGroupCodeToID := make(map[string]uuid.UUID)
+					for _, sg := range actualSubGroups {
+						subGroupCodeToID[sg.SubGroupCode] = sg.ID
+					}
+
+					// Build subKeyRecs with correct subgroup IDs from database
+					subKeyRecs = make([]map[string]any, 0, len(req.SubGroupKeys))
+					for _, k := range req.SubGroupKeys {
+						// Find the subgroup_code for this key by matching SubGroupKey
+						var subGroupCode string
+						for _, s := range req.SubGroups {
+							if s.CompanyCode == k.CompanyCode && s.SiteCode == k.SiteCode &&
+								s.GroupCode == k.GroupCode && s.SubGroupKey == k.SubGroupKey {
+								subGroupCode = s.SubGroupCode
+								break
+							}
+						}
+
+						// Only add if we found a valid subgroup_code and it exists in the database
+						if subGroupCode != "" {
+							if actualID, ok := subGroupCodeToID[subGroupCode]; ok {
+								subKeyRecs = append(subKeyRecs, map[string]any{
+									"id":           uuid.New(),
+									"sub_group_id": actualID,
+									"seq":          k.Seq,
+									"code":         k.Code,
+									"value":        k.Value,
+								})
+							}
+						}
+					}
+				}
 			}
 		}
 		if len(groupKeyRecs) > 0 {
+			// Delete existing group keys for the groups being processed
+			groupIDsToDelete := make([]uuid.UUID, 0, len(groupKeyRecs))
+			seenGroupIDs := make(map[uuid.UUID]bool)
+			for _, rec := range groupKeyRecs {
+				var groupID uuid.UUID
+				switch v := rec["price_list_group_id"].(type) {
+				case uuid.UUID:
+					groupID = v
+				case string:
+					var err error
+					groupID, err = uuid.Parse(v)
+					if err != nil {
+						continue
+					}
+				default:
+					continue
+				}
+				if !seenGroupIDs[groupID] {
+					groupIDsToDelete = append(groupIDsToDelete, groupID)
+					seenGroupIDs[groupID] = true
+				}
+			}
+			if len(groupIDsToDelete) > 0 {
+				if err := tx.Table("price_list_group_key").
+					Where("price_list_group_id IN ?", groupIDsToDelete).
+					Delete(nil).Error; err != nil {
+					return err
+				}
+			}
+
+			// Insert new group keys
 			if err := tx.Table("price_list_group_key").CreateInBatches(groupKeyRecs, batchSize).Error; err != nil {
 				return err
 			}
@@ -390,11 +784,62 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 		}
 		if len(subKeyRecs) > 0 {
+			// Delete existing subgroup keys for the subgroups being processed
+			subGroupIDsToDelete := make([]uuid.UUID, 0, len(subKeyRecs))
+			seenSubGroupIDs := make(map[uuid.UUID]bool)
+			for _, rec := range subKeyRecs {
+				var subGroupID uuid.UUID
+				switch v := rec["sub_group_id"].(type) {
+				case uuid.UUID:
+					subGroupID = v
+				case string:
+					var err error
+					subGroupID, err = uuid.Parse(v)
+					if err != nil {
+						continue
+					}
+				default:
+					continue
+				}
+				if !seenSubGroupIDs[subGroupID] {
+					subGroupIDsToDelete = append(subGroupIDsToDelete, subGroupID)
+					seenSubGroupIDs[subGroupID] = true
+				}
+			}
+			if len(subGroupIDsToDelete) > 0 {
+				if err := tx.Table("price_list_sub_group_key").
+					Where("sub_group_id IN ?", subGroupIDsToDelete).
+					Delete(nil).Error; err != nil {
+					return err
+				}
+			}
+
+			// Insert new subgroup keys
 			if err := tx.Table("price_list_sub_group_key").CreateInBatches(subKeyRecs, batchSize).Error; err != nil {
 				return err
 			}
 		}
 		if len(subGroupFormulasRecs) > 0 {
+			// Delete existing subgroup formulas for the subgroups being processed
+			subGroupCodesToDelete := make([]string, 0, len(subGroupFormulasRecs))
+			seenSubGroupCodes := make(map[string]bool)
+			for _, rec := range subGroupFormulasRecs {
+				if subGroupCode, ok := rec["price_list_subgroup_code"].(string); ok && subGroupCode != "" {
+					if !seenSubGroupCodes[subGroupCode] {
+						subGroupCodesToDelete = append(subGroupCodesToDelete, subGroupCode)
+						seenSubGroupCodes[subGroupCode] = true
+					}
+				}
+			}
+			if len(subGroupCodesToDelete) > 0 {
+				if err := tx.Table("price_list_subgroup_formulas_map").
+					Where("price_list_subgroup_code IN ?", subGroupCodesToDelete).
+					Delete(nil).Error; err != nil {
+					return err
+				}
+			}
+
+			// Insert new subgroup formulas
 			if err := tx.Table("price_list_subgroup_formulas_map").CreateInBatches(subGroupFormulasRecs, batchSize).Error; err != nil {
 				return err
 			}
@@ -680,57 +1125,6 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	}
 
 	return req, nil
-}
-
-type existingGroupKeyRow struct {
-	CompanyCode string `gorm:"column:company_code"`
-	SiteCode    string `gorm:"column:site_code"`
-	GroupCode   string `gorm:"column:group_code"`
-}
-
-func checkDuplicateGroupsCreateOnly(tx *gorm.DB, groups []PriceListGroupCreateDTO) error {
-	if len(groups) == 0 {
-		return nil
-	}
-
-	keys := make([]existingGroupKeyRow, 0, len(groups))
-	seen := map[string]bool{}
-	for _, g := range groups {
-		k := g.CompanyCode + "|" + g.SiteCode + "|" + g.GroupCode
-		if seen[k] {
-			return fmt.Errorf("duplicate group in file: %s", k)
-		}
-		seen[k] = true
-		keys = append(keys, existingGroupKeyRow{CompanyCode: g.CompanyCode, SiteCode: g.SiteCode, GroupCode: g.GroupCode})
-	}
-
-	const batchSize = 400
-	for i := 0; i < len(keys); i += batchSize {
-		end := i + batchSize
-		if end > len(keys) {
-			end = len(keys)
-		}
-		batch := keys[i:end]
-
-		q := tx.Table("price_list_group").Select("company_code, site_code, group_code")
-		for idx, k := range batch {
-			if idx == 0 {
-				q = q.Where("company_code=? AND site_code=? AND group_code=?", k.CompanyCode, k.SiteCode, k.GroupCode)
-			} else {
-				q = q.Or("company_code=? AND site_code=? AND group_code=?", k.CompanyCode, k.SiteCode, k.GroupCode)
-			}
-		}
-
-		var existed []existingGroupKeyRow
-		if err := q.Find(&existed).Error; err != nil {
-			return err
-		}
-		if len(existed) > 0 {
-			e := existed[0]
-			return fmt.Errorf("duplicate group in DB: company=%s site=%s group_code=%s", e.CompanyCode, e.SiteCode, e.GroupCode)
-		}
-	}
-	return nil
 }
 
 type genKeyPart struct {

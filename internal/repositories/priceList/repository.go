@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
 
@@ -531,25 +532,82 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 		return result, nil
 	}
 
-	gormx, err := db.ConnectGORM("prime_erp")
+	sqlxDB, err := db.ConnectSqlx("prime_erp")
 	if err != nil {
 		return nil, err
 	}
-	defer db.CloseGORM(gormx)
+	defer sqlxDB.Close()
 
-	// get the latest price list formulas for all sub group codes
-	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
-	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
-		Where("price_list_subgroup_code IN ?", subGroupCodes).
-		Order("create_dtm DESC").
-		Preload("PriceListFormulas").
-		Find(&priceListSubGroupFormulasMap).Error; err != nil {
+	// Build query to handle empty strings properly using COALESCE
+	// This ensures empty strings are properly matched
+	query := `
+		SELECT 
+			psfm.id,
+			COALESCE(psfm.price_list_subgroup_code, '') as price_list_subgroup_code,
+			psfm.price_list_formulas_code,
+			psfm.is_default,
+			psfm.create_dtm,
+			pf.id,
+			pf.formula_code,
+			pf.name,
+			pf.uom,
+			pf.formula_type,
+			pf.expression,
+			pf.params,
+			pf.rounding,
+			pf.create_dtm
+		FROM price_list_subgroup_formulas_map psfm
+		LEFT JOIN price_list_formulas pf ON psfm.price_list_formulas_code = pf.formula_code
+		WHERE COALESCE(psfm.price_list_subgroup_code, '') IN (?)
+		ORDER BY psfm.create_dtm DESC
+	`
+
+	// Use sqlx.In to expand the IN clause
+	query, args, err := sqlx.In(query, subGroupCodes)
+	if err != nil {
 		return nil, err
 	}
 
-	// Group formulas by sub group code
-	for _, formula := range priceListSubGroupFormulasMap {
-		result[formula.PriceListSubGroupCode] = append(result[formula.PriceListSubGroupCode], formula)
+	// Rebind to match the database driver's placeholder syntax
+	query = sqlxDB.Rebind(query)
+
+	rows, err := sqlxDB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Scan results
+	for rows.Next() {
+		var fm models.PriceListSubGroupFormulasMap
+		var pf models.PriceListFormulas
+
+		err := rows.Scan(
+			&fm.ID,
+			&fm.PriceListSubGroupCode,
+			&fm.PriceListFormulasCode,
+			&fm.IsDefault,
+			&fm.CreateDtm,
+			&pf.ID,
+			&pf.FormulaCode,
+			&pf.Name,
+			&pf.Uom,
+			&pf.FormulaType,
+			&pf.Expression,
+			&pf.Params,
+			&pf.Rounding,
+			&pf.CreateDtm,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		fm.PriceListFormulas = pf
+		result[fm.PriceListSubGroupCode] = append(result[fm.PriceListSubGroupCode], fm)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil

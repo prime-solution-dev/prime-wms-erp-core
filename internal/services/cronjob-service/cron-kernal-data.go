@@ -22,7 +22,11 @@ func GetKernal() {
 	ttt := "start kernal service"
 	println(ttt)
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		CreditRequestEffectiveDtmPending()
+	}()
 
 	go func() {
 		defer wg.Done()
