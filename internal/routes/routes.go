@@ -70,6 +70,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/SubGroup/UpdateLatest", func(c *gin.Context) {
 		utils.ProcessRequestWithBinding(c, priceService.UpdateLatestPriceListSubGroup)
 	})
+	price.POST("/SubGroup/GetCalculated", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.GetCalculatedPriceListSubGroup)
+	})
 	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.UpdateExtras)
 	})
