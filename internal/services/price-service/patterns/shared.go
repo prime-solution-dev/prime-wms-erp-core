@@ -1643,10 +1643,14 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				switch childCol.DataMapping {
 				case "before_price_weight":
 					row[childCol.Field] = sg.BeforePriceWeight
+				case "before_total_net_price_weight":
+					row[childCol.Field] = sg.BeforeTotalNetPriceWeight
 				case "total_net_price_weight":
 					row[childCol.Field] = sg.TotalNetPriceWeight
 				case "before_price_unit":
 					row[childCol.Field] = sg.BeforePriceUnit
+				case "before_total_net_price_unit":
+					row[childCol.Field] = sg.BeforeTotalNetPriceUnit
 				case "total_net_price_unit":
 					row[childCol.Field] = sg.TotalNetPriceUnit
 				case "import_date":
