@@ -96,22 +96,22 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		searchDocRef += fmt.Sprintf(` and invoice_item.document_ref IN (%s)`, whereInClause)
 	}
 	if invoiceCodeLike != "" {
-		searchInvoiceCode += fmt.Sprintf(" and invoice.invoice_code LIKE '%%%s%%' ", invoiceCodeLike)
+		searchInvoiceCode += fmt.Sprintf(" and invoice.invoice_code ILIKE '%%%s%%' ", invoiceCodeLike)
 	}
 	if invoiceRefLike != "" {
-		searchInvoiceRef += fmt.Sprintf(" and invoice.document_ref LIKE '%%%s%%' ", invoiceRefLike)
+		searchInvoiceRef += fmt.Sprintf(" and invoice.document_ref ILIKE '%%%s%%' ", invoiceRefLike)
 	}
 	if packingLike != "" {
-		searchDocRef += fmt.Sprintf(" and invoice_item.source_code LIKE '%%%s%%' ", packingLike)
+		searchDocRef += fmt.Sprintf(" and invoice_item.source_code ILIKE '%%%s%%' ", packingLike)
 	}
 	if salesOrderLike != "" {
-		searchDocRef += fmt.Sprintf(" and invoice_item.document_ref LIKE '%%%s%%' ", salesOrderLike)
+		searchDocRef += fmt.Sprintf(" and invoice_item.document_ref ILIKE '%%%s%%' ", salesOrderLike)
 	}
 	if customerCodeLike != "" {
-		searchCustomerCode += fmt.Sprintf(" and invoice.party_code LIKE '%%%s%%' ", customerCodeLike)
+		searchCustomerCode += fmt.Sprintf(" and invoice.party_code ILIKE '%%%s%%' ", customerCodeLike)
 	}
 	if customerNameLike != "" {
-		searchCustomerCode += fmt.Sprintf(" and invoice.party_name LIKE '%%%s%%' ", customerNameLike)
+		searchCustomerCode += fmt.Sprintf(" and invoice.party_name ILIKE '%%%s%%' ", customerNameLike)
 	}
 	if documentDate != nil {
 		searchDocRef += fmt.Sprintf(" and DATE(invoice.document_date) = DATE('%s') ", documentDate.Format("2006-01-02"))
