@@ -430,20 +430,23 @@ func ExtractRequiredGroupCodes(config *PriceTableConfiguration) []string {
 	return result
 }
 
+// pgCodeRegex matches short group codes like PG02, PG03, PG04, PG07.
+var pgCodeRegex = regexp.MustCompile(`^PG\d+$`)
+
 // convertDataMappingToGroupCode converts a dataMapping value to a group code format.
-// Handles both "product_group_2" -> "PRODUCT_GROUP2" and "PRODUCT_GROUP2" -> "PRODUCT_GROUP2"
+// Handles: "PG02"/"PG04"/"PG07" (return as-is), "product_group_2" -> "PG2", etc.
 // Returns empty string if the dataMapping is not a product group reference.
 func convertDataMappingToGroupCode(dataMapping string) string {
 	if dataMapping == "" {
 		return ""
 	}
 
-	// If already in uppercase format (PRODUCT_GROUP2), return as is
-	if strings.HasPrefix(dataMapping, "PG02") {
+	// If already in PG<number> format (e.g. PG02, PG03, PG04, PG07), return as is
+	if pgCodeRegex.MatchString(dataMapping) {
 		return dataMapping
 	}
 
-	// Convert lowercase format (product_group_2) to uppercase (PRODUCT_GROUP2)
+	// Convert lowercase format (product_group_2) to PG format (PG2)
 	if strings.HasPrefix(dataMapping, "product_group_") {
 		parts := strings.Split(dataMapping, "_")
 		if len(parts) >= 3 {
@@ -1206,7 +1209,8 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
 
 			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
-			if colConfig.DataMapping != "" {
+			// Skip line_bundle so it is only ever taken from udf_json
+			if colConfig.DataMapping != "" && colConfig.DataMapping != "line_bundle" {
 				if value, exists := row[colConfig.DataMapping]; exists {
 					row[fieldName] = value
 					continue
@@ -1520,6 +1524,12 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		}
 
 		for _, fixedCol := range pattern.FixedColumns {
+			// Skip columns that use valueGetter (client-side computed values like "#")
+			// to avoid adding empty keys to tableData
+			if fixedCol.ValueGetter != "" {
+				continue
+			}
+
 			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			// Handle "type" as a configurable special case that historically mapped to PRODUCT_GROUP9.
 			if fixedCol.DataMapping == "type" {
@@ -1530,7 +1540,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			}
 
 			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
-			if fixedCol.DataMapping != "" {
+			// Skip line_bundle so it is only ever taken from udf_json
+			if fixedCol.DataMapping != "" && fixedCol.DataMapping != "line_bundle" {
 				if value, exists := row[fixedCol.DataMapping]; exists {
 					row[fixedCol.Field] = value
 					continue
@@ -1573,6 +1584,12 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				} else {
 					row[fixedCol.Field] = nil
 				}
+			case "line_bundle":
+				if lineBundleValue != nil {
+					row[fixedCol.Field] = *lineBundleValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
 			case "total_net_price_weight":
 				row[fixedCol.Field] = sg.TotalNetPriceWeight
 			case "is_highlight":
@@ -1591,6 +1608,10 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
 				row[fixedCol.Field] = sg.Remark
+			case "weight_spec":
+				row[fixedCol.Field] = getWeightSpecFromInventory(sg)
+			case "avg_product":
+				row[fixedCol.Field] = getAvgProductFromInventory(sg)
 			}
 
 			if fixedCol.DataMapping == "" {
@@ -1656,7 +1677,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 
 		for _, colConfig := range pattern.Columns {
 			// Check if dataMapping is a direct SubGroupKey field (e.g., "PG03")
-			if colConfig.DataMapping != "" {
+			// Skip line_bundle so it is only ever taken from udf_json
+			if colConfig.DataMapping != "" && colConfig.DataMapping != "line_bundle" {
 				if value, exists := row[colConfig.DataMapping]; exists {
 					row[colConfig.Field] = value
 					continue
