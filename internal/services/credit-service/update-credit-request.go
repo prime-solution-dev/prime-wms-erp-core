@@ -70,7 +70,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 							Reason:          "",
 						})
 						req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef
-						creditExtraIDForDelete = append(creditExtraIDForDelete, GetCreditRes.(ResultCredit).Credit[0].ID)
+						creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].ID)
 					}
 
 				} else {

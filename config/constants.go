@@ -19,6 +19,9 @@ var (
 	CANCEL_ORDER_ENDPOINT                  string
 	GET_PACK_SO_ENDPOINT                   string
 	GET_INBOUND_ENDPOINT                   string
+	GET_GOODS_RECEIVE_ENDPOINT             string
+	GET_ORDER_DELIVERY_ENDPOINT            string
+	GET_CUSTOMER_MASTER_ENDPOINT           string
 )
 
 // Initialize sets the endpoint values (call after loading .env)
@@ -30,6 +33,9 @@ func Initialize() {
 	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrders"
 	GET_PACK_SO_ENDPOINT = GetBaseURL() + "/packing/packing/get-packing-so"
 	GET_INBOUND_ENDPOINT = GetBaseURL() + "/goods-receive/get-inbounds"
+	GET_GOODS_RECEIVE_ENDPOINT = GetBaseURL() + "/goods-receive/get-goods-recieves"
+	GET_ORDER_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/GetOrdersDelivery"
+	GET_CUSTOMER_MASTER_ENDPOINT = GetBaseURL() + "/customer/Customer/GetCustomers"
 }
 
 // HTTP Configuration
