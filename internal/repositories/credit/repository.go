@@ -259,7 +259,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, customerCodeLike string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -277,6 +277,10 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	}
 	if len(isAction) > 0 {
 		query = query.Where("is_action in (?)", isAction)
+	}
+	if customerCodeLike != "" {
+		likePattern := fmt.Sprintf("%%%s%%", customerCodeLike)
+		query = query.Where("customer_code LIKE ?", likePattern)
 	}
 
 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +

@@ -7,12 +7,13 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -93,6 +94,33 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchDocRef += fmt.Sprintf(` and invoice_item.document_ref IN (%s)`, whereInClause)
+	}
+	if invoiceCodeLike != "" {
+		searchInvoiceCode += fmt.Sprintf(" and invoice.invoice_code LIKE '%%%s%%' ", invoiceCodeLike)
+	}
+	if invoiceRefLike != "" {
+		searchInvoiceRef += fmt.Sprintf(" and invoice.document_ref LIKE '%%%s%%' ", invoiceRefLike)
+	}
+	if packingLike != "" {
+		searchDocRef += fmt.Sprintf(" and invoiceItem.source_code LIKE '%%%s%%' ", packingLike)
+	}
+	if salesOrderLike != "" {
+		searchDocRef += fmt.Sprintf(" and invoiceItem.document_ref LIKE '%%%s%%' ", salesOrderLike)
+	}
+	if customerCodeLike != "" {
+		searchCustomerCode += fmt.Sprintf(" and invoice.party_code LIKE '%%%s%%' ", customerCodeLike)
+	}
+	if customerNameLike != "" {
+		searchCustomerCode += fmt.Sprintf(" and invoice.party_name LIKE '%%%s%%' ", customerNameLike)
+	}
+	if documentDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.document_date) = DATE('%s') ", documentDate.Format("2006-01-02"))
+	}
+	if createDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.create_dtm) = DATE('%s') ", createDate.Format("2006-01-02"))
+	}
+	if lastSubmitDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.submit_date) = DATE('%s') ", lastSubmitDate.Format("2006-01-02"))
 	}
 
 	var invoiceID []uuid.UUID
