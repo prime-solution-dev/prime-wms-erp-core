@@ -481,3 +481,19 @@ type PriceListSubGroupFormulasMap struct {
 func (PriceListSubGroupFormulasMap) TableName() string {
 	return "price_list_subgroup_formulas_map"
 }
+
+type GetCalculatedPriceListSubGroupItem struct {
+	SubGroupID                string  `json:"subgroup_id"`
+	TotalNetPriceUnit         float64 `json:"total_net_price_unit"`
+	TotalNetPriceWeight       float64 `json:"total_net_price_weight"`
+	ExtraPriceUnit            float64 `json:"extra_price_unit"`
+	ExtraPriceWeight          float64 `json:"extra_price_weight"`
+	BeforeTotalNetPriceUnit   float64 `json:"before_total_net_price_unit"`
+	BeforeTotalNetPriceWeight float64 `json:"before_total_net_price_weight"`
+}
+
+type GetCalculatedPriceListSubGroupResponse struct {
+	Success bool                                 `json:"success"`
+	Message string                               `json:"message"`
+	Data    []GetCalculatedPriceListSubGroupItem `json:"data"`
+}
