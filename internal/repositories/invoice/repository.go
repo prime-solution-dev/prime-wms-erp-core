@@ -126,7 +126,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 	var invoiceID []uuid.UUID
 	gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 x" + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
+		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
 		Group("invoice.id").Scan(&invoiceID)
 
 	if len(invoiceID) > 0 {
