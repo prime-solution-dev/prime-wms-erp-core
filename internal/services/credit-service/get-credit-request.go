@@ -15,23 +15,23 @@ import (
 )
 
 type GetCreditReq struct {
-	ID                      []uuid.UUID `json:"id"`
-	CustomerCode            []string    `json:"customer_code"`
-	IsAction                []bool      `json:"is_action"`
-	RequestType             []string    `json:"request_type"`
-	Status                  []string    `json:"status"`
-	Page                    int         `json:"page"`
-	PageSize                int         `json:"page_size"`
-	CustomerCodeLike        string      `json:"customer_code_like"`
-	CustomerNameLike        string      `json:"customer_name_like"`
-	CreditLimitLike         float64     `json:"credit_limit_like"`
-	IncreaseCreditLimitLike float64     `json:"increase_credit_limit_like"`
-	StartDate               *time.Time  `json:"start_date_time"`
-	EndDateTime             *time.Time  `json:"end_date_time"`
-	ConsumedCreditLike      float64     `json:"consumed_credit_like"`
-	BalanceCreditLimitLike  float64     `json:"balance_credit_limit_like"`
-	CustomerStatus          string      `json:"customer_status"`
-	PendingApprove          string      `json:"pending_approve"`
+	ID                  []uuid.UUID `json:"id"`
+	CustomerCode        []string    `json:"customer_code"`
+	IsAction            []bool      `json:"is_action"`
+	RequestType         []string    `json:"request_type"`
+	Status              []string    `json:"status"`
+	Page                int         `json:"page"`
+	PageSize            int         `json:"page_size"`
+	CustomerCodeLike    string      `json:"customer_code_like"`
+	CustomerNameLike    string      `json:"customer_name_like"`
+	CreditLimit         float64     `json:"credit_limit"`
+	IncreaseCreditLimit float64     `json:"increase_credit_limit"`
+	StartDate           *time.Time  `json:"start_date_time"`
+	EndDateTime         *time.Time  `json:"end_date_time"`
+	ConsumedCredit      float64     `json:"consumed_credit"`
+	BalanceCreditLimit  float64     `json:"balance_credit_limit"`
+	CustomerStatus      string      `json:"customer_status"`
+	PendingApprove      string      `json:"pending_approve"`
 }
 type ResultCreditRequest struct {
 	Total         int                    `json:"total"`
@@ -63,7 +63,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.CustomerCodeLike, req.Page, req.PageSize)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimit, req.IncreaseCreditLimit, req.StartDate, req.EndDateTime, req.ConsumedCredit, req.BalanceCreditLimit, req.CustomerStatus, req.PendingApprove)
 	if errApproval != nil {
 		return nil, errApproval
 	}

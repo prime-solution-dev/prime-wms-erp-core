@@ -102,10 +102,10 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		searchInvoiceRef += fmt.Sprintf(" and invoice.document_ref LIKE '%%%s%%' ", invoiceRefLike)
 	}
 	if packingLike != "" {
-		searchDocRef += fmt.Sprintf(" and invoiceItem.source_code LIKE '%%%s%%' ", packingLike)
+		searchDocRef += fmt.Sprintf(" and invoice_item.source_code LIKE '%%%s%%' ", packingLike)
 	}
 	if salesOrderLike != "" {
-		searchDocRef += fmt.Sprintf(" and invoiceItem.document_ref LIKE '%%%s%%' ", salesOrderLike)
+		searchDocRef += fmt.Sprintf(" and invoice_item.document_ref LIKE '%%%s%%' ", salesOrderLike)
 	}
 	if customerCodeLike != "" {
 		searchCustomerCode += fmt.Sprintf(" and invoice.party_code LIKE '%%%s%%' ", customerCodeLike)
@@ -126,7 +126,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 	var invoiceID []uuid.UUID
 	gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
+		Where("1=1 x" + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
 		Group("invoice.id").Scan(&invoiceID)
 
 	if len(invoiceID) > 0 {

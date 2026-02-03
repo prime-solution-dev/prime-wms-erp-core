@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/db"
 	models "prime-erp-core/internal/models"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -259,7 +260,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, customerCodeLike string, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimit float64, increaseCreditLimit float64, startDate *time.Time, endDate *time.Time, consumedCredit float64, balanceCreditLimit float64, customerStatus string, pendingApprove string) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
