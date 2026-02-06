@@ -260,7 +260,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimit float64, increaseCreditLimit float64, startDate *time.Time, endDate *time.Time, consumedCredit float64, balanceCreditLimit float64, customerStatus string, pendingApprove string) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove string) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -281,7 +281,19 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	}
 	if customerCodeLike != "" {
 		likePattern := fmt.Sprintf("%%%s%%", customerCodeLike)
-		query = query.Where("customer_code LIKE ?", likePattern)
+		query = query.Where("customer_code ILIKE ?", likePattern)
+	}
+	if creditLimitLike > 0 {
+		query = query.Where("amount::text >= ?", creditLimitLike)
+	}
+	if increaseCreditLimitLike > 0 {
+		query = query.Where("temporary_increase_credit_limit::text >= ?", increaseCreditLimitLike)
+	}
+	if startDate != nil {
+		query = query.Where("effective_dtm >= '%s' ", startDate.Format("2006-01-02"))
+	}
+	if endDate != nil {
+		query = query.Where("effective_dtm <= '%s' ", endDate.Format("2006-01-02"))
 	}
 
 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
