@@ -299,6 +299,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			Tel:                 deliveryReq.Tel,
 			LicensePlate:        deliveryReq.LicensePlate,
 			ContactName:         deliveryReq.ContactName,
+			StatusPayment:       deliveryReq.StatusPayment,
 			OrderItem:           createOrderItemDetail,
 		}
 
