@@ -100,6 +100,7 @@ type InvoiceItem struct {
 	TotalWeight            float64    `json:"total_weight"`
 	PriceListUnit          float64    `json:"price_list_unit"`
 	DocumentDate           *time.Time `json:"document_date"`
+	InvoiceTotalAmount     float64    `gorm:"-" json:"invoice_total_amount"`
 }
 
 func (InvoiceItem) TableName() string { return "invoice_item" }
