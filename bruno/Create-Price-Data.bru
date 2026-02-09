@@ -1,11 +1,11 @@
 meta {
-  name: create
+  name: Create-Price-Data
   type: http
   seq: 8
 }
 
 post {
-  url: http://localhost:9115/price/UploadPriceList
+  url: {{URL_ERP}}/price/UploadPriceList
   body: multipartForm
   auth: inherit
 }
@@ -20,4 +20,5 @@ body:multipart-form {
 
 settings {
   encodeUrl: false
+  timeout: 0
 }

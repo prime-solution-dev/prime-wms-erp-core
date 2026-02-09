@@ -40,9 +40,7 @@ func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, grou
 
 	columns := buildDynamicColumns(pattern, allSubGroups)
 	rowData := buildDynamicRows(config, pattern, allSubGroups)
-	fmt.Println("rowData", len(rowData))
 	mergedRows := mergeGroup1Item9Rows(rowData)
-	fmt.Println("mergedRows", len(mergedRows))
 
 	sort.SliceStable(mergedRows, func(i, j int) bool {
 		rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
@@ -54,11 +52,21 @@ func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, grou
 	for i, row := range mergedRows {
 		tableData[i] = map[string]interface{}(row)
 	}
+	// utils.PrintJSON(tableData)
 
 	tabLabel := "Price List Detail"
 	if len(mergedRows) > 0 {
-		if pg2 := fmt.Sprintf("%v", mergedRows[0]["product_group_2"]); pg2 != "" {
-			tabLabel = pg2
+		firstRow := mergedRows[0]
+		// Derive tab label from actual Product Group 2 fields instead of the missing product_group_2 key
+		candidateKeys := []string{"PG02", "pg_02"}
+		for _, key := range candidateKeys {
+			if val, ok := firstRow[key]; ok && val != nil {
+				label := fmt.Sprintf("%v", val)
+				if label != "" && label != "<nil>" {
+					tabLabel = label
+					break
+				}
+			}
 		}
 	}
 

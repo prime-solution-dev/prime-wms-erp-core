@@ -47,7 +47,6 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	user := `system` // TODO: get from ctx
 	now := time.Now()
-	nowTruc := now.Truncate(24 * time.Hour)
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	//get config
@@ -120,7 +119,7 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				CompanyCode:   quotationReq.CompanyCode,
 				SiteCode:      quotationReq.SiteCode,
 				StorageType:   []string{`NORMAL`},
-				SaleDate:      nowTruc,
+				SaleDate:      *quotationReq.DeliveryDate,
 			}
 
 			verifyReq = newVerifyReq
