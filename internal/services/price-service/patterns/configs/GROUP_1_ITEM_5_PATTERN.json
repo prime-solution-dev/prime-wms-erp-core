@@ -36,7 +36,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
@@ -45,7 +45,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "od",
@@ -166,13 +166,13 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "before_price_unit",
+              "field": "before_total_net_price_unit",
               "headerName": "ราคาขาย before",
               "width": 160,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_unit"
+              "dataMapping": "before_total_net_price_unit"
             },
             {
               "field": "total_net_price_unit",
