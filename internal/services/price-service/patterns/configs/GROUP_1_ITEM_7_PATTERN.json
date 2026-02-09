@@ -116,13 +116,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock_ton",
           "headerName": "Avg.kg stock (Tons)",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "remark",
