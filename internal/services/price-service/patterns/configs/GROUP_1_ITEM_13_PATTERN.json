@@ -87,13 +87,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 110,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
           "headerName": "Avg. kg stock",
           "width": 130,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "line_bundle",

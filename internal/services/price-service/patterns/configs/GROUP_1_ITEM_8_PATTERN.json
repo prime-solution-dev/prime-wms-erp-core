@@ -97,7 +97,7 @@
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock",
@@ -106,7 +106,7 @@
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "institute",
@@ -203,7 +203,7 @@
         "remark"
       ],
       "fetchable_suffixes": [
-        "before_price_unit",
+        "before_total_net_price_unit",
         "total_net_price_unit",
         "extra_price_unit"
       ],
