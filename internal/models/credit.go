@@ -19,6 +19,7 @@ type CreditRequest struct {
 	RequestType                  string     `json:"request_type"`
 	Status                       string     `json:"status"`
 	IsApprove                    bool       `json:"is_approve"`
+	ApproveDate                  *time.Time `json:"approve_date"`
 	Reason                       string     `json:"reason"`
 	EffectiveDtm                 *time.Time `json:"effective_dtm"`
 	ExpireDtm                    *time.Time `json:"expire_dtm"`
@@ -60,6 +61,7 @@ type CreditExtra struct {
 	ExpireDtm    *time.Time `json:"expire_dtm"`
 	DocRef       string     `json:"doc_ref"`
 	ApproveDate  *time.Time `json:"approve_date"`
+	ISapprove    bool       `json:"is_approve"`
 	CreateBy     string     `gorm:"type:varchar(100)" json:"create_by"`
 	CreateDtm    *time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
 	UpdateBy     string     `gorm:"type:varchar(100)" json:"update_by"`
