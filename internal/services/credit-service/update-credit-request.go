@@ -107,8 +107,6 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					EffectiveDtm: req[i].EffectiveDtm,
 					ExpireDtm:    req[i].ExpireDtm,
 					DocRef:       req[i].RequestCode,
-					ApproveDate:  &now,
-					ISapprove:    true,
 				})
 			} else {
 
@@ -128,6 +126,10 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 
 			}
 
+		}
+		if req[i].Status == "COMPLETED" {
+			req[i].IsApprove = true
+			req[i].ApproveDate = &now
 		}
 
 		creditRequestValue = append(creditRequestValue, req[i])
