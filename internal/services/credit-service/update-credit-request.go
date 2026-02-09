@@ -107,7 +107,8 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					EffectiveDtm: req[i].EffectiveDtm,
 					ExpireDtm:    req[i].ExpireDtm,
 					DocRef:       req[i].RequestCode,
-					//ApproveDate:  "",
+					ApproveDate:  &now,
+					ISapprove:    true,
 				})
 			} else {
 
