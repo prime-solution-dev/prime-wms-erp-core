@@ -15,13 +15,23 @@ import (
 )
 
 type GetCreditReq struct {
-	ID           []uuid.UUID `json:"id"`
-	CustomerCode []string    `json:"customer_code"`
-	IsAction     []bool      `json:"is_action"`
-	RequestType  []string    `json:"request_type"`
-	Status       []string    `json:"status"`
-	Page         int         `json:"page"`
-	PageSize     int         `json:"page_size"`
+	ID                      []uuid.UUID `json:"id"`
+	CustomerCode            []string    `json:"customer_code"`
+	IsAction                []bool      `json:"is_action"`
+	RequestType             []string    `json:"request_type"`
+	Status                  []string    `json:"status"`
+	Page                    int         `json:"page"`
+	PageSize                int         `json:"page_size"`
+	CustomerCodeLike        string      `json:"customer_code_like"`
+	CustomerNameLike        string      `json:"customer_name_like"`
+	CreditLimitLike         float64     `json:"credit_limit_like"`
+	IncreaseCreditLimitLike float64     `json:"increase_credit_limit_like"`
+	StartDate               *time.Time  `json:"start_date_time"`
+	EndDateTime             *time.Time  `json:"end_date_time"`
+	ConsumedCreditLike      float64     `json:"consumed_credit_like"`
+	BalanceCreditLimitLike  float64     `json:"balance_credit_limit_like"`
+	CustomerStatus          *bool       `json:"customer_status"`
+	PendingApprove          string      `json:"pending_approve"`
 }
 type ResultCreditRequest struct {
 	Total         int                    `json:"total"`
@@ -39,7 +49,34 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize)
+	if req.CustomerNameLike != "" {
+		requestData := map[string]interface{}{
+			"customer_name_like": req.CustomerNameLike,
+		}
+
+		customers, err := customerService.GetCustomers(requestData)
+		if err != nil {
+			return nil, err
+		}
+		for _, customer := range customers.Customers {
+			req.CustomerCode = append(req.CustomerCode, customer.CustomerCode)
+		}
+	}
+	if req.CustomerStatus != nil {
+		requestData := map[string]interface{}{
+			"active_flg": req.CustomerStatus,
+		}
+
+		customers, err := customerService.GetCustomers(requestData)
+		if err != nil {
+			return nil, err
+		}
+		for _, customer := range customers.Customers {
+			req.CustomerCode = append(req.CustomerCode, customer.CustomerCode)
+		}
+	}
+
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -101,7 +138,6 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			mapExpireDtm[creditValue.CustomerCode] = creditExtraValue.ExpireDtm
 
 		}
-
 	}
 	for i := range credit {
 		credit[i].Amount = mapCredit[credit[i].CustomerCode]
