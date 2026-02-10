@@ -38,6 +38,7 @@ type CreateDeliveryRequest struct {
 	TotalWeight       float64                      `json:"total_weight"`
 	Remark            string                       `json:"remark"`
 	BookingSlotType   string                       `json:"booking_slot_type"`
+	StatusPayment     string                       `json:"status_payment"`
 	DeliveryItems     []CreateDeliveryItemsRequest `json:"delivery_items"`
 }
 
@@ -128,6 +129,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				return "PENDING"
 			}(),
 			BookingSlotType: deliveryReq.BookingSlotType,
+			StatusPayment:   deliveryReq.StatusPayment,
 			CreateBy:        user,
 			CreateDate:      nowDateOnly, // date-only format
 			UpdateBy:        user,
@@ -306,6 +308,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Tel:                 deliveryReq.Tel,
 			LicensePlate:        deliveryReq.LicensePlate,
 			ContactName:         deliveryReq.ContactName,
+			StatusPayment:       deliveryReq.StatusPayment,
 			OrderItem:           createOrderItemDetail,
 		}
 

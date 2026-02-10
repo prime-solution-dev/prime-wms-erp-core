@@ -298,6 +298,7 @@ func GetProductByCode(productReq models.GetProductRequest) (map[string]models.Ge
 	if err != nil {
 		return nil, errors.New("failed to marshal product data to JSON: " + err.Error())
 	}
+	fmt.Println("productReq:", string(jsonData))
 
 	getProducts, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/GetProductDetail", bytes.NewBuffer(jsonData))
 	if err != nil {

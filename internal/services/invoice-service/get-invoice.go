@@ -8,6 +8,7 @@ import (
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -26,6 +27,15 @@ type GetInvoiceRequest struct {
 	SiteCode          string      `json:"site_code"`
 	Page              int         `json:"page"`
 	PageSize          int         `json:"page_size"`
+	InvoiceCodeLike   string      `json:"invoice_code_like"`
+	InvoiceRefLike    string      `json:"invoice_ref_like"`
+	PackingLike       string      `json:"packing_like"`
+	SalesOrderLike    string      `json:"sales_order_like"`
+	CustomerCodeLike  string      `json:"customer_code_like"`
+	CustomerNameLike  string      `json:"customer_name_like"`
+	DocumentDate      *time.Time  `json:"document_date"`
+	CreateDate        *time.Time  `json:"create_date"`
+	LastSubmitDate    *time.Time  `json:"last_submit_date"`
 }
 type ResultInvoice struct {
 	Total      int              `json:"total"`
@@ -43,7 +53,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

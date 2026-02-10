@@ -33,6 +33,15 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.SiteCode,
 		req.Page,
 		req.PageSize,
+		req.PurchaseCodeLike,
+		req.DocRefLike,
+		req.SupplierCodeLike,
+		req.SupplierNameLike,
+		req.ItemsProductCodeLike,
+		req.ItemsProductDescLike,
+		req.ItemsProductGroupOneNameLike,
+		req.StartCreateDate,
+		req.EndCreateDate,
 	)
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())

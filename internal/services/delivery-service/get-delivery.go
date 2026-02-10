@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	externalService "prime-erp-core/external/customer-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,15 +17,30 @@ import (
 )
 
 type GetDeliveryRequest struct {
-	ID                []string `json:"id"`
-	DeliveryCode      []string `json:"delivery_code"`
-	NotInDeliveryCode []string `json:"not_in_delivery_code"`
-	SaleOrderCode     []string `json:"sale_order_code"`
-	SiteCode          []string `json:"site_code"`
-	CompanyCode       []string `json:"company_code"`
-	Status            []string `json:"status"`
-	Page              int      `json:"page"`
-	PageSize          int      `json:"page_size"`
+	ID                       []string   `json:"id"`
+	DeliveryCode             []string   `json:"delivery_code"`
+	NotInDeliveryCode        []string   `json:"not_in_delivery_code"`
+	SaleOrderCode            []string   `json:"sale_order_code"`
+	SiteCode                 []string   `json:"site_code"`
+	CompanyCode              []string   `json:"company_code"`
+	Status                   []string   `json:"status"`
+	DeliveryCodeLike         string     `json:"delivery_code_like"`
+	DocumentRefLike          string     `json:"document_ref_like"`
+	SaleOrderCreateDateStart *time.Time `json:"sale_order_create_date_start"`
+	SaleOrderCreateDateEnd   *time.Time `json:"sale_order_create_date_end"`
+	CustomerCodeLike         string     `json:"customer_code_like"`
+	CustomerNameLike         string     `json:"customer_name_like"`
+	ShipToAddressLike        string     `json:"ship_to_address_like"`
+	DeliveryDateStart        *time.Time `json:"delivery_date_start"`
+	DeliveryDateEnd          *time.Time `json:"delivery_date_end"`
+	LicensePlateLike         string     `json:"license_plate_like"`
+	ContactNameLike          string     `json:"contact_name_like"`
+	ShipSlotDateStart        *time.Time `json:"ship_slot_date_start"`
+	ShipSlotDateEnd          *time.Time `json:"ship_slot_date_end"`
+	DeliveryTimeNameLike     string     `json:"delivery_time_name_like"`
+	StatusFilter             []string   `json:"status_filter"`
+	Page                     int        `json:"page"`
+	PageSize                 int        `json:"page_size"`
 }
 
 func (GetDeliveryResponse) TableName() string { return "delivery_booking" }
@@ -49,6 +66,7 @@ type GetDeliveryResponse struct {
 	Status           string                    `gorm:"type:varchar(50)" json:"status"`
 	BookingSlotType  string                    `gorm:"type:varchar(50)" json:"booking_slot_type"`
 	Remark           string                    `gorm:"type:varchar(255)" json:"remark"`
+	StatusPayment    string                    `gorm:"type:varchar(50)" json:"status_payment"`
 	CreateDate       *time.Time                `gorm:"type:date" json:"create_date"`
 	CreateBy         string                    `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                `gorm:"type:date" json:"update_date"`
@@ -87,6 +105,65 @@ type ResultDeliveryResponse struct {
 	Deliveries []GetDeliveryResponse `json:"deliveries"`
 }
 
+// buildStatusConditions สร้างเงื่อนไขการกรองตาม status ที่ซับซ้อน
+func buildStatusConditions(statusFilters []string) ([]string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	for _, statusFilter := range statusFilters {
+		switch strings.ToLower(statusFilter) {
+		case "new":
+			// status='PENDING'
+			conditions = append(conditions, "delivery_booking.status = ?")
+			args = append(args, "PENDING")
+		case "canceled", "cancelled":
+			// status='CANCELED'
+			conditions = append(conditions, "delivery_booking.status = ?")
+			args = append(args, "CANCELED")
+		case "draft":
+			// status='TEMP'
+			conditions = append(conditions, "delivery_booking.status = ?")
+			args = append(args, "TEMP")
+		case "completed":
+			// status='COMPLETED'
+			conditions = append(conditions, "delivery_booking.status = ?")
+			args = append(args, "COMPLETED")
+		}
+	}
+
+	return conditions, args
+}
+
+// getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
+func getCustomerCodesByName(customerNameLike string) ([]string, error) {
+	if len(customerNameLike) == 0 {
+		return nil, nil
+	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		CustomerNameLike: customerNameLike,
+		Page:             1,
+		PageSize:         1000, // เอาเยอะๆ เพื่อให้ได้ customerCode ทั้งหมดที่ match
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+
+	fmt.Printf("Found %d customers matching name like '%s'\n", len(customerByNameData.Customers), customerNameLike)
+
+	// เก็บ customerCode ทั้งหมดที่ได้จากการค้นหาด้วย name
+	var customerCodes []string
+	for _, customer := range customerByNameData.Customers {
+		customerCodes = append(customerCodes, customer.CustomerCode)
+	}
+
+	fmt.Println("Customer codes from name search:", customerCodes)
+	return customerCodes, nil
+}
+
 func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetDeliveryResponse
@@ -105,70 +182,201 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
+	// ถ้ามี CustomerNameLike ให้ไปค้นหา customerCode จาก customer service ก่อน
+	customerCodesFromName, err := getCustomerCodesByName(req.CustomerNameLike)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil, err
+	}
+
 	query := gormx.Select("delivery_booking.*, time.name as delivery_time_name").
 		Joins("LEFT JOIN time ON delivery_booking.delivery_time_code = time.code").
+		Joins("LEFT JOIN sale ON delivery_booking.document_ref = sale.sale_code").
 		Preload("Items").
 		Preload("SaleOrder").
 		Preload("SaleOrder.SaleItem").
 		Order("delivery_booking.update_date DESC")
 
 	if len(req.ID) > 0 {
-		query = query.Where("id IN ?", req.ID)
+		query = query.Where("delivery_booking.id IN ?", req.ID)
 	}
 
 	if len(req.DeliveryCode) > 0 {
-		query = query.Where("delivery_code IN ?", req.DeliveryCode)
+		query = query.Where("delivery_booking.delivery_code IN ?", req.DeliveryCode)
 	}
 
 	if len(req.NotInDeliveryCode) > 0 {
-		query = query.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+		query = query.Where("delivery_booking.delivery_code NOT IN ?", req.NotInDeliveryCode)
 	}
 
 	if len(req.SaleOrderCode) > 0 {
-		query = query.Where("document_ref IN ?", req.SaleOrderCode)
+		query = query.Where("delivery_booking.document_ref IN ?", req.SaleOrderCode)
 	}
 
 	if len(req.SiteCode) > 0 {
-		query = query.Where("site_code IN ?", req.SiteCode)
+		query = query.Where("delivery_booking.site_code IN ?", req.SiteCode)
 	}
 
 	if len(req.CompanyCode) > 0 {
-		query = query.Where("company_code IN ?", req.CompanyCode)
+		query = query.Where("delivery_booking.company_code IN ?", req.CompanyCode)
 	}
 
 	if len(req.Status) > 0 {
-		query = query.Where("status IN ?", req.Status)
+		query = query.Where("delivery_booking.status IN ?", req.Status)
+	}
+
+	// Like filters
+	if len(req.DeliveryCodeLike) > 0 {
+		query = query.Where("delivery_booking.delivery_code ILIKE ?", "%"+req.DeliveryCodeLike+"%")
+	}
+
+	if len(req.DocumentRefLike) > 0 {
+		query = query.Where("delivery_booking.document_ref ILIKE ?", "%"+req.DocumentRefLike+"%")
+	}
+
+	if len(req.CustomerCodeLike) > 0 {
+		query = query.Where("delivery_booking.customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
+	}
+
+	if len(req.CustomerNameLike) > 0 {
+		// ใช้ customerCode ที่ได้จากการค้นหาด้วย customer name แทนการค้นหาตรงๆ ด้วย customer_name
+		if len(customerCodesFromName) > 0 {
+			query = query.Where("delivery_booking.customer_code IN ?", customerCodesFromName)
+		} else {
+			// ถ้าไม่เจอ customer ใดๆ ที่ match กับ name ให้ return ข้อมูลว่างเปล่า
+			query = query.Where("1 = 0") // condition ที่จะไม่ match อะไรเลย
+		}
+	}
+
+	if len(req.ShipToAddressLike) > 0 {
+		query = query.Where("delivery_booking.ship_to_address ILIKE ?", "%"+req.ShipToAddressLike+"%")
+	}
+
+	if len(req.LicensePlateLike) > 0 {
+		query = query.Where("delivery_booking.license_plate ILIKE ?", "%"+req.LicensePlateLike+"%")
+	}
+
+	if len(req.ContactNameLike) > 0 {
+		query = query.Where("delivery_booking.contact_name ILIKE ?", "%"+req.ContactNameLike+"%")
+	}
+
+	if len(req.DeliveryTimeNameLike) > 0 {
+		query = query.Where("time.name ILIKE ?", "%"+req.DeliveryTimeNameLike+"%")
+	}
+
+	// Date range filters
+	if req.SaleOrderCreateDateStart != nil && req.SaleOrderCreateDateEnd != nil {
+		query = query.Where("sale.create_date BETWEEN ? AND ?", req.SaleOrderCreateDateStart, req.SaleOrderCreateDateEnd)
+	}
+
+	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
+		query = query.Where("sale.delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.ShipSlotDateStart != nil && req.ShipSlotDateEnd != nil {
+		query = query.Where("delivery_booking.delivery_date BETWEEN ? AND ?", req.ShipSlotDateStart, req.ShipSlotDateEnd)
+	}
+
+	// Apply status filter conditions
+	if len(req.StatusFilter) > 0 {
+		conditions, args := buildStatusConditions(req.StatusFilter)
+		if len(conditions) > 0 {
+			// Join conditions with OR
+			combinedCondition := "(" + strings.Join(conditions, " OR ") + ")"
+			query = query.Where(combinedCondition, args...)
+		}
 	}
 
 	// Build base query for counting
-	countQuery := gormx.Model(&GetDeliveryResponse{})
+	countQuery := gormx.Model(&GetDeliveryResponse{}).
+		Joins("LEFT JOIN time ON delivery_booking.delivery_time_code = time.code").
+		Joins("LEFT JOIN sale ON delivery_booking.document_ref = sale.sale_code")
 
 	if len(req.ID) > 0 {
-		countQuery = countQuery.Where("id IN ?", req.ID)
+		countQuery = countQuery.Where("delivery_booking.id IN ?", req.ID)
 	}
 
 	if len(req.DeliveryCode) > 0 {
-		countQuery = countQuery.Where("delivery_code IN ?", req.DeliveryCode)
+		countQuery = countQuery.Where("delivery_booking.delivery_code IN ?", req.DeliveryCode)
 	}
 
 	if len(req.NotInDeliveryCode) > 0 {
-		countQuery = countQuery.Where("delivery_code NOT IN ?", req.NotInDeliveryCode)
+		countQuery = countQuery.Where("delivery_booking.delivery_code NOT IN ?", req.NotInDeliveryCode)
 	}
 
 	if len(req.SaleOrderCode) > 0 {
-		countQuery = countQuery.Where("document_ref IN ?", req.SaleOrderCode)
+		countQuery = countQuery.Where("delivery_booking.document_ref IN ?", req.SaleOrderCode)
 	}
 
 	if len(req.SiteCode) > 0 {
-		countQuery = countQuery.Where("site_code IN ?", req.SiteCode)
+		countQuery = countQuery.Where("delivery_booking.site_code IN ?", req.SiteCode)
 	}
 
 	if len(req.CompanyCode) > 0 {
-		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+		countQuery = countQuery.Where("delivery_booking.company_code IN ?", req.CompanyCode)
 	}
 
 	if len(req.Status) > 0 {
-		countQuery = countQuery.Where("status IN ?", req.Status)
+		countQuery = countQuery.Where("delivery_booking.status IN ?", req.Status)
+	}
+
+	// Apply same like filters to count query
+	if len(req.DeliveryCodeLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.delivery_code ILIKE ?", "%"+req.DeliveryCodeLike+"%")
+	}
+
+	if len(req.DocumentRefLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.document_ref ILIKE ?", "%"+req.DocumentRefLike+"%")
+	}
+
+	if len(req.CustomerCodeLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
+	}
+
+	if len(req.CustomerNameLike) > 0 {
+		if len(customerCodesFromName) > 0 {
+			countQuery = countQuery.Where("delivery_booking.customer_code IN ?", customerCodesFromName)
+		} else {
+			countQuery = countQuery.Where("1 = 0")
+		}
+	}
+
+	if len(req.ShipToAddressLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.ship_to_address ILIKE ?", "%"+req.ShipToAddressLike+"%")
+	}
+
+	if len(req.LicensePlateLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.license_plate ILIKE ?", "%"+req.LicensePlateLike+"%")
+	}
+
+	if len(req.ContactNameLike) > 0 {
+		countQuery = countQuery.Where("delivery_booking.contact_name ILIKE ?", "%"+req.ContactNameLike+"%")
+	}
+
+	if len(req.DeliveryTimeNameLike) > 0 {
+		countQuery = countQuery.Where("time.name ILIKE ?", "%"+req.DeliveryTimeNameLike+"%")
+	}
+
+	// Apply same date range filters to count query
+	if req.SaleOrderCreateDateStart != nil && req.SaleOrderCreateDateEnd != nil {
+		countQuery = countQuery.Where("sale.create_date BETWEEN ? AND ?", req.SaleOrderCreateDateStart, req.SaleOrderCreateDateEnd)
+	}
+
+	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
+		countQuery = countQuery.Where("sale.delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.ShipSlotDateStart != nil && req.ShipSlotDateEnd != nil {
+		countQuery = countQuery.Where("delivery_booking.delivery_date BETWEEN ? AND ?", req.ShipSlotDateStart, req.ShipSlotDateEnd)
+	}
+
+	// Apply status filter conditions to count query
+	if len(req.StatusFilter) > 0 {
+		conditions, args := buildStatusConditions(req.StatusFilter)
+		if len(conditions) > 0 {
+			combinedCondition := "(" + strings.Join(conditions, " OR ") + ")"
+			countQuery = countQuery.Where(combinedCondition, args...)
+		}
 	}
 
 	var count int64

@@ -173,6 +173,8 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		groupKey := func(c, s, g string) string { return c + "|" + s + "|" + g }
 		subKey := func(c, s, g, sg string) string { return groupKey(c, s, g) + "|SUB|" + sg }
 		extraKey := func(c, s, g, ek string) string { return groupKey(c, s, g) + "|EXTRA|" + ek }
+		// extraRowKey includes condition_code so each (extra_key, condition_code) gets a unique id
+		extraRowKey := func(c, s, g, ek, cond string) string { return extraKey(c, s, g, ek) + "|COND|" + cond }
 
 		// ---------- map IDs ----------
 		groupIDs := map[string]uuid.UUID{}
@@ -243,9 +245,17 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			subGroupIDs[subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)] = uuid.New()
 		}
 
+		// One id per (group, extra_key, condition_code) to avoid duplicate primary key
 		extraIDs := map[string]uuid.UUID{}
+		extraKeyToGroupExtraID := map[string]uuid.UUID{} // first extra id per extra_key, for ExtraKeys FK
 		for _, e := range req.Extras {
-			extraIDs[extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)] = uuid.New()
+			ek := extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)
+			erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
+			id := uuid.New()
+			extraIDs[erk] = id
+			if _, ok := extraKeyToGroupExtraID[ek]; !ok {
+				extraKeyToGroupExtraID[ek] = id
+			}
 		}
 
 		// ---------- validate refs ----------
@@ -313,9 +323,9 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		extraRecs := make([]map[string]any, 0, len(req.Extras))
 		for _, e := range req.Extras {
 			gk := groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)
-			ek := extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)
+			erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
 			extraRecs = append(extraRecs, map[string]any{
-				"id":                  extraIDs[ek],
+				"id":                  extraIDs[erk],
 				"price_list_group_id": groupIDs[gk],
 				"extra_key":           e.ExtraKey,
 				"condition_code":      e.ConditionCode,
@@ -381,9 +391,13 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		extraKeyRecs := make([]map[string]any, 0, len(req.ExtraKeys))
 		for _, k := range req.ExtraKeys {
 			ek := extraKey(k.CompanyCode, k.SiteCode, k.GroupCode, k.ExtraKey)
+			groupExtraID, ok := extraKeyToGroupExtraID[ek]
+			if !ok || groupExtraID == uuid.Nil {
+				continue // skip: no price_list_group_extra row for this extra_key (would violate FK)
+			}
 			extraKeyRecs = append(extraKeyRecs, map[string]any{
 				"id":             uuid.New(),
-				"group_extra_id": extraIDs[ek],
+				"group_extra_id": groupExtraID,
 				"seq":            k.Seq,
 				"code":           k.Code,
 				"value":          k.Value,
@@ -496,9 +510,9 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			extraRecs = make([]map[string]any, 0, len(req.Extras))
 			for _, e := range req.Extras {
 				gk := groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)
-				ek := extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)
+				erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
 				extraRecs = append(extraRecs, map[string]any{
-					"id":                  extraIDs[ek],
+					"id":                  extraIDs[erk],
 					"price_list_group_id": groupIDs[gk],
 					"extra_key":           e.ExtraKey,
 					"condition_code":      e.ConditionCode,
@@ -567,8 +581,128 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 		}
 		if len(extraRecs) > 0 {
-			if err := tx.Table("price_list_group_extra").CreateInBatches(extraRecs, batchSize).Error; err != nil {
+			// Deduplicate extraRecs by id (keep last occurrence) to avoid "cannot affect row a second time" error
+			extraRecsMap := make(map[uuid.UUID]map[string]any)
+			for _, rec := range extraRecs {
+				var id uuid.UUID
+				switch v := rec["id"].(type) {
+				case uuid.UUID:
+					id = v
+				case string:
+					if parsed, err := uuid.Parse(v); err == nil {
+						id = parsed
+					} else {
+						continue
+					}
+				default:
+					continue
+				}
+				extraRecsMap[id] = rec
+			}
+			deduplicatedExtraRecs := make([]map[string]any, 0, len(extraRecsMap))
+			for _, rec := range extraRecsMap {
+				deduplicatedExtraRecs = append(deduplicatedExtraRecs, rec)
+			}
+
+			if err := tx.Table("price_list_group_extra").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{{Name: "id"}},
+					DoUpdates: clause.Assignments(map[string]interface{}{
+						"price_list_group_id": gorm.Expr("excluded.price_list_group_id"),
+						"extra_key":           gorm.Expr("excluded.extra_key"),
+						"condition_code":      gorm.Expr("excluded.condition_code"),
+						"operator":            gorm.Expr("excluded.operator"),
+						"value_int":           gorm.Expr("excluded.value_int"),
+						"length_extra_key":    gorm.Expr("excluded.length_extra_key"),
+						"cond_range_min":      gorm.Expr("excluded.cond_range_min"),
+						"cond_range_max":      gorm.Expr("excluded.cond_range_max"),
+						"update_by":           gorm.Expr("excluded.update_by"),
+						"update_dtm":          gorm.Expr("excluded.update_dtm"),
+					}),
+				}).
+				CreateInBatches(deduplicatedExtraRecs, batchSize).Error; err != nil {
 				return err
+			}
+
+			// Query back actual extra IDs after upsert to ensure we have correct IDs for foreign key references
+			type ExtraIDResult struct {
+				ID             uuid.UUID `gorm:"column:id"`
+				PriceListGroupID uuid.UUID `gorm:"column:price_list_group_id"`
+				ExtraKey       string    `gorm:"column:extra_key"`
+				ConditionCode  string    `gorm:"column:condition_code"`
+			}
+			var actualExtras []ExtraIDResult
+
+			// Collect IDs we inserted to query back
+			insertedIDs := make([]uuid.UUID, 0, len(deduplicatedExtraRecs))
+			for _, rec := range deduplicatedExtraRecs {
+				var id uuid.UUID
+				switch v := rec["id"].(type) {
+				case uuid.UUID:
+					id = v
+				case string:
+					if parsed, err := uuid.Parse(v); err == nil {
+						id = parsed
+					} else {
+						continue
+					}
+				default:
+					continue
+				}
+				insertedIDs = append(insertedIDs, id)
+			}
+
+			// Query back extras by their IDs
+			if len(insertedIDs) > 0 {
+				if err := tx.Table("price_list_group_extra").
+					Select("id, price_list_group_id, extra_key, condition_code").
+					Where("id IN ?", insertedIDs).
+					Scan(&actualExtras).Error; err != nil {
+					return err
+				}
+			}
+
+			// Map extra_key to first ID found (for ExtraKeys FK)
+			// Key format: company_code|site_code|group_code|EXTRA|extra_key
+			extraKeyToGroupExtraIDFromDB := make(map[string]uuid.UUID)
+			for _, e := range actualExtras {
+				// Find matching request extra to get company_code, site_code, group_code
+				for _, reqExtra := range req.Extras {
+					if reqExtra.ExtraKey == e.ExtraKey && reqExtra.ConditionCode == e.ConditionCode {
+						ek := extraKey(reqExtra.CompanyCode, reqExtra.SiteCode, reqExtra.GroupCode, reqExtra.ExtraKey)
+						if _, ok := extraKeyToGroupExtraIDFromDB[ek]; !ok {
+							extraKeyToGroupExtraIDFromDB[ek] = e.ID
+						}
+						break
+					}
+				}
+			}
+
+			// Rebuild extraKeyRecs with actual IDs from database
+			extraKeyRecs = make([]map[string]any, 0, len(req.ExtraKeys))
+			for _, k := range req.ExtraKeys {
+				ek := extraKey(k.CompanyCode, k.SiteCode, k.GroupCode, k.ExtraKey)
+				groupExtraID, ok := extraKeyToGroupExtraIDFromDB[ek]
+				if !ok || groupExtraID == uuid.Nil {
+					// Fallback: find any extra with matching extra_key (use first one)
+					for _, e := range actualExtras {
+						if e.ExtraKey == k.ExtraKey {
+							groupExtraID = e.ID
+							extraKeyToGroupExtraIDFromDB[ek] = e.ID
+							break
+						}
+					}
+					if groupExtraID == uuid.Nil {
+						continue // skip: no price_list_group_extra row for this extra_key
+					}
+				}
+				extraKeyRecs = append(extraKeyRecs, map[string]any{
+					"id":             uuid.New(),
+					"group_extra_id": groupExtraID,
+					"seq":            k.Seq,
+					"code":           k.Code,
+					"value":          k.Value,
+				})
 			}
 		}
 		if len(subRecs) > 0 {
@@ -1003,7 +1137,7 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	// ---- extra : gen extra_key + create extra_key rows from same PG01..PG10 ----
 	extraRows, _ := readSheet("price_list_group_extra")
 	for _, r := range extraRows {
-		if r["company_code"] == "" || r["site_code"] == "" || r["group_code"] == "" || r["condition_code"] == "" {
+		if r["company_code"] == "" || r["site_code"] == "" || r["group_code"] == "" {
 			return nil, fmt.Errorf("price_list_group_extra: company_code, site_code, group_code, condition_code are required")
 		}
 
@@ -1114,13 +1248,19 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 		return nil, err
 	}
 	for _, r := range formulasRows {
-		if r["subgroup_code"] == "" || r["formula_code"] == "" {
+		if r["subgroup_code"] == "" || r["formula_code_default"] == "" || r["formula_code_convert"] == "" {
 			return nil, fmt.Errorf("formulas_map: subgroup_code, formula_code are required")
 		}
 		req.SubGroupFormulas = append(req.SubGroupFormulas, PriceListSubGroupFormulasCreateDTO{
 			SubGroupCode: r["subgroup_code"],
-			FormulaCode:  r["formula_code"],
+			FormulaCode:  r["formula_code_default"],
 			IsDefault:    true,
+		})
+
+		req.SubGroupFormulas = append(req.SubGroupFormulas, PriceListSubGroupFormulasCreateDTO{
+			SubGroupCode: r["subgroup_code"],
+			FormulaCode:  r["formula_code_convert"],
+			IsDefault:    false,
 		})
 	}
 

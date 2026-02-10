@@ -3,6 +3,7 @@ package saleService
 import (
 	"encoding/json"
 	"errors"
+
 	"prime-erp-core/internal/db"
 	models "prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
@@ -12,16 +13,27 @@ import (
 )
 
 type GetSaleRequest struct {
-	ID             []uuid.UUID `json:"id"`
-	SaleCode       []string    `json:"sale_code"`
-	CustomerCode   []string    `json:"customer_code"`
-	Status         []string    `json:"status"`
-	StatusApprove  []string    `json:"status_approve"`
-	StatusPayment  []string    `json:"status_payment"`
-	IsApproved     []bool      `json:"is_approved"`
-	IsAvailableQty bool        `json:"is_available_qty"`
-	Page           int         `json:"page"`
-	PageSize       int         `json:"page_size"`
+	ID                   []uuid.UUID `json:"id"`
+	SaleCode             []string    `json:"sale_code"`
+	CustomerCode         []string    `json:"customer_code"`
+	Status               []string    `json:"status"`
+	StatusApprove        []string    `json:"status_approve"`
+	StatusPayment        []string    `json:"status_payment"`
+	IsApproved           []bool      `json:"is_approved"`
+	IsAvailableQty       bool        `json:"is_available_qty"`
+	SaleCodeLike         string      `json:"sale_code_like"`
+	DocumentRefLike      string      `json:"document_ref_like"`
+	CustomerCodeLike     string      `json:"customer_code_like"`
+	CustomerNameLike     string      `json:"customer_name_like"`
+	CreateDateStart      string      `json:"create_date_start"`
+	CreateDateEnd        string      `json:"create_date_end"`
+	ExpirePriceDateStart string      `json:"expire_price_date_start"`
+	ExpirePriceDateEnd   string      `json:"expire_price_date_end"`
+	DeliveryDateStart    string      `json:"delivery_date_start"`
+	DeliveryDateEnd      string      `json:"delivery_date_end"`
+	StatusFilter         []string    `json:"status_filter"`
+	Page                 int         `json:"page"`
+	PageSize             int         `json:"page_size"`
 }
 type ResultSale struct {
 	Total      int           `json:"total"`
@@ -45,8 +57,28 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return getSaleWithAvailableQtyFilter(req)
 	}
 
-	// Normal flow without qty filtering
-	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusApprove, req.StatusPayment, req.IsApproved, req.Page, req.PageSize)
+	// Normal flow without qty filtering - use repository
+	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(
+		req.ID,
+		req.SaleCode,
+		req.CustomerCode,
+		req.Status,
+		req.StatusApprove,
+		req.StatusPayment,
+		req.IsApproved,
+		req.SaleCodeLike,
+		req.DocumentRefLike,
+		req.CustomerCodeLike,
+		req.CustomerNameLike,
+		req.CreateDateStart,
+		req.CreateDateEnd,
+		req.ExpirePriceDateStart,
+		req.ExpirePriceDateEnd,
+		req.DeliveryDateStart,
+		req.DeliveryDateEnd,
+		req.StatusFilter,
+		req.Page,
+		req.PageSize)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -64,7 +96,26 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 	// Get all sales without pagination first
-	sale, _, _, errApproval := repositorySale.GetSalePreload(req.ID, req.SaleCode, req.CustomerCode, req.Status, req.StatusApprove, req.StatusPayment, req.IsApproved, 1, 0) // pageSize=0 means get all
+	sale, _, _, errApproval := repositorySale.GetSalePreload(
+		req.ID,
+		req.SaleCode,
+		req.CustomerCode,
+		req.Status,
+		req.StatusApprove,
+		req.StatusPayment,
+		req.IsApproved,
+		req.SaleCodeLike,
+		req.DocumentRefLike,
+		req.CustomerCodeLike,
+		req.CustomerNameLike,
+		req.CreateDateStart,
+		req.CreateDateEnd,
+		req.ExpirePriceDateStart,
+		req.ExpirePriceDateEnd,
+		req.DeliveryDateStart,
+		req.DeliveryDateEnd,
+		req.StatusFilter,
+		1, 0) // pageSize=0 means get all
 	if errApproval != nil {
 		return nil, errApproval
 	}

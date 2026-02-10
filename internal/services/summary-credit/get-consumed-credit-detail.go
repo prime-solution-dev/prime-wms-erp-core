@@ -3,6 +3,7 @@ package summaryService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
@@ -130,7 +131,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
 				sumPaymentTotalAmountAR += invoicePaidAmount
 			}
-			invoiceAmount := invoiceItemsValue.TotalAmount
+			//invoiceAmount := invoiceItemsValue.TotalAmount
 			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
 			if existResultInvoiceMap {
 				if invoiceItemMap.InvoiceType == "DN" {
@@ -140,15 +141,15 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 				if invoiceItemMap.InvoiceType == "CN" {
 					sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
-					invoiceAmount = -invoiceItemMap.TotalAmount
+					//invoiceAmount = -invoiceItemMap.TotalAmount
 				}
 			}
-
+			invoiceAmount := -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceAmount,
 				InvoicePaidAmount: invoicePaidAmount,
-				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
+				ConsumedAmount:    invoiceAmount + invoicePaidAmount,
 			})
 		}
 
