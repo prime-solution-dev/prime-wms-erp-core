@@ -55,7 +55,7 @@ type CreateOrderDetail struct {
 	Tel                 string                  `json:"tel"`
 	LicensePlate        string                  `json:"license_plate"`
 	ContactName         string                  `json:"contact_name"`
-	StatusPayment       string                  `json:"status_payment"`
+	StatusApproveGi     string                  `json:"status_approve_gi"`
 	OrderItem           []CreateOrderItemDetail `json:"order_item"`
 }
 
