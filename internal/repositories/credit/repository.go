@@ -297,9 +297,10 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	}
 
 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
-		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit," +
-		"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS is_approve," +
-		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
+		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
+		"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS is_approve, " +
+		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm, " +
+		"MAX(CASE WHEN status = 'APPROVED' THEN approve_date END) AS approve_date, " +
 		"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
 		Where("1=1").
 		Group("customer_code").Find(&creditRequest).Error
