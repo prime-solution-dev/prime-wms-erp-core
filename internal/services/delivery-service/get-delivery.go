@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	externalService "prime-erp-core/external/customer-service"
+	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"strings"
@@ -48,31 +49,32 @@ func (GetDeliveryResponse) TableName() string { return "delivery_booking" }
 func (GetDeliveryItemResponse) TableName() string { return "delivery_booking_item" }
 
 type GetDeliveryResponse struct {
-	ID               uuid.UUID                 `gorm:"type:uuid;primary_key" json:"id"`
-	DeliveryCode     string                    `gorm:"type:varchar(50)" json:"delivery_code"`
-	CompanyCode      string                    `gorm:"type:varchar(50)" json:"company_code"`
-	SiteCode         string                    `gorm:"type:varchar(50)" json:"site_code"`
-	DeliveryMethod   string                    `gorm:"type:varchar(50)" json:"delivery_method"`
-	DocumentRef      string                    `gorm:"type:varchar(50)" json:"document_ref"`
-	CustomerCode     string                    `gorm:"type:varchar(50)" json:"customer_code"`
-	ShipToAddress    string                    `gorm:"type:varchar(255)" json:"ship_to_address"`
-	DeliveryDate     *time.Time                `gorm:"type:date" json:"delivery_date"`
-	DeliveryTimeCode string                    `gorm:"type:varchar(50)" json:"delivery_time_code"`
-	DeliveryTimeName string                    `gorm:"type:varchar(100)" json:"delivery_time_name"`
-	LicensePlate     string                    `gorm:"type:varchar(50)" json:"license_plate"`
-	ContactName      string                    `gorm:"type:varchar(100)" json:"contact_name"`
-	Tel              string                    `gorm:"type:varchar(20)" json:"tel"`
-	TotalWeight      float64                   `gorm:"type:numeric" json:"total_weight"`
-	Status           string                    `gorm:"type:varchar(50)" json:"status"`
-	BookingSlotType  string                    `gorm:"type:varchar(50)" json:"booking_slot_type"`
-	Remark           string                    `gorm:"type:varchar(255)" json:"remark"`
-	StatusPayment    string                    `gorm:"type:varchar(50)" json:"status_payment"`
-	CreateDate       *time.Time                `gorm:"type:date" json:"create_date"`
-	CreateBy         string                    `gorm:"type:varchar(50)" json:"create_by"`
-	UpdateDate       *time.Time                `gorm:"type:date" json:"update_date"`
-	UpdateBy         string                    `gorm:"type:varchar(50)" json:"update_by"`
-	SaleOrder        models.Sale               `gorm:"foreignKey:DocumentRef;references:SaleCode" json:"sale_order"`
-	Items            []GetDeliveryItemResponse `gorm:"foreignKey:DeliveryID" json:"items"`
+	ID               uuid.UUID                                     `gorm:"type:uuid;primary_key" json:"id"`
+	DeliveryCode     string                                        `gorm:"type:varchar(50)" json:"delivery_code"`
+	CompanyCode      string                                        `gorm:"type:varchar(50)" json:"company_code"`
+	SiteCode         string                                        `gorm:"type:varchar(50)" json:"site_code"`
+	DeliveryMethod   string                                        `gorm:"type:varchar(50)" json:"delivery_method"`
+	DocumentRef      string                                        `gorm:"type:varchar(50)" json:"document_ref"`
+	CustomerCode     string                                        `gorm:"type:varchar(50)" json:"customer_code"`
+	ShipToAddress    string                                        `gorm:"type:varchar(255)" json:"ship_to_address"`
+	DeliveryDate     *time.Time                                    `gorm:"type:date" json:"delivery_date"`
+	DeliveryTimeCode string                                        `gorm:"type:varchar(50)" json:"delivery_time_code"`
+	DeliveryTimeName string                                        `gorm:"type:varchar(100)" json:"delivery_time_name"`
+	LicensePlate     string                                        `gorm:"type:varchar(50)" json:"license_plate"`
+	ContactName      string                                        `gorm:"type:varchar(100)" json:"contact_name"`
+	Tel              string                                        `gorm:"type:varchar(20)" json:"tel"`
+	TotalWeight      float64                                       `gorm:"type:numeric" json:"total_weight"`
+	Status           string                                        `gorm:"type:varchar(50)" json:"status"`
+	BookingSlotType  string                                        `gorm:"type:varchar(50)" json:"booking_slot_type"`
+	Remark           string                                        `gorm:"type:varchar(255)" json:"remark"`
+	StatusApproveGi  string                                        `gorm:"type:varchar(50)" json:"status_approve_gi"`
+	CreateDate       *time.Time                                    `gorm:"type:date" json:"create_date"`
+	CreateBy         string                                        `gorm:"type:varchar(50)" json:"create_by"`
+	UpdateDate       *time.Time                                    `gorm:"type:date" json:"update_date"`
+	UpdateBy         string                                        `gorm:"type:varchar(50)" json:"update_by"`
+	SaleOrder        models.Sale                                   `gorm:"foreignKey:DocumentRef;references:SaleCode" json:"sale_order"`
+	Order            orderExternalService.GetOrderDeliveryResponse `gorm:"-" json:"order"`
+	Items            []GetDeliveryItemResponse                     `gorm:"foreignKey:DeliveryID" json:"items"`
 }
 
 type GetDeliveryItemResponse struct {
@@ -162,6 +164,27 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 
 	fmt.Println("Customer codes from name search:", customerCodes)
 	return customerCodes, nil
+}
+
+// GetOrderDeliveryForDelivery ฟังก์ชันสำหรับเรียก GetOrdersDelivery สำหรับ GetDeliveryResponse
+func GetOrderDeliveryForDelivery(allDeliveries []GetDeliveryResponse) (orderExternalService.ResultOrderDeliveryResponse, error) {
+	getOrderRequest := orderExternalService.GetOrderDeliveryRequest{}
+	for _, row := range allDeliveries {
+		getOrderRequest.DeliveryCode = append(getOrderRequest.DeliveryCode, row.DeliveryCode)
+
+		for _, item := range row.Items {
+			getOrderRequest.DeliveryItem = append(getOrderRequest.DeliveryItem, item.DeliveryItem)
+		}
+	}
+
+	fmt.Println("getOrderRequest : ", getOrderRequest)
+	getOrderResponse, err := orderExternalService.GetOrdersDelivery(getOrderRequest)
+	if err != nil {
+		return orderExternalService.ResultOrderDeliveryResponse{}, errors.New("Error get orders delivery : " + err.Error())
+	}
+	fmt.Println("getOrderResponse : ", getOrderResponse)
+
+	return getOrderResponse, nil
 }
 
 func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -399,6 +422,32 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		fmt.Println(err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 		return nil, err
+	}
+
+	// GetOrderDelivery
+	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(res)
+	if err != nil {
+		fmt.Println("Error in GetOrderDelivery:", err)
+		// continue without orders
+	} else {
+		// Map orders from orderDeliveryResponse to delivery header
+		// Create map for efficient lookup of orders by delivery_code
+		orderMap := make(map[string]orderExternalService.GetOrderDeliveryResponse)
+
+		for _, order := range orderDeliveryResponse.Orders {
+			// Map by order.DocumentRef to delivery_code
+			orderMap[order.DocumentRef] = order
+		}
+
+		// Map orders to delivery header in res
+		for i := range res {
+			delivery := &res[i]
+
+			// Try to find matching order by deliveryCode = order.DocumentRef
+			if matchingOrder, exists := orderMap[delivery.DeliveryCode]; exists {
+				delivery.Order = matchingOrder
+			}
+		}
 	}
 
 	resultDelivery := ResultDeliveryResponse{
