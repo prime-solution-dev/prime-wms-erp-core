@@ -9,6 +9,8 @@ pipeline {
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '18.139.159.17'
         SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
+        VAULT_PATH = 'JenkinsWMS/jenkins.kernaluatWMS' // path ของ secret
+        ENV_FILE_KEY = 'kernaluat.env.erp' 
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -87,26 +89,30 @@ pipeline {
                 }
             }
         }
-stage('Update .env with DB_PASSWORD') {
-    steps {
-        script {
-            echo 'Updating .env file with DB_PASSWORD on remote...'
-            withCredentials([string(credentialsId: 'Jenkinsdemoserver', variable: 'DB_PASSWORD')]) {
-                sh """
-                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                "cd ${REPO_NAME} && \\
-                 if [ -f cmd/.env ]; then \\
-                     sed -i 's|\\\${DB_PASSWORD}|${DB_PASSWORD}|g' cmd/.env && \\
-                     echo '.env updated successfully!' && \\
-                     cat cmd/.env; \\
-                 else \\
-                     echo '.env file not found!'; \\
-                 fi"
-                """
+        stage('Fetch .env from Vault') {
+            steps {
+                script {
+                    echo "Fetching .env from Vault..."
+
+                    // ดึงค่า .env จาก Vault
+                    withVault([vaultSecrets: [
+                        [path: "${VAULT_PATH}",
+                         engineVersion: 2,
+                         secretValues: [
+                             [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
+                         ]
+                        ]
+                    ]]) {
+                        sh '''
+                            mkdir -p cmd
+                            echo "$AUTHEN_ENV" > cmd/.env
+                            chmod 600 cmd/.env
+                            echo ".env created at cmd/.env"
+                        '''
+                    }
+                }
             }
         }
-    }
-}
 stage('Build Docker Image') {
             steps {
                 script {
