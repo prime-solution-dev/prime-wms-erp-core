@@ -114,7 +114,17 @@ type GetOutboundItemResponse struct {
 	UpdateDtm       time.Time                    `gorm:"type:date" json:"update_dtm"`
 	ConfirmQty      float64                      `gorm:"type:numeric(10,4)" json:"confirm_qty"`
 	ConfirmWeight   float64                      `gorm:"type:numeric(10,4)" json:"confirm_weight"`
+	FlowTracking    []OutboundFlowTracking       `gorm:"foreignKey:OutboundItemId" json:"flow_tracking"`
 	Processes       []GetOutboundProcessResponse `gorm:"foreignKey:OutboundItemId" json:"processes"`
+}
+
+type OutboundFlowTracking struct {
+	ID             uuid.UUID `json:"id"`
+	OutboundItemId uuid.UUID `json:"outbound_item_id"`
+	ProcessCode    string    `json:"process_code"`
+	Status         string    `json:"status"`
+	CreateBy       string    `json:"create_by"`
+	CreateDtm      time.Time `json:"create_dtm"`
 }
 
 type GetOutboundProcessResponse struct {

@@ -43,7 +43,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "price_weight",
+          "dataMapping": "weight_spec",
           "cellStyle": {
             "textAlign": "right"
           }
@@ -55,7 +55,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "total_net_price_weight",
+          "dataMapping": "avg_product",
           "cellStyle": {
             "textAlign": "right"
           }
@@ -73,10 +73,10 @@
       ],
       "columns": [
         {
-          "field": "before_price_unit",
+          "field": "before_total_net_price_unit",
           "headerName": "ราคาขาย Before",
           "width": 150,
-          "dataMapping": "before_price_unit",
+          "dataMapping": "before_total_net_price_unit",
           "cellStyle": {
             "textAlign": "right"
           }

@@ -289,7 +289,8 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
         it.document_ref, 
         it.total_amount as invoice_total_amount,
 		i.invoice_code,
-		i.invoice_type
+		i.invoice_type,
+		i.total_amount as invoice_total_amount_header 
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref 
 	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR')
@@ -343,11 +344,12 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
 			if row["invoice_code"] != nil {
 				invoiceItem = models.InvoiceItem{
-					ID:          id,
-					InvoiceCode: row["invoice_code"].(string),
-					DocumentRef: row["document_ref"].(string),
-					TotalAmount: row["invoice_total_amount"].(float64),
-					InvoiceType: row["invoice_type"].(string),
+					ID:                 id,
+					InvoiceCode:        row["invoice_code"].(string),
+					DocumentRef:        row["document_ref"].(string),
+					TotalAmount:        row["invoice_total_amount"].(float64),
+					InvoiceType:        row["invoice_type"].(string),
+					InvoiceTotalAmount: row["invoice_total_amount_header"].(float64),
 				}
 			}
 

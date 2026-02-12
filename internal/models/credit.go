@@ -19,6 +19,7 @@ type CreditRequest struct {
 	RequestType                  string     `json:"request_type"`
 	Status                       string     `json:"status"`
 	IsApprove                    bool       `json:"is_approve"`
+	ApproveDate                  *time.Time `json:"approve_date"`
 	Reason                       string     `json:"reason"`
 	EffectiveDtm                 *time.Time `json:"effective_dtm"`
 	ExpireDtm                    *time.Time `json:"expire_dtm"`

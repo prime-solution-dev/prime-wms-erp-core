@@ -139,7 +139,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			}
 		}
 		if creditRequestValue.EffectiveDtm != nil {
-			fmt.Println("Now:", time.Now().Format(time.RFC3339))
+			fmt.Println("Now:", time.Now())
 			fmt.Println("Effective:", creditRequestValue.EffectiveDtm)
 			now := time.Now()
 			eff := creditRequestValue.EffectiveDtm
@@ -196,6 +196,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("Update Credit Request: ", string(jsonBytesUpdateCreditRequest))
 		urlUpdateCreditRequest := os.Getenv("base_url_erp") + "/credit/UpdateCreditRequest"
 		reqUpdateCreditRequest, err := http.NewRequest("POST", urlUpdateCreditRequest, bytes.NewBuffer(jsonBytesUpdateCreditRequest))
 		if err != nil {
@@ -238,6 +239,7 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println(string(jsonBytesCredit))
 		urlCreateCredit := os.Getenv("base_url_erp") + "/credit/CreateCredit"
 		reqCreateCredit, err := http.NewRequest("POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
 		if err != nil {
