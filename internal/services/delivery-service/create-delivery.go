@@ -38,6 +38,7 @@ type CreateDeliveryRequest struct {
 	TotalWeight       float64                      `json:"total_weight"`
 	Remark            string                       `json:"remark"`
 	BookingSlotType   string                       `json:"booking_slot_type"`
+	PaymentMethod     string                       `json:"payment_method"`
 	DeliveryItems     []CreateDeliveryItemsRequest `json:"delivery_items"`
 }
 
@@ -105,6 +106,13 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			deliveryDateOnly = &dateOnly
 		}
 
+		var statusApproveGi string
+		if deliveryReq.PaymentMethod == "CASH" {
+			statusApproveGi = "PENDING"
+		} else {
+			statusApproveGi = "COMPLETED"
+		}
+
 		newDelivery := models.Delivery{
 			ID:               deliveryId,
 			DeliveryCode:     deliveryCodes[num], // Use pre-generated delivery code
@@ -128,6 +136,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				return "PENDING"
 			}(),
 			BookingSlotType: deliveryReq.BookingSlotType,
+			StatusApproveGi: statusApproveGi,
 			CreateBy:        user,
 			CreateDate:      nowDateOnly, // date-only format
 			UpdateBy:        user,
@@ -263,6 +272,13 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			}
 		}
 
+		var statusApproveGi string
+		if deliveryReq.PaymentMethod == "CASH" {
+			statusApproveGi = "PENDING"
+		} else {
+			statusApproveGi = "COMPLETED"
+		}
+
 		newOrderDetail := orderExternalService.CreateOrderDetail{
 			Action:       "X",
 			OrderID:      uuid.New(),
@@ -306,6 +322,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Tel:                 deliveryReq.Tel,
 			LicensePlate:        deliveryReq.LicensePlate,
 			ContactName:         deliveryReq.ContactName,
+			StatusApproveGi:     statusApproveGi,
 			OrderItem:           createOrderItemDetail,
 		}
 

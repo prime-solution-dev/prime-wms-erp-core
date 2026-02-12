@@ -42,12 +42,12 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 
 	mapCredit := map[string]models.Credit{}
-	mapCreditExtra := map[uuid.UUID]models.CreditExtra{}
+	mapCreditExtra := map[string]models.CreditExtra{}
 
 	for _, creditValue := range GetCreditRes.(ResultCredit).Credit {
-		mapCredit[creditValue.CustomerCode] = creditValue
+		mapCredit[creditValue.DocRef] = creditValue
 		for _, creditExtraValue := range creditValue.CreditExtra {
-			mapCreditExtra[creditValue.ID] = creditExtraValue
+			mapCreditExtra[creditExtraValue.DocRef] = creditExtraValue
 		}
 
 	}
@@ -57,33 +57,39 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if req[i].Status == "REJECT" {
 			if len(GetCreditRes.(ResultCredit).Credit) > 0 {
 				if req[i].RequestType == "EXTRA" {
-					if len(GetCreditRes.(ResultCredit).Credit[0].CreditExtra) > 0 {
+					/* if len(GetCreditRes.(ResultCredit).Credit[0].CreditExtra) > 0 {
+					} */
+					if creditExtraValue, ok := mapCreditExtra[req[i].RequestCode]; ok {
 						creditTransaction = append(creditTransaction, models.CreditTransaction{
-							TransactionCode: GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef,
+							TransactionCode: creditExtraValue.DocRef,
 							TransactionType: "EXTRA",
-							Amount:          GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].Amount,
+							Amount:          creditExtraValue.Amount,
 							AdjustAmount:    0,
-							EffectiveDtm:    GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].EffectiveDtm,
-							ExpireDtm:       GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].ExpireDtm,
+							EffectiveDtm:    creditExtraValue.EffectiveDtm,
+							ExpireDtm:       creditExtraValue.ExpireDtm,
 							IsApprove:       false,
 							Status:          "REJECT",
 							Reason:          "",
 						})
-						req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].CreditExtra[0].DocRef
-						creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].ID)
+						req[0].RequestCode = creditExtraValue.DocRef
 					}
 
+					creditExtraIDForDelete = append(creditExtraIDForDelete, req[i].ID)
+
 				} else {
-					creditTransaction = append(creditTransaction, models.CreditTransaction{
-						TransactionCode: GetCreditRes.(ResultCredit).Credit[0].DocRef,
-						TransactionType: "BASE",
-						Amount:          GetCreditRes.(ResultCredit).Credit[0].Amount,
-						AdjustAmount:    0,
-						IsApprove:       false,
-						Status:          "REJECT",
-						Reason:          "",
-					})
-					req[0].RequestCode = GetCreditRes.(ResultCredit).Credit[0].DocRef
+					if creditValue, ok := mapCredit[req[i].RequestCode]; ok {
+						creditTransaction = append(creditTransaction, models.CreditTransaction{
+							TransactionCode: creditValue.DocRef,
+							TransactionType: "BASE",
+							Amount:          creditValue.Amount,
+							AdjustAmount:    0,
+							IsApprove:       false,
+							Status:          "REJECT",
+							Reason:          "",
+						})
+						req[0].RequestCode = creditValue.DocRef
+					}
+
 					creditIDForDelete = append(creditIDForDelete, req[i].ID)
 				}
 			}
@@ -101,7 +107,6 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 					EffectiveDtm: req[i].EffectiveDtm,
 					ExpireDtm:    req[i].ExpireDtm,
 					DocRef:       req[i].RequestCode,
-					//ApproveDate:  "",
 				})
 			} else {
 
@@ -121,6 +126,10 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 
 			}
 
+		}
+		if req[i].Status == "COMPLETED" {
+			req[i].IsApprove = true
+			req[i].ApproveDate = &now
 		}
 
 		creditRequestValue = append(creditRequestValue, req[i])
