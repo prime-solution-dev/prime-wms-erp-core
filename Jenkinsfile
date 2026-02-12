@@ -89,7 +89,6 @@ pipeline {
                 }
             }
         }
-
 stage('Fetch .env from Vault (Remote)') {
     steps {
         script {
@@ -118,8 +117,6 @@ EOF
         }
     }
 }
-
-
 stage('Build Docker Image') {
             steps {
                 script {
