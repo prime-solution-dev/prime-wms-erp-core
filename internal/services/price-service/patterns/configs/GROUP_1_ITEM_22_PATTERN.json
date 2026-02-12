@@ -1,0 +1,215 @@
+{
+    "patterns": [
+        {
+            "id": "pattern_group1_item7_pg2_tabs",
+            "name": "เหล็กฉาก/รางน้ำ PG02 Tabs",
+            "description": "Tabs by PG02 with PG05 dynamic column groups for each size and shared fixed columns",
+            "enabled": true,
+            "requiredGroupCodes": [
+                "GROUP_1_ITEM_7",
+                "GROUP_1_ITEM_22"
+            ],
+            "grouping": {
+                "tabs": "PG02",
+                "rows": "PG06",
+                "columnGroups": "PG05"
+            },
+            "fixedColumns": [
+                {
+                    "field": "#",
+                    "headerName": "#",
+                    "width": 70,
+                    "pinned": "left",
+                    "lockPosition": true,
+                    "suppressMovable": true,
+                    "valueGetter": "node.rowIndex + 1",
+                    "cellStyle": {
+                        "textAlign": "center",
+                        "fontWeight": "500"
+                    }
+                },
+                {
+                    "field": "product_group_6",
+                    "headerName": "หนา",
+                    "width": 140,
+                    "pinned": "left",
+                    "lockPosition": true,
+                    "suppressMovable": true,
+                    "spanRows": true,
+                    "cellStyle": {
+                        "textAlign": "center",
+                        "fontWeight": "600"
+                    }
+                }
+            ],
+            "columns": [
+                {
+                    "field": "stock_quantity",
+                    "headerName": "จำนวน",
+                    "width": 90,
+                    "dataMapping": "stock_quantity",
+                    "cellStyle": {
+                        "textAlign": "center"
+                    }
+                },
+                {
+                    "field": "grade",
+                    "headerName": "เกรด",
+                    "width": 110,
+                    "dataMapping": "PG03",
+                    "cellStyle": {
+                        "textAlign": "center"
+                    }
+                },
+                {
+                    "field": "batch_no",
+                    "headerName": "โรงงาน",
+                    "width": 120,
+                    "dataMapping": "batch_no",
+                    "cellStyle": {
+                        "textAlign": "center"
+                    }
+                },
+                {
+                    "field": "code",
+                    "headerName": "Code",
+                    "width": 140,
+                    "dataMapping": "code"
+                },
+                {
+                    "field": "face",
+                    "headerName": "หน้า",
+                    "width": 90,
+                    "dataMapping": "PG08",
+                    "cellStyle": {
+                        "textAlign": "center"
+                    }
+                },
+                {
+                    "field": "is_highlight",
+                    "headerName": "Highlight สีฟ้า",
+                    "width": 130,
+                    "dataMapping": "is_highlight",
+                    "cellRenderer": "agCheckboxCellRenderer"
+                },
+                {
+                    "field": "before_total_net_price_weight",
+                    "headerName": "ราคาขาย before",
+                    "width": 150,
+                    "dataMapping": "before_total_net_price_weight"
+                },
+                {
+                    "field": "total_net_price_weight",
+                    "headerName": "ราคาขาย after",
+                    "width": 150,
+                    "dataMapping": "total_net_price_weight"
+                },
+                {
+                    "field": "extra",
+                    "headerName": "Extra (THB)",
+                    "width": 130,
+                    "dataMapping": "extra_price_weight"
+                },
+                {
+                    "field": "warehouse",
+                    "headerName": "โกดัง",
+                    "width": 120,
+                    "dataMapping": "warehouse"
+                },
+                {
+                    "field": "weight_spec",
+                    "headerName": "Weight-spec",
+                    "width": 150,
+                    "dataMapping": "weight_spec"
+                },
+                {
+                    "field": "avg_kg_stock_ton",
+                    "headerName": "Avg.kg stock (Tons)",
+                    "width": 150,
+                    "dataMapping": "avg_product"
+                },
+                {
+                    "field": "remark",
+                    "headerName": "หมายเหตุ",
+                    "width": 200,
+                    "dataMapping": "remark"
+                },
+                {
+                    "field": "inactive",
+                    "headerName": "Inactive",
+                    "width": 110,
+                    "dataMapping": "inactive",
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "hide": true
+                }
+            ],
+            "applicableCategories": [
+                "เหล็กฉาก",
+                "รางน้ำ"
+            ],
+            "editable_suffixes": [
+                "code",
+                "is_highlight",
+                "total_net_price_weight",
+                "inactive"
+            ],
+            "fetchable_suffixes": [
+                "total_net_price_weight"
+            ]
+        }
+    ],
+    "defaultPattern": "pattern_group1_item7_pg2_tabs",
+    "tableConfig": {
+        "groupHeaderHeight": 60,
+        "headerHeight": 40,
+        "pagination": false,
+        "toolbar": {
+            "show": true,
+            "showSearch": false,
+            "showRefresh": false,
+            "showColumnToggle": false
+        },
+        "gridOptions": {
+            "suppressMovableColumns": true,
+            "suppressMenuHide": false,
+            "enableCellSpan": true
+        }
+    },
+    "valueMappings": {
+        "groupCodeMappings": {
+            "productGroup2": "PG02",
+            "productGroup6": "PG06",
+            "productGroup7": "PG07",
+            "productGroup5": "PG05",
+            "productGroup3": "PG03",
+            "productGroup4": "PG04",
+            "productGroup9": "PG09",
+            "type": "PG09"
+        },
+        "handlerMappings": {
+            "GROUP_1_ITEM_22": "BuildGroup1Item7Response"
+        },
+        "defaultItemFormat": [
+            {
+                "type": "group",
+                "value": "PG04"
+            },
+            {
+                "type": "literal",
+                "value": "x"
+            },
+            {
+                "type": "group",
+                "value": "PG06"
+            },
+            {
+                "type": "literal",
+                "value": "x"
+            },
+            {
+                "type": "group",
+                "value": "PG07"
+            }
+        ]
+    }
+}
