@@ -90,30 +90,35 @@ pipeline {
             }
         }
 
-        stage('Fetch .env from Vault') {
-            steps {
-                script {
-                    echo "Fetching .env from Vault..."
+stage('Fetch .env from Vault (Remote)') {
+    steps {
+        script {
+            echo "Fetching .env from Vault and write to remote server..."
 
-                    // ดึงค่า .env จาก Vault
-                    withVault([vaultSecrets: [
-                        [path: "${VAULT_PATH}",
-                         engineVersion: 2,
-                         secretValues: [
-                             [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
-                         ]
-                        ]
-                    ]]) {
-                        sh '''
-                            mkdir -p cmd
-                            echo "$AUTHEN_ENV" > cmd/.env
-                            chmod 600 cmd/.env
-                            echo ".env created at cmd/.env"
-                        '''
-                    }
-                }
+            withVault([vaultSecrets: [
+                [path: "${VAULT_PATH}",
+                 engineVersion: 2,
+                 secretValues: [
+                     [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
+                 ]
+                ]
+            ]]) {
+                sh """
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    cd ${REPO_NAME} &&
+                    mkdir -p cmd &&
+                    cat << "EOF" > cmd/.env
+${AUTHEN_ENV}
+EOF
+                    chmod 600 cmd/.env &&
+                    echo ".env written to remote ${REPO_NAME}/cmd/.env"
+                '
+                """
             }
         }
+    }
+}
+
 
 stage('Build Docker Image') {
             steps {
