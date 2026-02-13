@@ -60,8 +60,12 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	supplierReq := models.GetSupplierListRequest{}
 	productCodes := []string{}
+	siteCode := []string{}
+	companyCode := []string{}
 	invoiceCode := []string{}
 	for _, invoiceValue := range invoice {
+		siteCode = append(siteCode, invoiceValue.SiteCode)
+		companyCode = append(companyCode, invoiceValue.CompanyCode)
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
@@ -75,8 +79,8 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	productReq := models.GetProductRequest{
 		ProductCode: productCodes,
-		SiteCode:    []string{req.SiteCode},
-		CompanyCode: []string{req.CompanyCode},
+		SiteCode:    siteCode,
+		CompanyCode: companyCode,
 	}
 
 	mapProduct, err := purchaseService.GetProductByCode(productReq)
