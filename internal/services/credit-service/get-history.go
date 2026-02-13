@@ -265,9 +265,18 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"CANCELLED": 5,
 		"REJECT":    6,
 		"INACTIVE":  7,
+		"EXPIRED":   8,
 	}
 	sort.Slice(historyRes, func(o, j int) bool {
-		return order[historyRes[o].Status] < order[historyRes[j].Status]
+		so := order[historyRes[o].Status]
+		sj := order[historyRes[j].Status]
+
+		if so != sj {
+			return so < sj
+		}
+
+		return historyRes[o].SubmitDateTime.Before(*historyRes[j].SubmitDateTime)
+
 	})
 	resultApproval := ResultHistory{
 		Total:      totalRecords,
