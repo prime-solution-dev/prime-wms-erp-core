@@ -52,6 +52,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTel = conMapCustomer.Phone
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
+			req[i].PartyBranch = conMapCustomer.BranchName
 		}
 
 	}

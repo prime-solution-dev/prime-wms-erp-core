@@ -55,11 +55,11 @@ func CreditRequestEffectiveDtmPending() (interface{}, error) {
 	creditRequestUpdate := []models.CreditRequest{}
 	for _, creditRequestValue := range creditRequest.CreditRequest {
 		if creditRequestValue.ExpireDtm != nil {
-			exp := creditRequestValue.ExpireDtm
-			loc, _ := time.LoadLocation("Asia/Bangkok")
-			expLocal := exp.In(loc)
-			nowLocal := time.Now().In(loc)
-			if expLocal.Before(nowLocal) {
+			fmt.Println("Now:", time.Now().UTC())
+			fmt.Println("ExpireDtm:", creditRequestValue.ExpireDtm.UTC())
+			now := time.Now().UTC()
+			exp := creditRequestValue.ExpireDtm.UTC()
+			if exp.Before(now) {
 				creditTransaction = append(creditTransaction, models.CreditTransaction{
 					TransactionCode: creditRequestValue.RequestCode,
 					TransactionType: creditRequestValue.RequestType,
@@ -73,7 +73,7 @@ func CreditRequestEffectiveDtmPending() (interface{}, error) {
 				})
 				creditRequestUpdate = append(creditRequestUpdate, models.CreditRequest{
 					ID:                           creditRequestValue.ID,
-					Status:                       "CANCELLED",
+					Status:                       "EXPIRED",
 					RequestCode:                  creditRequestValue.RequestCode,
 					CustomerCode:                 creditRequestValue.CustomerCode,
 					CustomerName:                 creditRequestValue.CustomerName,
