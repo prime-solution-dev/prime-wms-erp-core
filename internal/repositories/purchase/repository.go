@@ -583,9 +583,10 @@ func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed)
 				}
 
 				min := base * (1 - tolPct/100.0)
-				max := base * (1 + tolPct/100.0)
+				//max := base * (1 + tolPct/100.0)
 
-				if input >= min && input <= max {
+				//if input >= min && input <= max {
+				if input >= min {
 					isPass = true
 				}
 			} else {
@@ -597,9 +598,10 @@ func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed)
 				}
 
 				min := base * (1 - tolPct/100.0)
-				max := base * (1 + tolPct/100.0)
+				//max := base * (1 + tolPct/100.0)
 
-				if input >= min && input <= max {
+				//if input >= min && input <= max {
+				if input >= min {
 					isPass = true
 				}
 			}
