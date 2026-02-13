@@ -5,6 +5,7 @@ import (
 	"errors"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	"slices"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -256,7 +257,18 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	}
-
+	order := map[string]int{
+		"PENDING":   1,
+		"COMPLETED": 2,
+		"ACTIVE":    3,
+		"CANCELED":  4,
+		"CANCELLED": 5,
+		"REJECT":    6,
+		"INACTIVE":  7,
+	}
+	sort.Slice(historyRes, func(o, j int) bool {
+		return order[historyRes[o].Status] < order[historyRes[j].Status]
+	})
 	resultApproval := ResultHistory{
 		Total:      totalRecords,
 		Page:       req.Page,
