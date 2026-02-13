@@ -34,6 +34,7 @@ func GetPurchaseList(
 	statusApprove []string,
 	statusPayment []string,
 	statusPaymentIncomplete bool,
+	status []string,
 	productCodes []string,
 	purchaseType []string,
 	docRef []string,
@@ -83,6 +84,9 @@ func GetPurchaseList(
 
 	if statusPaymentIncomplete {
 		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
+	}
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
 	}
 	if purchaseCodeLike != "" {
 		query = query.Where("purchase_code ILIKE ?", "%"+purchaseCodeLike+"%")
