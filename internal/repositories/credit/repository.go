@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/db"
 	models "prime-erp-core/internal/models"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -259,7 +260,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove string) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -278,11 +279,28 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if len(isAction) > 0 {
 		query = query.Where("is_action in (?)", isAction)
 	}
+	if customerCodeLike != "" {
+		likePattern := fmt.Sprintf("%%%s%%", customerCodeLike)
+		query = query.Where("customer_code ILIKE ?", likePattern)
+	}
+	if creditLimitLike > 0 {
+		query = query.Where("amount::text >= ?", creditLimitLike)
+	}
+	if increaseCreditLimitLike > 0 {
+		query = query.Where("temporary_increase_credit_limit::text >= ?", increaseCreditLimitLike)
+	}
+	if startDate != nil {
+		query = query.Where("effective_dtm >= '%s' ", startDate.Format("2006-01-02"))
+	}
+	if endDate != nil {
+		query = query.Where("effective_dtm <= '%s' ", endDate.Format("2006-01-02"))
+	}
 
 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
-		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit," +
-		"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS is_approve," +
-		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm," +
+		"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
+		"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS is_approve, " +
+		"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm, " +
+		"MAX(CASE WHEN status = 'APPROVED' THEN approve_date END) AS approve_date, " +
 		"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
 		Where("1=1").
 		Group("customer_code").Find(&creditRequest).Error

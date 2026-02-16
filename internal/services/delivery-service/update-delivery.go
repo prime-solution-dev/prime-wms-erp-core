@@ -24,6 +24,7 @@ type DeliveryDocumentUpdate struct {
 	models.Delivery
 
 	// Additional fields for external service (not for GORM)
+	PaymentMethod     string                       `json:"payment_method" gorm:"-"`
 	IsDraft           bool                         `json:"is_draft" gorm:"-"`
 	SoldToCode        string                       `json:"sold_to_code" gorm:"-"`
 	ShipToCode        string                       `json:"ship_to_code" gorm:"-"`
@@ -261,6 +262,13 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			}
 		}
 
+		var statusApproveGi string
+		if deliveryReq.PaymentMethod == "CASH" {
+			statusApproveGi = "PENDING"
+		} else {
+			statusApproveGi = "COMPLETED"
+		}
+
 		newOrderDetail := orderExternalService.CreateOrderDetail{
 			Action:              "X",
 			OrderID:             uuid.New(),
@@ -299,6 +307,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			Tel:                 deliveryReq.Tel,
 			LicensePlate:        deliveryReq.LicensePlate,
 			ContactName:         deliveryReq.ContactName,
+			StatusApproveGi:     statusApproveGi,
 			OrderItem:           createOrderItemDetail,
 		}
 

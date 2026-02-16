@@ -34,6 +34,7 @@ func GetPurchaseList(
 	statusApprove []string,
 	statusPayment []string,
 	statusPaymentIncomplete bool,
+	status []string,
 	productCodes []string,
 	purchaseType []string,
 	docRef []string,
@@ -42,6 +43,15 @@ func GetPurchaseList(
 	siteCode string,
 	page int,
 	pageSize int,
+	purchaseCodeLike string,
+	docRefLike string,
+	supplierCodeLike string,
+	supplierNameLike string,
+	itemsProductCodeLike string,
+	itemsProductDescLike string,
+	itemsProductGroupOneNameLike string,
+	startCreateDate *time.Time,
+	endCreateDate *time.Time,
 ) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -74,6 +84,52 @@ func GetPurchaseList(
 
 	if statusPaymentIncomplete {
 		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
+	}
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
+	}
+	if purchaseCodeLike != "" {
+		query = query.Where("purchase_code ILIKE ?", "%"+purchaseCodeLike+"%")
+	}
+	if docRefLike != "" {
+		query = query.Where("doc_ref ILIKE ?", "%"+docRefLike+"%")
+	}
+	if supplierCodeLike != "" {
+		query = query.Where("supplier_code ILIKE ?", "%"+supplierCodeLike+"%")
+	}
+	if supplierNameLike != "" {
+		query = query.Where("supplier_name ILIKE ?", "%"+supplierNameLike+"%")
+	}
+	if itemsProductCodeLike != "" {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_code ILIKE ?", "%"+itemsProductCodeLike+"%")
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+	if itemsProductDescLike != "" {
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_desc ILIKE ?", "%"+itemsProductDescLike+"%")
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+	if itemsProductGroupOneNameLike != "" {
+
+		sub := gormx.Model(&models.PurchaseItem{}).
+			Select("1").
+			Where("purchase.id = purchase_item.purchase_id").
+			Where("product_group_code ILIKE ?", "%"+itemsProductGroupOneNameLike+"%")
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+	if startCreateDate != nil {
+		query = query.Where("create_dtm >= '%s' ", startCreateDate.Format("2006-01-02"))
+	}
+	if endCreateDate != nil {
+		query = query.Where("create_dtm <= '%s' ", endCreateDate.Format("2006-01-02"))
 	}
 
 	if len(productCodes) > 0 {
@@ -531,9 +587,10 @@ func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed)
 				}
 
 				min := base * (1 - tolPct/100.0)
-				max := base * (1 + tolPct/100.0)
+				//max := base * (1 + tolPct/100.0)
 
-				if input >= min && input <= max {
+				//if input >= min && input <= max {
+				if input >= min {
 					isPass = true
 				}
 			} else {
@@ -545,9 +602,10 @@ func CompletePOItem(usedType string, purchaseItemUsed []models.PurchaseItemUsed)
 				}
 
 				min := base * (1 - tolPct/100.0)
-				max := base * (1 + tolPct/100.0)
+				//max := base * (1 + tolPct/100.0)
 
-				if input >= min && input <= max {
+				//if input >= min && input <= max {
+				if input >= min {
 					isPass = true
 				}
 			}

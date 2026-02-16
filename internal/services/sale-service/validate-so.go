@@ -24,6 +24,7 @@ type SaleValidationDocument struct {
 	CompanyCode  string               `json:"company_code"`
 	SiteCode     string               `json:"site_code"`
 	CustomerCode string               `json:"customer_code"`
+	DeliveryDate *time.Time           `json:"delivery_date"`
 	Items        []SaleValidationItem `json:"items"`
 }
 
@@ -70,9 +71,6 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	now := time.Now()
-	nowTruc := now.Truncate(24 * time.Hour)
-
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	// สร้าง verification requests
@@ -88,8 +86,9 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				CompanyCode:         saleReq.CompanyCode,
 				SiteCode:            saleReq.SiteCode,
 				StorageType:         []string{`NORMAL`},
-				SaleDate:            nowTruc,
+				SaleDate:            *saleReq.DeliveryDate,
 			}
+
 			verifyReq = newVerifyReq
 		}
 

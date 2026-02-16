@@ -5,6 +5,10 @@
       "name": "เหล็กฉาก/รางน้ำ PG02 Tabs",
       "description": "Tabs by PG02 with PG05 dynamic column groups for each size and shared fixed columns",
       "enabled": true,
+      "requiredGroupCodes": [
+        "GROUP_1_ITEM_7",
+        "GROUP_1_ITEM_22"
+      ],
       "grouping": {
         "tabs": "PG02",
         "rows": "PG06",
@@ -116,13 +120,13 @@
           "field": "weight_spec",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "weight_spec"
         },
         {
           "field": "avg_kg_stock_ton",
           "headerName": "Avg.kg stock (Tons)",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "avg_product"
         },
         {
           "field": "remark",
@@ -186,12 +190,26 @@
       "GROUP_1_ITEM_7": "BuildGroup1Item7Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
     ]
   }
 }
-

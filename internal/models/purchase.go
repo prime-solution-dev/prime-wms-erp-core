@@ -435,19 +435,29 @@ type CreatePurchaseRequest struct {
 }
 
 type GetPurchaseRequest struct {
-	PurchaseCodes           []string `json:"purchase_codes"`
-	SupplierCodes           []string `json:"supplier_codes"`
-	StatusApprove           []string `json:"status_approve"`
-	StatusPayment           []string `json:"status_payment"` // PENDING, COMPLETED for check invoice
-	StatusPaymentIncomplete bool     `json:"status_payment_incomplete"`
-	ProductCodes            []string `json:"product_codes"`
-	PurchaseType            []string `json:"purchase_type"`
-	DocRef                  []string `json:"doc_ref"`
-	TradingRef              []string `json:"trading_ref"`
-	CompanyCode             string   `json:"company_code"`
-	SiteCode                string   `json:"site_code"`
-	Page                    int      `json:"page"`
-	PageSize                int      `json:"page_size"`
+	PurchaseCodes                []string   `json:"purchase_codes"`
+	SupplierCodes                []string   `json:"supplier_codes"`
+	StatusApprove                []string   `json:"status_approve"`
+	StatusPayment                []string   `json:"status_payment"` // PENDING, COMPLETED for check invoice
+	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
+	Status                       []string   `json:"status"`
+	ProductCodes                 []string   `json:"product_codes"`
+	PurchaseType                 []string   `json:"purchase_type"`
+	DocRef                       []string   `json:"doc_ref"`
+	TradingRef                   []string   `json:"trading_ref"`
+	CompanyCode                  string     `json:"company_code"`
+	SiteCode                     string     `json:"site_code"`
+	Page                         int        `json:"page"`
+	PageSize                     int        `json:"page_size"`
+	PurchaseCodeLike             string     `json:"purchase_code_like"`
+	DocRefLike                   string     `json:"doc_ref_like"`
+	SupplierCodeLike             string     `json:"supplier_code_like"`
+	SupplierNameLike             string     `json:"supplier_name_like"`
+	ItemsProductCodeLike         string     `json:"items_product_code_like"`
+	ItemsProductDescLike         string     `json:"items_product_desc_like"`
+	ItemsProductGroupOneNameLike string     `json:"items_product_group_one_name_like"`
+	StartCreateDate              *time.Time `json:"start_create_date"`
+	EndCreateDate                *time.Time `json:"end_create_date"`
 }
 
 type PurchaseItemResponse struct {
