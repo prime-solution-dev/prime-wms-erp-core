@@ -25,6 +25,7 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.StatusApprove,
 		req.StatusPayment,
 		req.StatusPaymentIncomplete,
+		req.Status,
 		req.ProductCodes,
 		req.PurchaseType,
 		req.DocRef,
