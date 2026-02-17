@@ -20,6 +20,8 @@ type GetQuotationRequest struct {
 	QuotationCode        []string   `json:"quotation_code"`
 	SiteCode             []string   `json:"site_code"`
 	CompanyCode          []string   `json:"company_code"`
+	CustomerCode         []string   `json:"customer_code"`
+	ProductCode          []string   `json:"product_code"`
 	QuotationCodeLike    string     `json:"quotation_code_like"`
 	CustomerCodeLike     string     `json:"customer_code_like"`
 	CustomerNameLike     string     `json:"customer_name_like"`
@@ -29,6 +31,8 @@ type GetQuotationRequest struct {
 	ExpirePriceDateEnd   *time.Time `json:"expire_price_date_end"`
 	DeliveryDateStart    *time.Time `json:"delivery_date_start"`
 	DeliveryDateEnd      *time.Time `json:"delivery_date_end"`
+	CompletedDateStart   *time.Time `json:"completed_date_start"`
+	CompletedDateEnd     *time.Time `json:"completed_date_end"`
 	Status               []string   `json:"status"`
 	StatusFilter         []string   `json:"status_filter"` // สำหรับกรองตาม status ที่แสดงใน UI
 	Page                 int        `json:"page"`
@@ -268,6 +272,15 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		query = query.Where("customer_code IN ?", req.CustomerCode)
+	}
+
+	if len(req.ProductCode) > 0 {
+		query = query.Joins("JOIN quotation_item ON quotation_item.quotation_id = quotation.id").
+			Where("quotation_item.product_code IN ?", req.ProductCode)
+	}
+
 	if len(req.QuotationCodeLike) > 0 {
 		query = query.Where("quotation_code ILIKE ?", "%"+req.QuotationCodeLike+"%")
 	}
@@ -296,6 +309,10 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
 		query = query.Where("delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
+		query = query.Where("update_date BETWEEN ? AND ? AND status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
 	}
 
 	if len(req.Status) > 0 {
@@ -331,6 +348,14 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		countQuery = countQuery.Where("customer_code IN ?", req.CustomerCode)
+	}
+
+	if len(req.ProductCode) > 0 {
+		countQuery = countQuery.Joins("JOIN quotation_item ON quotation_item.quotation_id = quotation.id").
+			Where("quotation_item.product_code IN ?", req.ProductCode)
+	}
 	// Apply same filters to count query
 	if len(req.QuotationCodeLike) > 0 {
 		countQuery = countQuery.Where("quotation_code ILIKE ?", "%"+req.QuotationCodeLike+"%")
@@ -358,6 +383,10 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
 		countQuery = countQuery.Where("delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
+		countQuery = countQuery.Where("update_date BETWEEN ? AND ? AND status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
 	}
 
 	if len(req.Status) > 0 {
