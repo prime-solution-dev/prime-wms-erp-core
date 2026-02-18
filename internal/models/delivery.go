@@ -24,7 +24,7 @@ type Delivery struct {
 	Remark           string     `json:"remark"`
 	Status           string     `json:"status"`
 	BookingSlotType  string     `json:"booking_slot_type"`
-	StatusPayment    string     `json:"status_payment"`
+	StatusApproveGi  string     `json:"status_approve_gi"`
 	CreateDate       time.Time  `json:"create_date"`
 	CreateBy         string     `json:"create_by"`
 	UpdateDate       time.Time  `json:"update_date"`

@@ -88,6 +88,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				StorageType:         []string{`NORMAL`},
 				SaleDate:            *saleReq.DeliveryDate,
 			}
+
 			verifyReq = newVerifyReq
 		}
 

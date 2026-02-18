@@ -41,18 +41,18 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	for _, customer := range customers.Customers {
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
-	prefix := ""
+	prefix := "IV"
 	if req[0].PaymentMethod == "CASH" {
-		prefix = "CC"
+		prefix = "CS"
 	}
 	if req[0].PaymentMethod == "CREDIT" {
-		prefix = "CN"
+		prefix = "IV"
 	}
-
+	configCodeValue := "RUNNING_AR"
 	count := len(req)
-	purchaseCodes, err := GeneratePurchaseCodes(ctx, count, prefix)
+	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
 	if err != nil {
-		return nil, errors.New("failed to generate purchase order codes: " + err.Error())
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
 	}
 	fmt.Println(purchaseCodes)
 
@@ -174,12 +174,12 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	return nil, nil
 }
-func GeneratePurchaseCodes(ctx *gin.Context, count int, prefix string) ([]string, error) {
+func GenerateInvoiceCodes(ctx *gin.Context, count int, prefix string, configCodeValue string) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No purchases to generate codes for
 	}
 
-	configCode := "RUNNING_AR"
+	configCode := configCodeValue
 
 	getReq := systemConfigService.GetRunningSystemConfigRequest{
 		ConfigCode: configCode,

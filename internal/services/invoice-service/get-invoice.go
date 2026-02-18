@@ -8,6 +8,7 @@ import (
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -59,8 +60,12 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	supplierReq := models.GetSupplierListRequest{}
 	productCodes := []string{}
+	siteCode := []string{}
+	companyCode := []string{}
 	invoiceCode := []string{}
 	for _, invoiceValue := range invoice {
+		siteCode = append(siteCode, invoiceValue.SiteCode)
+		companyCode = append(companyCode, invoiceValue.CompanyCode)
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
@@ -71,16 +76,18 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
+	mapProduct := map[string]models.GetProductsDetailComponent{}
+	if len(productCodes) > 0 {
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    siteCode,
+			CompanyCode: companyCode,
+		}
 
-	productReq := models.GetProductRequest{
-		ProductCode: productCodes,
-		SiteCode:    []string{req.SiteCode},
-		CompanyCode: []string{req.CompanyCode},
-	}
-
-	mapProduct, err := purchaseService.GetProductByCode(productReq)
-	if err != nil {
-		return nil, errors.New("failed to get product list: " + err.Error())
+		mapProduct, err = purchaseService.GetProductByCode(productReq)
+		if err != nil {
+			return nil, errors.New("failed to get product list: " + err.Error())
+		}
 	}
 
 	// Get Product Group One
@@ -114,11 +121,19 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	}
-
+	order := map[string]int{
+		"PRODUCT": 1,
+		"ADJUST":  2,
+		"TRANS":   3,
+		"Deposit": 4,
+	}
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
 		}
+		sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
+			return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		})
 		for j := range invoice[i].InvoiceItem {
 			if productDetail, ok := mapProduct[invoice[i].InvoiceItem[j].ProductCode]; ok {
 				invoice[i].InvoiceItem[j].ProductName = productDetail.ProductName
