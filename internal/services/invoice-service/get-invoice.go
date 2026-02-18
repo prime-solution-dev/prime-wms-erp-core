@@ -76,16 +76,18 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
+	mapProduct := map[string]models.GetProductsDetailComponent{}
+	if len(productCodes) > 0 {
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    siteCode,
+			CompanyCode: companyCode,
+		}
 
-	productReq := models.GetProductRequest{
-		ProductCode: productCodes,
-		SiteCode:    siteCode,
-		CompanyCode: companyCode,
-	}
-
-	mapProduct, err := purchaseService.GetProductByCode(productReq)
-	if err != nil {
-		return nil, errors.New("failed to get product list: " + err.Error())
+		mapProduct, err = purchaseService.GetProductByCode(productReq)
+		if err != nil {
+			return nil, errors.New("failed to get product list: " + err.Error())
+		}
 	}
 
 	// Get Product Group One
