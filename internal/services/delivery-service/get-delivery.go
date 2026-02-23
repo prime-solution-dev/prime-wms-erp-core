@@ -24,9 +24,12 @@ type GetDeliveryRequest struct {
 	SaleOrderCode            []string   `json:"sale_order_code"`
 	SiteCode                 []string   `json:"site_code"`
 	CompanyCode              []string   `json:"company_code"`
+	CustomerCode             []string   `json:"customer_code"`
 	Status                   []string   `json:"status"`
 	DeliveryCodeLike         string     `json:"delivery_code_like"`
 	DocumentRefLike          string     `json:"document_ref_like"`
+	CreateDateStart          *time.Time `json:"create_date_start"`
+	CreateDateEnd            *time.Time `json:"create_date_end"`
 	SaleOrderCreateDateStart *time.Time `json:"sale_order_create_date_start"`
 	SaleOrderCreateDateEnd   *time.Time `json:"sale_order_create_date_end"`
 	CustomerCodeLike         string     `json:"customer_code_like"`
@@ -248,6 +251,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("delivery_booking.status IN ?", req.Status)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		query = query.Where("delivery_booking.customer_code IN ?", req.CustomerCode)
+	}
+
 	// Like filters
 	if len(req.DeliveryCodeLike) > 0 {
 		query = query.Where("delivery_booking.delivery_code ILIKE ?", "%"+req.DeliveryCodeLike+"%")
@@ -288,6 +295,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Date range filters
+	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
+		query = query.Where("delivery_booking.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
+	}
+
 	if req.SaleOrderCreateDateStart != nil && req.SaleOrderCreateDateEnd != nil {
 		query = query.Where("sale.create_date BETWEEN ? AND ?", req.SaleOrderCreateDateStart, req.SaleOrderCreateDateEnd)
 	}
@@ -343,6 +354,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		countQuery = countQuery.Where("delivery_booking.status IN ?", req.Status)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		countQuery = countQuery.Where("delivery_booking.customer_code IN ?", req.CustomerCode)
+	}
+
 	// Apply same like filters to count query
 	if len(req.DeliveryCodeLike) > 0 {
 		countQuery = countQuery.Where("delivery_booking.delivery_code ILIKE ?", "%"+req.DeliveryCodeLike+"%")
@@ -381,6 +396,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Apply same date range filters to count query
+	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
+		countQuery = countQuery.Where("delivery_booking.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
+	}
+
 	if req.SaleOrderCreateDateStart != nil && req.SaleOrderCreateDateEnd != nil {
 		countQuery = countQuery.Where("sale.create_date BETWEEN ? AND ?", req.SaleOrderCreateDateStart, req.SaleOrderCreateDateEnd)
 	}
