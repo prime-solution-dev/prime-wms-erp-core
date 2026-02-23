@@ -5,12 +5,12 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'PRDTMI' 
+        TARGET_BRANCH = 'Pacifica-uat'
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '54.179.75.32'
-        SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS' // path ของ secret
-        ENV_FILE_KEY = 'thaimetalprd.env.erp'
+        REMOTE_HOST = '13.250.141.97'                   
+        SSH_KEY_PATH = '/home/ec2-user/key/paci-uat.pem' 
+        VAULT_PATH = 'JenkinsWMS/Jenkins.PacificaPRODWMS'
+        ENV_FILE_KEY = 'PacificaPROD.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
