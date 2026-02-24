@@ -71,6 +71,7 @@ type GetDeliveryResponse struct {
 	BookingSlotType  string                                        `gorm:"type:varchar(50)" json:"booking_slot_type"`
 	Remark           string                                        `gorm:"type:varchar(255)" json:"remark"`
 	StatusApproveGi  string                                        `gorm:"type:varchar(50)" json:"status_approve_gi"`
+	ExternalID       string                                        `gorm:"type:varchar(255)" json:"external_id"`
 	CreateDate       *time.Time                                    `gorm:"type:date" json:"create_date"`
 	CreateBy         string                                        `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                                    `gorm:"type:date" json:"update_date"`
