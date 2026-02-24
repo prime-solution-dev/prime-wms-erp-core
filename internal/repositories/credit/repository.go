@@ -296,6 +296,9 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if endDate != nil {
 		query = query.Where("effective_dtm <= '%s' ", endDate.Format("2006-01-02"))
 	}
+	if page == 0 {
+		page = 1
+	}
 
 	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
 	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
@@ -325,6 +328,10 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 		Count(&totalRecords).Error
 	if err != nil {
 		return nil, 0, 0, err
+	}
+
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
 	}
 
 	offset := (page - 1) * pageSize
