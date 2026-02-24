@@ -25,6 +25,7 @@ type GetQuotationRequest struct {
 	QuotationCodeLike    string     `json:"quotation_code_like"`
 	CustomerCodeLike     string     `json:"customer_code_like"`
 	CustomerNameLike     string     `json:"customer_name_like"`
+	ProductCodeLike      string     `json:"product_code_like"`
 	CreateDateStart      *time.Time `json:"create_date_start"`
 	CreateDateEnd        *time.Time `json:"create_date_end"`
 	ExpirePriceDateStart *time.Time `json:"expire_price_date_start"`
@@ -289,6 +290,11 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
 	}
 
+	if len(req.ProductCodeLike) > 0 {
+		query = query.Joins("JOIN quotation_item ON quotation_item.quotation_id = quotation.id").
+			Where("quotation_item.product_code ILIKE ?", "%"+req.ProductCodeLike+"%")
+	}
+
 	if len(req.CustomerNameLike) > 0 {
 		// ใช้ customerCode ที่ได้จากการค้นหาด้วย customer name แทนการค้นหาตรงๆ ด้วย customer_name
 		if len(customerCodesFromName) > 0 {
@@ -371,6 +377,11 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		} else {
 			countQuery = countQuery.Where("1 = 0")
 		}
+	}
+
+	if len(req.ProductCodeLike) > 0 {
+		countQuery = countQuery.Joins("JOIN quotation_item ON quotation_item.quotation_id = quotation.id").
+			Where("quotation_item.product_code ILIKE ?", "%"+req.ProductCodeLike+"%")
 	}
 
 	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
