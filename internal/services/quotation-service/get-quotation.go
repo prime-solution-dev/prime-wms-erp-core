@@ -318,11 +318,11 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
-		query = query.Where("update_date BETWEEN ? AND ? AND status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
+		query = query.Where("quotation.update_date BETWEEN ? AND ? AND quotation.status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
 	}
 
 	if len(req.Status) > 0 {
-		query = query.Where("status IN ?", req.Status)
+		query = query.Where("quotation.status IN ?", req.Status)
 	}
 
 	// Apply status filter conditions
@@ -397,11 +397,11 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
-		countQuery = countQuery.Where("update_date BETWEEN ? AND ? AND status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
+		countQuery = countQuery.Where("quotation.update_date BETWEEN ? AND ? AND quotation.status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
 	}
 
 	if len(req.Status) > 0 {
-		countQuery = countQuery.Where("status IN ?", req.Status)
+		countQuery = countQuery.Where("quotation.status IN ?", req.Status)
 	}
 
 	// Apply status filter conditions to count query
