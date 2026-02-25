@@ -7,6 +7,7 @@ import (
 	models "prime-erp-core/internal/models"
 	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
 	customerService "prime-erp-core/internal/services/customer-service"
+	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"strconv"
@@ -54,7 +55,8 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err != nil {
 		return nil, errors.New("failed to generate invoice codes: " + err.Error())
 	}
-	fmt.Println(purchaseCodes)
+
+	depositCut := []models.Deposit{}
 
 	for i := range req {
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
@@ -70,6 +72,16 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 		}
 		req[i].InvoiceCode = purchaseCodes[i]
+		for it := range req[i].InvoiceItem {
+			if req[i].InvoiceItem[it].ArticleType == "DEPOSIT" {
+				depositCut = append(depositCut, models.Deposit{
+					DepositCode: req[i].InvoiceItem[it].DocumentRef,
+					AmountUsed:  req[i].InvoiceItem[it].SubtotalExclVat,
+				})
+			}
+
+		}
+
 	}
 
 	requestData := map[string]interface{}{
@@ -172,6 +184,19 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		return createInvoiceReturn, nil
 	}
+	if len(depositCut) > 0 {
+		jsonBytesDepositCut, err := json.Marshal(depositCut)
+		if err != nil {
+			return nil, err
+		}
+
+		_, errCutDepost := depositService.CutDepost(ctx, string(jsonBytesDepositCut))
+		if errCutDepost != nil {
+			return nil, errCutDepost
+		}
+
+	}
+
 	return nil, nil
 }
 func GenerateInvoiceCodes(ctx *gin.Context, count int, prefix string, configCodeValue string) ([]string, error) {
