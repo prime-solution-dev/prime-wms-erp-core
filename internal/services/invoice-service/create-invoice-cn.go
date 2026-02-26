@@ -39,8 +39,22 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	for _, customer := range customers.Customers {
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
+	prefix := "CN"
+	if req[0].PaymentMethod == "CASH" {
+		prefix = "CC"
+	}
+	if req[0].PaymentMethod == "CREDIT" {
+		prefix = "CN"
+	}
+	configCodeValue := "RUNNING_CN"
+	count := len(req)
+	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
 
 	for i := range req {
+		req[i].InvoiceCode = invoiceCodes[i]
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
@@ -52,6 +66,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTel = conMapCustomer.Phone
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
+			req[i].PartyBranch = conMapCustomer.BranchName
 		}
 
 	}

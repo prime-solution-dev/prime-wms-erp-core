@@ -19,14 +19,18 @@ type GetSaleRequest struct {
 	Status               []string    `json:"status"`
 	StatusApprove        []string    `json:"status_approve"`
 	StatusPayment        []string    `json:"status_payment"`
+	ProductCode          []string    `json:"product_code"`
 	IsApproved           []bool      `json:"is_approved"`
 	IsAvailableQty       bool        `json:"is_available_qty"`
 	SaleCodeLike         string      `json:"sale_code_like"`
 	DocumentRefLike      string      `json:"document_ref_like"`
+	CompletedDateStart   string      `json:"completed_date_start"`
+	CompletedDateEnd     string      `json:"completed_date_end"`
 	CustomerCodeLike     string      `json:"customer_code_like"`
 	CustomerNameLike     string      `json:"customer_name_like"`
 	CreateDateStart      string      `json:"create_date_start"`
 	CreateDateEnd        string      `json:"create_date_end"`
+	ProductCodeLike      string      `json:"product_code_like"`
 	ExpirePriceDateStart string      `json:"expire_price_date_start"`
 	ExpirePriceDateEnd   string      `json:"expire_price_date_end"`
 	DeliveryDateStart    string      `json:"delivery_date_start"`
@@ -65,13 +69,17 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.Status,
 		req.StatusApprove,
 		req.StatusPayment,
+		req.ProductCode,
 		req.IsApproved,
 		req.SaleCodeLike,
 		req.DocumentRefLike,
+		req.CompletedDateStart,
+		req.CompletedDateEnd,
 		req.CustomerCodeLike,
 		req.CustomerNameLike,
 		req.CreateDateStart,
 		req.CreateDateEnd,
+		req.ProductCodeLike,
 		req.ExpirePriceDateStart,
 		req.ExpirePriceDateEnd,
 		req.DeliveryDateStart,
@@ -103,13 +111,17 @@ func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 		req.Status,
 		req.StatusApprove,
 		req.StatusPayment,
+		req.ProductCode,
 		req.IsApproved,
 		req.SaleCodeLike,
 		req.DocumentRefLike,
+		req.CompletedDateStart,
+		req.CompletedDateEnd,
 		req.CustomerCodeLike,
 		req.CustomerNameLike,
 		req.CreateDateStart,
 		req.CreateDateEnd,
+		req.ProductCodeLike,
 		req.ExpirePriceDateStart,
 		req.ExpirePriceDateEnd,
 		req.DeliveryDateStart,
