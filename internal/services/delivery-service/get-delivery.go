@@ -32,6 +32,7 @@ type GetDeliveryRequest struct {
 	CreateDateEnd            *time.Time `json:"create_date_end"`
 	SaleOrderCreateDateStart *time.Time `json:"sale_order_create_date_start"`
 	SaleOrderCreateDateEnd   *time.Time `json:"sale_order_create_date_end"`
+	ProductCodeLike          string     `json:"product_code_like"`
 	CustomerCodeLike         string     `json:"customer_code_like"`
 	CustomerNameLike         string     `json:"customer_name_like"`
 	ShipToAddressLike        string     `json:"ship_to_address_like"`
@@ -265,6 +266,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("delivery_booking.document_ref ILIKE ?", "%"+req.DocumentRefLike+"%")
 	}
 
+	if len(req.ProductCodeLike) > 0 {
+		query = query.Where("EXISTS (SELECT 1 FROM delivery_booking_item dbi WHERE dbi.delivery_id = delivery_booking.id AND dbi.product_code ILIKE ?)", "%"+req.ProductCodeLike+"%")
+	}
+
 	if len(req.CustomerCodeLike) > 0 {
 		query = query.Where("delivery_booking.customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
 	}
@@ -337,6 +342,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if len(req.NotInDeliveryCode) > 0 {
 		countQuery = countQuery.Where("delivery_booking.delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.ProductCodeLike) > 0 {
+		countQuery = countQuery.Where("EXISTS (SELECT 1 FROM delivery_booking_item dbi WHERE dbi.delivery_id = delivery_booking.id AND dbi.product_code ILIKE ?)", "%"+req.ProductCodeLike+"%")
 	}
 
 	if len(req.SaleOrderCode) > 0 {
