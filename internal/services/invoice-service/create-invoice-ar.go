@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	models "prime-erp-core/internal/models"
-	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
 	customerService "prime-erp-core/internal/services/customer-service"
+	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"strconv"
@@ -163,9 +163,16 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						Status:       "PENDING",
 					})
 				}
-				errDeposit := repositoryDeposit.CreateDeposit(deposit)
-				if errDeposit != nil {
-					return nil, errDeposit
+				if len(deposit) > 0 {
+					jsonBytesCreateDeposit, err := json.Marshal(deposit)
+					if err != nil {
+						return nil, err
+					}
+
+					_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
+					if errDeposit != nil {
+						return nil, errDeposit
+					}
 				}
 
 			}
