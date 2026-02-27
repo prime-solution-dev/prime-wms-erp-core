@@ -620,6 +620,7 @@ func getInvoiceAp(ctx *gin.Context, poCodes []string, poItems []string) (map[str
 
 	reqAp := invoiceService.GetInvoiceRequest{
 		InvoiceItemDocRef: poCodes,
+		Status:            []string{`PENDING`, `COMPLETED`},
 	}
 
 	jsonBytes, err := json.Marshal(reqAp)
