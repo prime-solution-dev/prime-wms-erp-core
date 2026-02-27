@@ -19,6 +19,7 @@ type GetPurchaseItemRemainRequest struct {
 	SupplierCodes  []string `json:"supplier_codes"`
 	StatusApprove  []string `json:"status_approve"`
 	StattusPayment []string `json:"stattus_payment"`
+	ProductCodes   []string `json:"product_codes"` // TODO: implement filter by product code in PO Item
 	Page           *int     `json:"page"`
 	PageSize       *int     `json:"limit"`
 }
@@ -572,10 +573,8 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 		for _, gri := range gr.GoodsReceiveItem {
 			grCode := gr.ReceiveCode
 			grItem := gri.ReceiveItem
-
 			ibCode := gr.DocumentRef
 			ibItem := gri.DocumentRefItem
-
 			unitCode := gri.UnitCode
 
 			key := fmt.Sprintf("%s|%s", grCode, grItem)
@@ -591,12 +590,23 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 				}
 			}
 
-			qty := 0.0
+			//case if GR Confirm more than GR Item, we only use GR Item as max
+			grQty := gri.Qty
+
+			confirmQty := 0.0
 			for _, cf := range gri.GoodsReceiveConfirm {
-				qty += cf.Qty
+				confirmQty += cf.Qty
 			}
 
-			doc.Qty += qty
+			useQty := grQty
+			if confirmQty < useQty {
+				useQty = confirmQty
+			}
+			if useQty < 0 {
+				useQty = 0
+			}
+
+			doc.Qty += useQty
 			rs[key] = doc
 		}
 	}
