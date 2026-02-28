@@ -15,6 +15,8 @@ import (
 )
 
 type GetPurchaseItemRemainRequest struct {
+	CompanyCode    string   `json:"company_code"`
+	SiteCode       string   `json:"site_code"`
 	PurchaseCodes  []string `json:"purchase_codes"`
 	SupplierCodes  []string `json:"supplier_codes"`
 	StatusApprove  []string `json:"status_approve"`
@@ -107,6 +109,14 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 
 func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
 	res := GetPurchaseItemRemainResponse{}
+
+	// validatetion
+	if strings.TrimSpace(req.CompanyCode) == "" {
+		return nil, fmt.Errorf("company_code is required")
+	}
+	if strings.TrimSpace(req.SiteCode) == "" {
+		return nil, fmt.Errorf("site_code is required")
+	}
 
 	// Optional filters (empty = no filter)
 	productSet := makeStringSetTrimUpper(req.ProductCodes)
@@ -515,10 +525,9 @@ func getPurchase(ctx *gin.Context, req GetPurchaseItemRemainRequest) (map[string
 		Status:        []string{`PENDING`},
 		StatusApprove: req.StatusApprove,
 		StatusPayment: req.StattusPayment,
-
-		// optional: if purchase service supports filtering by product codes, pass through.
-		// if not supported on that service, it should ignore/return same results.
-		ProductCodes: req.ProductCodes,
+		CompanyCode:   strings.TrimSpace(req.CompanyCode),
+		SiteCode:      strings.TrimSpace(req.SiteCode),
+		ProductCodes:  req.ProductCodes,
 	}
 
 	jsonBytes, err := json.Marshal(reqPo)
