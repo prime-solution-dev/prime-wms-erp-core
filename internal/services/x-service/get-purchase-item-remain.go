@@ -19,7 +19,7 @@ type GetPurchaseItemRemainRequest struct {
 	SupplierCodes  []string `json:"supplier_codes"`
 	StatusApprove  []string `json:"status_approve"`
 	StattusPayment []string `json:"stattus_payment"`
-	ProductCodes   []string `json:"product_codes"` // TODO: implement filter by product code in PO Item
+	ProductCodes   []string `json:"product_codes"` // optional
 	Page           *int     `json:"page"`
 	PageSize       *int     `json:"limit"`
 }
@@ -108,12 +108,15 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
 	res := GetPurchaseItemRemainResponse{}
 
+	// Optional filters (empty = no filter)
+	productSet := makeStringSetTrimUpper(req.ProductCodes)
+
 	poCodes := []string{}
-	poCosesCheck := map[string]bool{}
+	poCodesCheck := map[string]bool{}
 	poItems := []string{}
 	poItemsCheck := map[string]bool{}
 
-	// fetch purchase (PENDING)
+	// fetch purchase (PENDING) - allow upstream filter if supported (cheap)
 	poMap, err := getPurchase(ctx, req)
 	if err != nil {
 		return nil, err
@@ -122,15 +125,26 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
+	// Build PO codes, PO items (filtered by product if provided)
 	for _, po := range poMap {
-		poCode := po.PurchaseCode
-		if _, ok := poCosesCheck[poCode]; !ok {
-			poCosesCheck[poCode] = true
+		poCode := strings.TrimSpace(po.PurchaseCode)
+		if poCode == "" {
+			continue
+		}
+		if _, ok := poCodesCheck[poCode]; !ok {
+			poCodesCheck[poCode] = true
 			poCodes = append(poCodes, poCode)
 		}
 
 		for _, poi := range po.Items {
-			poItem := poi.PurchaseItem
+			// If product filter present, only keep those PO items
+			if len(productSet) > 0 && !inSetTrimUpper(productSet, poi.ProductCode) {
+				continue
+			}
+			poItem := strings.TrimSpace(poi.PurchaseItem)
+			if poItem == "" {
+				continue
+			}
 			if _, ok := poItemsCheck[poItem]; !ok {
 				poItemsCheck[poItem] = true
 				poItems = append(poItems, poItem)
@@ -138,22 +152,28 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		}
 	}
 
-	// fetch IB (PENDING)
+	// If product filter was provided but no matching PO items -> early return empty
+	if len(productSet) > 0 && len(poItems) == 0 {
+		res.Daatas = []GetPurchaseItemRemainResponseResult{}
+		return &res, nil
+	}
+
+	// fetch IB (PENDING) by filtered poCodes + poItems
 	ibDocMap, err := getInbound(poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
 
-	// prepare
+	// prepare maps
 	ibCodes := []string{}
 	ibCodesCheck := map[string]bool{}
 	ibItems := []string{}
 	ibItemsCheck := map[string]bool{}
 
 	ibDocMapPo := map[string]documentData{}    // po|item -> ibQty
-	grDocMap := map[string]documentData{}      // grCode|grItem -> grConfirmQty + ref IB
-	grRemainMapPo := map[string]documentData{} // po|item -> (grConfirm - apMatchedBy4Key)
-	ignoreSourceAp := map[string]bool{}        // po|item|gr|grItem -> true when AP matched
+	grDocMap := map[string]documentData{}      // grCode|grItem -> grUseQty + ref IB
+	grRemainMapPo := map[string]documentData{} // po|item -> (grUseQty - apMatchedBy4Key) clamp>=0
+	ignoreSourceAp := map[string]bool{}        // po|item|gr|grItem -> true when AP matched by 4-key
 	ibToPO := map[string][2]string{}           // ibCode|ibItem -> [poCode, poItem]
 
 	if len(ibDocMap) > 0 {
@@ -196,7 +216,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		}
 	}
 
-	// fetch AP
+	// fetch AP (PENDING/COMPLETED) by poCodes (optionally filter by poItems locally)
 	apDocMap, err := getInvoiceAp(ctx, poCodes, poItems)
 	if err != nil {
 		return nil, err
@@ -216,11 +236,11 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return nil, err
 	}
 
-	// compute remainQty map
-	remainMap := ComputePurchaseRemainQty(poMap, ibDocMapPo, apDocMapPo, grRemainMapPo)
+	// compute remainQty map (skip non-matching product items when filter exists)
+	remainMap := ComputePurchaseRemainQty(poMap, ibDocMapPo, apDocMapPo, grRemainMapPo, productSet)
 
-	// build response (Qty = ตั้งต้นจาก PO, RemainQty = computed)
-	results, err := ConvertToResponse(poMap, remainMap)
+	// build response (filter product again for safety)
+	results, err := ConvertToResponse(poMap, remainMap, productSet)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +284,7 @@ func ComputeReceiveRemain(
 	rs := map[string]documentData{}     // key -> poCode|poItem (sum diff)
 	ignoreSourceAp := map[string]bool{} // key -> po|item|gr|grItem
 
-	//  sum AP by 4-key (po|item|gr|grItem)
+	// sum AP by 4-key (po|item|gr|grItem)
 	apBy4Key := map[string]float64{}
 	for _, ap := range apDocMap {
 		poCode := strings.TrimSpace(ap.DocumentRef)
@@ -294,8 +314,8 @@ func ComputeReceiveRemain(
 			continue
 		}
 
-		poCode := poPair[0]
-		poItem := poPair[1]
+		poCode := strings.TrimSpace(poPair[0])
+		poItem := strings.TrimSpace(poPair[1])
 		if poCode == "" || poItem == "" {
 			continue
 		}
@@ -305,7 +325,7 @@ func ComputeReceiveRemain(
 
 		diff := gr.Qty - apQty
 		if diff < 0 {
-			diff = 0
+			diff = 0 // clamp: GR completed usually already goes to AP by confirm qty
 		}
 
 		poKey := fmt.Sprintf("%s|%s", poCode, poItem)
@@ -320,7 +340,7 @@ func ComputeReceiveRemain(
 		doc.Qty += diff
 		rs[poKey] = doc
 
-		//  mark ignore เฉพาะกรณีเจอ AP จริง
+		// mark ignore only when AP matched by 4-key and has qty
 		if hasAP && apQty > 0 {
 			ignoreSourceAp[k4] = true
 		}
@@ -368,18 +388,25 @@ func ComputePurchaseRemainQty(
 	ibDocMapPo map[string]documentData,
 	apDocMapPo map[string]documentData,
 	grRemainMapPo map[string]documentData,
+	productSet map[string]bool, // optional
 ) map[string]float64 {
 
 	remainMap := map[string]float64{} // key -> poCode|poItem
 
 	for poCode, po := range poMap {
 		for _, it := range po.Items {
+
+			// If product filter provided, compute only for those items
+			if len(productSet) > 0 && !inSetTrimUpper(productSet, it.ProductCode) {
+				continue
+			}
+
 			poItem := strings.TrimSpace(it.PurchaseItem)
 			if poItem == "" {
 				continue
 			}
 
-			key := fmt.Sprintf("%s|%s", poCode, poItem)
+			key := fmt.Sprintf("%s|%s", strings.TrimSpace(poCode), poItem)
 
 			poQty := it.Qty
 
@@ -413,14 +440,21 @@ func ComputePurchaseRemainQty(
 func ConvertToResponse(
 	poMap map[string]models.PurchaseResponse,
 	remainMap map[string]float64,
+	productSet map[string]bool, // optional
 ) ([]GetPurchaseItemRemainResponseResult, error) {
 
 	rs := []GetPurchaseItemRemainResponseResult{}
 
 	for _, po := range poMap {
 		for _, it := range po.Items {
-			key := fmt.Sprintf("%s|%s", po.PurchaseCode, strings.TrimSpace(it.PurchaseItem))
-			remain := remainMap[key] // default 0 ถ้าไม่เจอ
+
+			// If product filter provided, only return those items
+			if len(productSet) > 0 && !inSetTrimUpper(productSet, it.ProductCode) {
+				continue
+			}
+
+			key := fmt.Sprintf("%s|%s", strings.TrimSpace(po.PurchaseCode), strings.TrimSpace(it.PurchaseItem))
+			remain := remainMap[key] // default 0 if not found
 
 			r := GetPurchaseItemRemainResponseResult{
 				PurchaseID:           po.ID,
@@ -481,15 +515,18 @@ func getPurchase(ctx *gin.Context, req GetPurchaseItemRemainRequest) (map[string
 		Status:        []string{`PENDING`},
 		StatusApprove: req.StatusApprove,
 		StatusPayment: req.StattusPayment,
+
+		// optional: if purchase service supports filtering by product codes, pass through.
+		// if not supported on that service, it should ignore/return same results.
+		ProductCodes: req.ProductCodes,
 	}
 
 	jsonBytes, err := json.Marshal(reqPo)
 	if err != nil {
 		return rs, err
 	}
-	jsonString := string(jsonBytes)
 
-	resPoInf, err := purchaseService.GetPO(ctx, jsonString)
+	resPoInf, err := purchaseService.GetPO(ctx, string(jsonBytes))
 	if err != nil {
 		return rs, err
 	}
@@ -590,9 +627,8 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 				}
 			}
 
-			//case if GR Confirm more than GR Item, we only use GR Item as max
+			// Use min(GR Qty, GR Confirm Qty) to avoid confirm > base qty
 			grQty := gri.Qty
-
 			confirmQty := 0.0
 			for _, cf := range gri.GoodsReceiveConfirm {
 				confirmQty += cf.Qty
@@ -616,7 +652,9 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 
 func getInvoiceAp(ctx *gin.Context, poCodes []string, poItems []string) (map[string]documentData, error) {
 	rs := map[string]documentData{} // invoiceCode|invoiceItem -> doc
-	_ = poItems
+
+	poItemSet := makeStringSetTrimUpper(poItems)
+	poCodeSet := makeStringSetTrimUpper(poCodes)
 
 	reqAp := invoiceService.GetInvoiceRequest{
 		InvoiceItemDocRef: poCodes,
@@ -627,9 +665,8 @@ func getInvoiceAp(ctx *gin.Context, poCodes []string, poItems []string) (map[str
 	if err != nil {
 		return rs, err
 	}
-	jsonString := string(jsonBytes)
 
-	resApInf, err := invoiceService.GetInvoice(ctx, jsonString)
+	resApInf, err := invoiceService.GetInvoice(ctx, string(jsonBytes))
 	if err != nil {
 		return rs, err
 	}
@@ -645,12 +682,27 @@ func getInvoiceAp(ctx *gin.Context, poCodes []string, poItems []string) (map[str
 
 	for _, ap := range resAp.Invoice {
 		for _, api := range ap.InvoiceItem {
-			invCode := ap.InvoiceCode
-			invItem := api.InvoiceItem
-			poCode := api.DocumentRef
-			poItem := api.DocumentRefItem
-			grCode := api.SourceCode
-			grItem := api.SourceItem
+			invCode := strings.TrimSpace(ap.InvoiceCode)
+			invItem := strings.TrimSpace(api.InvoiceItem)
+			if invCode == "" || invItem == "" {
+				continue
+			}
+
+			poCode := strings.TrimSpace(api.DocumentRef)
+			poItem := strings.TrimSpace(api.DocumentRefItem)
+
+			// Safety: ensure only requested POs (even if invoice service returns extra)
+			if len(poCodeSet) > 0 && !inSetTrimUpper(poCodeSet, poCode) {
+				continue
+			}
+			// Optional: if caller filtered PO items, keep only those items
+			if len(poItemSet) > 0 && !inSetTrimUpper(poItemSet, poItem) {
+				continue
+			}
+
+			grCode := strings.TrimSpace(api.SourceCode)
+			grItem := strings.TrimSpace(api.SourceItem)
+
 			qty := api.Qty
 			unitCode := api.UnitCode
 
@@ -675,4 +727,27 @@ func getInvoiceAp(ctx *gin.Context, poCodes []string, poItems []string) (map[str
 	}
 
 	return rs, nil
+}
+
+func makeStringSetTrimUpper(xs []string) map[string]bool {
+	m := map[string]bool{}
+	for _, x := range xs {
+		v := strings.ToUpper(strings.TrimSpace(x))
+		if v == "" {
+			continue
+		}
+		m[v] = true
+	}
+	return m
+}
+
+func inSetTrimUpper(m map[string]bool, v string) bool {
+	if len(m) == 0 {
+		return true // no filter
+	}
+	k := strings.ToUpper(strings.TrimSpace(v))
+	if k == "" {
+		return false
+	}
+	return m[k]
 }
