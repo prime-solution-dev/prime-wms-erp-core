@@ -3,6 +3,7 @@ package xService
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	goodsReceiveService "prime-erp-core/external/goods-receive-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
@@ -255,6 +256,13 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return nil, err
 	}
 	res.Daatas = results
+
+	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
+	res.Daatas = paged
+	res.Page = &page
+	res.PageSize = &pageSize
+	res.Total = &total
+	res.TotalPage = &totalPages
 
 	return &res, nil
 }
@@ -759,4 +767,38 @@ func inSetTrimUpper(m map[string]bool, v string) bool {
 		return false
 	}
 	return m[k]
+}
+
+func paginateResults(
+	all []GetPurchaseItemRemainResponseResult,
+	pagePtr *int,
+	limitPtr *int,
+) (paged []GetPurchaseItemRemainResponseResult, page int, limit int, total int, totalPages int) {
+
+	// defaults
+	page = 1
+	limit = 50
+	if pagePtr != nil && *pagePtr > 0 {
+		page = *pagePtr
+	}
+	if limitPtr != nil && *limitPtr > 0 {
+		limit = *limitPtr
+	}
+
+	total = len(all)
+	if total == 0 {
+		return []GetPurchaseItemRemainResponseResult{}, page, limit, 0, 0
+	}
+
+	totalPages = int(math.Ceil(float64(total) / float64(limit)))
+	start := (page - 1) * limit
+	if start >= total {
+		return []GetPurchaseItemRemainResponseResult{}, page, limit, total, totalPages
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	return all[start:end], page, limit, total, totalPages
 }
