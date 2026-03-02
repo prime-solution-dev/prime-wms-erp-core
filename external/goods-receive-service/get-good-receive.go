@@ -208,7 +208,7 @@ func GetGoodsReceives(jsonPayload GoodsReceiveFilter) (GoddsReceiveResult, error
 		return GoddsReceiveResult{}, errors.New("Error marshaling struct to JSON:" + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_INBOUND_ENDPOINT, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", config.GET_GOODS_RECEIVE_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GoddsReceiveResult{}, errors.New("Error parsing DateTo: " + err.Error())
 	}
