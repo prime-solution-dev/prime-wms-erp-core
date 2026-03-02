@@ -82,7 +82,7 @@ func buildStatusFilterConditions(statusFilters []string) string {
 }
 
 // Create
-func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -181,6 +181,12 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		searchDocumentRefLike = fmt.Sprintf(` AND sale_item.document_ref ILIKE '%%%s%%'`, documentRefLike)
 	}
 
+	// Handle product code like search
+	searchProductCodeLike := ""
+	if len(productCodeLike) > 0 {
+		searchProductCodeLike = fmt.Sprintf(` AND sale_item.product_code ILIKE '%%%s%%'`, productCodeLike)
+	}
+
 	// Handle customer name search
 	searchCustomerByName := ""
 	if len(customerNameLike) > 0 {
@@ -230,7 +236,7 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
 		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
 		Joins("left join delivery_booking_item on sale_item.sale_item = delivery_booking_item.document_ref_item").
-		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
+		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
 		Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {

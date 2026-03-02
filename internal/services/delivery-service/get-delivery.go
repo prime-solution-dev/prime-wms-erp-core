@@ -32,6 +32,9 @@ type GetDeliveryRequest struct {
 	CreateDateEnd            *time.Time `json:"create_date_end"`
 	SaleOrderCreateDateStart *time.Time `json:"sale_order_create_date_start"`
 	SaleOrderCreateDateEnd   *time.Time `json:"sale_order_create_date_end"`
+	CompleteDateStart        *time.Time `json:"complete_date_start"`
+	CompleteDateEnd          *time.Time `json:"complete_date_end"`
+	ProductCodeLike          string     `json:"product_code_like"`
 	CustomerCodeLike         string     `json:"customer_code_like"`
 	CustomerNameLike         string     `json:"customer_name_like"`
 	ShipToAddressLike        string     `json:"ship_to_address_like"`
@@ -71,6 +74,7 @@ type GetDeliveryResponse struct {
 	BookingSlotType  string                                        `gorm:"type:varchar(50)" json:"booking_slot_type"`
 	Remark           string                                        `gorm:"type:varchar(255)" json:"remark"`
 	StatusApproveGi  string                                        `gorm:"type:varchar(50)" json:"status_approve_gi"`
+	ExternalID       string                                        `gorm:"type:varchar(255)" json:"external_id"`
 	CreateDate       *time.Time                                    `gorm:"type:date" json:"create_date"`
 	CreateBy         string                                        `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate       *time.Time                                    `gorm:"type:date" json:"update_date"`
@@ -264,6 +268,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("delivery_booking.document_ref ILIKE ?", "%"+req.DocumentRefLike+"%")
 	}
 
+	if len(req.ProductCodeLike) > 0 {
+		query = query.Where("EXISTS (SELECT 1 FROM delivery_booking_item dbi WHERE dbi.delivery_id = delivery_booking.id AND dbi.product_code ILIKE ?)", "%"+req.ProductCodeLike+"%")
+	}
+
 	if len(req.CustomerCodeLike) > 0 {
 		query = query.Where("delivery_booking.customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
 	}
@@ -295,6 +303,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Date range filters
+	if req.CompleteDateStart != nil && req.CompleteDateEnd != nil {
+		query = query.Where("delivery_booking.update_date BETWEEN ? AND ? AND delivery_booking.status = ?", req.CompleteDateStart, req.CompleteDateEnd, "COMPLETED")
+	}
+
 	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
 		query = query.Where("delivery_booking.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
 	}
@@ -336,6 +348,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if len(req.NotInDeliveryCode) > 0 {
 		countQuery = countQuery.Where("delivery_booking.delivery_code NOT IN ?", req.NotInDeliveryCode)
+	}
+
+	if len(req.ProductCodeLike) > 0 {
+		countQuery = countQuery.Where("EXISTS (SELECT 1 FROM delivery_booking_item dbi WHERE dbi.delivery_id = delivery_booking.id AND dbi.product_code ILIKE ?)", "%"+req.ProductCodeLike+"%")
 	}
 
 	if len(req.SaleOrderCode) > 0 {
@@ -396,6 +412,10 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Apply same date range filters to count query
+	if req.CompleteDateStart != nil && req.CompleteDateEnd != nil {
+		countQuery = countQuery.Where("delivery_booking.update_date BETWEEN ? AND ? AND delivery_booking.status = ?", req.CompleteDateStart, req.CompleteDateEnd, "COMPLETED")
+	}
+
 	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
 		countQuery = countQuery.Where("delivery_booking.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
 	}
