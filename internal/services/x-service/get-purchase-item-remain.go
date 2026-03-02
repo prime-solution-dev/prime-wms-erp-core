@@ -167,15 +167,11 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
-	println("in 3 : %s", time.Now().Format(time.RFC3339))
-
 	// fetch IB (PENDING) by filtered poCodes + poItems
 	ibDocMap, err := getInbound(poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
-
-	println("in 4 : %s", time.Now().Format(time.RFC3339))
 
 	// prepare maps
 	ibCodes := []string{}
@@ -236,8 +232,6 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return nil, err
 	}
 
-	println("in 6 : %s", time.Now().Format(time.RFC3339))
-
 	// compute GRDiff per PO|POItem and ignoreSourceAp
 	if len(grDocMap) > 0 {
 		grRemainMapPo, ignoreSourceAp, err = ComputeReceiveRemain(grDocMap, apDocMap, ibToPO)
@@ -261,8 +255,6 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return nil, err
 	}
 	res.Daatas = results
-
-	println("in 7 : %s", time.Now().Format(time.RFC3339))
 
 	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
 	res.Daatas = paged
