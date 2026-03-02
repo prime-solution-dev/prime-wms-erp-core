@@ -144,7 +144,11 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					//invoiceAmount = -invoiceItemMap.TotalAmount
 				}
 			}
-			invoiceAmount := -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
+			invoiceAmount := invoiceItemsValue.InvoiceTotalAmount
+			if invoiceItemsValue.InvoiceType == "CN" {
+				invoiceAmount = -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
+			}
+
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceAmount,
