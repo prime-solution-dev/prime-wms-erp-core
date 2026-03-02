@@ -14,6 +14,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	xService "prime-erp-core/internal/services/x-service"
 
 	deliveryService "prime-erp-core/internal/services/delivery-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
@@ -314,6 +315,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
+	})
+	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
+		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})
 
 	//purchase
