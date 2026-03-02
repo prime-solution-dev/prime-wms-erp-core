@@ -14,6 +14,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	systemConfigService "prime-erp-core/internal/services/system-config"
 
 	deliveryService "prime-erp-core/internal/services/delivery-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
@@ -81,6 +82,11 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
+
+	config := ctx.Group("/config")
+	config.POST("/GetSystemConfig", func(c *gin.Context) {
+		utils.ProcessRequest(c, systemConfigService.GetSystemConfig)
+	})
 
 	//quotation
 	quotation := ctx.Group("/quotation")
