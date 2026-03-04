@@ -7,29 +7,30 @@ import (
 )
 
 type Delivery struct {
-	ID               uuid.UUID  `json:"id"`
-	DeliveryCode     string     `json:"delivery_code"`
-	CompanyCode      string     `json:"company_code"`
-	SiteCode         string     `json:"site_code"`
-	DeliveryMethod   string     `json:"delivery_method"`
-	DocumentRef      string     `json:"document_ref"`
-	CustomerCode     string     `json:"customer_code"`
-	ShipToAddress    string     `json:"ship_to_address"`
-	DeliveryDate     *time.Time `json:"delivery_date"`
-	DeliveryTimeCode string     `json:"delivery_time_code"`
-	LicensePlate     string     `json:"license_plate"`
-	ContactName      string     `json:"contact_name"`
-	Tel              string     `json:"tel"`
-	TotalWeight      float64    `json:"total_weight"`
-	Remark           string     `json:"remark"`
-	Status           string     `json:"status"`
-	BookingSlotType  string     `json:"booking_slot_type"`
-	StatusApproveGi  string     `json:"status_approve_gi"`
-	ExternalID       string     `json:"external_id"`
-	CreateDate       time.Time  `json:"create_date"`
-	CreateBy         string     `json:"create_by"`
-	UpdateDate       time.Time  `json:"update_date"`
-	UpdateBy         string     `json:"update_by"`
+	ID                     uuid.UUID  `json:"id"`
+	DeliveryCode           string     `json:"delivery_code"`
+	CompanyCode            string     `json:"company_code"`
+	SiteCode               string     `json:"site_code"`
+	DeliveryMethod         string     `json:"delivery_method"`
+	DocumentRef            string     `json:"document_ref"`
+	CustomerCode           string     `json:"customer_code"`
+	ShipToAddress          string     `json:"ship_to_address"`
+	DeliveryDate           *time.Time `json:"delivery_date"`
+	DeliveryTimeCode       string     `json:"delivery_time_code"`
+	LicensePlate           string     `json:"license_plate"`
+	ContactName            string     `json:"contact_name"`
+	Tel                    string     `json:"tel"`
+	TotalWeight            float64    `json:"total_weight"`
+	Remark                 string     `json:"remark"`
+	Status                 string     `json:"status"`
+	BookingSlotType        string     `json:"booking_slot_type"`
+	StatusApproveGi        string     `json:"status_approve_gi"`
+	ExternalID             string     `json:"external_id"`
+	ExternalDocumentNumber string     `json:"external_document_number"`
+	CreateDate             time.Time  `json:"create_date"`
+	CreateBy               string     `json:"create_by"`
+	UpdateDate             time.Time  `json:"update_date"`
+	UpdateBy               string     `json:"update_by"`
 }
 
 func (Delivery) TableName() string { return "delivery_booking" }
