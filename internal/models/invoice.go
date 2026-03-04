@@ -49,7 +49,7 @@ type Invoice struct {
 	InvoiceDate              *time.Time       `json:"invoice_date"`
 	TotalDiscount            float64          `json:"total_discount"`
 	PaymentStatus            string           `gorm:"-" json:"payment_status"`
-	OriginalTaxInvoiceAmount float64          `json:"original_tax_invoice_amount"`
+	OriginalTaxInvoiceAmount float64          `gorm:"-" json:"original_tax_invoice_amount"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
