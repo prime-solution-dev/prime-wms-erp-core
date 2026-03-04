@@ -7,48 +7,49 @@ import (
 )
 
 type Invoice struct {
-	ID                     uuid.UUID        `json:"id"`
-	InvoiceCode            string           `json:"invoice_code"`
-	InvoiceRef             string           `json:"invoice_ref"`
-	InvoiceType            string           `json:"invoice_type"`
-	DocumentRefType        string           `json:"document_ref_type"`
-	DocumentRef            string           `json:"document_ref"`
-	CreditTermDay          float64          `json:"credit_term_day"`
-	PaymentDate            *time.Time       `json:"payment_date"`
-	DocumentDate           *time.Time       `json:"document_date"`
-	TaxDate                *time.Time       `json:"tax_date"`
-	TaxInvoice             string           `json:"tax_invoice"`
-	PartyType              string           `json:"party_type"`
-	PartyCode              string           `json:"party_code"`
-	PartyName              string           `json:"party_name"`
-	PartyBranch            string           `json:"party_branch"`
-	PartyAddress           string           `json:"party_address"`
-	PartyEmail             string           `json:"party_email"`
-	PartyTel               string           `json:"party_tel"`
-	PartyTaxID             string           `json:"party_tax_id"`
-	PartyExternalID        string           `gorm:"-"  json:"party_external_id"`
-	DueDate                *time.Time       `json:"due_date"`
-	TotalAmount            float64          `json:"total_amount"`
-	TotalVat               float64          `json:"total_vat"`
-	Status                 string           `json:"status"`
-	Remark                 string           `json:"remark"`
-	CreateBy               string           `gorm:"type:varchar(100)" json:"create_by"`
-	CreateDtm              time.Time        `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
-	UpdateBy               string           `gorm:"type:varchar(100)" json:"update_by"`
-	UpdateDTM              time.Time        `gorm:"autoUpdateTime;<-" json:"update_dtm"`
-	InvoiceItem            []InvoiceItem    `json:"invoice_item"`
-	InvoiceDeposit         []InvoiceDeposit `json:"invoice_deposit"`
-	CompanyCode            string           `json:"company_code"`
-	SiteCode               string           `json:"site_code"`
-	ExternalID             string           `json:"external_id"`
-	SubtotalExclVat        float64          `json:"subtotal_excl_vat"`
-	SubtotalExclVatDeposit float64          `json:"subtotal_excl_vat_deposit"`
-	PaymentMethod          string           `json:"payment_method"`
-	OwnerName              string           `json:"owner_name"`
-	PartyDocumentRef       string           `json:"party_document_ref"`
-	InvoiceDate            *time.Time       `json:"invoice_date"`
-	TotalDiscount          float64          `json:"total_discount"`
-	PaymentStatus          string           `gorm:"-" json:"payment_status"`
+	ID                       uuid.UUID        `json:"id"`
+	InvoiceCode              string           `json:"invoice_code"`
+	InvoiceRef               string           `json:"invoice_ref"`
+	InvoiceType              string           `json:"invoice_type"`
+	DocumentRefType          string           `json:"document_ref_type"`
+	DocumentRef              string           `json:"document_ref"`
+	CreditTermDay            float64          `json:"credit_term_day"`
+	PaymentDate              *time.Time       `json:"payment_date"`
+	DocumentDate             *time.Time       `json:"document_date"`
+	TaxDate                  *time.Time       `json:"tax_date"`
+	TaxInvoice               string           `json:"tax_invoice"`
+	PartyType                string           `json:"party_type"`
+	PartyCode                string           `json:"party_code"`
+	PartyName                string           `json:"party_name"`
+	PartyBranch              string           `json:"party_branch"`
+	PartyAddress             string           `json:"party_address"`
+	PartyEmail               string           `json:"party_email"`
+	PartyTel                 string           `json:"party_tel"`
+	PartyTaxID               string           `json:"party_tax_id"`
+	PartyExternalID          string           `gorm:"-"  json:"party_external_id"`
+	DueDate                  *time.Time       `json:"due_date"`
+	TotalAmount              float64          `json:"total_amount"`
+	TotalVat                 float64          `json:"total_vat"`
+	Status                   string           `json:"status"`
+	Remark                   string           `json:"remark"`
+	CreateBy                 string           `gorm:"type:varchar(100)" json:"create_by"`
+	CreateDtm                time.Time        `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
+	UpdateBy                 string           `gorm:"type:varchar(100)" json:"update_by"`
+	UpdateDTM                time.Time        `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+	InvoiceItem              []InvoiceItem    `json:"invoice_item"`
+	InvoiceDeposit           []InvoiceDeposit `json:"invoice_deposit"`
+	CompanyCode              string           `json:"company_code"`
+	SiteCode                 string           `json:"site_code"`
+	ExternalID               string           `json:"external_id"`
+	SubtotalExclVat          float64          `json:"subtotal_excl_vat"`
+	SubtotalExclVatDeposit   float64          `json:"subtotal_excl_vat_deposit"`
+	PaymentMethod            string           `json:"payment_method"`
+	OwnerName                string           `json:"owner_name"`
+	PartyDocumentRef         string           `json:"party_document_ref"`
+	InvoiceDate              *time.Time       `json:"invoice_date"`
+	TotalDiscount            float64          `json:"total_discount"`
+	PaymentStatus            string           `gorm:"-" json:"payment_status"`
+	OriginalTaxInvoiceAmount float64          `json:"original_tax_invoice_amount"`
 }
 
 func (Invoice) TableName() string { return "invoice" }
