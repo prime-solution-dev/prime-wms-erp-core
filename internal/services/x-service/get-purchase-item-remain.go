@@ -15,15 +15,21 @@ import (
 )
 
 type GetPurchaseItemRemainRequest struct {
-	CompanyCode    string   `json:"company_code"`
-	SiteCode       string   `json:"site_code"`
-	PurchaseCodes  []string `json:"purchase_codes"`
-	SupplierCodes  []string `json:"supplier_codes"`
-	StatusApprove  []string `json:"status_approve"`
-	StattusPayment []string `json:"stattus_payment"`
-	ProductCodes   []string `json:"product_codes"` // optional
-	Page           *int     `json:"page"`
-	PageSize       *int     `json:"limit"`
+	CompanyCode      string            `json:"company_code"`
+	SiteCode         string            `json:"site_code"`
+	PurchaseCodes    []string          `json:"purchase_codes"`
+	SupplierCodes    []string          `json:"supplier_codes"`
+	StatusApprove    []string          `json:"status_approve"`
+	StattusPayment   []string          `json:"stattus_payment"`
+	ProductCodes     []string          `json:"product_codes"`
+	NotPurchaseItems []NotPurchaseItem `json:"not_purchase_items,omitempty"`
+	Page             *int              `json:"page"`
+	PageSize         *int              `json:"limit"`
+}
+
+type NotPurchaseItem struct {
+	PurchaseCode string `json:"purchase_code"`
+	PurchaseItem string `json:"purchase_item"`
 }
 
 type GetPurchaseItemRemainResponse struct {
@@ -535,6 +541,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	prodSet := makeStringSetTrimUpper(req.ProductCodes)
 	approveSet := makeStringSetTrimUpper(req.StatusApprove)
 	paySet := makeStringSetTrimUpper(req.StattusPayment)
+	notPairs := normalizeNotPurchasePairs(req.NotPurchaseItems) // []pair{PO, Item}
 
 	q := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", company, site).
@@ -565,6 +572,24 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		`, setToSlice(prodSet))
 	}
 
+	if len(notPairs) > 0 {
+		valuesSQL, args := buildValuesPairsSQL(notPairs) // "(?,?),(?,?)", []interface{}{...}
+
+		q = q.Where(fmt.Sprintf(`
+			EXISTS (
+				SELECT 1
+				FROM purchase_item pi
+				WHERE pi.purchase_id = purchase.id
+				  AND NOT EXISTS (
+						SELECT 1
+						FROM (VALUES %s) v(po_code, po_item)
+						WHERE v.po_code = UPPER(LTRIM(RTRIM(purchase.purchase_code)))
+						  AND v.po_item = UPPER(LTRIM(RTRIM(pi.purchase_item)))
+				  )
+			)
+		`, valuesSQL), args...)
+	}
+
 	var purchases []models.Purchase
 	if err := q.
 		Select([]string{
@@ -586,7 +611,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		return rs, nil
 	}
 
-	ids := make([]string, 0, len(purchases)) // if uuid.UUID -> use []uuid.UUID instead
+	ids := make([]string, 0, len(purchases))
 	purchaseByID := map[string]models.Purchase{}
 	for _, p := range purchases {
 		idStr := p.ID.String()
@@ -595,37 +620,51 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	}
 
 	itemQ := gormx.Model(&models.PurchaseItem{}).
-		Where("purchase_id IN ?", ids)
+		Joins("JOIN purchase p ON p.id = purchase_item.purchase_id").
+		Where("purchase_item.purchase_id IN ?", ids)
 
 	if len(prodSet) > 0 {
-		itemQ = itemQ.Where("UPPER(LTRIM(RTRIM(product_code))) IN ?", setToSlice(prodSet))
+		itemQ = itemQ.Where("UPPER(LTRIM(RTRIM(purchase_item.product_code))) IN ?", setToSlice(prodSet))
+	}
+
+	if len(notPairs) > 0 {
+		valuesSQL, args := buildValuesPairsSQL(notPairs)
+		itemQ = itemQ.Where(fmt.Sprintf(`
+			NOT EXISTS (
+				SELECT 1
+				FROM (VALUES %s) v(po_code, po_item)
+				WHERE v.po_code = UPPER(LTRIM(RTRIM(p.purchase_code)))
+				  AND v.po_item = UPPER(LTRIM(RTRIM(purchase_item.purchase_item)))
+			)
+		`, valuesSQL), args...)
 	}
 
 	var items []models.PurchaseItem
 	if err := itemQ.
 		Select([]string{
-			"id", "purchase_id", "purchase_item",
-			"product_code", "product_desc",
-			"product_group_code", "product_group_name",
-			"doc_ref_item",
-			"qty", "unit",
-			"purchase_qty", "purchase_unit", "purchase_unit_type",
-			"price_unit",
-			"total_discount", "total_amount",
-			"unit_uom", "total_cost",
-			"total_discount_percent", "discount_type",
-			"total_vat", "subtotal_excl_vat",
-			"weight_unit", "total_weight",
-			"status", "status_payment",
-			"remark",
-			"create_by", "create_dtm", "update_by", "update_dtm",
+			"purchase_item.id", "purchase_item.purchase_id", "purchase_item.purchase_item",
+			"purchase_item.product_code", "purchase_item.product_desc",
+			"purchase_item.product_group_code", "purchase_item.product_group_name",
+			"purchase_item.doc_ref_item",
+			"purchase_item.qty", "purchase_item.unit",
+			"purchase_item.purchase_qty", "purchase_item.purchase_unit", "purchase_item.purchase_unit_type",
+			"purchase_item.price_unit",
+			"purchase_item.total_discount", "purchase_item.total_amount",
+			"purchase_item.unit_uom", "purchase_item.total_cost",
+			"purchase_item.total_discount_percent", "purchase_item.discount_type",
+			"purchase_item.total_vat", "purchase_item.subtotal_excl_vat",
+			"purchase_item.weight_unit", "purchase_item.total_weight",
+			"purchase_item.status", "purchase_item.status_payment",
+			"purchase_item.remark",
+			"purchase_item.create_by", "purchase_item.create_dtm", "purchase_item.update_by", "purchase_item.update_dtm",
 		}).
-		Order("purchase_id ASC, purchase_item ASC").
+		Order("purchase_item.purchase_id ASC, purchase_item.purchase_item ASC").
 		Find(&items).Error; err != nil {
 		return rs, err
 	}
 
-	tmp := map[string]*models.PurchaseResponse{} // build pointer then copy
+	// build response
+	tmp := map[string]*models.PurchaseResponse{} // purchaseCode -> ptr
 
 	for _, it := range items {
 		pid := it.PurchaseID.String()
@@ -634,19 +673,18 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 			continue
 		}
 
-		key := strings.TrimSpace(p.PurchaseCode)
-		if key == "" {
+		code := strings.TrimSpace(p.PurchaseCode)
+		if code == "" {
 			continue
 		}
 
-		pr, ok := tmp[key]
+		pr, ok := tmp[code]
 		if !ok {
 			base := toPurchaseResponse(p)
-			tmp[key] = &base
-			pr = tmp[key]
+			tmp[code] = &base
+			pr = tmp[code]
 		}
 
-		// Append item
 		pr.Items = append(pr.Items, toPurchaseItemResponse(it, p))
 	}
 
@@ -1016,4 +1054,46 @@ func normalizeTrimUpperSlice(xs []string) []string {
 		}
 	}
 	return out
+}
+
+type pair struct {
+	PO   string
+	Item string
+}
+
+func normalizeNotPurchasePairs(xs []NotPurchaseItem) []pair {
+	out := make([]pair, 0, len(xs))
+	seen := map[string]bool{}
+
+	for _, x := range xs {
+		po := strings.ToUpper(strings.TrimSpace(x.PurchaseCode))
+		it := strings.ToUpper(strings.TrimSpace(x.PurchaseItem))
+		if po == "" || it == "" {
+			continue
+		}
+		k := po + "|" + it
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, pair{PO: po, Item: it})
+	}
+
+	return out
+}
+
+func buildValuesPairsSQL(ps []pair) (string, []interface{}) {
+	if len(ps) == 0 {
+		return "", nil
+	}
+
+	parts := make([]string, 0, len(ps))
+	args := make([]interface{}, 0, len(ps)*2)
+
+	for _, p := range ps {
+		parts = append(parts, "(?, ?)")
+		args = append(args, p.PO, p.Item)
+	}
+
+	return strings.Join(parts, ","), args
 }
