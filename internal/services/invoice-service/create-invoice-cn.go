@@ -108,7 +108,8 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, err
 		}
 		if HookInterfaceValue != nil {
-			str, _ := HookInterfaceValue.(string)
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
 
 			invoiceValue := []models.Invoice{}
 			invoiceValue = append(invoiceValue, models.Invoice{
