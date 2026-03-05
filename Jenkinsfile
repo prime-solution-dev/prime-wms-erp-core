@@ -9,8 +9,8 @@ pipeline {
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '13.250.141.97'                   
         SSH_KEY_PATH = '/home/ec2-user/key/paci-uat.pem' 
-        VAULT_PATH = 'JenkinsWMS/Jenkins.PacificaPRODWMS'
-        ENV_FILE_KEY = 'PacificaPROD.env.erp'
+        VAULT_PATH = 'JenkinsWMS/Jenkins.PacificaUATWMS'
+        ENV_FILE_KEY = 'PacificaUAT.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
