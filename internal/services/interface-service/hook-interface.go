@@ -52,7 +52,7 @@ func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
 	if productMap != nil {
 		if idVal, exists := productMap["id"]; exists {
 			if idStr, ok := idVal.(string); ok && idStr != "" {
-				return productMap["id"].(string), nil
+				return productMap, nil
 			}
 		} else {
 			return nil, errors.New(productMap["message"].(string))
