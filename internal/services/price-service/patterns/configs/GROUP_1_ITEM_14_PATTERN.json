@@ -38,7 +38,7 @@
           }
         },
         {
-          "field": "product_group_2",
+          "field": "PG02",
           "headerName": "Product Group 2",
           "width": 150,
           "pinned": "left",
@@ -52,7 +52,7 @@
           }
         },
         {
-          "field": "product_group_1",
+          "field": "PG01",
           "headerName": "Product Group 1",
           "width": 150,
           "pinned": "left",
@@ -66,7 +66,7 @@
           }
         },
         {
-          "field": "product_group_8",
+          "field": "PG08",
           "headerName": "Type",
           "width": 120,
           "pinned": "left",
