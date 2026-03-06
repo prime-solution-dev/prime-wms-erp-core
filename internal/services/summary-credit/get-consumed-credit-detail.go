@@ -132,8 +132,12 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
 				sumPaymentTotalAmountAR += invoicePaidAmount
 			}
+			if invoiceItemsValue.InvoiceType == "DN" {
+				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
+				sumPaymentTotalAmountDN += invoicePaidAmount
+			}
 			//invoiceAmount := invoiceItemsValue.TotalAmount
-			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
+			/* invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
 			if existResultInvoiceMap {
 				if invoiceItemMap.InvoiceType == "DN" {
 					sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
@@ -144,7 +148,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
 					//invoiceAmount = -invoiceItemMap.TotalAmount
 				}
-			}
+			} */
 			invoiceAmount := invoiceItemsValue.InvoiceTotalAmount
 			if invoiceItemsValue.InvoiceType == "CN" {
 				invoiceAmount = -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
