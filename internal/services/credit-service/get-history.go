@@ -275,7 +275,7 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			return so < sj
 		}
 
-		return historyRes[o].SubmitDateTime.Before(*historyRes[j].SubmitDateTime)
+		return historyRes[o].SubmitDateTime.After(*historyRes[j].SubmitDateTime)
 
 	})
 	resultApproval := ResultHistory{
