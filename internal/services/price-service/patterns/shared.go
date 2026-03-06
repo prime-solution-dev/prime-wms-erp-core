@@ -1576,6 +1576,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.PriceWeight
 			case "before_price_weight":
 				row[fixedCol.Field] = sg.BeforePriceWeight
+			case "before_total_net_price_weight":
+				row[fixedCol.Field] = sg.BeforeTotalNetPriceWeight
 			case "extra_price_weight":
 				row[fixedCol.Field] = sg.ExtraPriceWeight
 			case "market_weight":
@@ -1612,6 +1614,118 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 			case "avg_product":
 				row[fixedCol.Field] = getAvgProductFromInventory(sg)
+			case "import_date":
+				if importDateValue != nil {
+					row[fixedCol.Field] = importDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "delivery_date":
+				if deliveryDateValue != nil {
+					row[fixedCol.Field] = deliveryDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "ton":
+				if tonValue != nil {
+					row[fixedCol.Field] = tonValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "producer":
+				if producerValue != nil {
+					row[fixedCol.Field] = producerValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "next_production":
+				if nextProductionValue != nil {
+					row[fixedCol.Field] = nextProductionValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "tsm":
+				if tsmValue != nil {
+					row[fixedCol.Field] = tsmValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "selling_fast":
+				row[fixedCol.Field] = sellingFastValue
+			case "selling_slow":
+				row[fixedCol.Field] = sellingSlowValue
+			case "stock_quantity":
+				if stockQuantityValue != nil {
+					row[fixedCol.Field] = stockQuantityValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "batch_no":
+				if batchNoValue != nil {
+					row[fixedCol.Field] = batchNoValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "warehouse":
+				if warehouseValue != nil {
+					row[fixedCol.Field] = warehouseValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "code":
+				if codeValue != nil {
+					row[fixedCol.Field] = codeValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "bkk":
+				if bkkValue != nil {
+					row[fixedCol.Field] = bkkValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "factory":
+				if factoryValue != nil {
+					row[fixedCol.Field] = factoryValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "country":
+				if countryValue != nil {
+					row[fixedCol.Field] = countryValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "institute":
+				if instituteValue != nil {
+					row[fixedCol.Field] = instituteValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_ton":
+				if awaitingProductionTonValue != nil {
+					row[fixedCol.Field] = awaitingProductionTonValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_producer":
+				if awaitingProductionProducerValue != nil {
+					row[fixedCol.Field] = awaitingProductionProducerValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_import_date":
+				if awaitingProductionImportDateValue != nil {
+					row[fixedCol.Field] = awaitingProductionImportDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_delivery_date":
+				if awaitingProductionDeliveryDateValue != nil {
+					row[fixedCol.Field] = awaitingProductionDeliveryDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
 			}
 
 			if fixedCol.DataMapping == "" {
@@ -1714,6 +1828,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[colConfig.Field] = sg.ExtraPriceUnit
 			case "before_price_weight":
 				row[colConfig.Field] = sg.BeforePriceWeight
+			case "before_total_net_price_weight":
+				row[colConfig.Field] = sg.BeforeTotalNetPriceWeight
 			case "total_net_price_weight":
 				row[colConfig.Field] = sg.TotalNetPriceWeight
 			case "price_weight":
@@ -2034,13 +2150,24 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		row["thickness_x_length"] = thicknessLength
 		row["size"] = size
 
-		// Parse UDF data for highlight flag
+		// Parse UDF data for highlight flag and others
 		isHighlightValue := false
+		hasInactiveValue := false
+		inactiveValue := false
+		var remarkValue interface{}
+
 		if len(sg.UdfJson) > 0 {
 			udfData := make(map[string]interface{})
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
+				}
+				if i, ok := udfData["inactive"].(bool); ok {
+					hasInactiveValue = true
+					inactiveValue = i
+				}
+				if r, ok := udfData["remark"]; ok {
+					remarkValue = r
 				}
 			}
 		}
@@ -2066,18 +2193,41 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 			switch colConfig.DataMapping {
 			case "is_highlight":
 				row[fieldName] = isHighlightValue
+			case "inactive":
+				if hasInactiveValue {
+					row[fieldName] = inactiveValue
+				} else {
+					row[fieldName] = false
+				}
+			case "remark":
+				row[fieldName] = remarkValue
 			case "price_weight":
 				row[fieldName] = sg.PriceWeight
+			case "before_total_net_price_weight":
+				row[fieldName] = sg.BeforeTotalNetPriceWeight
 			case "total_net_price_weight":
 				row[fieldName] = sg.TotalNetPriceWeight
+			case "extra_price_weight":
+				row[fieldName] = sg.ExtraPriceWeight
 			case "before_price_unit":
 				row[fieldName] = sg.BeforePriceUnit
 			case "total_net_price_unit":
 				row[fieldName] = sg.TotalNetPriceUnit
 			case "extra_price_unit":
 				row[fieldName] = sg.ExtraPriceUnit
+			case "weight_spec":
+				row[fieldName] = getWeightSpecFromInventory(sg)
+			case "avg_product":
+				row[fieldName] = getAvgProductFromInventory(sg)
+			case "avg_kg_stock":
+				row[fieldName] = getAvgProductFromInventory(sg)
 			default:
-				row[fieldName] = nil
+				// Fallback to empty string for string-types like remark if not matched
+				if colConfig.DataMapping == "remark" {
+					row[fieldName] = ""
+				} else {
+					row[fieldName] = nil
+				}
 			}
 		}
 	}
