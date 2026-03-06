@@ -557,7 +557,10 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		q = q.Where("UPPER(LTRIM(RTRIM(status_approve))) IN ?", setToSlice(approveSet))
 	}
 	if len(paySet) > 0 {
-		q = q.Where("UPPER(LTRIM(RTRIM(status_payment))) IN ?", setToSlice(paySet))
+		q = q.Where(
+			"COALESCE(NULLIF(UPPER(LTRIM(RTRIM(status_payment))), ''), 'PENDING') IN ?",
+			setToSlice(paySet),
+		)
 	}
 
 	// Optional product filter: use EXISTS to avoid join+dup
