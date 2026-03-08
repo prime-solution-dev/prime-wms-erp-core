@@ -40,10 +40,10 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
 	prefix := "CN"
-	if req[0].PaymentMethod == "CASH" {
+	if req[0].RefPaymentMethod == "CASH" {
 		prefix = "CC"
 	}
-	if req[0].PaymentMethod == "CREDIT" {
+	if req[0].RefPaymentMethod == "CREDIT" {
 		prefix = "CN"
 	}
 	configCodeValue := "RUNNING_CN"
