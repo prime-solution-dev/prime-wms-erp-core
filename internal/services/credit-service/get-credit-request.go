@@ -233,7 +233,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 				resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) - conMapremainDeposit
 
 		}
-		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
+		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) + credit[i].ConsumedCredit
 
 	}
 
