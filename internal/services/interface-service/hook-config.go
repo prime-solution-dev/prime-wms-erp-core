@@ -29,6 +29,7 @@ func GetHookConfig(requestData map[string]interface{}) ([]HookConfig, error) {
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
+	fmt.Println(string(jsonData))
 
 	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_document")+"/interface/get-hook-config", bytes.NewBuffer(jsonData))
 	if err != nil {
