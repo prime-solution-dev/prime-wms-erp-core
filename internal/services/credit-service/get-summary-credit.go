@@ -97,7 +97,7 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		TotalCreditLimit:    totalCreditLimit,
 		ConsumedCredit:      consumedCredit, /* math.Round(consumedCredit*100) / 100 */
 
-		BalanceCreditLimit: totalCreditLimit + consumedCredit,
+		BalanceCreditLimit: totalCreditLimit - consumedCredit,
 	}
 
 	return resultSummaryCredit, nil
