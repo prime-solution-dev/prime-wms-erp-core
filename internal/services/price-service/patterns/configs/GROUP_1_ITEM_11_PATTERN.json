@@ -99,6 +99,19 @@
           "dataMapping": "extra_price_weight"
         },
         {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 150,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 200,
+          "dataMapping": "remark"
+        },
+        {
           "field": "inactive",
           "headerName": "Inactive",
           "width": 110,
@@ -107,8 +120,15 @@
           "hide": true
         }
       ],
-      "applicableCategories": ["หมวดเหล็กแบน"],
-      "editable_suffixes": ["is_highlight", "total_net_price_weight", "remark", "inactive"],
+      "applicableCategories": [
+        "หมวดเหล็กแบน"
+      ],
+      "editable_suffixes": [
+        "is_highlight",
+        "total_net_price_weight",
+        "remark",
+        "inactive"
+      ],
       "fetchable_suffixes": [
         "total_net_price_weight"
       ]
@@ -146,12 +166,26 @@
       "GROUP_1_ITEM_11": "BuildGroup1Item11Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
     ]
   }
 }
-
