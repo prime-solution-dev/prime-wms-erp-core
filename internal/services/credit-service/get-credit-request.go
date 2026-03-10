@@ -226,11 +226,11 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-
+		credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+			resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN)
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
 		if exist {
-			credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-				resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) - conMapremainDeposit
+			credit[i].ConsumedCredit = credit[i].ConsumedCredit - conMapremainDeposit
 
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
