@@ -161,7 +161,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				InvoicePaidAmount: invoicePaidAmount,
 				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
 			})
-			consumedInvoiceItems += (invoiceAmount + invoicePaidAmount)
+			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 		}
 
 		saleAmount += (resultValue.Sale.TotalAmount + consumedInvoiceItems)

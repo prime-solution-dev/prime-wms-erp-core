@@ -87,9 +87,9 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
 
 	totalCreditLimit := creditLimit + increaseCreditLimit
-	consumedCredit := (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit
-	//consumedCredit := resultGetPaidInvoice.TotalAmount - remainDeposit
+	/* consumedCredit := (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+	resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR - resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit */
+	consumedCredit := resultGetPaidInvoice.TotalAmount - remainDeposit
 
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,
