@@ -148,6 +148,8 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		currentCreditExtraValue, exists := mapCreditExtra[credit[i].CustomerCode]
 		if exists {
 			credit[i].TemporaryIncreaseCreditLimit = currentCreditExtraValue
+		} else {
+			credit[i].TemporaryIncreaseCreditLimit = 0
 		}
 		credit[i].EffectiveDtm = mapEffectiveDtm[credit[i].CustomerCode]
 		credit[i].ExpireDtm = mapExpireDtm[credit[i].CustomerCode]
