@@ -186,13 +186,19 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		for _, sg := range resp.SubGroups {
 			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 			for _, sgk := range sg.GroupKeys {
+				// Check if item name exists in group item map, use default empty string if not found
+				itemName := groupItemMap[sgk.Value].ItemName
+				if itemName == "" {
+					itemName = sgk.Value // Fallback to the value itself if item name not found
+				}
+
 				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
 					ID:         uuid.New().String(),
 					SubGroupID: sg.ID.String(),
 					GroupCode:  sgk.Code,
 					GroupName:  groupMap[sgk.Code].GroupName,
 					ValueCode:  sgk.Value,
-					ValueName:  groupItemMap[sgk.Value].ItemName,
+					ValueName:  itemName,
 					Seq:        sgk.Seq,
 				})
 			}
@@ -237,7 +243,6 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 	// Collect all key values from all subgroups for inventory service request
 	keyValues := []externalService.InventoryByProductCodeKeyValue{}
-	fmt.Println("responses", len(responses))
 	for _, resp := range responses {
 		for _, sg := range resp.SubGroups {
 			for _, sgk := range sg.GroupKeys {
@@ -270,30 +275,61 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
 		} else {
 			// Create a map of inventory data by ID for quick lookup
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
-			supplierCodeMap := make(map[string]string)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
-				supplierCodeMap[invItem.ID] = invItem.SupplierCode
 			}
 
-			// Match inventory response to subgroups by ID and enrich
-			for i := range result {
-				for j := range result[i].SubGroups {
-					if inventoryWeight, ok := inventoryMap[result[i].SubGroups[j].ID]; ok {
-						result[i].SubGroups[j].InventoryWeight = inventoryWeight
-					}
-					if supplierCode, ok := supplierCodeMap[result[i].SubGroups[j].ID]; ok {
-						result[i].SubGroups[j].SupplierCode = supplierCode
+			// Create new result with expanded subgroups for multiple inventory records
+			newResult := []models.GetPriceListResponse{}
+
+			for _, priceList := range result {
+				priceListGroup := priceList
+
+				// Process subgroups and expand if needed
+				expandedSubGroups := []models.PriceListSubGroupResponse{}
+				for _, sg := range priceListGroup.SubGroups {
+					if inventoryWeights, ok := inventoryMap[sg.ID]; ok && len(inventoryWeights) > 0 {
+						// Create a subgroup row for each inventory record
+						for _, inv := range inventoryWeights {
+							expandedSG := sg // Copy the subgroup
+
+							// Set inventory-specific data
+							expandedSG.InventoryWeight = []models.InventoryWeightResponse{inv}
+							expandedSG.ProductCode = inv.ProductCode
+							expandedSG.SupplierCode = inv.SupplierCode
+							expandedSG.SupplierName = inv.SupplierName
+							expandedSG.BatchNo = inv.BatchNo
+
+							// Map new API fields to existing model fields
+							if inv.TotalQty > 0 {
+								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							}
+							if inv.TotalWeight > 0 {
+								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
+							}
+							if inv.AvgWeight > 0 {
+								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
+							}
+
+							expandedSubGroups = append(expandedSubGroups, expandedSG)
+						}
+					} else {
+						// No inventory data, keep original subgroup
+						expandedSubGroups = append(expandedSubGroups, sg)
 					}
 				}
+
+				priceListGroup.SubGroups = expandedSubGroups
+				newResult = append(newResult, priceListGroup)
 			}
+			result = newResult
 		}
 	}
 

@@ -281,18 +281,24 @@ type PriceListSubGroupKeyResponse struct {
 }
 
 type InventoryWeightResponse struct {
-	InventoryWeightKeyCode string  `json:"inventory_weightkey_code"`
-	ProductCode            string  `json:"product_code"`
-	CompanyCode            string  `json:"company_code"`
-	SiteCode               string  `json:"site_code"`
-	BatchNo                string  `json:"batch_no"`
-	SerialCode             string  `json:"serial_code"`
-	AvgProduct             float64 `json:"avg_product"`
-	AvgBatch               float64 `json:"avg_batch"`
-	AvgSerial              float64 `json:"avg_serial"`
-	WeightSpec             float64 `json:"weight_spec"`
-	SumQty                 float64 `json:"sum_qty"`
-	SumWeight              float64 `json:"sum_weight"`
+	Key               string  `json:"key"`
+	InventoryKeyCode  string  `json:"inventory_weightkey_code,omitempty"`
+	ProductCode       string  `json:"product_code"`
+	CompanyCode       string  `json:"company_code,omitempty"`
+	SiteCode          string  `json:"site_code,omitempty"`
+	BatchNo           string  `json:"batch_no"`
+	SerialCode        string  `json:"serial_code,omitempty"`
+	SupplierCode      string  `json:"supplier_code"`
+	SupplierName      string  `json:"supplier_name"`
+	AvgProduct        float64 `json:"avg_product,omitempty"`
+	AvgBatch          float64 `json:"avg_batch,omitempty"`
+	AvgSerial         float64 `json:"avg_serial,omitempty"`
+	AvgWeight         float64 `json:"avg_weight,omitempty"`
+	WeightSpec        float64 `json:"weight_spec,omitempty"`
+	SumQty            float64 `json:"sum_qty,omitempty"`
+	SumWeight         float64 `json:"sum_weight,omitempty"`
+	TotalQty          float64 `json:"total_qty,omitempty"`
+	TotalWeight       float64 `json:"total_weight,omitempty"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -325,6 +331,9 @@ type PriceListSubGroupResponse struct {
 	SubGroupKeys              []PriceListSubGroupKeyResponse `json:"sub_group_keys"`
 	InventoryWeight           []InventoryWeightResponse      `json:"inventory_weight,omitempty"`
 	SupplierCode              string                         `json:"supplier_code,omitempty"`
+	SupplierName              string                         `json:"supplier_name,omitempty"`
+	ProductCode               string                         `json:"product_code,omitempty"`
+	BatchNo                   string                         `json:"batch_no,omitempty"`
 }
 
 type GetPriceListResponse struct {
