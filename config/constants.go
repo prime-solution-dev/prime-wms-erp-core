@@ -22,6 +22,8 @@ var (
 	GET_GOODS_RECEIVE_ENDPOINT             string
 	GET_ORDER_DELIVERY_ENDPOINT            string
 	GET_CUSTOMER_MASTER_ENDPOINT           string
+	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT   string
+	GET_INVENTORY_BY_KEY_ENDPOINT          string
 )
 
 // Initialize sets the endpoint values (call after loading .env)
