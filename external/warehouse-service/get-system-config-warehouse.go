@@ -27,7 +27,7 @@ type SystemConfigDto struct {
 	JSON       string `json:"json,omitempty"`
 }
 
-func GetSystemConfig(jsonPayload GetSystemConfigRequest) (GetSystemConfigResponse, error) {
+func GetSystemConfigWarehouse(jsonPayload GetSystemConfigRequest) (GetSystemConfigResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {

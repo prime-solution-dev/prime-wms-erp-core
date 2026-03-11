@@ -37,7 +37,7 @@ func Initialize() {
 	GET_GOODS_RECEIVE_ENDPOINT = GetBaseURL() + "/goods-receive/get-goods-recieves"
 	GET_ORDER_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/GetOrdersDelivery"
 	GET_CUSTOMER_MASTER_ENDPOINT = GetBaseURL() + "/customer/Customer/GetCustomers"
-	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT = GetBaseURL() + "/Warehouse/get-system-config"
+	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT = GetBaseURL() + "/warehouse/Warehouse/get-system-config"
 }
 
 // HTTP Configuration
