@@ -518,11 +518,11 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 
 // getAvgProductFromInventory extracts AvgProduct from the first InventoryWeight entry
 // Returns 0.0 if inventory data is not available
-func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
+func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) string {
 	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].AvgWeight
+		return fmt.Sprintf("%.2f", sg.InventoryWeight[0].AvgWeight)
 	}
-	return 0.0
+	return ""
 }
 
 // getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry

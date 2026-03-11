@@ -224,18 +224,18 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		kg := 0.0
 		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
 			// Use AvgProduct from first inventory weight response
-			if inventoryWeight[0].AvgProduct == 0 {
+			if inventoryWeight[0].AvgWeight == 0 {
 				avgKgStock = 1.0
 			} else {
-				avgKgStock = inventoryWeight[0].AvgProduct
+				avgKgStock = inventoryWeight[0].AvgWeight
 			}
-			if inventoryWeight[0].WeightSpec == 0 {
+			if inventoryWeight[0].TotalWeight == 0 {
 				weightSpec = 1.0
 			} else {
-				weightSpec = inventoryWeight[0].WeightSpec
+				weightSpec = inventoryWeight[0].TotalWeight
 			}
-			pcs = inventoryWeight[0].SumQty
-			kg = inventoryWeight[0].SumWeight
+			pcs = inventoryWeight[0].TotalQty
+			kg = inventoryWeight[0].TotalWeight
 		}
 
 		if len(priceListFormulas) > 0 {
