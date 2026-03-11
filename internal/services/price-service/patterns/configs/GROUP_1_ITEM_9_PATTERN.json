@@ -51,7 +51,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "Size",
           "width": 140,
           "pinned": "left",
@@ -63,19 +63,19 @@
           }
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 140,
-          "dataMapping": "weight_spec",
+          "dataMapping": "total_weight",
           "cellStyle": {
             "textAlign": "left"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
-          "dataMapping": "avg_product",
+          "dataMapping": "avg_weight",
           "cellStyle": {
             "textAlign": "left"
           }
@@ -163,7 +163,7 @@
   "valueMappings": {
     "groupCodeMappings": {
       "productGroup2": "PG02",
-      "productGroup6": "PG06",
+      "PG06": "PG06",
       "productGroup7": "PG07",
       "productGroup5": "PG05",
       "productGroup3": "PG03",

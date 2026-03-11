@@ -46,7 +46,7 @@
           "dataMapping": "type"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 150,
           "pinned": "left",
@@ -55,7 +55,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
           "field": "market_weight",
@@ -70,7 +70,7 @@
           "dataMapping": "market_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "pinned": "left",
@@ -79,7 +79,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "avg_kg_stock"
+          "dataMapping": "avg_weight"
         },
         {
           "field": "is_highlight",
