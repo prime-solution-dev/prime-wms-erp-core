@@ -11,12 +11,13 @@ import (
 )
 
 type GetDepositRequest struct {
-	ID           []uuid.UUID `json:"id"`
-	DepositCode  []string    `json:"deposit_code"`
-	CustomerCode []string    `json:"customer_code"`
-	Status       []string    `json:"status"`
-	Page         int         `json:"page"`
-	PageSize     int         `json:"page_size"`
+	ID             []uuid.UUID `json:"id"`
+	DepositCode    []string    `json:"deposit_code"`
+	NotDepositCode []string    `json:"not_deposit_code"`
+	CustomerCode   []string    `json:"customer_code"`
+	Status         []string    `json:"status"`
+	Page           int         `json:"page"`
+	PageSize       int         `json:"page_size"`
 }
 type ResultDeposit struct {
 	Total      int              `json:"total"`
@@ -34,7 +35,7 @@ func GetDeposit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	deposit, totalPages, totalRecords, errDeposit := repositoryDeposit.GetDepositPreload(req.ID, req.CustomerCode, req.Status, req.DepositCode, req.Page, req.PageSize)
+	deposit, totalPages, totalRecords, errDeposit := repositoryDeposit.GetDepositPreload(req.ID, req.CustomerCode, req.Status, req.DepositCode, req.Page, req.PageSize, req.NotDepositCode)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

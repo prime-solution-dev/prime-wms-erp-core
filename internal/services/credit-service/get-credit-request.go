@@ -32,6 +32,10 @@ type GetCreditReq struct {
 	BalanceCreditLimitLike  float64     `json:"balance_credit_limit_like"`
 	CustomerStatus          *bool       `json:"customer_status"`
 	PendingApprove          string      `json:"pending_approve"`
+	CompletedDateStart      *time.Time  `json:"completed_date_start"`
+	CompletedDateEnd        *time.Time  `json:"completed_date_end"`
+	CreateDateStart         *time.Time  `json:"create_date_start"`
+	CreateDateEnd           *time.Time  `json:"create_date_end"`
 }
 type ResultCreditRequest struct {
 	Total         int                    `json:"total"`
@@ -76,7 +80,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove)
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd)
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -144,6 +148,8 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		currentCreditExtraValue, exists := mapCreditExtra[credit[i].CustomerCode]
 		if exists {
 			credit[i].TemporaryIncreaseCreditLimit = currentCreditExtraValue
+		} else {
+			credit[i].TemporaryIncreaseCreditLimit = 0
 		}
 		credit[i].EffectiveDtm = mapEffectiveDtm[credit[i].CustomerCode]
 		credit[i].ExpireDtm = mapExpireDtm[credit[i].CustomerCode]
@@ -222,11 +228,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-
+		credit[i].ConsumedCredit = resultGetPaidInvoice.TotalAmount
+		/* credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
+		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) */
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
 		if exist {
-			credit[i].ConsumedCredit = conMapremainDeposit - (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-				resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN)
+			credit[i].ConsumedCredit = credit[i].ConsumedCredit - conMapremainDeposit
 
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit

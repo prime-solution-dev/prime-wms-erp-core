@@ -139,9 +139,9 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				invoice[i].InvoiceItem[j].ProductName = productDetail.ProductName
 				if len(productDetail.ProductGroups) > 0 {
 					for _, productGroups := range productDetail.ProductGroups {
-						if productGroups.GroupCode == "PRODUCT_GROUP1" {
-							invoice[i].InvoiceItem[j].ProductGroup = productGroups.GroupValue
-						}
+
+						invoice[i].InvoiceItem[j].ProductGroup = productGroups.GroupValue
+
 					}
 
 				}

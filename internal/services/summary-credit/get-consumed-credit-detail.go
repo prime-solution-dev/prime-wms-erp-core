@@ -120,6 +120,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	for _, resultValue := range result {
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
+		consumedInvoiceItems := 0.0
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
 			invoicePaidAmount := 0.00
 			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
@@ -129,35 +130,41 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 			if invoiceItemsValue.InvoiceType == "AR" {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
-				sumPaymentTotalAmountAR += invoicePaidAmount
+				//sumPaymentTotalAmountAR += invoicePaidAmount
+			}
+			if invoiceItemsValue.InvoiceType == "DN" {
+				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
+				//sumPaymentTotalAmountDN += invoicePaidAmount
 			}
 			//invoiceAmount := invoiceItemsValue.TotalAmount
 			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
 			if existResultInvoiceMap {
 				if invoiceItemMap.InvoiceType == "DN" {
-					sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
+					//sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
 					sumPaymentTotalAmountDN += invoicePaidAmount
 				}
 
-				if invoiceItemMap.InvoiceType == "CN" {
+				/* if invoiceItemMap.InvoiceType == "CN" {
 					sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
 					//invoiceAmount = -invoiceItemMap.TotalAmount
-				}
+				} */
 			}
 			invoiceAmount := invoiceItemsValue.InvoiceTotalAmount
 			if invoiceItemsValue.InvoiceType == "CN" {
 				invoiceAmount = -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
+				sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
 			}
 
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceAmount,
 				InvoicePaidAmount: invoicePaidAmount,
-				ConsumedAmount:    invoiceAmount + invoicePaidAmount,
+				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
 			})
+			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 		}
 
-		saleAmount += resultValue.Sale.TotalAmount
+		saleAmount += (resultValue.Sale.TotalAmount + consumedInvoiceItems)
 
 		detail := ConsumedCreditDetail{
 			SaleCode:       resultValue.Sale.SaleCode,

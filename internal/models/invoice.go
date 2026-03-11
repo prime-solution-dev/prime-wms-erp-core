@@ -44,6 +44,7 @@ type Invoice struct {
 	SubtotalExclVat          float64          `json:"subtotal_excl_vat"`
 	SubtotalExclVatDeposit   float64          `json:"subtotal_excl_vat_deposit"`
 	PaymentMethod            string           `json:"payment_method"`
+	RefPaymentMethod         string           `gorm:"-"  json:"ref_payment_method"`
 	OwnerName                string           `json:"owner_name"`
 	PartyDocumentRef         string           `json:"party_document_ref"`
 	InvoiceDate              *time.Time       `json:"invoice_date"`
