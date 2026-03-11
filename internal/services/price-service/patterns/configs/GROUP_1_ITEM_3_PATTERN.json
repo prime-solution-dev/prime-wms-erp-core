@@ -35,7 +35,7 @@
           "dataMapping": "PG06"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 120,
 
@@ -47,7 +47,7 @@
           "dataMapping": ""
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 120,
 

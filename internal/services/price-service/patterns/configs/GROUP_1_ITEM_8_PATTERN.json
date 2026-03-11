@@ -25,7 +25,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "หนา",
           "width": 120,
           "pinned": "left",
@@ -35,18 +35,15 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
-        {
-          "field": "ship_no",
-          "headerName": "Ship No.",
-          "width": 150,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "dataMapping": "ship_no"
         }
       ],
       "columns": [
+        {
+          "field": "batch_no",
+          "headerName": "Ship No.",
+          "width": 150,
+          "dataMapping": "batch_no"
+        },
         {
           "field": "quantity",
           "headerName": "ลูก",
@@ -91,22 +88,22 @@
           "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 140,
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "cellStyle": {
             "textAlign": "right"
           },
-          "dataMapping": "avg_product"
+          "dataMapping": "avg_weight"
         },
         {
           "field": "institute",
@@ -133,10 +130,10 @@
           "dataMapping": "code"
         },
         {
-          "field": "factory",
+          "field": "supplier_name",
           "headerName": "โรงงาน",
           "width": 130,
-          "dataMapping": "factory"
+          "dataMapping": "supplier_name"
         },
         {
           "field": "grade",
@@ -207,7 +204,7 @@
         "extra_price_unit"
       ],
       "summary": {
-        "rowGroupField": "product_group_6",
+        "rowGroupField": "PG06",
         "labelField": "quantity",
         "labelValue": "รวม",
         "columns": [
@@ -249,6 +246,7 @@
   },
   "valueMappings": {
     "groupCodeMappings": {
+      "productGroup1": "PG01",
       "productGroup2": "PG02",
       "productGroup6": "PG06",
       "productGroup7": "PG07",
@@ -262,12 +260,26 @@
       "GROUP_1_ITEM_8": "BuildGroup1Item8Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
     ]
   }
 }
-

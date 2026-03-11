@@ -29,7 +29,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "หนา",
           "width": 140,
           "pinned": "left",
@@ -117,16 +117,16 @@
           "dataMapping": "warehouse"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock_ton",
+          "field": "avg_weight_ton",
           "headerName": "Avg.kg stock (Tons)",
           "width": 150,
-          "dataMapping": "avg_product"
+          "dataMapping": "avg_weight"
         },
         {
           "field": "remark",
@@ -178,7 +178,7 @@
   "valueMappings": {
     "groupCodeMappings": {
       "productGroup2": "PG02",
-      "productGroup6": "PG06",
+      "PG06": "PG06",
       "productGroup7": "PG07",
       "productGroup5": "PG05",
       "productGroup3": "PG03",

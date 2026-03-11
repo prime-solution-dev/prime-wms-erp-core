@@ -186,7 +186,7 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
