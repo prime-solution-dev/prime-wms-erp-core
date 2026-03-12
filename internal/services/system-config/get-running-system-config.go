@@ -139,6 +139,9 @@ func GetRunningSystemConfigInvoice(ctx *gin.Context, jsonPayload string) (interf
 
 	currentMonth := now.Format("01") // MM format (11 for November)
 	currentYear := now.Year() + 543  // Full year format (2025)
+	if req.ConfigCode == "RUNNING_AP" {
+		currentYear = now.Year()
+	}
 	shortYearBE := fmt.Sprintf("%02d", currentYear%100)
 
 	// Check if year and month match current and reset if needed
