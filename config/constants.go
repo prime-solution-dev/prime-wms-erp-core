@@ -22,12 +22,14 @@ var (
 	GET_GOODS_RECEIVE_ENDPOINT             string
 	GET_ORDER_DELIVERY_ENDPOINT            string
 	GET_CUSTOMER_MASTER_ENDPOINT           string
+	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT   string
+	GET_INVENTORY_BY_KEY_ENDPOINT          string
 )
 
 // Initialize sets the endpoint values (call after loading .env)
 func Initialize() {
 	GET_INVENTORY_ATP_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/GetInventoryAtp"
-	GET_INVENTORY_BY_PRODUCT_CODE_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/get/inventory-by-product-code"
+	GET_INVENTORY_BY_KEY_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/get-inventory-weight-by-key"
 	CREATE_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CreateOrders"
 	UPDATE_ORDER_BY_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/UpdateOrderByDelivery"
 	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrders"
@@ -36,6 +38,7 @@ func Initialize() {
 	GET_GOODS_RECEIVE_ENDPOINT = GetBaseURL() + "/goods-receive/get-goods-recieves"
 	GET_ORDER_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/GetOrdersDelivery"
 	GET_CUSTOMER_MASTER_ENDPOINT = GetBaseURL() + "/customer/Customer/GetCustomers"
+	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT = GetBaseURL() + "/warehouse/Warehouse/get-system-config"
 }
 
 // HTTP Configuration
