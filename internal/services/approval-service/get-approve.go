@@ -42,8 +42,10 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errApproval
 	}
 	mdiItemCode := []string{}
+	userCodeApprovalValue := []string{}
 	for _, approvalValue := range approval {
 		mdiItemCode = append(mdiItemCode, approvalValue.MDItemCode)
+		userCodeApprovalValue = append(userCodeApprovalValue, approvalValue.CreateBy)
 	}
 
 	requestData := map[string]interface{}{
@@ -59,7 +61,7 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		userCode = append(userCode, requesterValue.RequesterCode)
 	}
 	requestDataGetUserApproval := map[string]interface{}{
-		"user_code":        userCode,
+		"user_code":        userCodeApprovalValue,
 		"module_item_code": mdiItemCode,
 		"active":           true,
 	}

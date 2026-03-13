@@ -23,6 +23,11 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	approvalValue := []models.Approval{}
 	approvalIDForReturn := []uuid.UUID{}
 	//createdAt := time.Now()
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 	for i := range req {
 		creditID := uuid.New()
 		req[i].ID = creditID
@@ -47,7 +52,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			Remark:        "",
 			CurentStepSeq: 1,
 			MDItemCode:    "CTM-CTM1",
-			CreateBy:      "User-1",
+			CreateBy:      userID,
 		}
 		approvalValue = append(approvalValue, approval)
 	}
