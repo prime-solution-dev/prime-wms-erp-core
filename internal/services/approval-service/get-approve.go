@@ -75,7 +75,7 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if userApproval.Data[j].CondRangeMin == nil {
 			return true
 		}
-		return *userApproval.Data[i].CondRangeMin < *userApproval.Data[j].CondRangeMin
+		return *userApproval.Data[i].CondRangeMin > *userApproval.Data[j].CondRangeMin
 	})
 	approvalItemPermission := map[string][]models.ApprovalItemPermission{}
 	for _, userApprovalValue := range userApproval.Data {
@@ -83,21 +83,22 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if userApprovalValue.CondRangeMin == nil {
 			continue
 		}
-		if float64(*userApprovalValue.CondRangeMin) > req.CondRangeMin {
+		if req.CondRangeMin >= float64(*userApprovalValue.CondRangeMin) {
 			_, ok := userCode[userApprovalValue.ApproveCode]
 			if ok {
-				approvalItemPermission[userApprovalValue.ModuleItemID] = append(approvalItemPermission[userApprovalValue.ModuleItemID], models.ApprovalItemPermission{
+				approvalItemPermission[userApprovalValue.ModuleItemCode] = append(approvalItemPermission[userApprovalValue.ModuleItemCode], models.ApprovalItemPermission{
 					UserCode: userApprovalValue.ApproveCode,
 				})
 			}
 			for _, secondarysValue := range userApprovalValue.Secondarys {
 				_, ok := userCode[secondarysValue.ApproveCode]
 				if ok {
-					approvalItemPermission[userApprovalValue.ModuleItemID] = append(approvalItemPermission[userApprovalValue.ModuleItemID], models.ApprovalItemPermission{
+					approvalItemPermission[userApprovalValue.ModuleItemCode] = append(approvalItemPermission[userApprovalValue.ModuleItemCode], models.ApprovalItemPermission{
 						UserCode: secondarysValue.ApproveCode,
 					})
 				}
 			}
+			break
 		}
 	}
 
