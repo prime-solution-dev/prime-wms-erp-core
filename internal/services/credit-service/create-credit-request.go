@@ -51,7 +51,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			Status:        "PENDING",
 			Remark:        "",
 			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
+			MDItemCode:    "CTM-CTM7",
 			CreateBy:      userID,
 		}
 		approvalValue = append(approvalValue, approval)
