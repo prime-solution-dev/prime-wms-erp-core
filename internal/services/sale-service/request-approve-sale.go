@@ -92,7 +92,7 @@ func RequestApproveSale(ctx *gin.Context, jsonPayload string) (interface{}, erro
 			DocumentCode: sale.SaleCode,
 			Status:       "PENDING",
 			Remark:       "",
-			MDItemCode:   "CTM-CTM4",
+			MDItemCode:   "CTM-CTM5",
 			CreateBy:     userID,
 			DocumentData: saleJSON,
 		}}
