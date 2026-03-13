@@ -13,6 +13,8 @@ import (
 
 type OutStandingSoRes struct {
 	ID            uuid.UUID  `json:"id"`
+	CustomerCode  string     `json:"customer_code"`
+	CustomerName  string     `json:"customer_name"`
 	SaleCode      string     `json:"sale_code"`
 	SaleDate      *time.Time `json:"sale_date"`
 	SaleAmount    float64    `json:"sale_amount"`
@@ -84,6 +86,8 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 		detail := OutStandingSoRes{
 			ID:            resultValue.Sale.ID,
+			CustomerCode:  resultValue.Sale.CustomerCode,
+			CustomerName:  resultValue.Sale.CustomerName,
 			SaleCode:      resultValue.Sale.SaleCode,
 			SaleDate:      resultValue.Sale.DeliveryDate,
 			SaleAmount:    resultValue.Sale.TotalAmount,

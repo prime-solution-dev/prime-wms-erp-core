@@ -106,10 +106,8 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			RequestData: req,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
-		if err != nil {
-			return nil, err
-		}
+		HookInterfaceValue, _ := interfaceService.HookInterface(requestDataCreateHook)
+
 		if HookInterfaceValue != nil {
 			externalID := HookInterfaceValue.(map[string]interface{})
 			str, _ := externalID["id"].(string)
