@@ -26,7 +26,11 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	//approvalItemPermissionValue := []models.ApprovalItemPermission{}
 	approvalIDForReturn := []uuid.UUID{}
 	mdiItemCode := []string{}
-
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 	for _, approval := range req {
 		mdiItemCode = append(mdiItemCode, approval.MDItemCode)
 	}
@@ -81,7 +85,8 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		/* 	jsonDataApproval, _ := json.Marshal(req[i])
 		req[i].DocumentData = jsonDataApproval */
 		req[i].ApprovalItem = []models.ApprovalItem{}
-
+		req[i].CreateBy = userID
+		req[i].UpdateBy = userID
 		approvalValue = append(approvalValue, req[i])
 	}
 
