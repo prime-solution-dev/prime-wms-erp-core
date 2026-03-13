@@ -5,7 +5,8 @@ import (
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryApproval "prime-erp-core/internal/repositories/approval"
-	authenticationService "prime-erp-core/internal/services/authentication-service"
+
+	//authenticationService "prime-erp-core/internal/services/authentication-service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	approvalValue := []models.Approval{}
 	approvalItemValue := []models.ApprovalItem{}
-	approvalItemPermissionValue := []models.ApprovalItemPermission{}
+	//approvalItemPermissionValue := []models.ApprovalItemPermission{}
 	approvalIDForReturn := []uuid.UUID{}
 	mdiItemCode := []string{}
 
@@ -30,14 +31,14 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mdiItemCode = append(mdiItemCode, approval.MDItemCode)
 	}
 
-	requestData := map[string]interface{}{
+	/* requestData := map[string]interface{}{
 		"md_item_code": mdiItemCode,
 		"action_code":  []string{"APPROVE"},
 	}
 	requester, errGetRequester := authenticationService.GetRequester(requestData)
 	if errGetRequester != nil {
 		return nil, errGetRequester
-	}
+	} */
 
 	for i, approval := range req {
 
@@ -60,7 +61,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ApprovalItemPermission: []models.ApprovalItemPermission{},
 		}
 
-		for _, requesterValue := range requester {
+		/* for _, requesterValue := range requester {
 			approvalItemPermissionID := uuid.New()
 			newApprovalItemPermission := models.ApprovalItemPermission{
 				ID:             approvalItemPermissionID,
@@ -68,7 +69,8 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				UserCode:       requesterValue.RequesterCode,
 			}
 			approvalItemPermissionValue = append(approvalItemPermissionValue, newApprovalItemPermission)
-		}
+		} */
+
 		approvalItemValue = append(approvalItemValue, newApprovalItem)
 
 		if req[i].ApproveCode != "" {
@@ -83,7 +85,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		approvalValue = append(approvalValue, req[i])
 	}
 
-	errCreateApproval := repositoryApproval.CreateApproval(approvalValue, approvalItemValue, approvalItemPermissionValue)
+	errCreateApproval := repositoryApproval.CreateApproval(approvalValue, approvalItemValue, []models.ApprovalItemPermission{})
 	if errCreateApproval != nil {
 		return nil, errCreateApproval
 	}
