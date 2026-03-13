@@ -81,6 +81,11 @@ func RequestApproveSale(ctx *gin.Context, jsonPayload string) (interface{}, erro
 	}
 	approvalResponse, ok := approvalResult.(approvalService.ResultApproval)
 	if !ok || len(approvalResponse.ApprovalRes) == 0 {
+		conUserID, _ := ctx.Get("user")
+		userID := ""
+		if conUserID != nil {
+			userID = conUserID.(string)
+		}
 		createApprovalReq := []models.Approval{{
 			ApproveTopic: "QPC ",
 			DocumentType: "SO",
@@ -88,7 +93,7 @@ func RequestApproveSale(ctx *gin.Context, jsonPayload string) (interface{}, erro
 			Status:       "PENDING",
 			Remark:       "",
 			MDItemCode:   "CTM-CTM4",
-			CreateBy:     "ADMIN",
+			CreateBy:     userID,
 			DocumentData: saleJSON,
 		}}
 

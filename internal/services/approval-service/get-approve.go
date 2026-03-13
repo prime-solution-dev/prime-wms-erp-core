@@ -87,14 +87,16 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			_, ok := userCode[userApprovalValue.ApproveCode]
 			if ok {
 				approvalItemPermission[userApprovalValue.ModuleItemCode] = append(approvalItemPermission[userApprovalValue.ModuleItemCode], models.ApprovalItemPermission{
-					UserCode: userApprovalValue.ApproveCode,
+					UserCode:    userApprovalValue.ApproveCode,
+					AutoApprove: userApprovalValue.AutoApprove,
 				})
 			}
 			for _, secondarysValue := range userApprovalValue.Secondarys {
 				_, ok := userCode[secondarysValue.ApproveCode]
 				if ok {
 					approvalItemPermission[userApprovalValue.ModuleItemCode] = append(approvalItemPermission[userApprovalValue.ModuleItemCode], models.ApprovalItemPermission{
-						UserCode: secondarysValue.ApproveCode,
+						UserCode:    secondarysValue.ApproveCode,
+						AutoApprove: userApprovalValue.AutoApprove,
 					})
 				}
 			}

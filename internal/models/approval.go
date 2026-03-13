@@ -54,6 +54,7 @@ type ApprovalItemPermission struct {
 	ID             uuid.UUID `json:"id"`
 	ApprovalItemID uuid.UUID `json:"approval_item_id"`
 	UserCode       string    `json:"user_code"`
+	AutoApprove    bool      `gorm:"-" json:"auto_approve"`
 }
 
 func (ApprovalItemPermission) TableName() string {
