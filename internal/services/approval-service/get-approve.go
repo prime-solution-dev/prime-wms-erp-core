@@ -47,7 +47,6 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mdiItemCode = append(mdiItemCode, approvalValue.MDItemCode)
 		userCodeApprovalValue = append(userCodeApprovalValue, approvalValue.CreateBy)
 	}
-
 	requestData := map[string]interface{}{
 		"md_item_code": mdiItemCode,
 		"action_code":  []string{"APPROVE"},
@@ -56,9 +55,9 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if errGetRequester != nil {
 		return nil, errGetRequester
 	}
-	userCode := []string{}
+	userCode := map[string]string{}
 	for _, requesterValue := range requester {
-		userCode = append(userCode, requesterValue.RequesterCode)
+		userCode[requesterValue.RequesterCode] = requesterValue.RequesterCode
 	}
 	requestDataGetUserApproval := map[string]interface{}{
 		"user_code":        userCodeApprovalValue,
@@ -80,20 +79,28 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	})
 	approvalItemPermission := map[string][]models.ApprovalItemPermission{}
 	for _, userApprovalValue := range userApproval.Data {
+
 		if userApprovalValue.CondRangeMin == nil {
 			continue
 		}
 		if float64(*userApprovalValue.CondRangeMin) > req.CondRangeMin {
-			approvalItemPermission[userApprovalValue.ModuleItemID] = append(approvalItemPermission[userApprovalValue.ModuleItemID], models.ApprovalItemPermission{
-				UserCode: userApprovalValue.ApproveCode,
-			})
-			for _, secondarysValue := range userApprovalValue.Secondarys {
+			_, ok := userCode[userApprovalValue.ApproveCode]
+			if ok {
 				approvalItemPermission[userApprovalValue.ModuleItemID] = append(approvalItemPermission[userApprovalValue.ModuleItemID], models.ApprovalItemPermission{
-					UserCode: secondarysValue.ApproveCode,
+					UserCode: userApprovalValue.ApproveCode,
 				})
+			}
+			for _, secondarysValue := range userApprovalValue.Secondarys {
+				_, ok := userCode[secondarysValue.ApproveCode]
+				if ok {
+					approvalItemPermission[userApprovalValue.ModuleItemID] = append(approvalItemPermission[userApprovalValue.ModuleItemID], models.ApprovalItemPermission{
+						UserCode: secondarysValue.ApproveCode,
+					})
+				}
 			}
 		}
 	}
+
 	for a := range approval {
 		approvalItemPermissionResult, existsapprovalItemPermission := approvalItemPermission[approval[a].MDItemCode]
 		if existsapprovalItemPermission {

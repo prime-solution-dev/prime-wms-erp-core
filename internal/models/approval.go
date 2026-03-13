@@ -22,7 +22,7 @@ type Approval struct {
 	CreateDate    time.Time      `gorm:"autoCreateTime;<-:create" json:"create_date"`
 	UpdateBy      string         `json:"update_by"`
 	UpdateDate    time.Time      `gorm:"autoUpdateTime;<-" json:"update_date"`
-	MDItemCode    string         `gorm:"-" json:"md_item_code"`
+	MDItemCode    string         `json:"md_item_code"`
 	ApprovalItem  []ApprovalItem `gorm:"foreignKey:ApprovalID;references:ID" json:"approval_item"`
 }
 
