@@ -63,6 +63,7 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"user_code":        userCodeApprovalValue,
 		"module_item_code": mdiItemCode,
 		"active":           true,
+		"is_not_expired":   true,
 	}
 	userApproval, errGetUserApproval := authenticationService.GetUserApproval(requestDataGetUserApproval)
 	if errGetUserApproval != nil {
