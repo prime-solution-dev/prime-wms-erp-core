@@ -3,8 +3,10 @@ package purchaseService
 import (
 	"encoding/json"
 	"errors"
+	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
+	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +25,17 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to generate purchase order codes: " + err.Error())
 	}
+
+	userCode := ""
+	if ctx != nil {
+		userCode = ctx.GetString("user")
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
 
 	purchase := []models.Purchase{}
 	for i, p := range req.Purchases {
@@ -51,8 +64,10 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		mappedPurchase.DocRefType = &docRefType
 		mappedPurchase.DocRef = &docRef
 		mappedPurchase.TradingRef = p.TradingRef
-		mappedPurchase.CreateBy = "system"
+		mappedPurchase.CreateBy = userCode
+		mappedPurchase.UpdateBy = userCode
 		mappedPurchase.CreateDtm = time.Now().UTC()
+		mappedPurchase.UpdateDtm = time.Now().UTC()
 
 		purchaseItems := []models.PurchaseItem{}
 		for _, item := range p.Items {
@@ -64,11 +79,36 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		mappedPurchase.PurchaseItems = purchaseItems
 
+		if p.Status == "PENDING" {
+			// Check auto approval for PENDING status
+			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
+				RequestUserCode: userCode,
+				ModuleCode:      "CUSTOMIZE",
+				TopicCode:       "CUSTOMIZE",
+				MdItemCode:      "CTM-CTM3",
+				CondRangeMin:    p.TotalAmount,
+				// TODO: Add module_code, topic_code, md_item_code
+			}
+
+			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			if err != nil {
+				return nil, err
+			}
+
+			if autoApprovalRes.IsAutoApproved {
+				mappedPurchase.IsApproved = true
+				mappedPurchase.StatusApprove = "COMPLETED"
+			} else {
+				mappedPurchase.IsApproved = false
+				mappedPurchase.StatusApprove = "PROCESS"
+			}
+		}
+
 		purchase = append(purchase, mappedPurchase)
 	}
 
 	// Create purchase
-	if err := purchaseRepository.CreatePurchase(purchase); err != nil {
+	if err := purchaseRepository.CreatePurchase(gormx, purchase); err != nil {
 		return nil, errors.New("failed to create purchase: " + err.Error())
 	}
 
