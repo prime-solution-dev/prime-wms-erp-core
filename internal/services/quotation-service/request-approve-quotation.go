@@ -81,6 +81,11 @@ func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{},
 	}
 	approvalResponse, ok := approvalResult.(approvalService.ResultApproval)
 	if !ok || len(approvalResponse.ApprovalRes) == 0 {
+		conUserID, _ := ctx.Get("user")
+		userID := ""
+		if conUserID != nil {
+			userID = conUserID.(string)
+		}
 		createApprovalReq := []models.Approval{{
 			ApproveTopic: "QPC ",
 			DocumentType: "QO",
@@ -88,7 +93,7 @@ func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{},
 			Status:       "PENDING",
 			Remark:       "",
 			MDItemCode:   "CTM-CTM4",
-			CreateBy:     "ADMIN",
+			CreateBy:     userID,
 			DocumentData: quotationJSON,
 		}}
 

@@ -34,3 +34,6 @@ Jenkinsfile
 # .vscode/
 .cursor/
 .agents/
+.agent/
+.claude/
+

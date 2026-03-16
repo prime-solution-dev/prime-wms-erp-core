@@ -59,7 +59,7 @@ func GetApprovalPreload(id []uuid.UUID, approveCode []string, status []string, d
 	var approvalID []uuid.UUID
 	gormx.Table("approval").Select("approval.id").
 		Joins("inner join approval_item on approval.id = approval_item.approval_id").
-		Joins("inner join approval_item_permission on approval_item.id = approval_item_permission.approval_item_id").
+		//Joins("inner join approval_item_permission on approval_item.id = approval_item_permission.approval_item_id").
 		Where("1=1 " + searchID + "" + searchApproveCode + "" + searchStatus + "" + searchDocumentCode + "").
 		Group("approval.id").Scan(&approvalID)
 
@@ -67,7 +67,7 @@ func GetApprovalPreload(id []uuid.UUID, approveCode []string, status []string, d
 
 		var count = len(approvalID)
 
-		query := gormx.Preload("ApprovalItem.ApprovalItemPermission")
+		query := gormx.Preload("ApprovalItem")
 
 		query = query.Where("id in (?)", approvalID)
 
