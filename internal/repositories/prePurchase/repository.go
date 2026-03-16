@@ -113,13 +113,7 @@ func GetPOBigLotList(
 }
 
 // Update
-func UpdatePOBigLot(prePurchases []models.PrePurchase) (err error) {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return err
-	}
-	defer db.CloseGORM(gormx)
-
+func UpdatePOBigLot(gormx *gorm.DB, prePurchases []models.PrePurchase) (err error) {
 	tx := gormx.Begin()
 	defer func() {
 		if r := recover(); r != nil {
