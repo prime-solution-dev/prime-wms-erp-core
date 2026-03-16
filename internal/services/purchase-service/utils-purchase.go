@@ -248,6 +248,10 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 	approvalReq := []models.Approval{}
 
 	for _, p := range purchases {
+		if p.StatusApprove == "COMPLETED" && p.IsApproved {
+			continue
+		}
+
 		approvalReq = append(approvalReq, models.Approval{
 			ApproveTopic:  "PO",
 			DocumentType:  p.PurchaseType,
@@ -259,6 +263,10 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 			MDItemCode:    "CTM-CTM3",
 			CreateBy:      userID,
 		})
+	}
+
+	if len(approvalReq) == 0 {
+		return nil
 	}
 
 	approvalReqJson, err := json.Marshal(approvalReq)
