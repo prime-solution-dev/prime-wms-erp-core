@@ -37,38 +37,28 @@
           }
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 130,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "weight_spec",
+          "dataMapping": "total_weight",
           "cellStyle": {
             "textAlign": "right"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "avg_product",
+          "dataMapping": "avg_weight",
           "cellStyle": {
             "textAlign": "right"
           }
-        },
-        {
-          "field": "is_highlight",
-          "headerName": "Highlight สีฟ้า",
-          "width": 140,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "is_highlight"
         }
       ],
       "columns": [
@@ -107,6 +97,16 @@
           "cellStyle": {
             "textAlign": "right"
           }
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
         },
         {
           "field": "inactive",

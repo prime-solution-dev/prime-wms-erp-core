@@ -38,7 +38,7 @@
           }
         },
         {
-          "field": "product_group_2",
+          "field": "PG02",
           "headerName": "Product Group 2",
           "width": 150,
           "pinned": "left",
@@ -52,7 +52,7 @@
           }
         },
         {
-          "field": "product_group_1",
+          "field": "PG01",
           "headerName": "Product Group 1",
           "width": 150,
           "pinned": "left",
@@ -66,7 +66,7 @@
           }
         },
         {
-          "field": "product_group_8",
+          "field": "PG08",
           "headerName": "Type",
           "width": 120,
           "pinned": "left",
@@ -121,13 +121,13 @@
           "dataMapping": "stock"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-Spec",
           "width": 120,
           "dataMapping": ""
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg Stock",
           "width": 130,
           "dataMapping": ""

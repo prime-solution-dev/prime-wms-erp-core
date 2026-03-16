@@ -85,6 +85,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}()
 
 	externalId := ""
+	externaldocNo := ""
 	requestData := map[string]interface{}{
 		"module":    []string{"DELIVERY"},
 		"topic":     []string{"DELIVERY"},
@@ -105,13 +106,13 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			RequestData: req,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
-		if err != nil {
-			return nil, err
-		}
+		HookInterfaceValue, _ := interfaceService.HookInterface(requestDataCreateHook)
+
 		if HookInterfaceValue != nil {
-			str, _ := HookInterfaceValue.(string)
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
 			externalId = str
+			externaldocNo = externalID["last"].(string)
 		}
 	}
 
@@ -167,13 +168,14 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 				return "PENDING"
 			}(),
-			BookingSlotType: deliveryReq.BookingSlotType,
-			StatusApproveGi: statusApproveGi,
-			ExternalID:      externalId,
-			CreateBy:        user,
-			CreateDate:      nowDateOnly, // date-only format
-			UpdateBy:        user,
-			UpdateDate:      nowDateOnly, // date-only format
+			BookingSlotType:        deliveryReq.BookingSlotType,
+			StatusApproveGi:        statusApproveGi,
+			ExternalID:             externalId,
+			ExternalDocumentNumber: externaldocNo,
+			CreateBy:               user,
+			CreateDate:             nowDateOnly, // date-only format
+			UpdateBy:               user,
+			UpdateDate:             nowDateOnly, // date-only format
 		}
 
 		deliveryToAdd = append(deliveryToAdd, newDelivery)

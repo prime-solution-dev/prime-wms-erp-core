@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
@@ -121,7 +122,16 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
 
+	prefix := "GRA"
+	configCodeValue := "RUNNING_AP"
+	count := len(req)
+	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
+
 	for i, invoice := range req {
+		req[i].InvoiceCode = purchaseCodes[i]
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
 			req[i].PartyBranch = supplier.Branch
@@ -211,6 +221,12 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					Type:    "po",
 				})
 			} */
+
+			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
+			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
+			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
+			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
+
 		}
 		req[i].TotalAmount = totalAmount
 		req[i].TotalVat = totalVat
@@ -254,7 +270,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, err
 			}
 			if HookInterfaceValue != nil {
-				str, _ := HookInterfaceValue.(string)
+
+				externalID := HookInterfaceValue.(map[string]interface{})
+				str, _ := externalID["id"].(string)
 
 				invoiceValue := []models.Invoice{}
 				invoiceValue = append(invoiceValue, models.Invoice{
@@ -274,4 +292,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 
 	return toleranceErrorResponse, nil
+}
+func round2(val float64) float64 {
+	return math.Round(val*100) / 100
 }
