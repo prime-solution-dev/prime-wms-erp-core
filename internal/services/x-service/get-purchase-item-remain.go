@@ -19,6 +19,7 @@ type GetPurchaseItemRemainRequest struct {
 	SiteCode         string            `json:"site_code"`
 	PurchaseCodes    []string          `json:"purchase_codes"`
 	SupplierCodes    []string          `json:"supplier_codes"`
+	Status           []string          `json:"status"`
 	StatusApprove    []string          `json:"status_approve"`
 	StattusPayment   []string          `json:"stattus_payment"`
 	ProductCodes     []string          `json:"product_codes"`
@@ -543,9 +544,16 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	paySet := makeStringSetTrimUpper(req.StattusPayment)
 	notPairs := normalizeNotPurchasePairs(req.NotPurchaseItems) // []pair{PO, Item}
 
+	statusSet := makeStringSetTrimUpper(req.Status)
+
 	q := gormx.Model(&models.Purchase{}).
-		Where("company_code = ? AND site_code = ?", company, site).
-		Where("status = ?", "PENDING")
+		Where("company_code = ? AND site_code = ?", company, site)
+
+	if len(statusSet) > 0 {
+		q = q.Where("UPPER(LTRIM(RTRIM(status))) IN ?", setToSlice(statusSet))
+	} else {
+		q = q.Where("status = ?", "PENDING")
+	}
 
 	if len(poSet) > 0 {
 		q = q.Where("UPPER(LTRIM(RTRIM(purchase_code))) IN ?", setToSlice(poSet))
