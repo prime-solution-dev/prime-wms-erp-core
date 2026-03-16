@@ -73,7 +73,9 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	if len(approvalValue) > 0 {
 
 		requestDataCheckAutoApprovalRest := map[string]interface{}{
-			"request_user_code": userID,
+			"request_user_code": "admin",
+			"module_code":       "CUSTOMIZE",
+			"topic_code":        "CUSTOMIZE",
 			"md_item_code":      "CTM-CTM7",
 			"cond_range_min":    req[0].Amount,
 		}
