@@ -1,0 +1,93 @@
+meta {
+  name: UpdateExtras
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{URL_ERP}}/UpdatePriceListExtra
+  body: json
+  auth: inherit
+}
+
+body:json {
+  [
+    {
+      "id": "fe0bd2db-b14d-446a-bc0d-12b4ff85f1cd",
+      "price_list_group_id": "2c60fd82-a35b-472b-a84a-3e667b3bb942",
+      "extra_key": "PG01_3|PG02_6|PG03_18",
+      "condition_code": "PG06",
+      "value_int": 2,
+      "length_extra_key": 0,
+      "operator": "<>",
+      "cond_range_min": 35,
+      "cond_range_max": 39,
+      "create_by": "",
+      "create_dtm": "2026-02-10T04:04:30Z",
+      "price_list_group_extra_keys": [
+        {
+          "id": "27954795-4a34-44ee-9dbe-db966e66bb7f",
+          "group_extra_id": "fe0bd2db-b14d-446a-bc0d-12b4ff85f1cd",
+          "code": "PG01",
+          "value": "PG01_3",
+          "seq": 1
+        },
+        {
+          "id": "55f3f5c6-5076-44de-81de-83e48b0c688a",
+          "group_extra_id": "fe0bd2db-b14d-446a-bc0d-12b4ff85f1cd",
+          "code": "PG02",
+          "value": "PG02_6",
+          "seq": 2
+        },
+        {
+          "id": "6b8a74e7-b0d5-4184-b9e0-3ab59b14d4b1",
+          "group_extra_id": "fe0bd2db-b14d-446a-bc0d-12b4ff85f1cd",
+          "code": "PG03",
+          "value": "PG03_18",
+          "seq": 3
+        }
+      ]
+    },
+    {
+      "id": "6254d8db-aee0-4afa-abc4-58e7b42558d1",
+      "price_list_group_id": "2c60fd82-a35b-472b-a84a-3e667b3bb942",
+      "extra_key": "PG01_3|PG02_6|PG03_18",
+      "condition_code": "PG06",
+      "value_int": 2,
+      "length_extra_key": 0,
+      "operator": "<",
+      "cond_range_min": 0,
+      "cond_range_max": 45,
+      "create_by": "",
+      "create_dtm": "2026-02-10T04:04:30Z",
+      "price_list_group_extra_keys": [
+        {
+          "id": "30a6f58e-6655-4f02-8c73-529d6cdc133f",
+          "group_extra_id": "6254d8db-aee0-4afa-abc4-58e7b42558d1",
+          "code": "PG01",
+          "value": "PG01_3",
+          "seq": 1
+        },
+        {
+          "id": "de5cf27f-ad9d-434f-8996-0d15a52a0236",
+          "group_extra_id": "6254d8db-aee0-4afa-abc4-58e7b42558d1",
+          "code": "PG02",
+          "value": "PG02_6",
+          "seq": 2
+        },
+        {
+          "id": "4158c986-921b-4066-9623-54f9ea1ff246",
+          "group_extra_id": "6254d8db-aee0-4afa-abc4-58e7b42558d1",
+          "code": "PG03",
+          "value": "PG03_18",
+          "seq": 3
+        }
+      ]
+    }
+  ]
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

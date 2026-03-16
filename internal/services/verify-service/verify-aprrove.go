@@ -242,6 +242,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				res.IsPassExpiryPrice = false
 			}
 		}
+	} else {
+		res.IsPassExpiryPrice = true
 	}
 
 	//Price Validation
@@ -264,6 +266,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				}
 			}
 		}
+	} else {
+		res.IsPassPrice = true
 	}
 
 	// Credit Validation
@@ -294,6 +298,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				res.IsPassCredit = false
 			}
 		}
+	} else {
+		res.IsPassCredit = true
 	}
 
 	//Inventory Validation
@@ -308,6 +314,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		if res.IsPassInventory && !invenRes.IsPassInventory {
 			res.IsPassInventory = false
 		}
+	} else {
+		res.IsPassInventory = true
 	}
 
 	return &res, nil

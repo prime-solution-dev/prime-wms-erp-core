@@ -54,22 +54,22 @@
       "columnGroups": [],
       "columns": [
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 120,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 120,
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "avg_product"
+          "dataMapping": "avg_weight"
         },
         {
           "field": "before_total_net_price_weight",

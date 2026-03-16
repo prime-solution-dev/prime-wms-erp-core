@@ -6,7 +6,6 @@ import (
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -51,13 +50,14 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	for _, creditValue := range resultCredit {
 		creditLimit += creditValue.Amount
 		for _, creditExtraValue := range creditValue.CreditExtra {
-			if creditValue.EffectiveDtm == nil {
+			increaseCreditLimit += creditExtraValue.Amount
+			/* if creditValue.EffectiveDtm == nil {
 				increaseCreditLimit += creditExtraValue.Amount
 			} else {
 				if creditValue.EffectiveDtm.After(time.Now()) || creditValue.EffectiveDtm.Equal(time.Now()) {
 					increaseCreditLimit += creditExtraValue.Amount
 				}
-			}
+			} */
 
 		}
 	}
@@ -88,7 +88,7 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 	totalCreditLimit := creditLimit + increaseCreditLimit
 	/* consumedCredit := (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-	resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit */
+	resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR - resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit */
 	consumedCredit := resultGetPaidInvoice.TotalAmount - remainDeposit
 
 	resultSummaryCredit := ResultGetSummaryCredit{
@@ -97,7 +97,7 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		TotalCreditLimit:    totalCreditLimit,
 		ConsumedCredit:      consumedCredit, /* math.Round(consumedCredit*100) / 100 */
 
-		BalanceCreditLimit: totalCreditLimit + consumedCredit,
+		BalanceCreditLimit: totalCreditLimit - consumedCredit,
 	}
 
 	return resultSummaryCredit, nil

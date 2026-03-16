@@ -142,7 +142,8 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 		},
 	}
 
-	tab := buildBasedPriceTab(groups, groupMap, paymentTermMap)
+	var _ map[string]models.GetGroupResponse = groupMap
+	tab := buildBasedPriceTab(groups, paymentTermMap)
 
 	if tab.Name != "Based price" {
 		t.Fatalf("expected tab name 'Based price', got %s", tab.Name)

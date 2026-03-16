@@ -130,37 +130,38 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 			if invoiceItemsValue.InvoiceType == "AR" {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
-				sumPaymentTotalAmountAR += invoicePaidAmount
+				//sumPaymentTotalAmountAR += invoicePaidAmount
 			}
 			if invoiceItemsValue.InvoiceType == "DN" {
 				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
-				sumPaymentTotalAmountDN += invoicePaidAmount
+				//sumPaymentTotalAmountDN += invoicePaidAmount
 			}
 			//invoiceAmount := invoiceItemsValue.TotalAmount
-			/* invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
+			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
 			if existResultInvoiceMap {
 				if invoiceItemMap.InvoiceType == "DN" {
-					sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
+					//sumInvoiceTotalAmountDN += invoiceItemMap.TotalAmount
 					sumPaymentTotalAmountDN += invoicePaidAmount
 				}
 
-				if invoiceItemMap.InvoiceType == "CN" {
+				/* if invoiceItemMap.InvoiceType == "CN" {
 					sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
 					//invoiceAmount = -invoiceItemMap.TotalAmount
-				}
-			} */
+				} */
+			}
 			invoiceAmount := invoiceItemsValue.InvoiceTotalAmount
 			if invoiceItemsValue.InvoiceType == "CN" {
 				invoiceAmount = -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
+				sumInvoiceTotalAmountCN += invoiceItemMap.TotalAmount
 			}
 
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceAmount,
 				InvoicePaidAmount: invoicePaidAmount,
-				ConsumedAmount:    invoiceAmount + invoicePaidAmount,
+				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
 			})
-			consumedInvoiceItems += (invoiceAmount + invoicePaidAmount)
+			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 		}
 
 		saleAmount += (resultValue.Sale.TotalAmount + consumedInvoiceItems)
