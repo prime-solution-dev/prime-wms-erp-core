@@ -87,7 +87,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if errCheckAutoApprovalRest != nil {
 			return nil, errCheckAutoApprovalRest
 		}
-		resultCheckAutoApprovalRest := checkAutoApprovalRest.(approvalService.CheckAutoApprovalResponse)
+		resultCheckAutoApprovalRest := checkAutoApprovalRest.(*approvalService.CheckAutoApprovalResponse)
 		if resultCheckAutoApprovalRest.IsAutoApproved {
 
 			creditRequest := []models.CreditRequest{}
