@@ -98,6 +98,12 @@ type SubGroup struct {
 	UdfJson                   json.RawMessage `json:"udf_json"`
 	Remark                    string          `json:"remark"`
 	GroupKeys                 []GroupKey      `json:"group_keys"`
+	SubgroupCode              string          `json:"subgroup_code,omitempty"`
+	InventoryWeight           []models.InventoryWeightResponse `json:"inventory_weight,omitempty"`
+	ProductCode               string          `json:"product_code,omitempty"`
+	SupplierCode              string          `json:"supplier_code,omitempty"`
+	SupplierName              string          `json:"supplier_name,omitempty"`
+	BatchNo                   string          `json:"batch_no,omitempty"`
 }
 
 func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
