@@ -98,6 +98,7 @@ type SubGroup struct {
 	UdfJson                   json.RawMessage `json:"udf_json"`
 	Remark                    string          `json:"remark"`
 	GroupKeys                 []GroupKey      `json:"group_keys"`
+	SubgroupCode              string          `json:"subgroup_code,omitempty"`
 	InventoryWeight           []models.InventoryWeightResponse `json:"inventory_weight,omitempty"`
 	ProductCode               string          `json:"product_code,omitempty"`
 	SupplierCode              string          `json:"supplier_code,omitempty"`
@@ -333,6 +334,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plsg.before_term_price_weight, 0) AS before_term_price_weight,
 			COALESCE(plsg.before_total_net_price_weight, 0) AS before_total_net_price_weight,
 			plsg.effective_date AS sub_effective_date,
+			plsg.subgroup_code AS sub_subgroup_code,
 			COALESCE(plsg.remark, '') AS sub_remark,
 			plsg.udf_json AS udf_json
 		FROM price_list_group plg
@@ -393,6 +395,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforeTotalNetPriceWeight: toFloat64(row["before_total_net_price_weight"]),
 				Remark:                    toString(row["sub_remark"]),
 				UdfJson:                   toJsonRawMessage(row["udf_json"]),
+				SubgroupCode:              toString(row["subgroup_code"]),
 			}
 			if t := toTime(row["sub_effective_date"]); t != nil {
 				subGroup.EffectiveDate = *t

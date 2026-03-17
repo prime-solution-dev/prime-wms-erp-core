@@ -211,6 +211,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 			subGroup := models.PriceListSubGroupResponse{
 				ID:                        sg.ID.String(),
 				PriceListGroupID:          resp.ID.String(),
+				SubgroupCode:              sg.SubgroupCode,
 				SubgroupKey:               sg.SubGroupKey,
 				IsTrading:                 sg.IsTrading,
 				PriceUnit:                 sg.PriceUnit,
@@ -233,7 +234,6 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,
 			}
-
 			subGroups = append(subGroups, subGroup)
 		}
 

@@ -1081,6 +1081,19 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		hasSellingSlow := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Clean up corrupted keys from previous double prefix bug
+				cleanedUdf := make(map[string]interface{})
+				for k, v := range udfData {
+					if strings.HasPrefix(k, "awaiting_production_awaiting_production_") {
+						cleanedUdf[strings.TrimPrefix(k, "awaiting_production_")] = v
+					} else if strings.HasPrefix(k, "selling_selling_") {
+						cleanedUdf[strings.TrimPrefix(k, "selling_")] = v
+					} else {
+						cleanedUdf[k] = v
+					}
+				}
+				udfData = cleanedUdf
+
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
 				}
@@ -1130,17 +1143,17 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 					// Handle awaiting_production fields directly from udf_json
 					if key == "awaiting_production_import_date" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
 						hasAwaitingProductionImportDate = true
 						continue
 					}
 					if key == "awaiting_production_ton" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
 						hasAwaitingProductionTon = true
 						continue
 					}
 					if key == "awaiting_production_producer" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
 						hasAwaitingProductionProducer = true
 						continue
 					}
@@ -1148,18 +1161,18 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					// Handle selling fields directly from udf_json
 					if key == "selling_fast" {
 						if sellingFast, ok := value.(bool); ok {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
 						} else {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 						}
 						hasSellingFast = true
 						continue
 					}
 					if key == "selling_slow" {
 						if sellingSlow, ok := value.(bool); ok {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
 						} else {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 						}
 						hasSellingSlow = true
 						continue
@@ -1188,21 +1201,21 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 		// Set default values for awaiting_production fields if they weren't found in udf_json
 		if !hasAwaitingProductionImportDate {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
 		}
 		if !hasAwaitingProductionTon {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
 		}
 		if !hasAwaitingProductionProducer {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
 		}
 
 		// Set default values for selling fields if they weren't found in udf_json
 		if !hasSellingFast {
-			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 		}
 		if !hasSellingSlow {
-			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 		}
 
 		row["is_highlight"] = isHighlightValue
@@ -1359,6 +1372,10 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					row[fieldName] = sg.BeforePriceUnit
 				case "total_net_price_unit":
 					row[fieldName] = sg.TotalNetPriceUnit
+				case "before_total_net_price_weight":
+					row[fieldName] = sg.BeforeTotalNetPriceWeight
+				case "before_total_net_price_unit":
+					row[fieldName] = sg.BeforeTotalNetPriceUnit
 				}
 			}
 		}
@@ -1439,6 +1456,19 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		var supplierNameValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Clean up corrupted keys from previous double prefix bug
+				cleanedUdf := make(map[string]interface{})
+				for k, v := range udfData {
+					if strings.HasPrefix(k, "awaiting_production_awaiting_production_") {
+						cleanedUdf[strings.TrimPrefix(k, "awaiting_production_")] = v
+					} else if strings.HasPrefix(k, "selling_selling_") {
+						cleanedUdf[strings.TrimPrefix(k, "selling_")] = v
+					} else {
+						cleanedUdf[k] = v
+					}
+				}
+				udfData = cleanedUdf
+
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
 				}
