@@ -304,6 +304,7 @@ type InventoryWeightResponse struct {
 type PriceListSubGroupResponse struct {
 	ID                        string                         `json:"id"`
 	PriceListGroupID          string                         `json:"price_list_group_id"`
+	SubgroupCode              string                         `json:"subgroup_code"`
 	SubgroupKey               string                         `json:"subgroup_key"`
 	IsTrading                 bool                           `json:"is_trading"`
 	PriceUnit                 float64                        `json:"price_unit"`

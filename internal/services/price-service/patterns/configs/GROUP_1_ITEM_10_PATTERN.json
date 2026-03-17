@@ -35,7 +35,9 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
+        }
+      ],
+      "columns": [
         {
           "field": "total_weight",
           "headerName": "Weight-spec",
@@ -59,9 +61,7 @@
           "cellStyle": {
             "textAlign": "right"
           }
-        }
-      ],
-      "columns": [
+        },
         {
           "field": "before_total_net_price_unit",
           "headerName": "ราคาขาย Before",

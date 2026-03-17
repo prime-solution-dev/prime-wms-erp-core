@@ -44,7 +44,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
           "field": "avg_weight",
@@ -56,7 +56,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "od",
