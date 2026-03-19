@@ -1293,6 +1293,8 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				row[fieldName] = sg.BeforeTermPriceWeight
 			case "before_total_net_price_weight":
 				row[fieldName] = sg.BeforeTotalNetPriceWeight
+			case "default_uom":
+				row[fieldName] = sg.DefaultUom
 			case "effective_date":
 				row[fieldName] = sg.EffectiveDate
 			case "remark":
@@ -1376,12 +1378,19 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					row[fieldName] = sg.BeforeTotalNetPriceWeight
 				case "before_total_net_price_unit":
 					row[fieldName] = sg.BeforeTotalNetPriceUnit
+				case "default_uom":
+					row[fieldName] = sg.DefaultUom
 				}
 			}
 		}
 
 		row[fmt.Sprintf("%s_subgroup_id", columnKey)] = sg.ID
 		row[fmt.Sprintf("%s_is_trading", columnKey)] = sg.IsTrading
+		row[fmt.Sprintf("%s_default_uom", columnKey)] = sg.DefaultUom
+		row[fmt.Sprintf("%s_before_total_net_price_weight", columnKey)] = sg.BeforeTotalNetPriceWeight
+		row[fmt.Sprintf("%s_total_net_price_weight", columnKey)] = sg.TotalNetPriceWeight
+		row[fmt.Sprintf("%s_before_total_net_price_unit", columnKey)] = sg.BeforeTotalNetPriceUnit
+		row[fmt.Sprintf("%s_total_net_price_unit", columnKey)] = sg.TotalNetPriceUnit
 		row["subgroup_id"] = sg.ID
 		row["is_trading"] = sg.IsTrading
 	}
@@ -2055,6 +2064,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[colConfig.Field] = getAvgProductFromInventory(sg)
 			case "avg_kg_stock":
 				row[colConfig.Field] = getAvgProductFromInventory(sg)
+			case "default_uom":
+				row[colConfig.Field] = sg.DefaultUom
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
 				if colConfig.Field == "total_weight" {
@@ -2070,6 +2081,12 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 
 		row["subgroup_id"] = sg.ID
 		row["is_trading"] = sg.IsTrading
+		// Mandatory price fields - always included for price calculations and UOM display
+		row["default_uom"] = sg.DefaultUom
+		row["before_total_net_price_weight"] = sg.BeforeTotalNetPriceWeight
+		row["total_net_price_weight"] = sg.TotalNetPriceWeight
+		row["before_total_net_price_unit"] = sg.BeforeTotalNetPriceUnit
+		row["total_net_price_unit"] = sg.TotalNetPriceUnit
 
 		rows = append(rows, row)
 	}
@@ -2264,6 +2281,11 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 
 		// Set subgroup identifier for the specific PRODUCT_GROUP2 entry
 		row[fmt.Sprintf("%s_subgroup_id", identifier)] = sg.ID
+		row[fmt.Sprintf("%s_default_uom", identifier)] = sg.DefaultUom
+		row[fmt.Sprintf("%s_before_total_net_price_weight", identifier)] = sg.BeforeTotalNetPriceWeight
+		row[fmt.Sprintf("%s_total_net_price_weight", identifier)] = sg.TotalNetPriceWeight
+		row[fmt.Sprintf("%s_before_total_net_price_unit", identifier)] = sg.BeforeTotalNetPriceUnit
+		row[fmt.Sprintf("%s_total_net_price_unit", identifier)] = sg.TotalNetPriceUnit
 
 		// Add flattened SubGroupKey fields for direct access
 		for _, sgk := range sg.SubGroupKeys {
@@ -2320,6 +2342,8 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 				} else {
 					row[fieldName] = nil
 				}
+			case "default_uom":
+				row[fieldName] = sg.DefaultUom
 			default:
 				// Fallback to empty string for string-types like remark if not matched
 				if colConfig.DataMapping == "remark" {

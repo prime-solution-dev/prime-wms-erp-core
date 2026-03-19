@@ -145,8 +145,8 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {

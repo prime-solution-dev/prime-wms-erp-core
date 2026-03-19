@@ -89,28 +89,6 @@
           "cellStyle": {
             "textAlign": "center"
           }
-        },
-        {
-          "field": "line_bundle",
-          "headerName": "เส้น/มัด",
-          "width": 120,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "dataMapping": "line_bundle",
-          "cellStyle": {
-            "textAlign": "center"
-          }
-        },
-        {
-          "field": "is_highlight",
-          "headerName": "Highlight สีฟ้า",
-          "width": 120,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "cellRenderer": "agCheckboxCellRenderer",
-          "dataMapping": "is_highlight"
         }
       ],
       "columns": [
@@ -149,6 +127,28 @@
           "headerName": "Extra",
           "width": 120,
           "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "line_bundle",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
         },
         {
           "field": "delivery_date",

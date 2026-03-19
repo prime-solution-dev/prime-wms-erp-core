@@ -233,6 +233,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				Remark:                    sg.Remark,
 				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,
+				DefaultUom:                sg.DefaultUom,
 			}
 			subGroups = append(subGroups, subGroup)
 		}
