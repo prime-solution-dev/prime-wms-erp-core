@@ -98,6 +98,8 @@ type SubGroup struct {
 	UdfJson                   json.RawMessage `json:"udf_json"`
 	Remark                    string          `json:"remark"`
 	GroupKeys                 []GroupKey      `json:"group_keys"`
+	SubgroupCode              string          `json:"subgroup_code,omitempty"`
+	DefaultUom                string          `json:"default_uom,omitempty"`
 	InventoryWeight           []models.InventoryWeightResponse `json:"inventory_weight,omitempty"`
 	ProductCode               string          `json:"product_code,omitempty"`
 	SupplierCode              string          `json:"supplier_code,omitempty"`
@@ -333,6 +335,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 			COALESCE(plsg.before_term_price_weight, 0) AS before_term_price_weight,
 			COALESCE(plsg.before_total_net_price_weight, 0) AS before_total_net_price_weight,
 			plsg.effective_date AS sub_effective_date,
+			plsg.subgroup_code AS sub_subgroup_code,
 			COALESCE(plsg.remark, '') AS sub_remark,
 			plsg.udf_json AS udf_json
 		FROM price_list_group plg
@@ -393,6 +396,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				BeforeTotalNetPriceWeight: toFloat64(row["before_total_net_price_weight"]),
 				Remark:                    toString(row["sub_remark"]),
 				UdfJson:                   toJsonRawMessage(row["udf_json"]),
+				SubgroupCode:              toString(row["sub_subgroup_code"]),
 			}
 			if t := toTime(row["sub_effective_date"]); t != nil {
 				subGroup.EffectiveDate = *t
@@ -434,6 +438,38 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				for i := range g.SubGroups {
 					if g.SubGroups[i].ID.String() == subID {
 						g.SubGroups[i].GroupKeys = append(g.SubGroups[i].GroupKeys, groupKey)
+					}
+				}
+			}
+		}
+	}
+
+	// Fetch formula data to get default UOM for each subgroup
+	subGroupCodes := []string{}
+	for _, g := range groupMap {
+		for _, sg := range g.SubGroups {
+			if sg.SubgroupCode != "" {
+				subGroupCodes = append(subGroupCodes, sg.SubgroupCode)
+			}
+		}
+	}
+
+	if len(subGroupCodes) > 0 {
+		formulasMap, err := priceListRepository.GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch formula data: %w", err)
+		}
+
+		// Populate DefaultUom for each subgroup based on is_default formula
+		for _, g := range groupMap {
+			for i := range g.SubGroups {
+				subGroupCode := g.SubGroups[i].SubgroupCode
+				if formulas, ok := formulasMap[subGroupCode]; ok {
+					for _, formula := range formulas {
+						if formula.IsDefault {
+							g.SubGroups[i].DefaultUom = formula.PriceListFormulas.Uom
+							break
+						}
 					}
 				}
 			}
