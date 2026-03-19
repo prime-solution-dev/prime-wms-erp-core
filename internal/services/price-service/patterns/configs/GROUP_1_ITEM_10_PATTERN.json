@@ -2,7 +2,7 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_10_default",
-      "name": "PG09 Price Table",
+      "name": "หมวดเหล็กเส้น",
       "description": "Dynamic table for PG09 with PG09 price breakouts per item/length.",
       "enabled": true,
       "grouping": {
@@ -47,7 +47,7 @@
           "suppressMovable": true,
           "dataMapping": "total_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
@@ -59,7 +59,7 @@
           "suppressMovable": true,
           "dataMapping": "avg_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
@@ -68,7 +68,7 @@
           "width": 150,
           "dataMapping": "before_total_net_price_unit",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
@@ -77,7 +77,7 @@
           "width": 150,
           "dataMapping": "total_net_price_unit",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
@@ -86,7 +86,7 @@
           "width": 130,
           "dataMapping": "extra_price_unit",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
@@ -95,7 +95,7 @@
           "width": 120,
           "dataMapping": "line_bundle",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {

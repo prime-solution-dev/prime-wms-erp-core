@@ -2081,6 +2081,12 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 
 		row["subgroup_id"] = sg.ID
 		row["is_trading"] = sg.IsTrading
+		// Mandatory price fields - always included for price calculations and UOM display
+		row["default_uom"] = sg.DefaultUom
+		row["before_total_net_price_weight"] = sg.BeforeTotalNetPriceWeight
+		row["total_net_price_weight"] = sg.TotalNetPriceWeight
+		row["before_total_net_price_unit"] = sg.BeforeTotalNetPriceUnit
+		row["total_net_price_unit"] = sg.TotalNetPriceUnit
 
 		rows = append(rows, row)
 	}
