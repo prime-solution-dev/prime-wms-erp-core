@@ -109,7 +109,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		tempSale.IsApproved = isApproved
 
 		// Check auto approval for PENDING status
-		if status == "PENDING" {
+		if status == "PENDING" && statusApprove != "COMPLETED" {
 			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
 				RequestUserCode: user,
 				ModuleCode:      "CUSTOMIZE",

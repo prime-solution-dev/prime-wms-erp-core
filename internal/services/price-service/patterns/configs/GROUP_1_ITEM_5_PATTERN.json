@@ -209,6 +209,9 @@
       ],
       "applicableCategories": [],
       "editable_suffixes": [
+        "awaiting_production_import_date",
+        "awaiting_production_ton",
+        "awaiting_production_producer",
         "is_highlight",
         "line_bundle",
         "total_net_price_weight",
