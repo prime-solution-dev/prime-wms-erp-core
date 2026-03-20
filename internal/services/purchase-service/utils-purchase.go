@@ -239,11 +239,19 @@ func GeneratePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
 
 // Approval actions
 func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error {
-	user := `system` // TODO: get from ctx
 
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 	approvalReq := []models.Approval{}
 
 	for _, p := range purchases {
+		if p.StatusApprove == "COMPLETED" && p.IsApproved {
+			continue
+		}
+
 		approvalReq = append(approvalReq, models.Approval{
 			ApproveTopic:  "PO",
 			DocumentType:  p.PurchaseType,
@@ -253,8 +261,12 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 			Remark:        "-",
 			CurentStepSeq: 1,
 			MDItemCode:    "CTM-CTM3",
-			CreateBy:      user,
+			CreateBy:      userID,
 		})
+	}
+
+	if len(approvalReq) == 0 {
+		return nil
 	}
 
 	approvalReqJson, err := json.Marshal(approvalReq)

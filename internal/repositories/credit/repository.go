@@ -261,7 +261,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove string) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove string, completedDateStart *time.Time, completedDateEnd *time.Time, createDateStart *time.Time, createDateEnd *time.Time) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -296,6 +296,15 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if endDate != nil {
 		query = query.Where("effective_dtm <= '%s' ", endDate.Format("2006-01-02"))
 	}
+	if completedDateStart != nil && completedDateEnd != nil {
+		query = query.Where("update_date BETWEEN ? AND ? AND status = ?", completedDateStart, completedDateEnd, "COMPLETED")
+	}
+	if createDateStart != nil && createDateEnd != nil {
+		query = query.Where("create_date BETWEEN ? AND ?", createDateStart, createDateEnd)
+	}
+	if page == 0 {
+		page = 1
+	}
 
 	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
 	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
@@ -325,6 +334,10 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 		Count(&totalRecords).Error
 	if err != nil {
 		return nil, 0, 0, err
+	}
+
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
 	}
 
 	offset := (page - 1) * pageSize

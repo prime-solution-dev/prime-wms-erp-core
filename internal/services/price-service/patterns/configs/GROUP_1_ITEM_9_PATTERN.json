@@ -25,7 +25,7 @@
           }
         },
         {
-          "field": "product_group_2",
+          "field": "PG02",
           "headerName": "Product Group",
           "width": 180,
           "pinned": "left",
@@ -38,7 +38,7 @@
           }
         },
         {
-          "field": "product_group_7",
+          "field": "PG07",
           "headerName": "ความยาว",
           "width": 150,
           "pinned": "left",
@@ -51,7 +51,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "Size",
           "width": 140,
           "pinned": "left",
@@ -61,21 +61,23 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
+        }
+      ],
+      "columns": [
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 140,
-          "dataMapping": "weight_spec",
+          "dataMapping": "total_weight",
           "cellStyle": {
             "textAlign": "left"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
-          "dataMapping": "avg_product",
+          "dataMapping": "avg_weight",
           "cellStyle": {
             "textAlign": "left"
           }
@@ -86,9 +88,7 @@
           "width": 130,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
+        },
         {
           "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
@@ -145,8 +145,8 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {
@@ -163,7 +163,7 @@
   "valueMappings": {
     "groupCodeMappings": {
       "productGroup2": "PG02",
-      "productGroup6": "PG06",
+      "PG06": "PG06",
       "productGroup7": "PG07",
       "productGroup5": "PG05",
       "productGroup3": "PG03",

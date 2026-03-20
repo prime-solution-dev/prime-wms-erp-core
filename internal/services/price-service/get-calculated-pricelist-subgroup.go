@@ -176,7 +176,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryByProductCode(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -218,18 +218,18 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		kg := 0.0
 		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
 			// Use AvgProduct from first inventory weight response
-			if inventoryWeight[0].AvgProduct == 0 {
+			if inventoryWeight[0].AvgWeight == 0 {
 				avgKgStock = 1.0
 			} else {
-				avgKgStock = inventoryWeight[0].AvgProduct
+				avgKgStock = inventoryWeight[0].AvgWeight
 			}
-			if inventoryWeight[0].WeightSpec == 0 {
+			if inventoryWeight[0].TotalWeight == 0 {
 				weightSpec = 1.0
 			} else {
-				weightSpec = inventoryWeight[0].WeightSpec
+				weightSpec = inventoryWeight[0].TotalWeight
 			}
-			pcs = inventoryWeight[0].SumQty
-			kg = inventoryWeight[0].SumWeight
+			pcs = inventoryWeight[0].TotalQty
+			kg = inventoryWeight[0].TotalWeight
 		}
 
 		if len(priceListFormulas) > 0 {
@@ -294,6 +294,17 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			}
 		}
 
+		// Find default UOM for this subgroup
+		defaultUom := ""
+		if formulas, ok := formulasMap[subGroup.SubGroupCode]; ok {
+			for _, formula := range formulas {
+				if formula.IsDefault {
+					defaultUom = formula.PriceListFormulas.Uom
+					break
+				}
+			}
+		}
+
 		// Add calculated data to response
 		responseData = append(responseData, models.GetCalculatedPriceListSubGroupItem{
 			SubGroupID:                subGroupID.String(),
@@ -303,6 +314,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			ExtraPriceWeight:          extraPriceWeight,
 			BeforeTotalNetPriceUnit:   beforeTotalNetPriceUnit,
 			BeforeTotalNetPriceWeight: beforeTotalNetPriceWeight,
+			DefaultUom:                defaultUom,
 		})
 	}
 

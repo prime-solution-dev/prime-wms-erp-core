@@ -12,13 +12,7 @@ import (
 )
 
 // Create
-func CreatePurchase(purchases []models.Purchase) error {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return err
-	}
-	defer db.CloseGORM(gormx)
-
+func CreatePurchase(gormx *gorm.DB, purchases []models.Purchase) error {
 	return gormx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&purchases).Error; err != nil {
 			return err
@@ -27,6 +21,7 @@ func CreatePurchase(purchases []models.Purchase) error {
 	})
 }
 
+// Get
 // Get
 func GetPurchaseList(
 	purchaseCodes []string,
@@ -62,6 +57,11 @@ func GetPurchaseList(
 	var purchases []models.Purchase
 	var totalRecords int64
 
+	// กัน page <= 0
+	if page <= 0 {
+		page = 1
+	}
+
 	// Build base query
 	query := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", companyCode, siteCode)
@@ -83,53 +83,58 @@ func GetPurchaseList(
 	}
 
 	if statusPaymentIncomplete {
-		query = query.Where("status_payment != ? OR status_payment IS NULL", "COMPLETED")
+		query = query.Where("(status_payment != ? OR status_payment IS NULL)", "COMPLETED")
 	}
+
 	if len(status) > 0 {
 		query = query.Where("status IN ?", status)
 	}
+
 	if purchaseCodeLike != "" {
 		query = query.Where("purchase_code ILIKE ?", "%"+purchaseCodeLike+"%")
 	}
+
 	if docRefLike != "" {
 		query = query.Where("doc_ref ILIKE ?", "%"+docRefLike+"%")
 	}
+
 	if supplierCodeLike != "" {
 		query = query.Where("supplier_code ILIKE ?", "%"+supplierCodeLike+"%")
 	}
+
 	if supplierNameLike != "" {
 		query = query.Where("supplier_name ILIKE ?", "%"+supplierNameLike+"%")
 	}
+
 	if itemsProductCodeLike != "" {
 		sub := gormx.Model(&models.PurchaseItem{}).
 			Select("1").
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_code ILIKE ?", "%"+itemsProductCodeLike+"%")
-
 		query = query.Where("EXISTS (?)", sub)
 	}
+
 	if itemsProductDescLike != "" {
 		sub := gormx.Model(&models.PurchaseItem{}).
 			Select("1").
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_desc ILIKE ?", "%"+itemsProductDescLike+"%")
-
 		query = query.Where("EXISTS (?)", sub)
 	}
-	if itemsProductGroupOneNameLike != "" {
 
+	if itemsProductGroupOneNameLike != "" {
 		sub := gormx.Model(&models.PurchaseItem{}).
 			Select("1").
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_group_code ILIKE ?", "%"+itemsProductGroupOneNameLike+"%")
-
 		query = query.Where("EXISTS (?)", sub)
 	}
+
 	if startCreateDate != nil {
-		query = query.Where("create_dtm >= '%s' ", startCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm >= ?", startCreateDate.Format("2006-01-02"))
 	}
 	if endCreateDate != nil {
-		query = query.Where("create_dtm <= '%s' ", endCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm <= ?", endCreateDate.Format("2006-01-02"))
 	}
 
 	if len(productCodes) > 0 {
@@ -137,7 +142,6 @@ func GetPurchaseList(
 			Select("1").
 			Where("purchase.id = purchase_item.purchase_id").
 			Where("product_code IN ?", productCodes)
-
 		query = query.Where("EXISTS (?)", sub)
 	}
 
@@ -158,41 +162,46 @@ func GetPurchaseList(
 		return nil, 0, 0, 0, 0, err
 	}
 
-	if pageSize == 0 {
-		pageSize = int(totalRecords)
-	}
+	applyPaging := pageSize > 0
 
-	// Apply pagination
-	offset := (page - 1) * pageSize
-	if err := query.
-		Preload("PurchaseItems").
-		Order(`
+	// Order clause (เหมือนเดิม)
+	orderClause := `
         CASE
             WHEN status = 'PENDING' AND status_approve = 'PENDING' THEN 1
             WHEN status = 'PENDING' AND status_approve = 'PROCESS' THEN 2
             WHEN status = 'PENDING' AND status_approve = 'COMPLETED' THEN 3
-                        WHEN status = 'PENDING' AND status_approve = 'REVIEW' THEN 4
-                        WHEN status = 'PENDING' AND status_approve = 'REJECT' THEN 5
-                        WHEN status = 'CANCELLED' THEN 6
-                        WHEN status = 'COMPLETED' THEN 7
-                        WHEN status = 'TEMP' THEN 8
-                        ELSE 9
+            WHEN status = 'PENDING' AND status_approve = 'REVIEW' THEN 4
+            WHEN status = 'PENDING' AND status_approve = 'REJECT' THEN 5
+            WHEN status = 'CANCELLED' THEN 6
+            WHEN status = 'COMPLETED' THEN 7
+            WHEN status = 'TEMP' THEN 8
+            ELSE 9
         END ASC,
-                create_dtm DESC
-    `).
-		Limit(pageSize).
-		Offset(offset).
-		Find(&purchases).Error; err != nil {
+        create_dtm DESC
+    `
+
+	q := query.Preload("PurchaseItems").Order(orderClause).Debug()
+
+	if applyPaging {
+		offset := (page - 1) * pageSize
+		q = q.Limit(pageSize).Offset(offset)
+	}
+
+	if err := q.Find(&purchases).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
 
+	// totalPages
 	totalPages := 0
 	if totalRecords > 0 {
-		totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
-	}
-
-	if page == 0 {
-		page = 1
+		if !applyPaging {
+			totalPages = 1
+			// pageSize=0 หมายถึง "all"
+			pageSize = int(totalRecords)
+			page = 1
+		} else {
+			totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+		}
 	}
 
 	return purchases, int(totalRecords), page, pageSize, totalPages, nil

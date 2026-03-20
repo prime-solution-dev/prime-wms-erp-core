@@ -223,7 +223,11 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 
 // Approval action
 func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) error {
-	user := `system` // TODO: get from ctx
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 
 	approvalReq := []models.Approval{}
 
@@ -237,7 +241,7 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 			Remark:        "-",
 			CurentStepSeq: 1,
 			MDItemCode:    "CTM-CTM3",
-			CreateBy:      user,
+			CreateBy:      userID,
 		})
 	}
 

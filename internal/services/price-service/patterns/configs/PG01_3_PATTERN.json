@@ -52,16 +52,16 @@
           "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "total_weight",
           "headerName": "Avg.kg stock",
           "width": 150,
-          "dataMapping": "avg_product"
+          "dataMapping": "total_weight"
         },
         {
           "field": "remark",
@@ -168,16 +168,16 @@
           "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "total_weight",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "avg_product"
+          "dataMapping": "total_weight"
         },
         {
           "field": "remark",
@@ -297,16 +297,16 @@
           "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 170,
-          "dataMapping": "weight_spec"
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "total_weight",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "avg_product"
+          "dataMapping": "total_weight"
         },
         {
           "field": "remark",

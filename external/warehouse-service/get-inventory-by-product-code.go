@@ -34,11 +34,12 @@ type InventoryByProductCodeResponse struct {
 	GroupValueKeys  string                           `json:"group_value_keys"`
 	ProductCode     string                           `json:"product_code"`
 	SupplierCode    string                           `json:"supplier_code"`
+	SupplierName    string                           `json:"supplier_name"`
 	InventoryWeight []models.InventoryWeightResponse `json:"inventory_weight"`
 }
 
-// GetInventoryByProductCode calls the external inventory service to get inventory weight data
-func GetInventoryByProductCode(companyCode string, siteCodes []string, keyValues []InventoryByProductCodeKeyValue) ([]InventoryByProductCodeResponse, error) {
+// GetInventoryWeightByKey calls the external inventory service to get inventory weight data
+func GetInventoryWeightByKey(companyCode string, siteCodes []string, keyValues []InventoryByProductCodeKeyValue) ([]InventoryByProductCodeResponse, error) {
 	// Build request body
 	reqBody := InventoryByProductCodeRequest{
 		CompanyCode: []string{companyCode},
@@ -52,7 +53,7 @@ func GetInventoryByProductCode(companyCode string, siteCodes []string, keyValues
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequest("POST", config.GET_INVENTORY_BY_PRODUCT_CODE_ENDPOINT, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", config.GET_INVENTORY_BY_KEY_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}

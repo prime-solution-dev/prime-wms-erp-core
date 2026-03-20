@@ -30,6 +30,7 @@ type CreditRequest struct {
 	CreateDtm                    *time.Time `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
 	UpdateBy                     string     `gorm:"type:varchar(100)" json:"update_by"`
 	UpdateDate                   time.Time  `gorm:"autoUpdateTime;<-" json:"update_dtm"`
+	ApprovalID                   uuid.UUID  `gorm:"-"  json:"approval_id"`
 }
 
 func (CreditRequest) TableName() string { return "credit_request" }

@@ -30,6 +30,7 @@ type GetSaleRequest struct {
 	CustomerNameLike     string      `json:"customer_name_like"`
 	CreateDateStart      string      `json:"create_date_start"`
 	CreateDateEnd        string      `json:"create_date_end"`
+	ProductCodeLike      string      `json:"product_code_like"`
 	ExpirePriceDateStart string      `json:"expire_price_date_start"`
 	ExpirePriceDateEnd   string      `json:"expire_price_date_end"`
 	DeliveryDateStart    string      `json:"delivery_date_start"`
@@ -78,6 +79,7 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.CustomerNameLike,
 		req.CreateDateStart,
 		req.CreateDateEnd,
+		req.ProductCodeLike,
 		req.ExpirePriceDateStart,
 		req.ExpirePriceDateEnd,
 		req.DeliveryDateStart,
@@ -119,6 +121,7 @@ func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 		req.CustomerNameLike,
 		req.CreateDateStart,
 		req.CreateDateEnd,
+		req.ProductCodeLike,
 		req.ExpirePriceDateStart,
 		req.ExpirePriceDateEnd,
 		req.DeliveryDateStart,

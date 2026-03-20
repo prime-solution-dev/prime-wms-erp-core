@@ -21,7 +21,7 @@ func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
 	if err != nil {
 		errors.New("error marshalling data :")
 	}
-
+	fmt.Println(string(jsonData))
 	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_document")+"/interface/hook-interface", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
@@ -52,7 +52,7 @@ func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
 	if productMap != nil {
 		if idVal, exists := productMap["id"]; exists {
 			if idStr, ok := idVal.(string); ok && idStr != "" {
-				return productMap["id"].(string), nil
+				return productMap, nil
 			}
 		} else {
 			return nil, errors.New(productMap["message"].(string))

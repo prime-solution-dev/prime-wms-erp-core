@@ -8,6 +8,7 @@ import (
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
@@ -83,6 +84,38 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}()
 
+	externalId := ""
+	externaldocNo := ""
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"CREATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	if err != nil {
+		return nil, err
+	}
+	if len(hookConfig) > 0 {
+		urlHook := ""
+		for _, hookConfigValue := range hookConfig {
+			urlHook = hookConfigValue.HookUrl
+		}
+
+		requestDataCreateHook := interfaceService.HookInterfaceRequest{
+			RequestData: req,
+			UrlHook:     urlHook,
+		}
+		HookInterfaceValue, _ := interfaceService.HookInterface(requestDataCreateHook)
+
+		if HookInterfaceValue != nil {
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
+			externalId = str
+			externaldocNo = externalID["last"].(string)
+		}
+	}
+
 	user := "SYSTEM" // TODO: get from ctx
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -135,12 +168,14 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 				return "PENDING"
 			}(),
-			BookingSlotType: deliveryReq.BookingSlotType,
-			StatusApproveGi: statusApproveGi,
-			CreateBy:        user,
-			CreateDate:      nowDateOnly, // date-only format
-			UpdateBy:        user,
-			UpdateDate:      nowDateOnly, // date-only format
+			BookingSlotType:        deliveryReq.BookingSlotType,
+			StatusApproveGi:        statusApproveGi,
+			ExternalID:             externalId,
+			ExternalDocumentNumber: externaldocNo,
+			CreateBy:               user,
+			CreateDate:             nowDateOnly, // date-only format
+			UpdateBy:               user,
+			UpdateDate:             nowDateOnly, // date-only format
 		}
 
 		deliveryToAdd = append(deliveryToAdd, newDelivery)

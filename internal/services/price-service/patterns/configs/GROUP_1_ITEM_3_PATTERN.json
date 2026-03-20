@@ -35,7 +35,7 @@
           "dataMapping": "PG06"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 120,
 
@@ -44,10 +44,10 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 120,
 
@@ -56,7 +56,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "od",
@@ -248,8 +248,8 @@
         "awaiting_production_import_date",
         "awaiting_production_ton",
         "awaiting_production_producer",
-        "price_kg_total_net_price_weight",
-        "price_line_total_net_price_unit",
+        "total_net_price_weight",
+        "total_net_price_unit",
         "selling_fast",
         "selling_slow",
         "remark",

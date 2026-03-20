@@ -6,6 +6,7 @@ import (
 	"fmt"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -53,6 +54,8 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 	creditIDForDelete := []uuid.UUID{}
 	creditExtraIDForDelete := []uuid.UUID{}
+	updateApproval := []models.Approval{}
+
 	for i := range req {
 		if req[i].Status == "REJECT" {
 			if len(GetCreditRes.(ResultCredit).Credit) > 0 {
@@ -125,7 +128,10 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 				req[i].IsAction = true
 
 			}
-
+			updateApproval = append(updateApproval, models.Approval{
+				ID:     req[i].ApprovalID,
+				Status: "COMPLETED",
+			})
 		}
 		if req[i].Status == "COMPLETED" {
 			req[i].IsApprove = true
@@ -173,6 +179,13 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		_, errCreateCredit := CreateCredit(ctx, string(jsonByteserrCredit))
 		if errCreateCredit != nil {
 			return nil, errCreateCredit
+		}
+	}
+	if len(updateApproval) > 0 {
+		updateApprovalPayload, _ := json.Marshal(updateApproval)
+		_, err := approvalService.UpdateApproval(ctx, string(updateApprovalPayload))
+		if err != nil {
+			return nil, fmt.Errorf("failed to update approval: %v", err)
 		}
 	}
 
