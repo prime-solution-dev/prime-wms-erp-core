@@ -89,6 +89,44 @@
           "cellStyle": {
             "textAlign": "center"
           }
+        }
+      ],
+      "columns": [
+        {
+          "field": "stock",
+          "headerName": "Stock",
+          "width": 110,
+          "dataMapping": "stock"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-Spec",
+          "width": 120,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg Stock",
+          "width": 130,
+          "dataMapping": "avg_weight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 140,
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 140,
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra",
+          "width": 120,
+          "dataMapping": "extra_price_weight"
         },
         {
           "field": "line_bundle",
@@ -111,44 +149,6 @@
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
-        {
-          "field": "stock",
-          "headerName": "Stock",
-          "width": 110,
-          "dataMapping": "stock"
-        },
-        {
-          "field": "total_weight",
-          "headerName": "Weight-Spec",
-          "width": 120,
-          "dataMapping": ""
-        },
-        {
-          "field": "avg_weight",
-          "headerName": "Avg.kg Stock",
-          "width": 130,
-          "dataMapping": ""
-        },
-        {
-          "field": "before_total_net_price_weight",
-          "headerName": "ราคาขาย Before",
-          "width": 140,
-          "dataMapping": "before_total_net_price_weight"
-        },
-        {
-          "field": "total_net_price_weight",
-          "headerName": "ราคาขาย After",
-          "width": 140,
-          "dataMapping": "total_net_price_weight"
-        },
-        {
-          "field": "extra_price_weight",
-          "headerName": "Extra",
-          "width": 120,
-          "dataMapping": "extra_price_weight"
         },
         {
           "field": "delivery_date",
@@ -214,7 +214,7 @@
       "type": "PG09"
     },
     "handlerMappings": {
-      "GROUP_1_ITEM_19": "BuildGroup1Item12Response"
+      "GROUP_1_ITEM_14": "BuildGroup1Item12Response"
     },
     "defaultItemFormat": [
       {"type": "group", "value": "PG04"},

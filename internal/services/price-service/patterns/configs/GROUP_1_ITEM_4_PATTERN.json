@@ -62,7 +62,7 @@
         {
           "field": "total_weight",
           "headerName": "Weight-spec",
-          "width": 140,
+          "width": 100,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -74,7 +74,7 @@
         {
           "field": "avg_weight",
           "headerName": "Avg.kg stock",
-          "width": 150,
+          "width": 80,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -86,7 +86,7 @@
         {
           "field": "market_weight",
           "headerName": "น.น ตลาด",
-          "width": 150,
+          "width": 80,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -98,7 +98,7 @@
         {
           "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
-          "width": 150,
+          "width": 80,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
@@ -132,7 +132,7 @@
         {
           "field": "remark",
           "headerName": "หมายเหตุ",
-          "width": 210,
+          "width": 120,
           "pinned": "right",
           "lockPosition": true,
           "suppressMovable": true,

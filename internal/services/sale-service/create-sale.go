@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
@@ -60,7 +61,10 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -103,6 +107,30 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		tempSale.Status = status
 		tempSale.StatusApprove = statusApprove
 		tempSale.IsApproved = isApproved
+
+		// Check auto approval for PENDING status
+		if status == "PENDING" && statusApprove != "COMPLETED" {
+			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
+				RequestUserCode: user,
+				ModuleCode:      "CUSTOMIZE",
+				TopicCode:       "CUSTOMIZE",
+				MdItemCode:      "CTM-CTM5",
+				CondRangeMin:    saleReq.TotalAmount,
+			}
+
+			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			if err != nil {
+				return nil, err
+			}
+
+			if autoApprovalRes.IsAutoApproved {
+				tempSale.IsApproved = true
+				tempSale.StatusApprove = "COMPLETED"
+			} else {
+				tempSale.IsApproved = false
+				tempSale.StatusApprove = "PENDING"
+			}
+		}
 
 		// ตั้งค่า validation flags เป็นค่าเริ่มต้น (หน้าบ้านได้ validate แล้ว)
 		tempSale.PassPriceList = "Y"

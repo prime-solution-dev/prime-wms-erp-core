@@ -12,13 +12,7 @@ import (
 )
 
 // Create
-func CreatePurchase(purchases []models.Purchase) error {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return err
-	}
-	defer db.CloseGORM(gormx)
-
+func CreatePurchase(gormx *gorm.DB, purchases []models.Purchase) error {
 	return gormx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&purchases).Error; err != nil {
 			return err

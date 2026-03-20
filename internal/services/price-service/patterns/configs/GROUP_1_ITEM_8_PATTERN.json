@@ -49,7 +49,7 @@
           "headerName": "ลูก",
           "width": 80,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "stock_quantity"
         },
@@ -65,7 +65,7 @@
           "headerName": "ราคาขาย Before",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "before_total_net_price_weight"
         },
@@ -74,7 +74,7 @@
           "headerName": "ราคาขาย After",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -83,7 +83,7 @@
           "headerName": "Extra",
           "width": 110,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_weight"
         },
@@ -92,7 +92,7 @@
           "headerName": "Weight-spec",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_weight"
         },
@@ -101,7 +101,7 @@
           "headerName": "Avg.kg stock",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "avg_weight"
         },

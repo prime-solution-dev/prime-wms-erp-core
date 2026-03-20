@@ -249,6 +249,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	approval.POST("/UpdateApproval", func(c *gin.Context) {
 		utils.ProcessRequest(c, approvalService.UpdateApproval)
 	})
+	approval.POST("/CheckAutoApprovalRest", func(c *gin.Context) {
+		utils.ProcessRequest(c, approvalService.CheckAutoApprovalRest)
+	})
+
 	//credit
 	credit := ctx.Group("/credit")
 	credit.POST("/GetCreditCurrent", func(c *gin.Context) {
