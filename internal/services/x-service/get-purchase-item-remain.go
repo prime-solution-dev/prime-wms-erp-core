@@ -26,6 +26,9 @@ type GetPurchaseItemRemainRequest struct {
 	NotPurchaseItems []NotPurchaseItem `json:"not_purchase_items,omitempty"`
 	Page             *int              `json:"page"`
 	PageSize         *int              `json:"limit"`
+	PurchaseCodeLike string            `json:"purchase_code_like,omitempty"`
+	ProductCodeLike  string            `json:"product_code_like,omitempty"`
+	ProductNameLike  string            `json:"product_name_like,omitempty"`
 }
 
 type NotPurchaseItem struct {
@@ -569,6 +572,31 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 			"COALESCE(NULLIF(UPPER(LTRIM(RTRIM(status_payment))), ''), 'PENDING') IN ?",
 			setToSlice(paySet),
 		)
+	}
+
+	// LIKE filters
+	if req.PurchaseCodeLike != "" {
+		q = q.Where("purchase_code ILIKE ?", "%"+req.PurchaseCodeLike+"%")
+	}
+	if req.ProductCodeLike != "" {
+		q = q.Where(`
+			EXISTS (
+				SELECT 1
+				FROM purchase_item pi
+				WHERE pi.purchase_id = purchase.id
+				  AND pi.product_code ILIKE ?
+			)
+		`, "%"+req.ProductCodeLike+"%")
+	}
+	if req.ProductNameLike != "" {
+		q = q.Where(`
+			EXISTS (
+				SELECT 1
+				FROM purchase_item pi
+				WHERE pi.purchase_id = purchase.id
+				  AND pi.product_desc ILIKE ?
+			)
+		`, "%"+req.ProductNameLike+"%")
 	}
 
 	// Optional product filter: use EXISTS to avoid join+dup
