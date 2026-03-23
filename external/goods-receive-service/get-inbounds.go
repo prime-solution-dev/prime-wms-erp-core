@@ -34,6 +34,11 @@ type InboundFilter struct {
 	DocumentRefType            []string    `json:"document_ref_type"`
 	InboundItemDocumentRef     []string    `json:"inbound_item_document_ref"`
 	InboundItemDocumentRefItem []string    `json:"inbound_item_document_ref_item"`
+	// LIKE search fields
+	PlanCodeLike     string `json:"plan_code_like"`
+	SupplierCodeLike string `json:"supplier_code_like"`
+	SupplierNameLike string `json:"supplier_name_like"`
+	InvoiceNoLike    string `json:"invoice_no_like"`
 }
 
 type ResultInbound struct {
