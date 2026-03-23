@@ -294,6 +294,17 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			}
 		}
 
+		// Find default UOM for this subgroup
+		defaultUom := ""
+		if formulas, ok := formulasMap[subGroup.SubGroupCode]; ok {
+			for _, formula := range formulas {
+				if formula.IsDefault {
+					defaultUom = formula.PriceListFormulas.Uom
+					break
+				}
+			}
+		}
+
 		// Add calculated data to response
 		responseData = append(responseData, models.GetCalculatedPriceListSubGroupItem{
 			SubGroupID:                subGroupID.String(),
@@ -303,6 +314,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			ExtraPriceWeight:          extraPriceWeight,
 			BeforeTotalNetPriceUnit:   beforeTotalNetPriceUnit,
 			BeforeTotalNetPriceWeight: beforeTotalNetPriceWeight,
+			DefaultUom:                defaultUom,
 		})
 	}
 

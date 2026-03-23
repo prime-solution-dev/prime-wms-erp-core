@@ -304,6 +304,7 @@ type InventoryWeightResponse struct {
 type PriceListSubGroupResponse struct {
 	ID                        string                         `json:"id"`
 	PriceListGroupID          string                         `json:"price_list_group_id"`
+	SubgroupCode              string                         `json:"subgroup_code"`
 	SubgroupKey               string                         `json:"subgroup_key"`
 	IsTrading                 bool                           `json:"is_trading"`
 	PriceUnit                 float64                        `json:"price_unit"`
@@ -334,6 +335,7 @@ type PriceListSubGroupResponse struct {
 	SupplierName              string                         `json:"supplier_name,omitempty"`
 	ProductCode               string                         `json:"product_code,omitempty"`
 	BatchNo                   string                         `json:"batch_no,omitempty"`
+	DefaultUom                string                         `json:"default_uom,omitempty"`
 }
 
 type GetPriceListResponse struct {
@@ -499,6 +501,7 @@ type GetCalculatedPriceListSubGroupItem struct {
 	ExtraPriceWeight          float64 `json:"extra_price_weight"`
 	BeforeTotalNetPriceUnit   float64 `json:"before_total_net_price_unit"`
 	BeforeTotalNetPriceWeight float64 `json:"before_total_net_price_weight"`
+	DefaultUom                string  `json:"default_uom,omitempty"`
 }
 
 type GetCalculatedPriceListSubGroupResponse struct {
