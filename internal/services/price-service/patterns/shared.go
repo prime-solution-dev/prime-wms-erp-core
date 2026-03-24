@@ -518,18 +518,18 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 
 // getAvgProductFromInventory extracts AvgProduct from the first InventoryWeight entry
 // Returns 0.0 if inventory data is not available
-func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
+func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) string {
 	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].AvgProduct
+		return fmt.Sprintf("%.2f", sg.InventoryWeight[0].AvgWeight)
 	}
-	return 0.0
+	return ""
 }
 
 // getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry
 // Returns 0.0 if inventory data is not available
 func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
 	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].WeightSpec
+		return sg.InventoryWeight[0].TotalWeight
 	}
 	return 0.0
 }
@@ -1067,6 +1067,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
+		var supplierNameValue interface{}
 		var warehouseValue interface{}
 		var codeValue interface{}
 		var deliveryDateValue interface{}
@@ -1080,6 +1081,19 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		hasSellingSlow := false
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Clean up corrupted keys from previous double prefix bug
+				cleanedUdf := make(map[string]interface{})
+				for k, v := range udfData {
+					if strings.HasPrefix(k, "awaiting_production_awaiting_production_") {
+						cleanedUdf[strings.TrimPrefix(k, "awaiting_production_")] = v
+					} else if strings.HasPrefix(k, "selling_selling_") {
+						cleanedUdf[strings.TrimPrefix(k, "selling_")] = v
+					} else {
+						cleanedUdf[k] = v
+					}
+				}
+				udfData = cleanedUdf
+
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
 				}
@@ -1098,6 +1112,9 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				}
 				if bn, ok := udfData["batch_no"]; ok {
 					batchNoValue = bn
+				}
+				if sn, ok := udfData["supplier_name"]; ok {
+					supplierNameValue = sn
 				}
 				if wh, ok := udfData["warehouse"]; ok {
 					warehouseValue = wh
@@ -1126,17 +1143,17 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 					// Handle awaiting_production fields directly from udf_json
 					if key == "awaiting_production_import_date" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = value
 						hasAwaitingProductionImportDate = true
 						continue
 					}
 					if key == "awaiting_production_ton" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = value
 						hasAwaitingProductionTon = true
 						continue
 					}
 					if key == "awaiting_production_producer" {
-						row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
+						row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = value
 						hasAwaitingProductionProducer = true
 						continue
 					}
@@ -1144,18 +1161,18 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					// Handle selling fields directly from udf_json
 					if key == "selling_fast" {
 						if sellingFast, ok := value.(bool); ok {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = sellingFast
 						} else {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 						}
 						hasSellingFast = true
 						continue
 					}
 					if key == "selling_slow" {
 						if sellingSlow, ok := value.(bool); ok {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = sellingSlow
 						} else {
-							row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+							row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 						}
 						hasSellingSlow = true
 						continue
@@ -1184,25 +1201,25 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 		// Set default values for awaiting_production fields if they weren't found in udf_json
 		if !hasAwaitingProductionImportDate {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_import_date"))] = nil
 		}
 		if !hasAwaitingProductionTon {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_ton"))] = nil
 		}
 		if !hasAwaitingProductionProducer {
-			row[fmt.Sprintf("%s_awaiting_production_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("awaiting_production_producer"))] = nil
 		}
 
 		// Set default values for selling fields if they weren't found in udf_json
 		if !hasSellingFast {
-			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_fast"))] = false
 		}
 		if !hasSellingSlow {
-			row[fmt.Sprintf("%s_selling_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
+			row[fmt.Sprintf("%s_%s", columnKey, sanitizeFieldName("selling_slow"))] = false
 		}
 
 		row["is_highlight"] = isHighlightValue
-		row["weight_spec"] = getWeightSpecFromInventory(sg)
+		row["total_weight"] = getWeightSpecFromInventory(sg)
 		row["avg_kg_stock"] = getAvgProductFromInventory(sg)
 
 		for _, colConfig := range pattern.Columns {
@@ -1276,6 +1293,8 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				row[fieldName] = sg.BeforeTermPriceWeight
 			case "before_total_net_price_weight":
 				row[fieldName] = sg.BeforeTotalNetPriceWeight
+			case "default_uom":
+				row[fieldName] = sg.DefaultUom
 			case "effective_date":
 				row[fieldName] = sg.EffectiveDate
 			case "remark":
@@ -1307,20 +1326,34 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			case "stock_quantity":
 				row[fieldName] = stockQuantityValue
 			case "batch_no":
-				row[fieldName] = batchNoValue
+				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
+					row[fieldName] = batchNoValue
+				} else if sg.BatchNo != "" {
+					row[fieldName] = sg.BatchNo
+				} else {
+					row[fieldName] = nil
+				}
+			case "supplier_name":
+				if sg.SupplierName != "" {
+					row[fieldName] = sg.SupplierName
+				} else if supplierNameValue != nil {
+					row[fieldName] = supplierNameValue
+				} else {
+					row[fieldName] = nil
+				}
 			case "warehouse":
 				row[fieldName] = warehouseValue
 			case "code":
 				row[fieldName] = codeValue
-			case "weight_spec":
+			case "total_weight":
 				row[fieldName] = getWeightSpecFromInventory(sg)
-			case "avg_product":
+			case "avg_weight":
 				row[fieldName] = getAvgProductFromInventory(sg)
 			case "avg_kg_stock":
 				row[fieldName] = getAvgProductFromInventory(sg)
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
-				if colConfig.Field == "weight_spec" {
+				if colConfig.Field == "total_weight" {
 					row[fieldName] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
 					row[fieldName] = getAvgProductFromInventory(sg)
@@ -1341,12 +1374,23 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					row[fieldName] = sg.BeforePriceUnit
 				case "total_net_price_unit":
 					row[fieldName] = sg.TotalNetPriceUnit
+				case "before_total_net_price_weight":
+					row[fieldName] = sg.BeforeTotalNetPriceWeight
+				case "before_total_net_price_unit":
+					row[fieldName] = sg.BeforeTotalNetPriceUnit
+				case "default_uom":
+					row[fieldName] = sg.DefaultUom
 				}
 			}
 		}
 
 		row[fmt.Sprintf("%s_subgroup_id", columnKey)] = sg.ID
 		row[fmt.Sprintf("%s_is_trading", columnKey)] = sg.IsTrading
+		row[fmt.Sprintf("%s_default_uom", columnKey)] = sg.DefaultUom
+		row[fmt.Sprintf("%s_before_total_net_price_weight", columnKey)] = sg.BeforeTotalNetPriceWeight
+		row[fmt.Sprintf("%s_total_net_price_weight", columnKey)] = sg.TotalNetPriceWeight
+		row[fmt.Sprintf("%s_before_total_net_price_unit", columnKey)] = sg.BeforeTotalNetPriceUnit
+		row[fmt.Sprintf("%s_total_net_price_unit", columnKey)] = sg.TotalNetPriceUnit
 		row["subgroup_id"] = sg.ID
 		row["is_trading"] = sg.IsTrading
 	}
@@ -1418,8 +1462,22 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		var awaitingProductionDeliveryDateValue interface{}
 		var awaitingProductionTonValue interface{}
 		var awaitingProductionProducerValue interface{}
+		var supplierNameValue interface{}
 		if len(sg.UdfJson) > 0 {
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+				// Clean up corrupted keys from previous double prefix bug
+				cleanedUdf := make(map[string]interface{})
+				for k, v := range udfData {
+					if strings.HasPrefix(k, "awaiting_production_awaiting_production_") {
+						cleanedUdf[strings.TrimPrefix(k, "awaiting_production_")] = v
+					} else if strings.HasPrefix(k, "selling_selling_") {
+						cleanedUdf[strings.TrimPrefix(k, "selling_")] = v
+					} else {
+						cleanedUdf[k] = v
+					}
+				}
+				udfData = cleanedUdf
+
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
 				}
@@ -1504,6 +1562,9 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if awaiting_production_producer, ok := udfData["awaiting_production_producer"]; ok {
 					awaitingProductionProducerValue = awaiting_production_producer
 				}
+				if supplier_name, ok := udfData["supplier_name"]; ok {
+					supplierNameValue = supplier_name
+				}
 				// Extract selling fields directly from udf_json
 				if selling_fast, ok := udfData["selling_fast"].(bool); ok {
 					sellingFastValue = selling_fast
@@ -1576,6 +1637,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.PriceWeight
 			case "before_price_weight":
 				row[fixedCol.Field] = sg.BeforePriceWeight
+			case "before_total_net_price_weight":
+				row[fixedCol.Field] = sg.BeforeTotalNetPriceWeight
 			case "extra_price_weight":
 				row[fixedCol.Field] = sg.ExtraPriceWeight
 			case "market_weight":
@@ -1608,15 +1671,137 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
 				row[fixedCol.Field] = sg.Remark
-			case "weight_spec":
+			case "total_weight":
 				row[fixedCol.Field] = getWeightSpecFromInventory(sg)
-			case "avg_product":
+			case "avg_weight":
 				row[fixedCol.Field] = getAvgProductFromInventory(sg)
+			case "import_date":
+				if importDateValue != nil {
+					row[fixedCol.Field] = importDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "delivery_date":
+				if deliveryDateValue != nil {
+					row[fixedCol.Field] = deliveryDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "ton":
+				if tonValue != nil {
+					row[fixedCol.Field] = tonValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "producer":
+				if producerValue != nil {
+					row[fixedCol.Field] = producerValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "next_production":
+				if nextProductionValue != nil {
+					row[fixedCol.Field] = nextProductionValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "tsm":
+				if tsmValue != nil {
+					row[fixedCol.Field] = tsmValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "selling_fast":
+				row[fixedCol.Field] = sellingFastValue
+			case "selling_slow":
+				row[fixedCol.Field] = sellingSlowValue
+			case "stock_quantity":
+				if stockQuantityValue != nil {
+					row[fixedCol.Field] = stockQuantityValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "batch_no":
+				if sg.BatchNo != "" {
+					row[fixedCol.Field] = sg.BatchNo
+				} else if batchNoValue != nil {
+					row[fixedCol.Field] = batchNoValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "warehouse":
+				if warehouseValue != nil {
+					row[fixedCol.Field] = warehouseValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "code":
+				if codeValue != nil {
+					row[fixedCol.Field] = codeValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "bkk":
+				if bkkValue != nil {
+					row[fixedCol.Field] = bkkValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "factory":
+				if factoryValue != nil {
+					row[fixedCol.Field] = factoryValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "country":
+				if countryValue != nil {
+					row[fixedCol.Field] = countryValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "institute":
+				if instituteValue != nil {
+					row[fixedCol.Field] = instituteValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_ton":
+				if awaitingProductionTonValue != nil {
+					row[fixedCol.Field] = awaitingProductionTonValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_producer":
+				if awaitingProductionProducerValue != nil {
+					row[fixedCol.Field] = awaitingProductionProducerValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_import_date":
+				if awaitingProductionImportDateValue != nil {
+					row[fixedCol.Field] = awaitingProductionImportDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "awaiting_production_delivery_date":
+				if awaitingProductionDeliveryDateValue != nil {
+					row[fixedCol.Field] = awaitingProductionDeliveryDateValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
+			case "supplier_name":
+				if sg.SupplierName != "" {
+					row[fixedCol.Field] = sg.SupplierName
+				} else if supplierNameValue != nil {
+					row[fixedCol.Field] = supplierNameValue
+				} else {
+					row[fixedCol.Field] = nil
+				}
 			}
 
 			if fixedCol.DataMapping == "" {
 				switch fixedCol.Field {
-				case "weight_spec":
+				case "total_weight":
 					row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 				case "avg_kg_stock":
 					row[fixedCol.Field] = getAvgProductFromInventory(sg)
@@ -1630,6 +1815,9 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 						} else {
 							row[fixedCol.Field] = ""
 						}
+					} else if pgCodeRegex.MatchString(fixedCol.Field) {
+						// Preserve PGxx codes (e.g. PG06) by reading directly from SubGroupKeys
+						row[fixedCol.Field] = getValueNameByGroupCode(sg.SubGroupKeys, fixedCol.Field)
 					} else {
 						// Set to empty string if no mapping found
 						row[fixedCol.Field] = ""
@@ -1714,6 +1902,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[colConfig.Field] = sg.ExtraPriceUnit
 			case "before_price_weight":
 				row[colConfig.Field] = sg.BeforePriceWeight
+			case "before_total_net_price_weight":
+				row[colConfig.Field] = sg.BeforeTotalNetPriceWeight
 			case "total_net_price_weight":
 				row[colConfig.Field] = sg.TotalNetPriceWeight
 			case "price_weight":
@@ -1785,8 +1975,18 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					row[colConfig.Field] = nil
 				}
 			case "batch_no":
-				if batchNoValue != nil {
+				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
 					row[colConfig.Field] = batchNoValue
+				} else if sg.BatchNo != "" {
+					row[colConfig.Field] = sg.BatchNo
+				} else {
+					row[colConfig.Field] = nil
+				}
+			case "supplier_name":
+				if sg.SupplierName != "" {
+					row[colConfig.Field] = sg.SupplierName
+				} else if supplierNameValue != nil {
+					row[colConfig.Field] = supplierNameValue
 				} else {
 					row[colConfig.Field] = nil
 				}
@@ -1858,15 +2058,17 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				} else {
 					row[colConfig.Field] = nil
 				}
-			case "weight_spec":
+			case "total_weight":
 				row[colConfig.Field] = getWeightSpecFromInventory(sg)
-			case "avg_product":
+			case "avg_weight":
 				row[colConfig.Field] = getAvgProductFromInventory(sg)
 			case "avg_kg_stock":
 				row[colConfig.Field] = getAvgProductFromInventory(sg)
+			case "default_uom":
+				row[colConfig.Field] = sg.DefaultUom
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
-				if colConfig.Field == "weight_spec" {
+				if colConfig.Field == "total_weight" {
 					row[colConfig.Field] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
 					row[colConfig.Field] = getAvgProductFromInventory(sg)
@@ -1879,6 +2081,12 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 
 		row["subgroup_id"] = sg.ID
 		row["is_trading"] = sg.IsTrading
+		// Mandatory price fields - always included for price calculations and UOM display
+		row["default_uom"] = sg.DefaultUom
+		row["before_total_net_price_weight"] = sg.BeforeTotalNetPriceWeight
+		row["total_net_price_weight"] = sg.TotalNetPriceWeight
+		row["before_total_net_price_unit"] = sg.BeforeTotalNetPriceUnit
+		row["total_net_price_unit"] = sg.TotalNetPriceUnit
 
 		rows = append(rows, row)
 	}
@@ -2034,13 +2242,32 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		row["thickness_x_length"] = thicknessLength
 		row["size"] = size
 
-		// Parse UDF data for highlight flag
+		// Parse UDF data for highlight flag and others
 		isHighlightValue := false
+		hasInactiveValue := false
+		inactiveValue := false
+		var remarkValue interface{}
+		var batchNoValue interface{}
+		var supplierNameValue interface{}
+
 		if len(sg.UdfJson) > 0 {
 			udfData := make(map[string]interface{})
 			if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
 				if h, ok := udfData["is_highlight"].(bool); ok {
 					isHighlightValue = h
+				}
+				if i, ok := udfData["inactive"].(bool); ok {
+					hasInactiveValue = true
+					inactiveValue = i
+				}
+				if r, ok := udfData["remark"]; ok {
+					remarkValue = r
+				}
+				if bn, ok := udfData["batch_no"]; ok {
+					batchNoValue = bn
+				}
+				if sn, ok := udfData["supplier_name"]; ok {
+					supplierNameValue = sn
 				}
 			}
 		}
@@ -2054,6 +2281,11 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 
 		// Set subgroup identifier for the specific PRODUCT_GROUP2 entry
 		row[fmt.Sprintf("%s_subgroup_id", identifier)] = sg.ID
+		row[fmt.Sprintf("%s_default_uom", identifier)] = sg.DefaultUom
+		row[fmt.Sprintf("%s_before_total_net_price_weight", identifier)] = sg.BeforeTotalNetPriceWeight
+		row[fmt.Sprintf("%s_total_net_price_weight", identifier)] = sg.TotalNetPriceWeight
+		row[fmt.Sprintf("%s_before_total_net_price_unit", identifier)] = sg.BeforeTotalNetPriceUnit
+		row[fmt.Sprintf("%s_total_net_price_unit", identifier)] = sg.TotalNetPriceUnit
 
 		// Add flattened SubGroupKey fields for direct access
 		for _, sgk := range sg.SubGroupKeys {
@@ -2066,18 +2298,59 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 			switch colConfig.DataMapping {
 			case "is_highlight":
 				row[fieldName] = isHighlightValue
+			case "inactive":
+				if hasInactiveValue {
+					row[fieldName] = inactiveValue
+				} else {
+					row[fieldName] = false
+				}
+			case "remark":
+				row[fieldName] = remarkValue
 			case "price_weight":
 				row[fieldName] = sg.PriceWeight
+			case "before_total_net_price_weight":
+				row[fieldName] = sg.BeforeTotalNetPriceWeight
 			case "total_net_price_weight":
 				row[fieldName] = sg.TotalNetPriceWeight
+			case "extra_price_weight":
+				row[fieldName] = sg.ExtraPriceWeight
 			case "before_price_unit":
 				row[fieldName] = sg.BeforePriceUnit
 			case "total_net_price_unit":
 				row[fieldName] = sg.TotalNetPriceUnit
 			case "extra_price_unit":
 				row[fieldName] = sg.ExtraPriceUnit
+			case "total_weight":
+				row[fieldName] = getWeightSpecFromInventory(sg)
+			case "avg_weight":
+				row[fieldName] = getAvgProductFromInventory(sg)
+			case "avg_kg_stock":
+				row[fieldName] = getAvgProductFromInventory(sg)
+			case "batch_no":
+				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
+					row[fieldName] = batchNoValue
+				} else if sg.BatchNo != "" {
+					row[fieldName] = sg.BatchNo
+				} else {
+					row[fieldName] = nil
+				}
+			case "supplier_name":
+				if supplierNameValue != nil && fmt.Sprintf("%v", supplierNameValue) != "" {
+					row[fieldName] = supplierNameValue
+				} else if sg.SupplierName != "" {
+					row[fieldName] = sg.SupplierName
+				} else {
+					row[fieldName] = nil
+				}
+			case "default_uom":
+				row[fieldName] = sg.DefaultUom
 			default:
-				row[fieldName] = nil
+				// Fallback to empty string for string-types like remark if not matched
+				if colConfig.DataMapping == "remark" {
+					row[fieldName] = ""
+				} else {
+					row[fieldName] = nil
+				}
 			}
 		}
 	}

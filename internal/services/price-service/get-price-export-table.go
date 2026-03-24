@@ -9,6 +9,8 @@ import (
 	"sort"
 	"time"
 
+	externalService "prime-erp-core/external/warehouse-service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
@@ -90,8 +92,84 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		},
 	)
 
+	// Collect all unique company codes and site codes from the response
+	companyCodeSet := make(map[string]bool)
+	siteCodeSet := make(map[string]bool)
+
+	for _, resp := range res {
+		if resp.CompanyCode != "" {
+			companyCodeSet[resp.CompanyCode] = true
+		}
+		if resp.SiteCode != "" {
+			siteCodeSet[resp.SiteCode] = true
+		}
+	}
+
+	// Collect all key values for inventory service request
+	keyValues := []externalService.InventoryByProductCodeKeyValue{}
+	for _, resp := range res {
+		for _, sg := range resp.SubGroups {
+			for _, sgk := range sg.GroupKeys {
+				keyValues = append(keyValues, externalService.InventoryByProductCodeKeyValue{
+					ID:         sg.ID.String(),
+					GroupCode:  sgk.Code,
+					GroupValue: sgk.Value,
+					Seq:        sgk.Seq,
+				})
+			}
+		}
+	}
+
+	// Call inventory service if we have key values
+	if len(keyValues) > 0 {
+		// Convert sets to slices
+		companyCodes := []string{}
+		for code := range companyCodeSet {
+			companyCodes = append(companyCodes, code)
+		}
+		siteCodes := []string{}
+		for code := range siteCodeSet {
+			siteCodes = append(siteCodes, code)
+		}
+
+		// Use first company code for the request
+		companyCode := ""
+		if len(companyCodes) > 0 {
+			companyCode = companyCodes[0]
+		}
+
+		// Call inventory service
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		if err != nil {
+			// Log error but continue without inventory data
+			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
+		} else {
+			// Create a map of inventory data by ID for quick lookup
+			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			for _, invItem := range inventoryResponse {
+				inventoryMap[invItem.ID] = invItem.InventoryWeight
+			}
+
+			// Enrich subgroups with inventory data
+			for i := range res {
+				for j := range res[i].SubGroups {
+					sg := &res[i].SubGroups[j]
+					if inventoryWeights, ok := inventoryMap[sg.ID.String()]; ok && len(inventoryWeights) > 0 {
+						// For export, use first inventory record per subgroup
+						inv := inventoryWeights[0]
+						sg.InventoryWeight = []models.InventoryWeightResponse{inv}
+						sg.ProductCode = inv.ProductCode
+						sg.SupplierCode = inv.SupplierCode
+						sg.SupplierName = inv.SupplierName
+						sg.BatchNo = inv.BatchNo
+					}
+				}
+			}
+		}
+	}
+
 	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, groupMap, paymentTermMap)
+	basedPriceTab := buildBasedPriceTab(res, paymentTermMap)
 
 	response := GetPriceExportTableResponse{
 		Tabs: []ExportTab{detailTab, basedPriceTab},
@@ -168,7 +246,55 @@ func buildExportTableTyped(
 		return ai.code < aj.code
 	})
 
-	columns := make([]ExportColumn, 0, len(cols))
+	// Start with fixed columns first (id is internal, not exported)
+	columns := []ExportColumn{
+		{Field: "PG01", HeaderName: "หมวดหลัก"},
+		{Field: "PG02", HeaderName: "หมวดย่อย"},
+		{Field: "PG03", HeaderName: "เกรด/รูปแบบ"},
+		{Field: "PG05", HeaderName: "ขนาด"},
+		{Field: "PG06", HeaderName: "ขนาดหน้ากว้าง"},
+		{Field: "PG07", HeaderName: "ความหนา"},
+		{Field: "PG08", HeaderName: "ความยาว"},
+		{Field: "PG09", HeaderName: "Other_1"},
+		{Field: "PG10", HeaderName: "Other_2"},
+		{Field: "total_weight", HeaderName: "Weight-spec"},
+		{Field: "avg_weight", HeaderName: "Avg.kg stock"},
+		{Field: "market_weight", HeaderName: "น.น. ตลาด"},
+		{Field: "total_net_price_weight", HeaderName: "ราคาขาย กก"},
+		{Field: "total_net_price_unit", HeaderName: "ราคาขาย เส้น"},
+		{Field: "remark", HeaderName: "Remark"},
+		{Field: "line_bundle", HeaderName: "เส้น/มัด"},
+		{Field: "stock", HeaderName: "Stock"},
+		{Field: "stock_quantity", HeaderName: "จำนวน"},
+		{Field: "quantity", HeaderName: "จำนวน"},
+		{Field: "batch_no", HeaderName: "Ship No."},
+		{Field: "brand", HeaderName: "ยี่ห้อ"},
+		{Field: "code", HeaderName: "Code"},
+		{Field: "warehouse", HeaderName: "โกดัง"},
+		{Field: "face", HeaderName: "หน้า"},
+		{Field: "z_value", HeaderName: "Z"},
+		{Field: "bkk", HeaderName: "BKK"},
+		{Field: "country", HeaderName: "ปท."},
+		{Field: "tsm", HeaderName: "สมอ."},
+		{Field: "institute", HeaderName: "สถาบัน"},
+		{Field: "length", HeaderName: "ความยาว"},
+		{Field: "od", HeaderName: "OD"},
+		{Field: "delivery_date", HeaderName: "ส่งมอบ ว/ด/ป"},
+		{Field: "ton", HeaderName: "จำนวนตัน"},
+		{Field: "next_production", HeaderName: "ผลิตงวดต่อไป"},
+		{Field: "import_date", HeaderName: "วัน เข้า"},
+		{Field: "producer", HeaderName: "ผู้ผลิต"},
+		{Field: "fast", HeaderName: "เร็ว"},
+		{Field: "slow", HeaderName: "ช้า"},
+		{Field: "inactive", HeaderName: "Inactive"},
+		{Field: "is_highlight", HeaderName: "Highlight สีฟ้า"},
+		{Field: "coil_id", HeaderName: "Coil ID"},
+		{Field: "supplier_name", HeaderName: "โรงงาน"},
+		{Field: "size", HeaderName: "ขนาด"},
+		{Field: "spec", HeaderName: "spec"},
+	}
+
+	// Then add dynamic group key columns (sorted by seq, then code)
 	for _, c := range cols {
 		header := c.name
 		if header == "" {
@@ -177,73 +303,89 @@ func buildExportTableTyped(
 		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
 	}
 
-	udfColumns := []string{"is_highlight",
-		"inactive",
-		"line_bundle",
-		"market_weight",
-		"od",
-		"stock",
-		"import_date",
-		"ton",
-		"producer",
-		"selling_fast",
-		"selling_slow",
-		"awaiting_production_import_date",
-		"awaiting_production_delivery_date",
-		"awaiting_production_ton",
-		"awaiting_production_producer",
-		"bkk",
-		"factory",
-		"country",
-		"ship_no",
-		"tsm",
-		"remark",
+	// Collect all unique UDF keys from all subgroups' udf_json data dynamically
+	udfKeyMap := make(map[string]bool)
+	for _, g := range groups {
+		for _, sg := range g.SubGroups {
+			if len(sg.UdfJson) > 0 {
+				udfData := make(map[string]interface{})
+				if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+					for key := range udfData {
+						udfKeyMap[key] = true
+					}
+				}
+			}
+		}
 	}
-	udfColumnsHeaders := []string{"Highlight สีฟ้า",
-		"Inactive",
-		"เส้น/มัด",
-		"น้ำหนักตลาด",
-		"OD",
-		"Stock",
-		"วัน เข้า",
-		"ตัน",
-		"ผู้ผลิต",
-		"ขายช้า",
-		"ขายเร็ว",
-		"รอผลิตวันเข้า",
-		"รอผลิตวันจัดส่ง",
-		"รอผลิตตัน",
-		"รอผลิตผู้ผลิต",
-		"BKK",
-		"โรงงงาน",
-		"ประเทศ",
-		"โกดัง",
-		"สถาบัน",
-		"Remark",
+
+	// Collect and sort UDF keys for deterministic column order
+	udfKeys := make([]string, 0, len(udfKeyMap))
+	for key := range udfKeyMap {
+		udfKeys = append(udfKeys, key)
 	}
-	for i, col := range udfColumns {
-		columns = append(columns, ExportColumn{Field: col, HeaderName: udfColumnsHeaders[i]})
+	sort.Strings(udfKeys)
+
+	// Generate dynamic UDF columns with headers
+	for _, key := range udfKeys {
+		// Use key as header (can be enhanced with mapping later if needed)
+		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
 	}
 
 	// Build rows: 1 row per subgroup.
 	rows := make([]map[string]interface{}, 0)
 	for _, g := range groups {
 		for _, sg := range g.SubGroups {
-			row := map[string]interface{}{
-				"id":                     sg.ID.String(),
-				"total_net_price_unit":   sg.TotalNetPriceUnit,
-				"total_net_price_weight": sg.TotalNetPriceWeight,
-				"remark":                 sg.Remark,
-			}
+			// Check inactive field from UDF to filter out inactive rows
+			inactiveValue := false
 			if len(sg.UdfJson) > 0 {
 				udfData := make(map[string]interface{})
 				if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
-					for _, col := range udfColumns {
-						if val, ok := udfData[col]; ok {
-							row[col] = val
+					if val, ok := udfData["inactive"].(bool); ok {
+						inactiveValue = val
+					}
+				}
+			}
+
+			// Skip row if inactive is true
+			if inactiveValue {
+				continue
+			}
+
+			row := map[string]interface{}{
+				"id":                           sg.ID.String(),
+				"total_net_price_unit":         sg.TotalNetPriceUnit,
+				"total_net_price_weight":       sg.TotalNetPriceWeight,
+				"before_total_net_price_unit":   sg.BeforeTotalNetPriceUnit,
+				"before_total_net_price_weight": sg.BeforeTotalNetPriceWeight,
+				"remark":                       sg.Remark,
+			}
+			// Map UDF values dynamically from udf_json to their corresponding columns
+			if len(sg.UdfJson) > 0 {
+				udfData := make(map[string]interface{})
+				if err := json.Unmarshal(sg.UdfJson, &udfData); err == nil {
+					for key, val := range udfData {
+						// Only add UDF fields that we have columns for
+						if udfKeyMap[key] {
+							row[key] = val
 						}
 					}
 				}
+			}
+
+			// Add inventory weight fields
+			if len(sg.InventoryWeight) > 0 {
+				inv := sg.InventoryWeight[0]
+				row["total_weight"] = inv.TotalWeight
+				row["avg_weight"] = inv.AvgWeight
+				row["market_weight"] = inv.WeightSpec
+				row["stock"] = inv.SumQty
+				row["stock_quantity"] = inv.TotalQty
+				row["quantity"] = inv.SumQty
+				row["batch_no"] = inv.BatchNo
+				row["brand"] = inv.SupplierName
+				row["code"] = inv.ProductCode
+				row["warehouse"] = inv.SiteCode
+				row["supplier_name"] = inv.SupplierName
 			}
 
 			// Fill dynamic group_code fields with value_name.
@@ -284,11 +426,7 @@ func buildDetailTab(
 }
 
 // buildBasedPriceTab creates the "Based price" tab with group-level data and Terms.
-func buildBasedPriceTab(
-	groups []GetPriceListGroupResponse,
-	groupMap map[string]models.GetGroupResponse,
-	paymentTermMap map[string]GetPaymentTermResponse,
-) ExportTab {
+func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[string]GetPaymentTermResponse) ExportTab {
 	now := time.Now()
 
 	// Build columns.

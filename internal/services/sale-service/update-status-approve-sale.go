@@ -85,6 +85,11 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		"update_date":     nowDateOnly,
 	}
 
+	// เพิ่ม is_approved = true เมื่อ status เป็น COMPLETED
+	if req.Status == "COMPLETED" {
+		updateFields["is_approved"] = true
+	}
+
 	if err := gormx.Model(&models.Sale{}).
 		Where("id = ?", req.ID).
 		Updates(updateFields).Error; err != nil {

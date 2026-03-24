@@ -63,7 +63,7 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 		}
 
 		tab := PriceListDetailTabConfig{
-			ID:    uuid.New(),
+			ID:    uuid.NewSHA1(uuid.NameSpaceDNS, []byte(tabLabel)),
 			Label: tabLabel,
 			TableConfig: TableConfig{
 				Title:             tabLabel,

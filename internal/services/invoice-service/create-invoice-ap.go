@@ -121,7 +121,16 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
 
+	prefix := "GRA"
+	configCodeValue := "RUNNING_AP"
+	count := len(req)
+	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
+
 	for i, invoice := range req {
+		req[i].InvoiceCode = purchaseCodes[i]
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
 			req[i].PartyBranch = supplier.Branch
@@ -254,7 +263,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, err
 			}
 			if HookInterfaceValue != nil {
-				str, _ := HookInterfaceValue.(string)
+
+				externalID := HookInterfaceValue.(map[string]interface{})
+				str, _ := externalID["id"].(string)
 
 				invoiceValue := []models.Invoice{}
 				invoiceValue = append(invoiceValue, models.Invoice{

@@ -2,7 +2,7 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_10_default",
-      "name": "PG09 Price Table",
+      "name": "หมวดเหล็กเส้น",
       "description": "Dynamic table for PG09 with PG09 price breakouts per item/length.",
       "enabled": true,
       "grouping": {
@@ -35,29 +35,67 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
+        }
+      ],
+      "columns": [
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 130,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "weight_spec",
+          "dataMapping": "total_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "avg_product",
+          "dataMapping": "avg_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "before_total_net_price_unit",
+          "headerName": "ราคาขาย Before",
+          "width": 150,
+          "dataMapping": "before_total_net_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "total_net_price_unit",
+          "headerName": "ราคาขาย After",
+          "width": 150,
+          "dataMapping": "total_net_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "extra_price_unit",
+          "headerName": "Extra",
+          "width": 130,
+          "dataMapping": "extra_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 120,
+          "dataMapping": "line_bundle",
+          "cellStyle": {
+            "textAlign": "left"
           }
         },
         {
@@ -69,44 +107,6 @@
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
-        {
-          "field": "before_total_net_price_unit",
-          "headerName": "ราคาขาย Before",
-          "width": 150,
-          "dataMapping": "before_total_net_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "total_net_price_unit",
-          "headerName": "ราคาขาย After",
-          "width": 150,
-          "dataMapping": "total_net_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "extra_price_unit",
-          "headerName": "Extra",
-          "width": 130,
-          "dataMapping": "extra_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "line_bundle",
-          "headerName": "เส้น/มัด",
-          "width": 120,
-          "dataMapping": "line_bundle",
-          "cellStyle": {
-            "textAlign": "right"
-          }
         },
         {
           "field": "inactive",
@@ -153,8 +153,8 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {

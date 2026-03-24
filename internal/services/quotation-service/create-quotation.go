@@ -9,6 +9,7 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
@@ -51,7 +52,10 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -111,6 +115,33 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if quotationReq.Status == "PENDING" {
 			tempQuotation.ExpirePriceDate = &expiryDate
 			tempQuotation.ExpirePriceDay = int(expiryDays)
+
+			// Check auto approval for PENDING status
+			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
+				RequestUserCode: user,
+				ModuleCode:      "CUSTOMIZE",
+				TopicCode:       "CUSTOMIZE",
+				MdItemCode:      "CTM-CTM4",
+				CondRangeMin:    quotationReq.TotalAmount,
+				// TODO: Add module_code, topic_code, md_item_code
+			}
+
+			requestJSON, _ := json.MarshalIndent(autoApprovalReq, "", "  ")
+			fmt.Println("CreateGoodsIssueRequest JSON:")
+			fmt.Println(string(requestJSON))
+
+			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			if err != nil {
+				return nil, err
+			}
+
+			if autoApprovalRes.IsAutoApproved {
+				tempQuotation.IsApproved = true
+				tempQuotation.StatusApprove = "COMPLETED"
+			} else {
+				tempQuotation.IsApproved = false
+				tempQuotation.StatusApprove = "PENDING"
+			}
 		}
 
 		// Convert DeliveryDate to date-only format if provided
@@ -187,25 +218,45 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	//Verification
 	if req.IsVerifyPrice {
 		for _, verifyReq := range verifyReqMap {
-			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
-			if err != nil {
-				return nil, err
+			// Skip VerifyApproveLogic for quotations that are already auto-approved
+			shouldSkipVerification := false
+			for _, doc := range verifyReq.Documents {
+				for _, quotation := range createQuotations {
+					if quotation.QuotationCode == doc.DocRef && quotation.StatusApprove == "COMPLETED" {
+						shouldSkipVerification = true
+						res = append(res, CreateQuotationResponse{
+							IsPass:        true, // Auto-approved
+							QuotationCode: doc.DocRef,
+						})
+						break
+					}
+				}
+				if shouldSkipVerification {
+					break
+				}
 			}
 
-			for _, doc := range verifyRes.Documents {
-				res = append(res, CreateQuotationResponse{
-					IsPass:        doc.IsPassPrice,
-					QuotationCode: doc.DocRef,
-				})
+			if !shouldSkipVerification {
+				verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+				if err != nil {
+					return nil, err
+				}
 
-				for i := range createQuotations {
-					if createQuotations[i].QuotationCode == doc.DocRef {
-						if !doc.IsPassPrice {
-							createQuotations[i].IsApproved = false
-							createQuotations[i].StatusApprove = "PENDING"
-						} else {
-							createQuotations[i].IsApproved = true
-							createQuotations[i].StatusApprove = "COMPLETED"
+				for _, doc := range verifyRes.Documents {
+					res = append(res, CreateQuotationResponse{
+						IsPass:        doc.IsPassPrice,
+						QuotationCode: doc.DocRef,
+					})
+
+					for i := range createQuotations {
+						if createQuotations[i].QuotationCode == doc.DocRef {
+							if !doc.IsPassPrice {
+								createQuotations[i].IsApproved = false
+								createQuotations[i].StatusApprove = "PENDING"
+							} else {
+								createQuotations[i].IsApproved = true
+								createQuotations[i].StatusApprove = "COMPLETED"
+							}
 						}
 					}
 				}

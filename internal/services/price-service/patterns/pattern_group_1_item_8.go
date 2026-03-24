@@ -38,7 +38,7 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
-	productGroup1Code := getGroupCodeFromConfig(config, pattern, "productGroup1", "PRODUCT_GROUP1")
+	productGroup1Code := getGroupCodeFromConfig(config, pattern, "productGroup1", "PG01")
 	groupedByProductGroup1 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
 		tabKey := getValueNameByGroupCode(sg.SubGroupKeys, productGroup1Code)
