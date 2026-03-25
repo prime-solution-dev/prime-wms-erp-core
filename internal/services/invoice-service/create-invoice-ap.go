@@ -198,6 +198,8 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				totalDiscount := 0.0
 				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
 					totalDiscount = totalBeforeDiscount * req[i].InvoiceItem[it].TotalDiscount_percent
+				} else {
+					totalDiscount = req[i].InvoiceItem[it].TotalDiscount
 				}
 				req[i].InvoiceItem[it].TotalDiscount = totalDiscount
 
