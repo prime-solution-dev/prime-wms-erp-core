@@ -145,7 +145,7 @@ func GetProduct(jsonPayload GetProductRequest) (GetProductsResponse, error) {
 	if err != nil {
 		return GetProductsResponse{}, errors.New("Error marshaling struct to JSON:")
 	}
-	req, err := http.NewRequest("POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", config.GET_PRODUCT_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GetProductsResponse{}, errors.New("Error parsing DateTo: " + err.Error())
 	}
