@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
 
@@ -60,6 +61,94 @@ func GetPriceListSubGroupByID(subGroupID uuid.UUID) (*models.PriceListSubGroup, 
 	}
 
 	return &subGroup, nil
+}
+
+// GetPriceListSubGroupsByIDs loads multiple price list sub groups (with keys) by sub group IDs.
+func GetPriceListSubGroupsByIDs(subGroupIDs []uuid.UUID) ([]models.PriceListSubGroup, error) {
+	if len(subGroupIDs) == 0 {
+		return []models.PriceListSubGroup{}, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroups := []models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Where("id IN ?", subGroupIDs).
+		Preload("PriceListGroup").
+		Preload("PriceListGroup.PriceListGroupExtras.PriceListGroupExtraKeys").
+		Preload("PriceListSubGroupKeys").
+		Find(&subGroups).Error; err != nil {
+		return nil, err
+	}
+
+	return subGroups, nil
+}
+
+// GetPriceListSubGroupsByGroupCodes loads price list sub groups (with keys and extras)
+// for all price list groups matching the given group codes.
+func GetPriceListSubGroupsByGroupCodes(groupCodes []string) ([]models.PriceListSubGroup, error) {
+	if len(groupCodes) == 0 {
+		return []models.PriceListSubGroup{}, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	subGroups := []models.PriceListSubGroup{}
+
+	if err := gormx.Model(&models.PriceListSubGroup{}).
+		Joins("JOIN price_list_group ON price_list_group.id = price_list_sub_group.price_list_group_id").
+		Where("price_list_group.group_code IN ?", groupCodes).
+		Preload("PriceListGroup").
+		Preload("PriceListGroup.PriceListGroupExtras.PriceListGroupExtraKeys").
+		Preload("PriceListSubGroupKeys").
+		Find(&subGroups).Error; err != nil {
+		return nil, err
+	}
+
+	return subGroups, nil
+}
+
+// GetGroupItemValueInt looks up group_item.value_int for a given group_code (mapped from condition_code)
+// and subgroup key value. It returns (valueInt, found, error).
+func GetGroupItemValueInt(groupCode, value string) (float64, bool, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return 0, false, err
+	}
+	defer db.CloseGORM(gormx)
+
+	// 1) find group by group_code
+	var grp models.Group
+	if err := gormx.Model(&models.Group{}).
+		Where("group_code = ?", groupCode).
+		First(&grp).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+
+	// 2) find group_item by group_id + item_code
+	var item models.GroupItem
+	if err := gormx.Model(&models.GroupItem{}).
+		Where("group_id = ? AND item_code = ?", grp.ID, value).
+		First(&item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+
+	return item.ValueInt, true, nil
 }
 
 func GetPriceListExtraConfig(groupCodes []string) ([]models.PriceListExtraConfig, error) {
@@ -415,8 +504,7 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 	})
 }
 
-
-func GetPriceListSubGroupFormulasMapBySubGroupID(subGroupID uuid.UUID) ([]models.PriceListSubGroupFormulasMap, error) {
+func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]models.PriceListSubGroupFormulasMap, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return []models.PriceListSubGroupFormulasMap{}, err
@@ -426,11 +514,101 @@ func GetPriceListSubGroupFormulasMapBySubGroupID(subGroupID uuid.UUID) ([]models
 	// get the latest price list formulas
 	priceListSubGroupFormulasMap := []models.PriceListSubGroupFormulasMap{}
 	if err := gormx.Model(&models.PriceListSubGroupFormulasMap{}).
-		Where("price_list_sub_group_id = ?", subGroupID).
+		Where("price_list_subgroup_code = ?", subGroupCode).
 		Order("create_dtm DESC").
 		Preload("PriceListFormulas").
 		Find(&priceListSubGroupFormulasMap).Error; err != nil {
 		return priceListSubGroupFormulasMap, err
 	}
 	return priceListSubGroupFormulasMap, nil
+}
+
+// GetPriceListSubGroupFormulasMapBySubGroupCodes loads price list formulas for multiple sub group codes.
+// Returns a map keyed by sub group code for efficient lookup.
+func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+	result := make(map[string][]models.PriceListSubGroupFormulasMap)
+
+	if len(subGroupCodes) == 0 {
+		return result, nil
+	}
+
+	sqlxDB, err := db.ConnectSqlx("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer sqlxDB.Close()
+
+	// Build query to handle empty strings properly using COALESCE
+	// This ensures empty strings are properly matched
+	query := `
+		SELECT 
+			psfm.id,
+			COALESCE(psfm.price_list_subgroup_code, '') as price_list_subgroup_code,
+			psfm.price_list_formulas_code,
+			psfm.is_default,
+			psfm.create_dtm,
+			pf.id,
+			pf.formula_code,
+			pf.name,
+			pf.uom,
+			pf.formula_type,
+			pf.expression,
+			pf.params,
+			pf.rounding,
+			pf.create_dtm
+		FROM price_list_subgroup_formulas_map psfm
+		LEFT JOIN price_list_formulas pf ON psfm.price_list_formulas_code = pf.formula_code
+		WHERE COALESCE(psfm.price_list_subgroup_code, '') IN (?)
+		ORDER BY psfm.create_dtm DESC
+	`
+
+	// Use sqlx.In to expand the IN clause
+	query, args, err := sqlx.In(query, subGroupCodes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Rebind to match the database driver's placeholder syntax
+	query = sqlxDB.Rebind(query)
+
+	rows, err := sqlxDB.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Scan results
+	for rows.Next() {
+		var fm models.PriceListSubGroupFormulasMap
+		var pf models.PriceListFormulas
+
+		err := rows.Scan(
+			&fm.ID,
+			&fm.PriceListSubGroupCode,
+			&fm.PriceListFormulasCode,
+			&fm.IsDefault,
+			&fm.CreateDtm,
+			&pf.ID,
+			&pf.FormulaCode,
+			&pf.Name,
+			&pf.Uom,
+			&pf.FormulaType,
+			&pf.Expression,
+			&pf.Params,
+			&pf.Rounding,
+			&pf.CreateDtm,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		fm.PriceListFormulas = pf
+		result[fm.PriceListSubGroupCode] = append(result[fm.PriceListSubGroupCode], fm)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

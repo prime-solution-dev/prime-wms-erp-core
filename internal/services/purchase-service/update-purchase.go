@@ -3,8 +3,11 @@ package purchaseService
 import (
 	"encoding/json"
 	"errors"
+	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
+	approvalService "prime-erp-core/internal/services/approval-service"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,6 +19,17 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
+	userCode := ""
+	if ctx != nil {
+		userCode = ctx.GetString("user")
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
 	purchases := []models.Purchase{}
 	for _, r := range req {
 		purchase := MapPurchaseFormRequestToPurchaseModel(r)
@@ -26,6 +40,8 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		purchase.ID = *r.ID
 		purchase.PurchaseCode = *r.PurchaseCode
+		purchase.UpdateBy = userCode
+		purchase.UpdateDtm = time.Now().UTC()
 
 		// Map purchase items
 		reqItems := []models.PurchaseItem{}
@@ -37,6 +53,31 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		purchase.PurchaseItems = reqItems
+
+		if r.Status == "PENDING" {
+			// Check auto approval for PENDING status
+			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
+				RequestUserCode: userCode,
+				ModuleCode:      "CUSTOMIZE",
+				TopicCode:       "CUSTOMIZE",
+				MdItemCode:      "CTM-CTM3",
+				CondRangeMin:    r.TotalAmount,
+				// TODO: Add module_code, topic_code, md_item_code
+			}
+
+			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			if err != nil {
+				return nil, err
+			}
+
+			if autoApprovalRes.IsAutoApproved {
+				r.IsApproved = true
+				r.StatusApprove = "COMPLETED"
+			} else {
+				r.IsApproved = false
+				r.StatusApprove = "PROCESS"
+			}
+		}
 
 		purchases = append(purchases, purchase)
 	}
@@ -102,7 +143,7 @@ func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	if err := purchaseRepository.CompletePOItem(req.PurchaseItemCodes); err != nil {
+	if err := purchaseRepository.CompletePOItem(req.UsedType, req.PurchaseItemUsed); err != nil {
 		return nil, errors.New("failed to complete PO item: " + err.Error())
 	}
 

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
-	verifyService "prime-erp-core/internal/services/verify-service"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,12 +20,14 @@ type CreateSaleRequest struct {
 	IsVerifyExpiryDate bool   `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
 	IsVerifyInventory  bool   `json:"is_verify_inventory"`
 	QuotationID        string `json:"quotation_id"`
+	Status             string `json:"status"` // Status ที่หน้าบ้านส่งมา (APPROVED หรือ WAIT_FOR_APPROVED)
 	Sales              []SaleDocument
 }
 
 type SaleDocument struct {
 	models.Sale
-	Items []models.SaleItem
+	Items       []models.SaleItem
+	SaleDeposit []models.SaleDeposit
 }
 
 type CreateSaleResponse struct {
@@ -35,6 +37,8 @@ type CreateSaleResponse struct {
 	IsPassInventory  bool   `json:"is_pass_inventory"`
 	IsPassExpiryDate bool   `json:"is_pass_expiry_date"`
 	SaleCode         string `json:"sale_code"`
+	Status           string `json:"status"`  // Status ของ Sale ที่สร้างแล้ว
+	Message          string `json:"message"` // ข้อความแจ้งผลลัพธ์
 }
 
 func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -57,19 +61,31 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
-	nowTruc := now.Truncate(24 * time.Hour)
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	createSales := []models.Sale{}
 	createSaleItems := []models.SaleItem{}
-	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
+	createSaleDeposits := []models.SaleDeposit{}
 
 	// Generate all sale codes first
 	saleCodes, err := generateSaleCodes(ctx, len(req.Sales))
 	if err != nil {
 		return nil, err
+	}
+
+	// ใช้ status ที่หน้าบ้านส่งมา
+	statusApprove := "PROCESS"
+	isApproved := false
+	status := "PENDING"
+	if req.Status == "APPROVED" {
+		statusApprove = "COMPLETED"
+		isApproved = true
+		status = "PENDING"
 	}
 
 	for i, saleReq := range req.Sales {
@@ -87,34 +103,42 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		tempSale.CreateBy = user
 		tempSale.UpdateDate = &nowDateOnly
 		tempSale.UpdateBy = user
-		tempSale.StatusApprove = "COMPLETED"
-		tempSale.IsApproved = true
-		tempSale.Status = "PENDING"
+		// ใช้ status จากหน้าบ้าน
+		tempSale.Status = status
+		tempSale.StatusApprove = statusApprove
+		tempSale.IsApproved = isApproved
+
+		// Check auto approval for PENDING status
+		if status == "PENDING" && statusApprove != "COMPLETED" {
+			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
+				RequestUserCode: user,
+				ModuleCode:      "CUSTOMIZE",
+				TopicCode:       "CUSTOMIZE",
+				MdItemCode:      "CTM-CTM5",
+				CondRangeMin:    saleReq.TotalAmount,
+			}
+
+			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			if err != nil {
+				return nil, err
+			}
+
+			if autoApprovalRes.IsAutoApproved {
+				tempSale.IsApproved = true
+				tempSale.StatusApprove = "COMPLETED"
+			} else {
+				tempSale.IsApproved = false
+				tempSale.StatusApprove = "PENDING"
+			}
+		}
+
+		// ตั้งค่า validation flags เป็นค่าเริ่มต้น (หน้าบ้านได้ validate แล้ว)
+		tempSale.PassPriceList = "Y"
+		tempSale.PassPriceExpire = "Y"
+		tempSale.PassCreditLimit = "Y"
+		tempSale.PassAtpCheck = "Y"
 
 		createSales = append(createSales, tempSale)
-
-		//Approval
-		verifyReqKey := fmt.Sprintf(`%s|%s`, saleReq.CompanyCode, saleReq.SiteCode)
-		verifyReq, existVerifyReq := verifyReqMap[verifyReqKey]
-		if !existVerifyReq {
-			newVerifyReq := verifyService.VerifyApproveRequest{
-				IsVerifyPrice:       req.IsVerifyPrice,
-				IsVerifyCredit:      req.IsVerifyCredit,
-				IsVerifyExpiryPrice: req.IsVerifyExpiryDate,
-				IsVerifyInventory:   req.IsVerifyInventory,
-				CompanyCode:         saleReq.CompanyCode,
-				SiteCode:            saleReq.SiteCode,
-				StorageType:         []string{`NORMAL`},
-				SaleDate:            nowTruc,
-			}
-			verifyReq = newVerifyReq
-		}
-
-		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:       saleCode,
-			CustomerCode: saleReq.CustomerCode,
-			Items:        []verifyService.VerifyApproveItem{},
-		}
 
 		for _, item := range saleReq.Items {
 			item.ID = uuid.New()
@@ -132,83 +156,31 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			item.UpdateBy = user
 
 			createSaleItems = append(createSaleItems, item)
-
-			//Approval
-			newApprItem := verifyService.VerifyApproveItem{
-				ItemRef:       item.SaleItem,
-				ProductCode:   item.ProductCode,
-				Qty:           item.Qty,
-				Unit:          item.Unit,
-				TotalWeight:   item.TotalWeight,
-				PriceUnit:     item.PriceUnit,
-				PriceListUnit: item.PriceListUnit,
-				TotalAmount:   item.TotalAmount,
-				SaleUnit:      item.SaleUnit,
-				SaleUnitType:  item.SaleUnitType,
-			}
-
-			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
 		}
 
-		//Approval
-		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
-		verifyReqMap[verifyReqKey] = verifyReq
-	}
+		for _, deposit := range saleReq.SaleDeposit {
+			deposit.ID = uuid.New()
+			deposit.SaleID = tempSale.ID
 
-	// Verification
-	for _, verifyReq := range verifyReqMap {
-		verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
-		if err != nil {
-			return nil, err
+			createSaleDeposits = append(createSaleDeposits, deposit)
 		}
 
-		for _, doc := range verifyRes.Documents {
-			// Check if critical validations fail - don't allow creation if they fail
-			// if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassExpiryPrice {
-			// 	res = append(res, CreateSaleResponse{
-			// 		IsPass:           false,
-			// 		IsPassPrice:      doc.IsPassPrice,
-			// 		IsPassCredit:     doc.IsPassCredit,
-			// 		IsPassInventory:  doc.IsPassInventory,
-			// 		IsPassExpiryDate: doc.IsPassExpiryPrice,
-			// 		SaleCode:         doc.DocRef,
-			// 	})
-			// 	// Return immediately - don't create sale if critical validations fail
-			// 	return res, nil
-			// }
-
-			res = append(res, CreateSaleResponse{
-				IsPass:           doc.IsPassPrice && doc.IsPassCredit && doc.IsPassInventory && doc.IsPassExpiryPrice,
-				IsPassPrice:      doc.IsPassPrice,
-				IsPassCredit:     doc.IsPassCredit,
-				IsPassInventory:  doc.IsPassInventory,
-				IsPassExpiryDate: doc.IsPassExpiryPrice,
-				SaleCode:         doc.DocRef,
-			})
-
-			for _, sale := range createSales {
-				if doc.IsPassPrice {
-					sale.PassPriceList = "Y"
-				} else {
-					sale.PassPriceList = "N"
-				}
-				if doc.IsPassExpiryPrice {
-					sale.PassPriceExpire = "Y"
-				} else {
-					sale.PassPriceExpire = "N"
-				}
-				if doc.IsPassCredit {
-					sale.PassCreditLimit = "Y"
-				} else {
-					sale.PassCreditLimit = "N"
-				}
-				if doc.IsPassInventory {
-					sale.PassAtpCheck = "Y"
-				} else {
-					sale.PassAtpCheck = "N"
-				}
-			}
+		// เพิ่มข้อมูลใน response
+		statusMessage := "Sale Order สร้างสำเร็จ"
+		if req.Status == "WAIT_FOR_APPROVED" {
+			statusMessage = "Sale Order สร้างสำเร็จ - รออนุมัติ"
 		}
+
+		res = append(res, CreateSaleResponse{
+			IsPass:           true, // หน้าบ้านได้ validate แล้วถึงส่งมา
+			IsPassPrice:      true,
+			IsPassCredit:     true,
+			IsPassInventory:  true,
+			IsPassExpiryDate: true,
+			SaleCode:         saleCode,
+			Status:           req.Status,
+			Message:          statusMessage,
+		})
 	}
 
 	// check duplicate sale codes
@@ -300,6 +272,25 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err := updateSaleRunningConfig(ctx, len(createSales)); err != nil {
 		// Log error but don't fail the transaction as sales are already created
 		fmt.Printf("Warning: failed to update running config: %v\n", err)
+	}
+
+	// ถ้า status เป็น WAIT_FOR_APPROVED ให้ส่ง sale id ไปสร้าง RequestApproveSale
+	if req.Status == "WAIT_FOR_APPROVED" {
+		for _, sale := range createSales {
+			requestApproveReq := RequestApproveSaleRequest{
+				ID: sale.ID,
+			}
+			approvePayload, err := json.Marshal(requestApproveReq)
+			if err != nil {
+				fmt.Printf("Warning: failed to marshal request approve sale: %v\n", err)
+				continue
+			}
+
+			_, err = RequestApproveSale(ctx, string(approvePayload))
+			if err != nil {
+				fmt.Printf("Warning: failed to create approval request for sale %s: %v\n", sale.SaleCode, err)
+			}
+		}
 	}
 
 	return res, nil

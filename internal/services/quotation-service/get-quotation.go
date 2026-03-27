@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	externalService "prime-erp-core/external/customer-service"
 	"prime-erp-core/internal/db"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,12 +16,28 @@ import (
 )
 
 type GetQuotationRequest struct {
-	ID            []string `json:"id"`
-	QuotationCode []string `json:"quotation_code"`
-	SiteCode      []string `json:"site_code"`
-	CompanyCode   []string `json:"company_code"`
-	Page          int      `json:"page"`
-	PageSize      int      `json:"page_size"`
+	ID                   []string   `json:"id"`
+	QuotationCode        []string   `json:"quotation_code"`
+	SiteCode             []string   `json:"site_code"`
+	CompanyCode          []string   `json:"company_code"`
+	CustomerCode         []string   `json:"customer_code"`
+	ProductCode          []string   `json:"product_code"`
+	QuotationCodeLike    string     `json:"quotation_code_like"`
+	CustomerCodeLike     string     `json:"customer_code_like"`
+	CustomerNameLike     string     `json:"customer_name_like"`
+	ProductCodeLike      string     `json:"product_code_like"`
+	CreateDateStart      *time.Time `json:"create_date_start"`
+	CreateDateEnd        *time.Time `json:"create_date_end"`
+	ExpirePriceDateStart *time.Time `json:"expire_price_date_start"`
+	ExpirePriceDateEnd   *time.Time `json:"expire_price_date_end"`
+	DeliveryDateStart    *time.Time `json:"delivery_date_start"`
+	DeliveryDateEnd      *time.Time `json:"delivery_date_end"`
+	CompletedDateStart   *time.Time `json:"completed_date_start"`
+	CompletedDateEnd     *time.Time `json:"completed_date_end"`
+	Status               []string   `json:"status"`
+	StatusFilter         []string   `json:"status_filter"` // สำหรับกรองตาม status ที่แสดงใน UI
+	Page                 int        `json:"page"`
+	PageSize             int        `json:"page_size"`
 }
 
 func (GetQuotationResponse) TableName() string { return "quotation" }
@@ -68,6 +86,10 @@ type GetQuotationResponse struct {
 	SubtotalExclVat             float64                    `gorm:"type:numeric" json:"subtotal_excl_vat"`
 	TotalTransportCostVat       float64                    `gorm:"type:numeric" json:"total_transport_cost_vat"`
 	RemarkApproval              string                     `gorm:"type:varchar(255)" json:"remark_approval"`
+	Revision                    float64                    `gorm:"type:numeric" json:"revision"`
+	QuotationCodeRef            string                     `gorm:"type:varchar(50)" json:"quotation_code_ref"`
+	CreditTerm                  string                     `gorm:"type:varchar(50)" json:"credit_term"`
+	PayerTerm                   string                     `gorm:"type:varchar(50)" json:"payer_term"`
 	CreateDate                  *time.Time                 `gorm:"type:date" json:"create_date"`
 	CreateBy                    string                     `gorm:"type:varchar(50)" json:"create_by"`
 	UpdateDate                  *time.Time                 `gorm:"type:date" json:"update_date"`
@@ -121,6 +143,93 @@ type ResultQuotationResponse struct {
 	Quotations []GetQuotationResponse `json:"quotations"`
 }
 
+// buildStatusConditions สร้างเงื่อนไขการกรองตาม status ที่ซับซ้อน
+func buildStatusConditions(statusFilters []string) ([]string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	for _, statusFilter := range statusFilters {
+		switch strings.ToLower(statusFilter) {
+		case "new":
+			// status='PENDING' และ status_approve='PENDING' (ใน edit mode)
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "PENDING")
+		case "create":
+			// status='PENDING' และ status_approve='PENDING' (ไม่ใช่ edit mode)
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "PENDING")
+		case "pending":
+			// รวมทุกสถานะ pending
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "PENDING")
+		case "wait for approve", "waitapprove":
+			// status='PENDING' และ status_approve='PROCESS'
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "PROCESS")
+		case "approved":
+			// status='PENDING' และ status_approve='COMPLETED' และยังไม่ overdue
+			conditions = append(conditions, "(status = ? AND status_approve = ? AND (expire_price_date IS NULL OR expire_price_date >= CURRENT_DATE))")
+			args = append(args, "PENDING", "COMPLETED")
+		case "overdue":
+			// status='PENDING' และ status_approve='COMPLETED' และ overdue
+			conditions = append(conditions, "(status = ? AND status_approve = ? AND expire_price_date IS NOT NULL AND expire_price_date < CURRENT_DATE)")
+			args = append(args, "PENDING", "COMPLETED")
+		case "reject":
+			// status='PENDING' และ status_approve='REJECT'
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "REJECT")
+		case "review":
+			// status='PENDING' และ status_approve='REVIEW'
+			conditions = append(conditions, "(status = ? AND status_approve = ?)")
+			args = append(args, "PENDING", "REVIEW")
+		case "canceled", "cancelled":
+			// status='CANCELED'
+			conditions = append(conditions, "status = ?")
+			args = append(args, "CANCELED")
+		case "draft":
+			// status='TEMP'
+			conditions = append(conditions, "status = ?")
+			args = append(args, "TEMP")
+		case "converted":
+			// status='COMPLETED'
+			conditions = append(conditions, "status = ?")
+			args = append(args, "COMPLETED")
+		}
+	}
+
+	return conditions, args
+}
+
+// getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
+func getCustomerCodesByName(customerNameLike string) ([]string, error) {
+	if len(customerNameLike) == 0 {
+		return nil, nil
+	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		CustomerNameLike: customerNameLike,
+		Page:             1,
+		PageSize:         1000, // เอาเยอะๆ เพื่อให้ได้ customerCode ทั้งหมดที่ match
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+
+	fmt.Printf("Found %d customers matching name like '%s'\n", len(customerByNameData.Customers), customerNameLike)
+
+	// เก็บ customerCode ทั้งหมดที่ได้จากการค้นหาด้วย name
+	var customerCodes []string
+	for _, customer := range customerByNameData.Customers {
+		customerCodes = append(customerCodes, customer.CustomerCode)
+	}
+
+	fmt.Println("Customer codes from name search:", customerCodes)
+	return customerCodes, nil
+}
+
 func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetQuotationResponse
@@ -137,6 +246,13 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
+
+	// ถ้ามี CustomerNameLike ให้ไปค้นหา customerCode จาก customer service ก่อน
+	customerCodesFromName, err := getCustomerCodesByName(req.CustomerNameLike)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil, err
+	}
 
 	query := gormx.Preload("Items").
 		Order("quotation.update_date DESC")
@@ -157,8 +273,148 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		query = query.Where("customer_code IN ?", req.CustomerCode)
+	}
+
+	if len(req.ProductCode) > 0 {
+		query = query.Joins("JOIN quotation_item qi ON qi.quotation_id = quotation.id").
+			Where("qi.product_code IN ?", req.ProductCode)
+	}
+
+	if len(req.QuotationCodeLike) > 0 {
+		query = query.Where("quotation_code ILIKE ?", "%"+req.QuotationCodeLike+"%")
+	}
+
+	if len(req.CustomerCodeLike) > 0 {
+		query = query.Where("customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
+	}
+
+	if len(req.ProductCodeLike) > 0 {
+		query = query.Joins("JOIN quotation_item qi ON qi.quotation_id = quotation.id").
+			Where("qi.product_code ILIKE ?", "%"+req.ProductCodeLike+"%")
+	}
+
+	if len(req.CustomerNameLike) > 0 {
+		// ใช้ customerCode ที่ได้จากการค้นหาด้วย customer name แทนการค้นหาตรงๆ ด้วย customer_name
+		if len(customerCodesFromName) > 0 {
+			query = query.Where("customer_code IN ?", customerCodesFromName)
+		} else {
+			// ถ้าไม่เจอ customer ใดๆ ที่ match กับ name ให้ return ข้อมูลว่างเปล่า
+			query = query.Where("1 = 0") // condition ที่จะไม่ match อะไรเลย
+		}
+	}
+
+	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
+		query = query.Where("quotation.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
+	}
+
+	if req.ExpirePriceDateStart != nil && req.ExpirePriceDateEnd != nil {
+		query = query.Where("quotation.expire_price_date BETWEEN ? AND ?", req.ExpirePriceDateStart, req.ExpirePriceDateEnd)
+	}
+
+	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
+		query = query.Where("quotation.delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
+		query = query.Where("quotation.update_date BETWEEN ? AND ? AND quotation.status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
+	}
+
+	if len(req.Status) > 0 {
+		query = query.Where("quotation.status IN ?", req.Status)
+	}
+
+	// Apply status filter conditions
+	if len(req.StatusFilter) > 0 {
+		conditions, args := buildStatusConditions(req.StatusFilter)
+		if len(conditions) > 0 {
+			// Join conditions with OR
+			combinedCondition := "(" + strings.Join(conditions, " OR ") + ")"
+			query = query.Where(combinedCondition, args...)
+		}
+	}
+
+	// Build base query for counting
+	countQuery := gormx.Model(&GetQuotationResponse{})
+
+	if len(req.ID) > 0 {
+		countQuery = countQuery.Where("id IN ?", req.ID)
+	}
+
+	if len(req.QuotationCode) > 0 {
+		countQuery = countQuery.Where("quotation_code IN ?", req.QuotationCode)
+	}
+
+	if len(req.SiteCode) > 0 {
+		countQuery = countQuery.Where("site_code IN ?", req.SiteCode)
+	}
+
+	if len(req.CompanyCode) > 0 {
+		countQuery = countQuery.Where("company_code IN ?", req.CompanyCode)
+	}
+
+	if len(req.CustomerCode) > 0 {
+		countQuery = countQuery.Where("customer_code IN ?", req.CustomerCode)
+	}
+
+	if len(req.ProductCode) > 0 {
+		countQuery = countQuery.Joins("JOIN quotation_item qi ON qi.quotation_id = quotation.id").
+			Where("qi.product_code IN ?", req.ProductCode)
+	}
+	// Apply same filters to count query
+	if len(req.QuotationCodeLike) > 0 {
+		countQuery = countQuery.Where("quotation_code ILIKE ?", "%"+req.QuotationCodeLike+"%")
+	}
+
+	if len(req.CustomerCodeLike) > 0 {
+		countQuery = countQuery.Where("customer_code ILIKE ?", "%"+req.CustomerCodeLike+"%")
+	}
+
+	if len(req.CustomerNameLike) > 0 {
+		if len(customerCodesFromName) > 0 {
+			countQuery = countQuery.Where("customer_code IN ?", customerCodesFromName)
+		} else {
+			countQuery = countQuery.Where("1 = 0")
+		}
+	}
+
+	if len(req.ProductCodeLike) > 0 {
+		countQuery = countQuery.Joins("JOIN quotation_item qi ON qi.quotation_id = quotation.id").
+			Where("qi.product_code ILIKE ?", "%"+req.ProductCodeLike+"%")
+	}
+
+	if req.CreateDateStart != nil && req.CreateDateEnd != nil {
+		countQuery = countQuery.Where("quotation.create_date BETWEEN ? AND ?", req.CreateDateStart, req.CreateDateEnd)
+	}
+
+	if req.ExpirePriceDateStart != nil && req.ExpirePriceDateEnd != nil {
+		countQuery = countQuery.Where("quotation.expire_price_date BETWEEN ? AND ?", req.ExpirePriceDateStart, req.ExpirePriceDateEnd)
+	}
+
+	if req.DeliveryDateStart != nil && req.DeliveryDateEnd != nil {
+		countQuery = countQuery.Where("quotation.delivery_date BETWEEN ? AND ?", req.DeliveryDateStart, req.DeliveryDateEnd)
+	}
+
+	if req.CompletedDateStart != nil && req.CompletedDateEnd != nil {
+		countQuery = countQuery.Where("quotation.update_date BETWEEN ? AND ? AND quotation.status = ?", req.CompletedDateStart, req.CompletedDateEnd, "COMPLETED")
+	}
+
+	if len(req.Status) > 0 {
+		countQuery = countQuery.Where("quotation.status IN ?", req.Status)
+	}
+
+	// Apply status filter conditions to count query
+	if len(req.StatusFilter) > 0 {
+		conditions, args := buildStatusConditions(req.StatusFilter)
+		if len(conditions) > 0 {
+			combinedCondition := "(" + strings.Join(conditions, " OR ") + ")"
+			countQuery = countQuery.Where(combinedCondition, args...)
+		}
+	}
+
 	var count int64
-	gormx.Model(&GetQuotationResponse{}).Count(&count)
+	countQuery.Count(&count)
 
 	totalRecords := count
 	totalPages := 0

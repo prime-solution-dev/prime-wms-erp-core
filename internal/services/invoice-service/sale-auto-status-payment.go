@@ -22,7 +22,7 @@ func SaleAutoStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, e
 	}
 	saleCode := ""
 
-	invoice, _, _, errDeposit := repositoryInvoice.GetInvoicePreload(nil, req.InvoiceCode, nil, nil, nil, nil, nil, 0, 0)
+	invoice, _, _, errDeposit := repositoryInvoice.GetInvoicePreload(nil, req.InvoiceCode, nil, nil, nil, nil, nil, nil, 0, 0, "", "", "", "", "", "", nil, nil, nil)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

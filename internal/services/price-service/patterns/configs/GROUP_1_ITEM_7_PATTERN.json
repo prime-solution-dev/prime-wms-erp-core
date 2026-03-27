@@ -2,13 +2,17 @@
   "patterns": [
     {
       "id": "pattern_group1_item7_pg2_tabs",
-      "name": "เหล็กฉาก/รางน้ำ PRODUCT_GROUP2 Tabs",
-      "description": "Tabs by PRODUCT_GROUP2 with PRODUCT_GROUP5 dynamic column groups for each size and shared fixed columns",
+      "name": "เหล็กฉาก/รางน้ำ PG02 Tabs",
+      "description": "Tabs by PG02 with PG05 dynamic column groups for each size and shared fixed columns",
       "enabled": true,
+      "requiredGroupCodes": [
+        "GROUP_1_ITEM_7",
+        "GROUP_1_ITEM_22"
+      ],
       "grouping": {
-        "tabs": "PRODUCT_GROUP2",
-        "rows": "PRODUCT_GROUP6",
-        "columnGroups": "PRODUCT_GROUP5"
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG05"
       },
       "fixedColumns": [
         {
@@ -25,7 +29,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "หนา",
           "width": 140,
           "pinned": "left",
@@ -52,7 +56,7 @@
           "field": "grade",
           "headerName": "เกรด",
           "width": 110,
-          "dataMapping": "product_group_3",
+          "dataMapping": "PG03",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -76,7 +80,7 @@
           "field": "face",
           "headerName": "หน้า",
           "width": 90,
-          "dataMapping": "product_group_8",
+          "dataMapping": "PG08",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -89,10 +93,10 @@
           "cellRenderer": "agCheckboxCellRenderer"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย before",
           "width": 150,
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -113,16 +117,16 @@
           "dataMapping": "warehouse"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock_ton",
+          "field": "avg_weight_ton",
           "headerName": "Avg.kg stock (Tons)",
           "width": 150,
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "remark",
@@ -170,6 +174,42 @@
       "suppressMenuHide": false,
       "enableCellSpan": true
     }
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_7": "BuildGroup1Item7Response"
+    },
+    "defaultItemFormat": [
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
+    ]
   }
 }
-

@@ -28,14 +28,12 @@ type GetInventoryAtpResponse struct {
 type productAtp struct {
 	CompanyCode   string   `json:"company_code"`
 	SiteCode      string   `json:"site_code"`
-	WarehouseCode string   `json:"warehouse_code"`
 	ProductCode   string   `json:"product_code"`
-	TodayStockQty int      `json:"current_stock_qty"`
-	TodayAtpQty   int      `json:"current_atp_qty"`
-	TotalAtpQty   int      `json:"atp_qty"`
+	TodayStockQty float64  `json:"today_stock_qty"`
+	TodayAtpQty   float64  `json:"today_atp_qty"`
+	TotalAtpQty   float64  `json:"total_atp_qty"`
 	DayAtps       []dayAtp `json:"day_atps"`
 }
-
 type dayAtp struct {
 	Date         time.Time     `json:"date"`
 	AtpQty       int           `json:"atp_qty"`

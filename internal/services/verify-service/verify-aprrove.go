@@ -32,6 +32,8 @@ type VerifyApproveDocument struct {
 	EffectiveDatePrice           time.Time           `json:"effective_date_price"`
 	TransportCost                float64             `json:"transport_cost"`
 	TransportType                string              `json:"transport_type"`
+	TotalAmount                  float64             `json:"total_amount"`
+	TotalWeight                  float64             `json:"total_weight"`
 	IsVerifyWithOldTransportCost bool                `json:"is_verify_with_old_transport_cost"`
 	Items                        []VerifyApproveItem `json:"items"`
 
@@ -125,7 +127,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	inventoryReq.CompanyCode = req.CompanyCode
 	inventoryReq.SiteCode = req.SiteCode
 	inventoryReq.StorageTypes = req.StorageType
-	//inventoryReq.ToDate = &req.SaleDate
+	inventoryReq.ToDate = &req.SaleDate
 
 	for _, document := range req.Documents {
 		//Build Res
@@ -142,6 +144,10 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		newPriceReq := priceService.GetComparePriceRequest{}
 		newPriceReq.UnitCode = `PC`       //TODO: get from config
 		newPriceReq.UnitCodeWeight = `KG` //TODO: get from config
+		newPriceReq.TransportType = document.TransportType
+		newPriceReq.TotalTransportCost = document.TransportCost
+		newPriceReq.TotalAmount = document.TotalAmount
+		newPriceReq.TotalWeight = document.TotalWeight
 
 		//Expiry
 		expPriceReq = append(expPriceReq, VerifyExpiryPriceRequest{
@@ -236,6 +242,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				res.IsPassExpiryPrice = false
 			}
 		}
+	} else {
+		res.IsPassExpiryPrice = true
 	}
 
 	//Price Validation
@@ -258,6 +266,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				}
 			}
 		}
+	} else {
+		res.IsPassPrice = true
 	}
 
 	// Credit Validation
@@ -288,6 +298,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				res.IsPassCredit = false
 			}
 		}
+	} else {
+		res.IsPassCredit = true
 	}
 
 	//Inventory Validation
@@ -302,6 +314,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		if res.IsPassInventory && !invenRes.IsPassInventory {
 			res.IsPassInventory = false
 		}
+	} else {
+		res.IsPassInventory = true
 	}
 
 	return &res, nil

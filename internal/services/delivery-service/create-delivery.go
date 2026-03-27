@@ -8,6 +8,7 @@ import (
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
@@ -38,6 +39,7 @@ type CreateDeliveryRequest struct {
 	TotalWeight       float64                      `json:"total_weight"`
 	Remark            string                       `json:"remark"`
 	BookingSlotType   string                       `json:"booking_slot_type"`
+	PaymentMethod     string                       `json:"payment_method"`
 	DeliveryItems     []CreateDeliveryItemsRequest `json:"delivery_items"`
 }
 
@@ -50,6 +52,7 @@ type CreateDeliveryItemsRequest struct {
 	DocumentRefItem string  `json:"document_ref_item"`
 	SaleUnitCode    string  `json:"sale_unit_code"`
 	SaleMethod      string  `json:"sale_method"`
+	Remark          string  `json:"remark"`
 }
 
 func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -81,6 +84,38 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}()
 
+	externalId := ""
+	externaldocNo := ""
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"CREATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	if err != nil {
+		return nil, err
+	}
+	if len(hookConfig) > 0 {
+		urlHook := ""
+		for _, hookConfigValue := range hookConfig {
+			urlHook = hookConfigValue.HookUrl
+		}
+
+		requestDataCreateHook := interfaceService.HookInterfaceRequest{
+			RequestData: req,
+			UrlHook:     urlHook,
+		}
+		HookInterfaceValue, _ := interfaceService.HookInterface(requestDataCreateHook)
+
+		if HookInterfaceValue != nil {
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
+			externalId = str
+			externaldocNo = externalID["last"].(string)
+		}
+	}
+
 	user := "SYSTEM" // TODO: get from ctx
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
@@ -102,6 +137,13 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if deliveryReq.DeliveryDate != nil {
 			dateOnly := time.Date(deliveryReq.DeliveryDate.Year(), deliveryReq.DeliveryDate.Month(), deliveryReq.DeliveryDate.Day(), 0, 0, 0, 0, deliveryReq.DeliveryDate.Location())
 			deliveryDateOnly = &dateOnly
+		}
+
+		var statusApproveGi string
+		if deliveryReq.PaymentMethod == "CASH" {
+			statusApproveGi = "PENDING"
+		} else {
+			statusApproveGi = "COMPLETED"
 		}
 
 		newDelivery := models.Delivery{
@@ -126,11 +168,14 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				}
 				return "PENDING"
 			}(),
-			BookingSlotType: deliveryReq.BookingSlotType,
-			CreateBy:        user,
-			CreateDate:      nowDateOnly, // date-only format
-			UpdateBy:        user,
-			UpdateDate:      nowDateOnly, // date-only format
+			BookingSlotType:        deliveryReq.BookingSlotType,
+			StatusApproveGi:        statusApproveGi,
+			ExternalID:             externalId,
+			ExternalDocumentNumber: externaldocNo,
+			CreateBy:               user,
+			CreateDate:             nowDateOnly, // date-only format
+			UpdateBy:               user,
+			UpdateDate:             nowDateOnly, // date-only format
 		}
 
 		deliveryToAdd = append(deliveryToAdd, newDelivery)
@@ -149,6 +194,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				WeightUnit:      deliveryItem.WeightUnit,
 				Status:          "PENDING",
 				DocumentRefItem: deliveryItem.DocumentRefItem,
+				Remark:          deliveryItem.Remark,
 				CreateDate:      nowDateOnly, // date-only format
 				CreateBy:        user,
 				UpdateDate:      nowDateOnly, // date-only format
@@ -247,7 +293,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				SaleMethod:        item.SaleMethod,
 				Weight:            item.Weight,
 				WeightUnit:        item.WeightUnit,
-				Remark:            "",
+				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
@@ -259,6 +305,13 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				deliveryCode = d.DeliveryCode
 				break
 			}
+		}
+
+		var statusApproveGi string
+		if deliveryReq.PaymentMethod == "CASH" {
+			statusApproveGi = "PENDING"
+		} else {
+			statusApproveGi = "COMPLETED"
 		}
 
 		newOrderDetail := orderExternalService.CreateOrderDetail{
@@ -291,6 +344,20 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Remark:              deliveryReq.Remark,
 			CompanyCode:         deliveryReq.CompanyCode,
 			SiteCode:            deliveryReq.SiteCode,
+			DocumentRef2:        deliveryReq.DocumentRef,
+			DocumentRefType2:    "SALES_ORDER",
+			PartyCode:           "",
+			PartyName:           "",
+			PartyType:           "",
+			Reason:              "",
+			ShippingAddress:     "",
+			DeliveryMethod:      deliveryReq.DeliveryMethod,
+			BookingDate:         deliveryReq.DeliveryDate,
+			DeliveryTimeCode:    deliveryReq.DeliveryTimeCode,
+			Tel:                 deliveryReq.Tel,
+			LicensePlate:        deliveryReq.LicensePlate,
+			ContactName:         deliveryReq.ContactName,
+			StatusApproveGi:     statusApproveGi,
 			OrderItem:           createOrderItemDetail,
 		}
 
@@ -299,6 +366,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	createOrderRequest.Orders = createOrderdetail
 
 	fmt.Println("createOrderRequest : ", createOrderRequest)
+
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())

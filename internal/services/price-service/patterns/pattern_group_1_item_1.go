@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"prime-erp-core/internal/models"
-	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
 
 func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (PriceListDetailApiResponse, error) {
+	// utils.PrintJson(priceListData)
 	groupedData := groupDataByGroupKeyAndProductGroup2(priceListData)
 	tabs := make([]PriceListDetailTabConfig, 0)
 	var loadErr error
@@ -26,7 +26,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 	tabsWithOrder := []tabWithOrder{}
 
 	for groupKey, productGroup2Map := range groupedData {
-		config, err := loadConfiguration(groupKey)
+		config, err := LoadConfiguration(groupKey)
 		if err != nil {
 			loadErr = fmt.Errorf("load configuration for %s: %w", groupKey, err)
 			continue
@@ -41,14 +41,14 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 		for _, productGroup2 := range productGroup2Keys {
 			subGroups := productGroup2Map[productGroup2]
+
 			pattern := selectPatternForCategory(config, productGroup2)
 			if pattern == nil {
 				continue
 			}
 
 			columns := buildDynamicColumns(pattern, subGroups)
-			rowData := buildDynamicRows(pattern, subGroups)
-			utils.PrintJSON(rowData)
+			rowData := buildDynamicRows(config, pattern, subGroups)
 
 			// Regroup rows to prevent data loss when the same column_group_key appears
 			// multiple times for a given row_group_value (e.g., multiple subgroup_ids
@@ -65,6 +65,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 			// 1) Group by row_group_value using the same composite logic as before
 			rowsByRowGroup := make(map[string][]AGGridRowData)
+			skippedRowsEmptyGroup := 0
 			for _, row := range rowData {
 				mergeKeyParts := make([]string, 0, len(rowFields))
 				for _, field := range rowFields {
@@ -84,6 +85,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 					}
 				}
 				if rowGroupValue == "" {
+					skippedRowsEmptyGroup++
 					continue
 				}
 
@@ -107,9 +109,11 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 
 				// 2) Group rows in this thickness group by column_group_key
 				columnsByKey := make(map[string][]AGGridRowData)
+				skippedRowsEmptyColKey := 0
 				for _, row := range groupRows {
 					colKey := strings.TrimSpace(fmt.Sprintf("%v", row["column_group_key"]))
 					if colKey == "" {
+						skippedRowsEmptyColKey++
 						continue
 					}
 					columnsByKey[colKey] = append(columnsByKey[colKey], row)

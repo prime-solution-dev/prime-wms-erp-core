@@ -33,3 +33,7 @@ Jenkinsfile
 # .idea/
 # .vscode/
 .cursor/
+.agents/
+.agent/
+.claude/
+

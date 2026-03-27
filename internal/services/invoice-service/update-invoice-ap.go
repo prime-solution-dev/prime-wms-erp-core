@@ -82,7 +82,41 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
 
+	requestDataGetInvoice := map[string]interface{}{
+		"status":                    []string{"COMPLETED"},
+		"invoice_item_document_ref": poNumber,
+	}
+
+	jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
+	if err != nil {
+		return nil, err
+	}
+	getInvoice, errCreateInvoice := GetInvoice(ctx, string(jsonBytesGetInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
+	}
+	resultInvoice := getInvoice.(ResultInvoice).Invoice
+	resultInvoiceMap := map[string]POData{}
+	for _, resultInvoiceValue := range resultInvoice {
+		for _, resultInvoiceItemValue := range resultInvoiceValue.InvoiceItem {
+			invoiceItemMapResult, exist := resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem]
+			if exist {
+				resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem] = POData{
+					QTY:    invoiceItemMapResult.QTY + resultInvoiceItemValue.Qty,
+					Weight: invoiceItemMapResult.Weight + resultInvoiceItemValue.Weight,
+				}
+			} else {
+				resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem] = POData{
+					QTY:    resultInvoiceItemValue.Qty,
+					Weight: resultInvoiceItemValue.Weight,
+				}
+			}
+		}
+	}
+
 	toleranceErrorResponse := ToleranceErrorResponse{}
+	completePOItem := []models.PurchaseItemUsed{}
+	partialPOItem := []string{}
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -98,6 +132,11 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
 				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
+				invoiceItemMapResult, existInvoice := resultInvoiceMap[invoiceItem.DocumentRefItem]
+				if existInvoice {
+					invoiceItem.Qty += invoiceItemMapResult.QTY
+					invoiceItem.Weight += invoiceItemMapResult.Weight
+				}
 				if invoiceItem.Qty > poQTY {
 
 					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
@@ -107,6 +146,19 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						Type:    "qty",
 					})
 
+				}
+				/* if invoiceItem.Qty == poQTYMapResult.QTY {
+
+				} */
+				completePOItem = append(completePOItem, models.PurchaseItemUsed{
+					PurchaseCode:     invoiceItem.DocumentRef,
+					PurchaseItemCode: invoiceItem.DocumentRefItem,
+					QTY:              invoiceItem.Qty,
+					Weight:           invoiceItem.Weight,
+					Tolerance:        tolerance,
+				})
+				if invoiceItem.Qty < poQTY {
+					partialPOItem = append(partialPOItem, invoiceItem.DocumentRefItem)
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.Weight {
@@ -130,6 +182,23 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 	if len(toleranceErrorResponse.ToleranceError) == 0 {
+
+		if len(completePOItem) > 0 {
+			requestDataGetPO := map[string]interface{}{
+				"used_type":          "GR",
+				"purchase_item_used": completePOItem,
+			}
+
+			jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
+			if err != nil {
+				errors.New("Error marshalling data :")
+			}
+			_, errCompletePOItem := purchaseService.CompletePOItem(ctx, string(jsonBytesGetPO))
+			if errCompletePOItem != nil {
+				return nil, errCompletePOItem
+			}
+		}
+
 		jsonBytesCreateInvoice, err := json.Marshal(req)
 		if err != nil {
 			return nil, err

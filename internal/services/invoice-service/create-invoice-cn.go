@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
+	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	customerService "prime-erp-core/internal/services/customer-service"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -36,12 +39,26 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	for _, customer := range customers.Customers {
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
+	prefix := "CN"
+	if req[0].RefPaymentMethod == "CASH" {
+		prefix = "CC"
+	}
+	if req[0].RefPaymentMethod == "CREDIT" {
+		prefix = "CN"
+	}
+	configCodeValue := "RUNNING_CN"
+	count := len(req)
+	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
 
 	for i := range req {
+		req[i].InvoiceCode = invoiceCodes[i]
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
-			for _, soldValue := range conMapCustomer.Sold {
+			for _, soldValue := range conMapCustomer.Billing {
 				req[i].PartyBranch = soldValue.BranchID
 				req[i].PartyAddress = conMapCustomer.Address
 			}
@@ -49,6 +66,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTel = conMapCustomer.Phone
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
+			req[i].PartyBranch = conMapCustomer.BranchName
 		}
 
 	}
@@ -63,11 +81,11 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errCreateInvoice
 	}
 
-	/* invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
+	invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
-		"topic":     []string{"AP"},
+		"topic":     []string{"CN"},
 		"sub_topic": []string{"CREATE"},
 	}
 
@@ -90,7 +108,8 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, err
 		}
 		if HookInterfaceValue != nil {
-			str, _ := HookInterfaceValue.(string)
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
 
 			invoiceValue := []models.Invoice{}
 			invoiceValue = append(invoiceValue, models.Invoice{
@@ -103,7 +122,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errCreateApproval
 			}
 		}
-	} */
+	}
 
 	return createInvoiceReturn, nil
 

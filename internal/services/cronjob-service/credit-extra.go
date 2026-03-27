@@ -53,7 +53,9 @@ func CreditExtra() (interface{}, error) {
 	for _, creditValue := range creditRequest.Credit {
 		for _, creditExtraValue := range creditValue.CreditExtra {
 			if creditExtraValue.ExpireDtm != nil {
-				if creditExtraValue.ExpireDtm.After(time.Now()) || creditExtraValue.ExpireDtm.Equal(time.Now()) {
+				now := time.Now()
+				exp := creditExtraValue.ExpireDtm
+				if exp.Before(now) {
 					creditTransaction = append(creditTransaction, models.CreditTransaction{
 						TransactionCode: creditExtraValue.DocRef,
 						TransactionType: "EXTRA",
@@ -73,7 +75,10 @@ func CreditExtra() (interface{}, error) {
 		}
 	}
 	if len(creditExtraID) > 0 {
-		jsonBytesDeleteCreditExtra, err := json.Marshal(creditExtraID)
+		requestDeleteCreditExtra := map[string][]uuid.UUID{
+			"id": creditExtraID,
+		}
+		jsonBytesDeleteCreditExtra, err := json.Marshal(requestDeleteCreditExtra)
 		if err != nil {
 			return nil, err
 		}

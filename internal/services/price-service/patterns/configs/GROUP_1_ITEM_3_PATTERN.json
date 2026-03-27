@@ -6,7 +6,7 @@
       "description": "Pattern for GROUP_1_ITEM_3 - Uses SubGroups directly as rows, grouped by PRODUCT_GROUP4",
       "enabled": true,
       "grouping": {
-        "tabs": "PRODUCT_GROUP4",
+        "tabs": "PG04",
         "rows": "",
         "columnGroups": ""
       },
@@ -32,10 +32,10 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "product_group_6"
+          "dataMapping": "PG06"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 120,
 
@@ -44,10 +44,10 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 120,
 
@@ -56,7 +56,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "od",
@@ -165,16 +165,16 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_kg_before_price_weight",
+              "field": "before_total_net_price_weight",
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_total_net_price_weight"
             },
             {
-              "field": "price_kg_total_net_price_weight",
+              "field": "total_net_price_weight",
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
@@ -190,22 +190,22 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "price_line_before_price_weight",
+              "field": "before_total_net_price_unit",
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_total_net_price_unit"
             },
             {
-              "field": "price_line_total_net_price_weight",
+              "field": "total_net_price_unit",
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "total_net_price_weight"
+              "dataMapping": "total_net_price_unit"
             }
           ]
         },
@@ -248,16 +248,15 @@
         "awaiting_production_import_date",
         "awaiting_production_ton",
         "awaiting_production_producer",
-        "price_kg_before_price_weight",
-        "price_kg_total_net_price_weight",
-        "price_line_before_price_weight",
-        "price_line_total_net_price_weight",
+        "total_net_price_weight",
+        "total_net_price_unit",
         "selling_fast",
         "selling_slow",
         "remark",
         "inactive"
       ],
       "fetchable_suffixes": [
+        "total_net_price_unit",
         "total_net_price_weight"
       ]
     }
@@ -282,5 +281,27 @@
     "version": "1.0.0",
     "lastUpdated": "2025-01-23",
     "description": "Configuration for GROUP_1_ITEM_3 - Direct SubGroup rows pattern grouped by PRODUCT_GROUP4"
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_3": "BuildGroup1Item3Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
   }
 }

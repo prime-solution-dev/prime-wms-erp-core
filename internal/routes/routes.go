@@ -14,6 +14,8 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	priceService "prime-erp-core/internal/services/price-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	systemConfigService "prime-erp-core/internal/services/system-config"
+	xService "prime-erp-core/internal/services/x-service"
 
 	deliveryService "prime-erp-core/internal/services/delivery-service"
 	quotationService "prime-erp-core/internal/services/quotation-service"
@@ -64,14 +66,28 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetPriceDetail", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.GetPriceDetail)
 	})
-	price.POST("/SubGroup/Latest", func(c *gin.Context) {
-		utils.ProcessRequestWithBinding(c, priceService.GetLatestPriceListSubGroup)
+	price.POST("/GetPriceExportTable", func(c *gin.Context) {
+		utils.ProcessRequest(c, priceService.GetPriceExportTable)
+	})
+	price.POST("/SubGroup/UpdateLatest", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.UpdateLatestPriceListSubGroup)
+	})
+	price.POST("/SubGroup/GetCalculated", func(c *gin.Context) {
+		utils.ProcessRequestWithBinding(c, priceService.GetCalculatedPriceListSubGroup)
 	})
 	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
 		utils.ProcessRequest(c, priceService.UpdateExtras)
 	})
+	price.POST("/UploadPriceList", func(c *gin.Context) {
+		utils.ProcessRequestMultiPart(c, priceService.UploadPricelistMultipart)
+	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
+
+	config := ctx.Group("/config")
+	config.POST("/GetSystemConfig", func(c *gin.Context) {
+		utils.ProcessRequest(c, systemConfigService.GetSystemConfig)
+	})
 
 	//quotation
 	quotation := ctx.Group("/quotation")
@@ -87,6 +103,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	quotation.POST("/EditQuotation", func(c *gin.Context) {
 		utils.ProcessRequest(c, quotationService.EditQuotation)
+	})
+	quotation.POST("/CancelQuotation", func(c *gin.Context) {
+		utils.ProcessRequest(c, quotationService.CancelQuotation)
 	})
 
 	quotation.POST("/RequestApproveQuotation", func(c *gin.Context) {
@@ -138,6 +157,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	payment.POST("/CreatePayment", func(c *gin.Context) {
 		utils.ProcessRequest(c, paymentService.CreatePayment)
 	})
+	payment.POST("/DeletePayment", func(c *gin.Context) {
+		utils.ProcessRequest(c, paymentService.DeletePayment)
+	})
 
 	//sale
 	sale := ctx.Group("/sale")
@@ -170,6 +192,14 @@ func RegisterRoutes(ctx *gin.Engine) {
 	sale.POST("/GetSalePack", func(c *gin.Context) {
 		utils.ProcessRequest(c, saleService.GetSalePack)
 	})
+
+	sale.POST("/ValidateSaleOrder", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.ValidateSale)
+	})
+
+	sale.POST("/UpdateSaleItemStatus", func(c *gin.Context) {
+		utils.ProcessRequest(c, saleService.UpdateSaleItemStatus)
+	})
 	//delivery
 	delivery := ctx.Group("/delivery")
 	delivery.POST("/CreateDelivery", func(c *gin.Context) {
@@ -183,6 +213,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
+	})
+	delivery.POST("/GetDeliveryCO", func(c *gin.Context) {
+		utils.ProcessRequest(c, deliveryService.GetDeliveryCO)
 	})
 	/* 	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
 	   		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
@@ -216,6 +249,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	approval.POST("/UpdateApproval", func(c *gin.Context) {
 		utils.ProcessRequest(c, approvalService.UpdateApproval)
 	})
+	approval.POST("/CheckAutoApprovalRest", func(c *gin.Context) {
+		utils.ProcessRequest(c, approvalService.CheckAutoApprovalRest)
+	})
+
 	//credit
 	credit := ctx.Group("/credit")
 	credit.POST("/GetCreditCurrent", func(c *gin.Context) {
@@ -226,6 +263,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	credit.POST("/GetCreditRequestCronjob", func(c *gin.Context) {
 		utils.ProcessRequest(c, creditService.GetCreditRequestCronjob)
+	})
+	credit.POST("/GetCustomerCredit", func(c *gin.Context) {
+		utils.ProcessRequest(c, creditService.GetCustomerCreditRest)
 	})
 
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
@@ -285,6 +325,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
+	})
+	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
+		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})
 
 	//purchase

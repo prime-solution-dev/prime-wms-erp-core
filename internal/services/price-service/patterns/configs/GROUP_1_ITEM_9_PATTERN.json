@@ -2,13 +2,13 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_9_default",
-      "name": "GROUP_1_ITEM_9 Length Matrix",
+      "name": "PG09 Length Matrix",
       "description": "Single table layout for GROUP_1_ITEM_9 with PRODUCT_GROUP3 column groups and row-span columns for Product Group and Length",
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP2|PRODUCT_GROUP7",
-        "columnGroups": "PRODUCT_GROUP3"
+        "rows": "PG02|PG07",
+        "columnGroups": "PG03"
       },
       "fixedColumns": [
         {
@@ -25,57 +25,59 @@
           }
         },
         {
-          "field": "product_group_2",
+          "field": "PG02",
           "headerName": "Product Group",
           "width": 180,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "spanRows": true,
-          "dataMapping": "product_group_2",
+          "dataMapping": "PG02",
           "cellStyle": {
             "fontWeight": "600"
           }
         },
         {
-          "field": "product_group_7",
+          "field": "PG07",
           "headerName": "ความยาว",
           "width": 150,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "spanRows": true,
-          "dataMapping": "product_group_7",
+          "dataMapping": "PG07",
           "cellStyle": {
             "fontWeight": "600"
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "Size",
           "width": 140,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_6",
+          "dataMapping": "PG06",
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
+        }
+      ],
+      "columns": [
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 140,
-          "dataMapping": "",
+          "dataMapping": "total_weight",
           "cellStyle": {
             "textAlign": "left"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
-          "dataMapping": "",
+          "dataMapping": "avg_weight",
           "cellStyle": {
             "textAlign": "left"
           }
@@ -86,23 +88,21 @@
           "width": 130,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
+        },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 150,
-          "dataMapping": "before_price_weight",
+          "dataMapping": "before_total_net_price_weight",
           "cellStyle": {
             "textAlign": "left"
           }
         },
         {
-          "field": "price_weight",
+          "field": "total_net_price_weight",
           "headerName": "ราคาขาย After",
           "width": 150,
-          "dataMapping": "price_weight",
+          "dataMapping": "total_net_price_weight",
           "cellStyle": {
             "textAlign": "left"
           }
@@ -145,8 +145,8 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {
@@ -159,6 +159,28 @@
     "version": "1.0.0",
     "lastUpdated": "2025-02-25",
     "description": "Configuration for GROUP_1_ITEM_9 showing dynamic PRODUCT_GROUP3 columns with row-spanned Product Group and Length headers."
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "PG06": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_9": "BuildGroup1Item9Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
   }
 }
 

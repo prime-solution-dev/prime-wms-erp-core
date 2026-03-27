@@ -24,8 +24,9 @@ type UpdateSaleRequest struct {
 
 type SaleDocumentUpdate struct {
 	models.Sale
-	Items       []models.SaleItem `json:"items"`        // Items to update
-	DeleteItems []uuid.UUID       `json:"delete_items"` // Item IDs to delete
+	Items       []models.SaleItem    `json:"items"`        // Items to update
+	SaleDeposit []models.SaleDeposit `json:"sale_deposit"` // Sale deposits to update
+	DeleteItems []uuid.UUID          `json:"delete_items"` // Item IDs to delete
 }
 
 type UpdateSaleResponse struct {
@@ -59,11 +60,11 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	user := `system` // TODO: get from ctx
 	now := time.Now()
-	nowTruc := now.Truncate(24 * time.Hour)
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	updateSales := []models.Sale{}
 	updateSaleItems := []models.SaleItem{}
+	updateSaleDeposits := []models.SaleDeposit{}
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	for _, saleReq := range req.Sales {
@@ -95,7 +96,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				CompanyCode:         saleReq.CompanyCode,
 				SiteCode:            saleReq.SiteCode,
 				StorageType:         []string{`NORMAL`},
-				SaleDate:            nowTruc,
+				SaleDate:            *saleReq.DeliveryDate,
 			}
 			verifyReq = newVerifyReq
 		}
@@ -131,6 +132,13 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
 		}
 
+		for _, deposit := range saleReq.SaleDeposit {
+			// Ensure deposit belongs to this sale
+			deposit.ID = uuid.New()
+			deposit.SaleID = tempSale.ID
+			updateSaleDeposits = append(updateSaleDeposits, deposit)
+		}
+
 		//Approval
 		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
 		verifyReqMap[verifyReqKey] = verifyReq
@@ -144,58 +152,55 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				return nil, err
 			}
 
-			for _, doc := range verifyRes.Documents {
-				// Check if critical validations fail - don't allow update if they fail
-				if !doc.IsPassCredit || !doc.IsPassInventory || !doc.IsPassPrice {
-					res = append(res, UpdateSaleResponse{
-						IsPass:           false,
-						IsPassPrice:      doc.IsPassPrice,
-						IsPassCredit:     doc.IsPassCredit,
-						IsPassInventory:  doc.IsPassInventory,
-						IsPassExpiryDate: doc.IsPassExpiryPrice,
-						SaleCode:         doc.DocRef,
-					})
-					// Return immediately - don't update sale if critical validations fail
-					// return res, nil
-					updateSales[0].IsApproved = false
-					updateSales[0].StatusApprove = "PENDING"
-				} else {
-					updateSales[0].IsApproved = true
-					updateSales[0].StatusApprove = "COMPLETED"
-				}
-
+			// Check if critical validations fail - don't allow update if they fail
+			if !verifyRes.IsPassCredit || !verifyRes.IsPassInventory || !verifyRes.IsPassPrice {
 				res = append(res, UpdateSaleResponse{
-					IsPass:           doc.IsPassPrice && doc.IsPassCredit && doc.IsPassInventory && doc.IsPassExpiryPrice,
-					IsPassPrice:      doc.IsPassPrice,
-					IsPassCredit:     doc.IsPassCredit,
-					IsPassInventory:  doc.IsPassInventory,
-					IsPassExpiryDate: doc.IsPassExpiryPrice,
-					SaleCode:         doc.DocRef,
+					IsPass:           false,
+					IsPassPrice:      verifyRes.IsPassPrice,
+					IsPassCredit:     verifyRes.IsPassCredit,
+					IsPassInventory:  verifyRes.IsPassInventory,
+					IsPassExpiryDate: verifyRes.IsPassExpiryPrice,
+					SaleCode:         verifyRes.Documents[0].DocRef,
 				})
+				// Return immediately - don't update sale if critical validations fail
+				// return res, nil // Uncomment this line if you want to stop the update on failure
+			} else {
+				updateSales[0].IsApproved = true
+				updateSales[0].StatusApprove = "COMPLETED"
+			}
 
-				for i := range updateSales {
-					if doc.IsPassPrice {
-						updateSales[i].PassPriceList = "Y"
-					} else {
-						updateSales[i].PassPriceList = "N"
-					}
-					if doc.IsPassExpiryPrice {
-						updateSales[i].PassPriceExpire = "Y"
-					} else {
-						updateSales[i].PassPriceExpire = "N"
-					}
-					if doc.IsPassCredit {
-						updateSales[i].PassCreditLimit = "Y"
-					} else {
-						updateSales[i].PassCreditLimit = "N"
-					}
-					if doc.IsPassInventory {
-						updateSales[i].PassAtpCheck = "Y"
-					} else {
-						updateSales[i].PassAtpCheck = "N"
-					}
+			res = append(res, UpdateSaleResponse{
+				IsPass:           verifyRes.IsPassPrice && verifyRes.IsPassCredit && verifyRes.IsPassInventory && verifyRes.IsPassExpiryPrice,
+				IsPassPrice:      verifyRes.IsPassPrice,
+				IsPassCredit:     verifyRes.IsPassCredit,
+				IsPassInventory:  verifyRes.IsPassInventory,
+				IsPassExpiryDate: verifyRes.IsPassExpiryPrice,
+				SaleCode:         verifyRes.Documents[0].DocRef,
+			})
+
+			for i := range updateSales {
+				if verifyRes.IsPassPrice {
+					updateSales[i].PassPriceList = "Y"
+				} else {
+					updateSales[i].PassPriceList = "N"
+				}
+				if verifyRes.IsPassExpiryPrice {
+					updateSales[i].PassPriceExpire = "Y"
+				} else {
+					updateSales[i].PassPriceExpire = "N"
+				}
+				if verifyRes.IsPassCredit {
+					updateSales[i].PassCreditLimit = "Y"
+				} else {
+					updateSales[i].PassCreditLimit = "N"
+				}
+				if verifyRes.IsPassInventory {
+					updateSales[i].PassAtpCheck = "Y"
+				} else {
+					updateSales[i].PassAtpCheck = "N"
 				}
 			}
+
 		}
 	} else {
 		// If not verifying, create response for all sales with default values
@@ -248,6 +253,24 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Updates(item).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update sale item %s: %v", item.SaleItem, err)
+		}
+	}
+
+	// delete existing deposits
+	for _, saleReq := range req.Sales {
+		if len(saleReq.SaleDeposit) > 0 {
+			if err := tx.Where("sale_id = ?", saleReq.Sale.ID).Delete(&models.SaleDeposit{}).Error; err != nil {
+				tx.Rollback()
+				return nil, fmt.Errorf("failed to delete existing sale deposits: %v", err)
+			}
+		}
+	}
+
+	// Update existing deposits
+	for _, deposit := range updateSaleDeposits {
+		if err := tx.Create(&deposit).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to insert sale deposit for sale ID %s: %v", deposit.SaleID, err)
 		}
 	}
 

@@ -1,0 +1,24 @@
+meta {
+  name: Create-Price-Data
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{URL_ERP}}/price/UploadPriceList
+  body: multipartForm
+  auth: inherit
+}
+
+headers {
+  Content-Type: multipart/form-data
+}
+
+body:multipart-form {
+  files: @file()
+}
+
+settings {
+  encodeUrl: false
+  timeout: 0
+}

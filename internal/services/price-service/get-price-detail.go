@@ -10,6 +10,8 @@ import (
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
 	"time"
 
+	externalService "prime-erp-core/external/warehouse-service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -129,6 +131,11 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	}
 
 	result := []models.GetPriceListResponse{}
+
+	// Collect unique company codes and site codes
+	companyCodeSet := make(map[string]bool)
+	siteCodeSet := make(map[string]bool)
+
 	for _, resp := range responses {
 		// Extract GroupKey from first subgroup's subgroup_key (first part before "|")
 		groupKey := ""
@@ -166,18 +173,32 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 			priceListResp.EffectiveDate = &effectiveDate
 		}
 
+		// Collect company code and site code
+		if resp.CompanyCode != "" {
+			companyCodeSet[resp.CompanyCode] = true
+		}
+		if resp.SiteCode != "" {
+			siteCodeSet[resp.SiteCode] = true
+		}
+
 		// Transform subgroups
 		subGroups := []models.PriceListSubGroupResponse{}
 		for _, sg := range resp.SubGroups {
 			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 			for _, sgk := range sg.GroupKeys {
+				// Check if item name exists in group item map, use default empty string if not found
+				itemName := groupItemMap[sgk.Value].ItemName
+				if itemName == "" {
+					itemName = sgk.Value // Fallback to the value itself if item name not found
+				}
+
 				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
 					ID:         uuid.New().String(),
 					SubGroupID: sg.ID.String(),
 					GroupCode:  sgk.Code,
 					GroupName:  groupMap[sgk.Code].GroupName,
 					ValueCode:  sgk.Value,
-					ValueName:  groupItemMap[sgk.Value].ItemName,
+					ValueName:  itemName,
 					Seq:        sgk.Seq,
 				})
 			}
@@ -187,9 +208,10 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				sgEffectiveDate = sg.EffectiveDate.Format(time.RFC3339)
 			}
 
-			subGroups = append(subGroups, models.PriceListSubGroupResponse{
+			subGroup := models.PriceListSubGroupResponse{
 				ID:                        sg.ID.String(),
 				PriceListGroupID:          resp.ID.String(),
+				SubgroupCode:              sg.SubgroupCode,
 				SubgroupKey:               sg.SubGroupKey,
 				IsTrading:                 sg.IsTrading,
 				PriceUnit:                 sg.PriceUnit,
@@ -211,11 +233,105 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 				Remark:                    sg.Remark,
 				UdfJson:                   sg.UdfJson,
 				SubGroupKeys:              subGroupKeys,
-			})
+				DefaultUom:                sg.DefaultUom,
+			}
+			subGroups = append(subGroups, subGroup)
 		}
 
 		priceListResp.SubGroups = subGroups
 		result = append(result, priceListResp)
+	}
+
+	// Collect all key values from all subgroups for inventory service request
+	keyValues := []externalService.InventoryByProductCodeKeyValue{}
+	for _, resp := range responses {
+		for _, sg := range resp.SubGroups {
+			for _, sgk := range sg.GroupKeys {
+				keyValues = append(keyValues, externalService.InventoryByProductCodeKeyValue{
+					ID:         sg.ID.String(),
+					GroupCode:  sgk.Code,
+					GroupValue: sgk.Value,
+					Seq:        sgk.Seq,
+				})
+			}
+		}
+	}
+
+	// Call inventory service if we have key values
+	if len(keyValues) > 0 {
+		// Convert sets to slices
+		companyCodes := []string{}
+		for code := range companyCodeSet {
+			companyCodes = append(companyCodes, code)
+		}
+		siteCodes := []string{}
+		for code := range siteCodeSet {
+			siteCodes = append(siteCodes, code)
+		}
+
+		// Use first company code for the request (as per example, it's a single value array)
+		companyCode := ""
+		if len(companyCodes) > 0 {
+			companyCode = companyCodes[0]
+		}
+
+		// Call inventory service
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		if err != nil {
+			// Log error but continue without inventory data
+			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
+		} else {
+			// Create a map of inventory data by ID for quick lookup
+			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			for _, invItem := range inventoryResponse {
+				inventoryMap[invItem.ID] = invItem.InventoryWeight
+			}
+
+			// Create new result with expanded subgroups for multiple inventory records
+			newResult := []models.GetPriceListResponse{}
+
+			for _, priceList := range result {
+				priceListGroup := priceList
+
+				// Process subgroups and expand if needed
+				expandedSubGroups := []models.PriceListSubGroupResponse{}
+				for _, sg := range priceListGroup.SubGroups {
+					if inventoryWeights, ok := inventoryMap[sg.ID]; ok && len(inventoryWeights) > 0 {
+						// Create a subgroup row for each inventory record
+						for _, inv := range inventoryWeights {
+							expandedSG := sg // Copy the subgroup
+
+							// Set inventory-specific data
+							expandedSG.InventoryWeight = []models.InventoryWeightResponse{inv}
+							expandedSG.ProductCode = inv.ProductCode
+							expandedSG.SupplierCode = inv.SupplierCode
+							expandedSG.SupplierName = inv.SupplierName
+							expandedSG.BatchNo = inv.BatchNo
+
+							// Map new API fields to existing model fields
+							if inv.TotalQty > 0 {
+								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							}
+							if inv.TotalWeight > 0 {
+								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
+							}
+							if inv.AvgWeight > 0 {
+								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
+							}
+
+							expandedSubGroups = append(expandedSubGroups, expandedSG)
+						}
+					} else {
+						// No inventory data, keep original subgroup
+						expandedSubGroups = append(expandedSubGroups, sg)
+					}
+				}
+
+				priceListGroup.SubGroups = expandedSubGroups
+				newResult = append(newResult, priceListGroup)
+			}
+			result = newResult
+		}
 	}
 
 	return result, nil
@@ -237,6 +353,28 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	if len(req.GroupCodes) == 0 {
 		return nil, fmt.Errorf("group_codes is required")
+	}
+
+	// Load configuration using the first groupCode to extract requiredGroupCodes
+	groupCode := req.GroupCodes[0]
+	config, err := pricePatterns.LoadConfiguration(groupCode)
+	if err != nil {
+		// If config loading fails, continue with original groupCodes
+		// This ensures backward compatibility
+	} else {
+		// Extract requiredGroupCodes from configuration
+		requiredGroupCodes := pricePatterns.ExtractRequiredGroupCodes(config)
+		// Merge requiredGroupCodes into req.GroupCodes (avoid duplicates)
+		groupCodeMap := make(map[string]bool)
+		for _, gc := range req.GroupCodes {
+			groupCodeMap[gc] = true
+		}
+		for _, gc := range requiredGroupCodes {
+			if !groupCodeMap[gc] {
+				req.GroupCodes = append(req.GroupCodes, gc)
+				groupCodeMap[gc] = true
+			}
+		}
 	}
 
 	// Connect to database
@@ -261,38 +399,33 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Determine the pattern handler from the group's code
-	groupCode := priceListData[0].GroupCode
-	if groupCode == "" {
+	dataGroupCode := priceListData[0].GroupCode
+	if dataGroupCode == "" {
 		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
 
-	type priceTableHandler func([]models.GetPriceListResponse, string) (pricePatterns.PriceListDetailApiResponse, error)
+	// Try to load configuration for handler mapping using dataGroupCode
+	// This ensures we load the correct config file for the actual data group code
+	handlerConfig, err := pricePatterns.LoadConfiguration(dataGroupCode)
+	var handler pricePatterns.PriceTableHandler
+	var handlerFound bool
 
-	handlers := map[string]priceTableHandler{
-		"GROUP_1_ITEM_1": func(data []models.GetPriceListResponse, _ string) (pricePatterns.PriceListDetailApiResponse, error) {
-			return pricePatterns.BuildGroup1Item1Response(data)
-		},
-		"GROUP_1_ITEM_2": pricePatterns.BuildGroup1Item2Response,
-		"GROUP_1_ITEM_3": pricePatterns.BuildGroup1Item3Response,
-		"GROUP_1_ITEM_4": pricePatterns.BuildGroup1Item4Response,
-		"GROUP_1_ITEM_5": pricePatterns.BuildGroup1Item5Response,
-		"GROUP_1_ITEM_6": pricePatterns.BuildGroup1Item6Response,
-		"GROUP_1_ITEM_7": pricePatterns.BuildGroup1Item7Response,
-		"GROUP_1_ITEM_8": pricePatterns.BuildGroup1Item8Response,
-		"GROUP_1_ITEM_9": pricePatterns.BuildGroup1Item9Response,
-		"GROUP_1_ITEM_10": func(data []models.GetPriceListResponse, code string) (pricePatterns.PriceListDetailApiResponse, error) {
-			return pricePatterns.BuildGroup1Item10Response(data, code)
-		},
-		"GROUP_1_ITEM_11": pricePatterns.BuildGroup1Item11Response,
-		"GROUP_1_ITEM_13": pricePatterns.BuildGroup1Item13Response,
+	if err == nil && handlerConfig != nil {
+		// Try to resolve handler from configuration
+		handler, handlerFound = pricePatterns.ResolveHandler(handlerConfig, dataGroupCode)
 	}
 
-	handler, ok := handlers[groupCode]
-	if !ok {
-		return nil, fmt.Errorf("unsupported GroupCode: %s", groupCode)
+	// Fall back to default handlers if config resolution failed
+	if !handlerFound {
+		defaultHandlers := pricePatterns.GetDefaultHandlers()
+		handler, handlerFound = defaultHandlers[dataGroupCode]
 	}
 
-	response, err := handler(priceListData, groupCode)
+	if !handlerFound {
+		return nil, fmt.Errorf("unsupported GroupCode: %s", dataGroupCode)
+	}
+
+	response, err := handler(priceListData, dataGroupCode)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
@@ -33,9 +33,10 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 	}
 
 	// Group subgroups by PRODUCT_GROUP4
+	productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
 	groupedByProductGroup4 := make(map[string][]models.PriceListSubGroupResponse)
 	for _, sg := range allSubGroups {
-		productGroup4 := getValueNameByGroupCode(sg.SubGroupKeys, "PRODUCT_GROUP4")
+		productGroup4 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup4Code)
 		if productGroup4 == "" {
 			// If no PRODUCT_GROUP4, use a default group
 			productGroup4 = "Other"
@@ -57,7 +58,7 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 	tabs := make([]PriceListDetailTabConfig, 0)
 	for _, productGroup4 := range productGroup4Keys {
 		subGroups := groupedByProductGroup4[productGroup4]
-		rowData := buildDirectRows(pattern, subGroups)
+		rowData := buildDirectRows(config, pattern, subGroups)
 
 		tableData := make([]map[string]interface{}, len(rowData))
 		for i, row := range rowData {

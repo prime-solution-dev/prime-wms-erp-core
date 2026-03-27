@@ -2,13 +2,13 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_10_default",
-      "name": "GROUP_1_ITEM_10 Price Table",
-      "description": "Dynamic table for GROUP_1_ITEM_10 with PRODUCT_GROUP9 price breakouts per item/length.",
+      "name": "หมวดเหล็กเส้น",
+      "description": "Dynamic table for PG09 with PG09 price breakouts per item/length.",
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP4|PRODUCT_GROUP7",
-        "columnGroups": "PRODUCT_GROUP9"
+        "rows": "PG04|PG07",
+        "columnGroups": "PG09"
       },
       "fixedColumns": [
         {
@@ -35,29 +35,67 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
+        }
+      ],
+      "columns": [
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 130,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "price_weight",
+          "dataMapping": "total_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           }
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "total_net_price_weight",
+          "dataMapping": "avg_weight",
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "before_total_net_price_unit",
+          "headerName": "ราคาขาย Before",
+          "width": 150,
+          "dataMapping": "before_total_net_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "total_net_price_unit",
+          "headerName": "ราคาขาย After",
+          "width": 150,
+          "dataMapping": "total_net_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "extra_price_unit",
+          "headerName": "Extra",
+          "width": 130,
+          "dataMapping": "extra_price_unit",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 120,
+          "dataMapping": "line_bundle",
+          "cellStyle": {
+            "textAlign": "left"
           }
         },
         {
@@ -69,44 +107,6 @@
           "suppressMovable": true,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
-        }
-      ],
-      "columns": [
-        {
-          "field": "before_price_unit",
-          "headerName": "ราคาขาย Before",
-          "width": 150,
-          "dataMapping": "before_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "total_net_price_unit",
-          "headerName": "ราคาขาย After",
-          "width": 150,
-          "dataMapping": "total_net_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "extra_price_unit",
-          "headerName": "Extra",
-          "width": 130,
-          "dataMapping": "extra_price_unit",
-          "cellStyle": {
-            "textAlign": "right"
-          }
-        },
-        {
-          "field": "line_bundle",
-          "headerName": "เส้น/มัด",
-          "width": 120,
-          "dataMapping": "line_bundle",
-          "cellStyle": {
-            "textAlign": "right"
-          }
         },
         {
           "field": "inactive",
@@ -120,7 +120,7 @@
       "itemFormat": [
         {
           "type": "group",
-          "value": "PRODUCT_GROUP4"
+          "value": "PG04"
         },
         {
           "type": "literal",
@@ -128,7 +128,7 @@
         },
         {
           "type": "group",
-          "value": "PRODUCT_GROUP7"
+          "value": "PG07"
         }
       ],
       "applicableCategories": [
@@ -153,8 +153,8 @@
     "pagination": false,
     "toolbar": {
       "show": true,
-      "showSearch": true,
-      "showRefresh": true,
+      "showSearch": false,
+      "showRefresh": false,
       "showColumnToggle": false
     },
     "gridOptions": {
@@ -167,6 +167,28 @@
     "version": "1.0.0",
     "lastUpdated": "2025-11-25",
     "description": "Configuration for GROUP_1_ITEM_10 showing per-item TR/จีน pricing columns."
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_10": "BuildGroup1Item10Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
   }
 }
 

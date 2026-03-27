@@ -74,6 +74,7 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
+		CreditTerm:      req.CreditTerm,
 		CreateBy:        user,
 		CreateDtm:       now,
 		UpdateBy:        user,
@@ -149,6 +150,7 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		IsApproved:                  prePurchases.IsApproved,
 		StatusApprove:               prePurchases.StatusApprove,
 		Remark:                      prePurchases.Remark,
+		CreditTerm:                  prePurchases.CreditTerm,
 		CreateBy:                    prePurchases.CreateBy,
 		CreateDtm:                   prePurchases.CreateDtm.Format(time.RFC3339),
 		UpdateBy:                    prePurchases.UpdateBy,
@@ -213,6 +215,7 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 		StatusApprove:   req.StatusApprove,
 		DeliveryAddress: req.DeliveryAddress,
 		Remark:          req.Remark,
+		CreditTerm:      req.CreditTerm,
 		UpdateBy:        user,
 		UpdateDtm:       now,
 	}
@@ -220,7 +223,11 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 
 // Approval action
 func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) error {
-	user := `system` // TODO: get from ctx
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 
 	approvalReq := []models.Approval{}
 
@@ -233,8 +240,8 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 			Status:        pp.StatusApprove,
 			Remark:        "-",
 			CurentStepSeq: 1,
-			MDItemCode:    "CTM-CTM1",
-			CreateBy:      user,
+			MDItemCode:    "CTM-CTM3",
+			CreateBy:      userID,
 		})
 	}
 
@@ -339,7 +346,7 @@ func GeneratePrePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
 		return []string{}, nil // No pre-purchase to generate codes for
 	}
 
-	configCode := "RUNNING_POB"
+	configCode := "RUNNING_PB"
 
 	getReq := systemConfigService.GetRunningSystemConfigRequest{
 		ConfigCode: configCode,

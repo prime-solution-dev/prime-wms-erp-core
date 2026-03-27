@@ -25,7 +25,7 @@
           }
         },
         {
-          "field": "product_group_6",
+          "field": "PG06",
           "headerName": "หนา",
           "width": 120,
           "pinned": "left",
@@ -35,24 +35,21 @@
           "cellStyle": {
             "fontWeight": "600"
           }
-        },
-        {
-          "field": "ship_no",
-          "headerName": "Ship No.",
-          "width": 150,
-          "pinned": "left",
-          "lockPosition": true,
-          "suppressMovable": true,
-          "dataMapping": "ship_no"
         }
       ],
       "columns": [
+        {
+          "field": "batch_no",
+          "headerName": "Ship No.",
+          "width": 150,
+          "dataMapping": "batch_no"
+        },
         {
           "field": "quantity",
           "headerName": "ลูก",
           "width": 80,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "stock_quantity"
         },
@@ -64,20 +61,20 @@
           "dataMapping": "is_highlight"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย Before",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
           "headerName": "ราคาขาย After",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -86,27 +83,27 @@
           "headerName": "Extra",
           "width": 110,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
           "dataMapping": "extra_price_weight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "cellStyle": {
-            "textAlign": "right"
+            "textAlign": "left"
           },
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "institute",
@@ -133,34 +130,34 @@
           "dataMapping": "code"
         },
         {
-          "field": "factory",
+          "field": "supplier_name",
           "headerName": "โรงงาน",
           "width": 130,
-          "dataMapping": "factory"
+          "dataMapping": "supplier_name"
         },
         {
           "field": "grade",
           "headerName": "เกรด",
           "width": 120,
-          "dataMapping": "product_group_3"
+          "dataMapping": "PG03"
         },
         {
           "field": "z_value",
           "headerName": "Z",
           "width": 80,
-          "dataMapping": "product_group_8"
+          "dataMapping": "PG08"
         },
         {
           "field": "face",
           "headerName": "หน้า",
           "width": 100,
-          "dataMapping": "product_group_5"
+          "dataMapping": "PG05"
         },
         {
           "field": "coil_id",
           "headerName": "Coil ID",
           "width": 140,
-          "dataMapping": "product_group_9"
+          "dataMapping": "PG09"
         },
         {
           "field": "country",
@@ -194,7 +191,6 @@
       ],
       "editable_suffixes": [
         "total_net_price_weight",
-        "extra_price_weight",
         "bkk",
         "code",
         "institute",
@@ -203,12 +199,12 @@
         "remark"
       ],
       "fetchable_suffixes": [
-        "before_price_unit",
+        "before_total_net_price_unit",
         "total_net_price_unit",
         "extra_price_unit"
       ],
       "summary": {
-        "rowGroupField": "product_group_6",
+        "rowGroupField": "PG06",
         "labelField": "quantity",
         "labelValue": "รวม",
         "columns": [
@@ -218,7 +214,7 @@
             "applyToColumnGroups": false
           },
           {
-            "field": "before_price_weight",
+            "field": "before_total_net_price_weight",
             "aggregation": "sum",
             "applyToColumnGroups": false
           }
@@ -247,6 +243,43 @@
     "version": "1.0.0",
     "lastUpdated": "2025-02-15",
     "description": "Base configuration for GROUP_1_ITEM_8 price list layout including summary configuration."
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup1": "PG01",
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_8": "BuildGroup1Item8Response"
+    },
+    "defaultItemFormat": [
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
+    ]
   }
 }
-

@@ -36,12 +36,19 @@ func CreateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	for _, customer := range customers.Customers {
 		convertCustomerMap[customer.CustomerCode] = customer
 	}
-
+	prefix := "DN"
+	configCodeValue := "RUNNING_DN"
+	count := len(req)
+	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
 	for i := range req {
+		req[i].InvoiceCode = invoiceCodes[i]
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
-			for _, soldValue := range conMapCustomer.Sold {
+			for _, soldValue := range conMapCustomer.Billing {
 				req[i].PartyBranch = soldValue.BranchID
 				req[i].PartyAddress = conMapCustomer.Address
 			}

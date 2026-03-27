@@ -9,7 +9,11 @@ import (
 )
 
 func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	fmt.Printf("[DEBUG] BuildGroup1Item2Response: Processing %d price list entries\n", len(priceListData))
+	fmt.Printf("[DEBUG] GroupCode: %s\n", groupCode)
+	fmt.Printf("[DEBUG] PriceListData: %+v\n", priceListData)
+
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
@@ -31,7 +35,7 @@ func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, group
 	}
 
 	columns := buildFixedColumns(pattern)
-	rowData := buildDirectRows(pattern, subGroups)
+	rowData := buildDirectRows(config, pattern, subGroups)
 
 	tableData := make([]map[string]interface{}, len(rowData))
 	for i, row := range rowData {

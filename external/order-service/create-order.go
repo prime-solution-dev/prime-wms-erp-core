@@ -42,6 +42,20 @@ type CreateOrderDetail struct {
 	Remark              string                  `json:"remark"`
 	CompanyCode         string                  `json:"company_code"`
 	SiteCode            string                  `json:"site_code"`
+	DocumentRef2        string                  `json:"document_ref_2"`
+	DocumentRefType2    string                  `json:"document_ref_type_2"`
+	PartyCode           string                  `json:"party_code"`
+	PartyName           string                  `json:"party_name"`
+	PartyType           string                  `json:"party_type"`
+	Reason              string                  `json:"reason"`
+	ShippingAddress     string                  `json:"shipping_address"`
+	DeliveryMethod      string                  `json:"delivery_method"`
+	BookingDate         *time.Time              `json:"booking_date"`
+	DeliveryTimeCode    string                  `json:"delivery_time_code"`
+	Tel                 string                  `json:"tel"`
+	LicensePlate        string                  `json:"license_plate"`
+	ContactName         string                  `json:"contact_name"`
+	StatusApproveGi     string                  `json:"status_approve_gi"`
 	OrderItem           []CreateOrderItemDetail `json:"order_item"`
 }
 

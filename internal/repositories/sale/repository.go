@@ -1,17 +1,88 @@
 package saleRepository
 
 import (
+	"errors"
 	"fmt"
 	"math"
+	externalService "prime-erp-core/external/customer-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
 
+// getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
+func getCustomerCodesByName(customerNameLike string) ([]string, error) {
+	if len(customerNameLike) == 0 {
+		return nil, nil
+	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		CustomerNameLike: customerNameLike,
+		Page:             1,
+		PageSize:         1000, // เอาเยอะๆ เพื่อให้ได้ customerCode ทั้งหมดที่ match
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+
+	fmt.Printf("Found %d customers matching name like '%s'\n", len(customerByNameData.Customers), customerNameLike)
+
+	// เก็บ customerCode ทั้งหมดที่ได้จากการค้นหาด้วย name
+	var customerCodes []string
+	for _, customer := range customerByNameData.Customers {
+		customerCodes = append(customerCodes, customer.CustomerCode)
+	}
+
+	fmt.Println("Customer codes from name search:", customerCodes)
+	return customerCodes, nil
+}
+
+// buildStatusFilterConditions สร้างเงื่อนไข SQL สำหรับ status filter
+func buildStatusFilterConditions(statusFilters []string) string {
+	if len(statusFilters) == 0 {
+		return ""
+	}
+
+	var conditions []string
+
+	for _, statusFilter := range statusFilters {
+		switch strings.ToLower(statusFilter) {
+		case "new":
+			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PENDING' AND delivery_booking_item.document_ref_item IS NULL)")
+		case "waitapprove":
+			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'PROCESS' AND delivery_booking_item.document_ref_item IS NULL)")
+		case "approved":
+			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'COMPLETED' AND delivery_booking_item.document_ref_item IS NULL)")
+		case "reject":
+			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REJECT' AND delivery_booking_item.document_ref_item IS NULL)")
+		case "review":
+			conditions = append(conditions, "(sale.status = 'PENDING' AND sale.status_approve = 'REVIEW' AND delivery_booking_item.document_ref_item IS NULL)")
+		case "canceled":
+			conditions = append(conditions, "sale.status = 'CANCELED'")
+		case "draft":
+			conditions = append(conditions, "sale.status = 'TEMP'")
+		case "completed":
+			conditions = append(conditions, "sale.status = 'COMPLETED'")
+		case "partial":
+			// สำหรับ partial จะต้องมี delivery items อยู่ แต่ยัง PENDING
+			conditions = append(conditions, "(sale.status = 'PENDING' AND delivery_booking_item.document_ref_item IS NOT NULL)")
+		}
+	}
+
+	if len(conditions) > 0 {
+		return " AND (" + strings.Join(conditions, " OR ") + ")"
+	}
+	return ""
+}
+
 // Create
-func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusPayment []string, isApproved []bool, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -48,6 +119,15 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchCustomerCode = fmt.Sprintf(` and sale.customer_code IN (%s)`, whereInClause)
 	}
+	searchProductCode := ""
+	if len(productCode) > 0 {
+		quotedStrings := make([]string, len(productCode))
+		for i, s := range productCode {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchProductCode = fmt.Sprintf(` and sale_item.product_code IN (%s)`, whereInClause)
+	}
 	searchIsStatus := ""
 	if len(status) > 0 {
 		quotedStrings := make([]string, len(status))
@@ -66,6 +146,15 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchStatusPayment = fmt.Sprintf(` and sale.status_payment IN (%s)`, whereInClause)
 	}
+	searchStatusApprove := ""
+	if len(statusApprove) > 0 {
+		quotedStrings := make([]string, len(statusApprove))
+		for i, s := range statusApprove {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchStatusApprove = fmt.Sprintf(` and sale.status_approve IN (%s)`, whereInClause)
+	}
 	searchIsApproved := ""
 	if len(isApproved) > 0 {
 		boolStrings := make([]string, len(isApproved))
@@ -76,17 +165,85 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		searchIsApproved = fmt.Sprintf(` AND sale.is_approved IN (%s)`, whereInClause)
 	}
 
+	// New search conditions
+	searchSaleCodeLike := ""
+	if len(saleCodeLike) > 0 {
+		searchSaleCodeLike = fmt.Sprintf(` AND sale.sale_code ILIKE '%%%s%%'`, saleCodeLike)
+	}
+
+	searchCustomerCodeLike := ""
+	if len(customerCodeLike) > 0 {
+		searchCustomerCodeLike = fmt.Sprintf(` AND sale.customer_code ILIKE '%%%s%%'`, customerCodeLike)
+	}
+
+	searchDocumentRefLike := ""
+	if len(documentRefLike) > 0 {
+		searchDocumentRefLike = fmt.Sprintf(` AND sale_item.document_ref ILIKE '%%%s%%'`, documentRefLike)
+	}
+
+	// Handle product code like search
+	searchProductCodeLike := ""
+	if len(productCodeLike) > 0 {
+		searchProductCodeLike = fmt.Sprintf(` AND sale_item.product_code ILIKE '%%%s%%'`, productCodeLike)
+	}
+
+	// Handle customer name search
+	searchCustomerByName := ""
+	if len(customerNameLike) > 0 {
+		customerCodesFromName, err := getCustomerCodesByName(customerNameLike)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		if len(customerCodesFromName) > 0 {
+			quotedStrings := make([]string, len(customerCodesFromName))
+			for i, s := range customerCodesFromName {
+				quotedStrings[i] = fmt.Sprintf("'%s'", s)
+			}
+			whereInClause := strings.Join(quotedStrings, ", ")
+			searchCustomerByName = fmt.Sprintf(` AND sale.customer_code IN (%s)`, whereInClause)
+		} else {
+			// No customers found, return empty result
+			searchCustomerByName = " AND 1 = 0"
+		}
+	}
+
+	searchCompletedDate := ""
+	if len(CompletedDateStart) > 0 && len(CompletedDateEnd) > 0 {
+		searchCompletedDate = fmt.Sprintf(` AND sale.update_date BETWEEN '%s' AND '%s' AND sale.status = 'COMPLETED'`, CompletedDateStart, CompletedDateEnd)
+	}
+
+	// Date range searches
+	searchCreateDate := ""
+	if len(createDateStart) > 0 && len(createDateEnd) > 0 {
+		searchCreateDate = fmt.Sprintf(` AND sale.create_date BETWEEN '%s' AND '%s'`, createDateStart, createDateEnd)
+	}
+
+	searchExpirePriceDate := ""
+	if len(expirePriceDateStart) > 0 && len(expirePriceDateEnd) > 0 {
+		searchExpirePriceDate = fmt.Sprintf(` AND sale.expire_price_date BETWEEN '%s' AND '%s'`, expirePriceDateStart, expirePriceDateEnd)
+	}
+
+	searchDeliveryDate := ""
+	if len(deliveryDateStart) > 0 && len(deliveryDateEnd) > 0 {
+		searchDeliveryDate = fmt.Sprintf(` AND sale.delivery_date BETWEEN '%s' AND '%s'`, deliveryDateStart, deliveryDateEnd)
+	}
+
+	// Status filter conditions
+	statusFilterCondition := buildStatusFilterConditions(statusFilter)
+
 	var saleID []uuid.UUID
 	gormx.Table("sale").Select("sale.id").
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
-		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchIsStatus + "" + searchStatusPayment + "" + searchIsApproved + "").
+		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
+		Joins("left join delivery_booking_item on sale_item.sale_item = delivery_booking_item.document_ref_item").
+		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
 		Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {
 
 		var count = len(saleID)
 
-		query := gormx.Preload("SaleItem")
+		query := gormx.Preload("SaleItem.DeliveryItems").Preload("SaleDeposit")
 
 		query = query.Where("id in (?)", saleID)
 
@@ -147,15 +304,17 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
         s.customer_code, 
 		s.status_payment,
         s.total_amount,
+		s.delivery_date,
         it.id as item_id, 
         it.document_ref, 
         it.total_amount as invoice_total_amount,
 		i.invoice_code,
-		i.invoice_type
+		i.invoice_type,
+		i.total_amount as invoice_total_amount_header 
     FROM sale s
     LEFT JOIN invoice_item it ON s.sale_code = it.document_ref 
 	LEFT JOIN invoice  i  ON i.id = it.invoice_id  and (i.invoice_type = 'AR')
-		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and is_approved = true 
+		where   s.status in ('PENDING','COMPLETED') and status_payment = 'PENDING' and s.payment_method <> 'CASH' and is_approved = true 
 		%s
 		 ORDER BY s.sale_code
 	`, search)
@@ -176,9 +335,18 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 
 		idSale, _ := uuid.Parse(idStrSale)
 		// สร้าง Sale object
+		var deliveryDate *time.Time
+
+		if row["delivery_date"] != nil {
+			t := row["delivery_date"].(time.Time)
+			deliveryDate = &t
+		} else {
+			deliveryDate = nil
+		}
 		sale := models.Sale{
 			ID:            idSale,
 			SaleCode:      saleCode,
+			DeliveryDate:  deliveryDate,
 			CustomerCode:  row["customer_code"].(string),
 			TotalAmount:   row["total_amount"].(float64),
 			StatusPayment: row["status_payment"].(string),
@@ -196,11 +364,12 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 			sumInvoiceTotalAmount += row["invoice_total_amount"].(float64)
 			if row["invoice_code"] != nil {
 				invoiceItem = models.InvoiceItem{
-					ID:          id,
-					InvoiceCode: row["invoice_code"].(string),
-					DocumentRef: row["document_ref"].(string),
-					TotalAmount: row["invoice_total_amount"].(float64),
-					InvoiceType: row["invoice_type"].(string),
+					ID:                 id,
+					InvoiceCode:        row["invoice_code"].(string),
+					DocumentRef:        row["document_ref"].(string),
+					TotalAmount:        row["invoice_total_amount"].(float64),
+					InvoiceType:        row["invoice_type"].(string),
+					InvoiceTotalAmount: row["invoice_total_amount_header"].(float64),
 				}
 			}
 

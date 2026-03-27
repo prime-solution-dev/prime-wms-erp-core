@@ -46,7 +46,7 @@
           "dataMapping": "type"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 150,
           "pinned": "left",
@@ -55,7 +55,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "price_weight"
+          "dataMapping": "total_weight"
         },
         {
           "field": "market_weight",
@@ -70,7 +70,7 @@
           "dataMapping": "market_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg.kg stock",
           "width": 140,
           "pinned": "left",
@@ -79,7 +79,7 @@
           "cellStyle": {
             "textAlign": "left"
           },
-          "dataMapping": "total_net_price_weight"
+          "dataMapping": "avg_weight"
         },
         {
           "field": "is_highlight",
@@ -99,16 +99,16 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "kg_c_before_price_weight",
+              "field": "before_total_net_price_weight",
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
                 "textAlign": "left"
               },
-              "dataMapping": "before_price_weight"
+              "dataMapping": "before_total_net_price_weight"
             },
             {
-              "field": "kg_c_total_net_price_weight",
+              "field": "total_net_price_weight",
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
@@ -124,7 +124,7 @@
           "openByDefault": true,
           "children": [
             {
-              "field": "line_before_price_unit",
+              "field": "before_price_unit",
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
@@ -133,7 +133,7 @@
               "dataMapping": "before_price_unit"
             },
             {
-              "field": "line_total_net_price_unit",
+              "field": "total_net_price_unit",
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
@@ -184,6 +184,7 @@
         "line_bundle",
         "inactive",
         "market_weight",
+        "total_net_price_weight",
         "total_net_price_unit",
         "remark"
       ],
@@ -216,6 +217,28 @@
     "version": "1.0.0",
     "lastUpdated": "2025-01-23",
     "description": "Configuration for GROUP_1_ITEM_2 - Direct SubGroup rows pattern"
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_2": "BuildGroup1Item2Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
   }
 }
 

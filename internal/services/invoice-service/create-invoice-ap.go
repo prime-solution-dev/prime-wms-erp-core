@@ -112,7 +112,25 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if errmapProduct != nil {
 		return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 	}
+	mapMovingAvgCost, errGetMovingAvgCost := purchaseService.GetMovingAvgCost(productReq)
+	if errGetMovingAvgCost != nil {
+		return nil, errors.New("failed to get moving avg cost: " + errGetMovingAvgCost.Error())
+	}
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+	if errGetProductInterface != nil {
+		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+	}
+
+	prefix := "GRA"
+	configCodeValue := "RUNNING_AP"
+	count := len(req)
+	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+	if err != nil {
+		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	}
+
 	for i, invoice := range req {
+		req[i].InvoiceCode = purchaseCodes[i]
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
 			req[i].PartyBranch = supplier.Branch
@@ -135,9 +153,20 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
-				req[i].InvoiceItem[it].PriceUnit = poQTYMapResult.PriceUnit
+
+				if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
+					req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
+				} else {
+					req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
+				}
+
 				req[i].InvoiceItem[it].InvoiceUnitType = poQTYMapResult.PurchaseUnitType
-				req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
+				/* if mapProductInterface[req[i].InvoiceItem[it].ProductCode].UnitInterface != "" {
+					req[i].InvoiceItem[it].UnitUom = mapProduct[req[i].InvoiceItem[it].ProductCode].UnitInterface
+				} else {
+					req[i].InvoiceItem[it].UnitUom = poQTYMapResult.UnitUom
+				} */
+
 				req[i].InvoiceItem[it].WeightUnit = poQTYMapResult.WeightUnit
 				req[i].InvoiceItem[it].Avg_weightUnit = poQTYMapResult.WeightUnit
 				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
@@ -152,7 +181,37 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
 				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
 
-				totalAmount += req[i].InvoiceItem[it].TotalAmount
+				totalAmount += req[i].InvoiceItem[it].TotalAmount //total cost
+
+				totalBeforeDiscount := 0.0
+				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount + req[i].InvoiceItem[it].TotalDiscount
+				} else {
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent))
+				}
+				if req[i].InvoiceItem[it].UnitUom == "PC" {
+					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Qty
+				}
+				if req[i].InvoiceItem[it].UnitUom == "KG" {
+					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
+				}
+				totalDiscount := 0.0
+				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
+					totalDiscount = totalBeforeDiscount * req[i].InvoiceItem[it].TotalDiscount_percent
+				} else {
+					totalDiscount = req[i].InvoiceItem[it].TotalDiscount
+				}
+				req[i].InvoiceItem[it].TotalDiscount = totalDiscount
+
+				//movingAvgCost ใช้ เฉพาะ fab
+				if req[i].InvoiceType == "AP-FAB" {
+					if movingAvgCost, ok := mapMovingAvgCost[req[i].InvoiceItem[it].ProductCode]; ok {
+						req[i].InvoiceItem[it].PriceUnit = movingAvgCost.MA
+					}
+				}
+
+				//pc
+
 				totalVat += req[i].InvoiceItem[it].TotalVat
 				subtotalExclVat += req[i].InvoiceItem[it].SubtotalExclVat
 				totalDiscount += req[i].InvoiceItem[it].TotalDiscount
@@ -230,7 +289,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, err
 			}
 			if HookInterfaceValue != nil {
-				str, _ := HookInterfaceValue.(string)
+
+				externalID := HookInterfaceValue.(map[string]interface{})
+				str, _ := externalID["id"].(string)
 
 				invoiceValue := []models.Invoice{}
 				invoiceValue = append(invoiceValue, models.Invoice{

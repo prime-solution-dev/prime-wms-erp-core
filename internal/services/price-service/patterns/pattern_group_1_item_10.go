@@ -10,7 +10,7 @@ import (
 )
 
 func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
-	config, err := loadConfiguration(groupCode)
+	config, err := LoadConfiguration(groupCode)
 	if err != nil {
 		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
 	}
@@ -39,7 +39,7 @@ func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, grou
 	}
 
 	columns := buildDynamicColumns(pattern, allSubGroups)
-	rows := buildDynamicRows(pattern, allSubGroups)
+	rows := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rows)
 
 	sort.SliceStable(mergedRows, func(i, j int) bool {

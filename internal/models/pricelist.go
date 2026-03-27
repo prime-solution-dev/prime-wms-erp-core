@@ -58,9 +58,9 @@ type PriceListGroupTerm struct {
 	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
 	TermCode         string     `json:"term_code"`
 	Pdc              float64    `json:"pdc"`
-	PdcPercent       int        `json:"pdc_percent"`
+	PdcPercent       float64    `json:"pdc_percent"`
 	Due              float64    `json:"due"`
-	DuePercent       int        `json:"due_percent"`
+	DuePercent       float64    `json:"due_percent"`
 	CreateBy         string     `json:"create_by"`
 	CreateDtm        *time.Time `json:"create_dtm"`
 	UpdateBy         string     `json:"update_by"`
@@ -74,7 +74,7 @@ type PriceListGroupExtra struct {
 	PriceListGroupID        uuid.UUID                `json:"price_list_group_id"`
 	ExtraKey                string                   `json:"extra_key"`
 	ConditionCode           string                   `json:"condition_code"`
-	ValueInt                int                      `json:"value_int"`
+	ValueInt                float64                  `json:"value_int"`
 	LengthExtraKey          int                      `json:"length_extra_key"`
 	Operator                string                   `json:"operator"`
 	CondRangeMin            float64                  `json:"cond_range_min"`
@@ -114,6 +114,7 @@ func (PriceListExtraConfig) TableName() string { return "price_list_extra_config
 type PriceListSubGroup struct {
 	ID                        uuid.UUID              `json:"id"`
 	PriceListGroupID          uuid.UUID              `json:"price_list_group_id"`
+	SubGroupCode              string                 `json:"subgroup_code" gorm:"column:subgroup_code"`
 	SubgroupKey               string                 `json:"subgroup_key"`
 	IsTrading                 bool                   `json:"is_trading"`
 	PriceUnit                 float64                `json:"price_unit"`
@@ -222,9 +223,9 @@ type PriceListTermResponse struct {
 	TermName         string  `json:"term_name"`
 	TermType         string  `json:"term_type"`
 	Pdc              float64 `json:"pdc"`
-	PdcPercent       int     `json:"pdc_percent"`
+	PdcPercent       float64 `json:"pdc_percent"`
 	Due              float64 `json:"due"`
-	DuePercent       int     `json:"due_percent"`
+	DuePercent       float64 `json:"due_percent"`
 	CreateBy         string  `json:"create_by"`
 	CreateDtm        string  `json:"create_dtm"`
 	UpdateBy         string  `json:"update_by"`
@@ -279,9 +280,31 @@ type PriceListSubGroupKeyResponse struct {
 	Seq        int    `json:"seq"`
 }
 
+type InventoryWeightResponse struct {
+	Key               string  `json:"key"`
+	InventoryKeyCode  string  `json:"inventory_weightkey_code,omitempty"`
+	ProductCode       string  `json:"product_code"`
+	CompanyCode       string  `json:"company_code,omitempty"`
+	SiteCode          string  `json:"site_code,omitempty"`
+	BatchNo           string  `json:"batch_no"`
+	SerialCode        string  `json:"serial_code,omitempty"`
+	SupplierCode      string  `json:"supplier_code"`
+	SupplierName      string  `json:"supplier_name"`
+	AvgProduct        float64 `json:"avg_product,omitempty"`
+	AvgBatch          float64 `json:"avg_batch,omitempty"`
+	AvgSerial         float64 `json:"avg_serial,omitempty"`
+	AvgWeight         float64 `json:"avg_weight,omitempty"`
+	WeightSpec        float64 `json:"weight_spec,omitempty"`
+	SumQty            float64 `json:"sum_qty,omitempty"`
+	SumWeight         float64 `json:"sum_weight,omitempty"`
+	TotalQty          float64 `json:"total_qty,omitempty"`
+	TotalWeight       float64 `json:"total_weight,omitempty"`
+}
+
 type PriceListSubGroupResponse struct {
 	ID                        string                         `json:"id"`
 	PriceListGroupID          string                         `json:"price_list_group_id"`
+	SubgroupCode              string                         `json:"subgroup_code"`
 	SubgroupKey               string                         `json:"subgroup_key"`
 	IsTrading                 bool                           `json:"is_trading"`
 	PriceUnit                 float64                        `json:"price_unit"`
@@ -307,6 +330,12 @@ type PriceListSubGroupResponse struct {
 	UpdateDtm                 string                         `json:"update_dtm"`
 	UdfJson                   json.RawMessage                `json:"udf_json,omitempty"`
 	SubGroupKeys              []PriceListSubGroupKeyResponse `json:"sub_group_keys"`
+	InventoryWeight           []InventoryWeightResponse      `json:"inventory_weight,omitempty"`
+	SupplierCode              string                         `json:"supplier_code,omitempty"`
+	SupplierName              string                         `json:"supplier_name,omitempty"`
+	ProductCode               string                         `json:"product_code,omitempty"`
+	BatchNo                   string                         `json:"batch_no,omitempty"`
+	DefaultUom                string                         `json:"default_uom,omitempty"`
 }
 
 type GetPriceListResponse struct {
@@ -335,9 +364,9 @@ type GetPriceListResponse struct {
 type CreatePriceListGroupTermRequest struct {
 	TermCode   string  `json:"term_code"`
 	Pdc        float64 `json:"pdc"`
-	PdcPercent int     `json:"pdc_percent"`
+	PdcPercent float64 `json:"pdc_percent"`
 	Due        float64 `json:"due"`
-	DuePercent int     `json:"due_percent"`
+	DuePercent float64 `json:"due_percent"`
 }
 
 type CreatePriceListBaseRequest struct {
@@ -357,9 +386,9 @@ type UpdatePriceListGroupTermRequest struct {
 	PriceListGroupID uuid.UUID  `json:"price_list_group_id"`
 	TermCode         string     `json:"term_code"`
 	Pdc              float64    `json:"pdc"`
-	PdcPercent       int        `json:"pdc_percent"`
+	PdcPercent       float64    `json:"pdc_percent"`
 	Due              float64    `json:"due"`
-	DuePercent       int        `json:"due_percent"`
+	DuePercent       float64    `json:"due_percent"`
 	CreateBy         string     `json:"create_by"`
 	CreateDtm        *time.Time `json:"create_dtm"`
 	UpdateBy         string     `json:"update_by"`
@@ -403,8 +432,14 @@ type UpdatePriceListSubGroupRequest struct {
 	Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
 }
 
-type GetLatestPriceListSubGroupRequest struct {
-	SubGroupIDs []string `json:"subgroup_ids" binding:"required,dive,uuid4"`
+type UpdateLatestPriceListSubGroupRequest struct {
+	// UpdateType determines how the latest price list subgroup update will be performed.
+	// Allowed values:
+	// - "subgroup": update by explicit subgroup_ids (default when empty for backward compatibility)
+	// - "group"   : update all subgroups under the given group_codes
+	UpdateType  string   `json:"update_type" binding:"omitempty,oneof=subgroup group"`
+	GroupCodes  []string `json:"group_codes" binding:"omitempty,dive"`
+	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid4"`
 }
 
 type UpdatePriceListGroupExtraKeyRequest struct {
@@ -420,7 +455,7 @@ type UpdatePriceListExtraRequest struct {
 	PriceListGroupID        uuid.UUID                             `json:"price_list_group_id"`
 	ExtraKey                string                                `json:"extra_key"`
 	ConditionCode           string                                `json:"condition_code"`
-	ValueInt                int                                   `json:"value_int"`
+	ValueInt                float64                               `json:"value_int"`
 	LengthExtraKey          int                                   `json:"length_extra_key"`
 	Operator                string                                `json:"operator"`
 	CondRangeMin            float64                               `json:"cond_range_min"`
@@ -432,6 +467,7 @@ type UpdatePriceListExtraRequest struct {
 
 type PriceListFormulas struct {
 	ID          uuid.UUID       `json:"id" gorm:"primary_key;not null"`
+	FormulaCode string          `json:"formula_code" gorm:"not null"`
 	Name        string          `json:"name" gorm:"not null"`
 	Uom         string          `json:"uom" gorm:"not null"`
 	FormulaType string          `json:"formula_type" gorm:"not null"`
@@ -444,15 +480,32 @@ type PriceListFormulas struct {
 func (PriceListFormulas) TableName() string { return "price_list_formulas" }
 
 type PriceListSubGroupFormulasMap struct {
-	ID                  uuid.UUID         `json:"id" gorm:"primary_key;not null"`
-	PriceListSubGroupID uuid.UUID         `json:"price_list_sub_group_id" gorm:"not null"`
-	PriceListFormulasID uuid.UUID         `json:"price_list_formulas_id" gorm:"not null"`
-	IsDefault           bool              `json:"is_default" gorm:"default:false"`
-	CreateDtm           time.Time         `json:"create_dtm"`
-	PriceListFormulas   PriceListFormulas `gorm:"foreignKey:PriceListFormulasID;references:ID" json:"price_list_formulas"`
-	PriceListSubGroup   PriceListSubGroup `gorm:"foreignKey:PriceListSubGroupID;references:ID" json:"price_list_sub_group"`
+	ID                    uuid.UUID         `json:"id" gorm:"primary_key;not null"`
+	PriceListSubGroupCode string            `json:"price_list_subgroup_code" gorm:"not null"`
+	PriceListFormulasCode string            `json:"price_list_formulas_code" gorm:"not null"`
+	IsDefault             bool              `json:"is_default" gorm:"default:false"`
+	CreateDtm             time.Time         `json:"create_dtm"`
+	PriceListFormulas     PriceListFormulas `gorm:"foreignKey:PriceListFormulasCode;references:FormulaCode" json:"price_list_formulas"`
+	PriceListSubGroup     PriceListSubGroup `gorm:"foreignKey:PriceListSubGroupCode;references:SubgroupKey" json:"price_list_sub_group"`
 }
 
 func (PriceListSubGroupFormulasMap) TableName() string {
-	return "price_list_sub_group_formulas_map"
+	return "price_list_subgroup_formulas_map"
+}
+
+type GetCalculatedPriceListSubGroupItem struct {
+	SubGroupID                string  `json:"subgroup_id"`
+	TotalNetPriceUnit         float64 `json:"total_net_price_unit"`
+	TotalNetPriceWeight       float64 `json:"total_net_price_weight"`
+	ExtraPriceUnit            float64 `json:"extra_price_unit"`
+	ExtraPriceWeight          float64 `json:"extra_price_weight"`
+	BeforeTotalNetPriceUnit   float64 `json:"before_total_net_price_unit"`
+	BeforeTotalNetPriceWeight float64 `json:"before_total_net_price_weight"`
+	DefaultUom                string  `json:"default_uom,omitempty"`
+}
+
+type GetCalculatedPriceListSubGroupResponse struct {
+	Success bool                                 `json:"success"`
+	Message string                               `json:"message"`
+	Data    []GetCalculatedPriceListSubGroupItem `json:"data"`
 }

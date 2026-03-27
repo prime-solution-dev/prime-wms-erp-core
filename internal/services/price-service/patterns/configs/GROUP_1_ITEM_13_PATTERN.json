@@ -7,7 +7,7 @@
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PRODUCT_GROUP4|PRODUCT_GROUP3",
+        "rows": "PG04|PG03",
         "columnGroups": ""
       },
       "fixedColumns": [
@@ -31,7 +31,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_1",
+          "dataMapping": "PG01",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -45,7 +45,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_7",
+          "dataMapping": "PG07",
           "spanRows": true,
           "cellStyle": {
             "textAlign": "center",
@@ -59,7 +59,7 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_6_x_product_group_7",
+          "dataMapping": "PG06_x_PG07",
           "cellStyle": {
             "textAlign": "center"
           }
@@ -71,29 +71,29 @@
           "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
-          "dataMapping": "product_group_4_x_product_group_3",
+          "dataMapping": "PG04_x_PG03",
           "cellStyle": {
             "textAlign": "center"
           }
         },
         {
-          "field": "highlight_blue",
+          "field": "is_highlight",
           "headerName": "Highlight สีฟ้า",
           "width": 110,
           "cellRenderer": "agCheckboxCellRenderer",
           "dataMapping": "is_highlight"
         },
         {
-          "field": "weight_spec",
+          "field": "total_weight",
           "headerName": "Weight-spec",
           "width": 110,
-          "dataMapping": ""
+          "dataMapping": "total_weight"
         },
         {
-          "field": "avg_kg_stock",
+          "field": "avg_weight",
           "headerName": "Avg. kg stock",
           "width": 130,
-          "dataMapping": ""
+          "dataMapping": "avg_weight"
         },
         {
           "field": "line_bundle",
@@ -102,10 +102,10 @@
           "dataMapping": "line_bundle"
         },
         {
-          "field": "before_price_weight",
+          "field": "before_total_net_price_weight",
           "headerName": "ราคาขาย before",
           "width": 140,
-          "dataMapping": "before_price_weight"
+          "dataMapping": "before_total_net_price_weight"
         },
         {
           "field": "total_net_price_weight",
@@ -126,10 +126,10 @@
           "dataMapping": "delivery_date"
         },
         {
-          "field": "remark_next_production",
+          "field": "next_production",
           "headerName": "ผลิตงวดต่อไป SYS",
           "width": 180,
-          "dataMapping": "remark"
+          "dataMapping": "next_production"
         },
         {
           "field": "inactive",
@@ -142,14 +142,16 @@
       ],
       "columnGroups": [],
       "columns": [],
-      "applicableCategories": ["I-Beams"],
+      "applicableCategories": [
+        "I-Beams"
+      ],
       "editable_suffixes": [
         "is_highlight",
         "total_net_price_weight",
         "delivery_date",
         "line_bundle",
         "remark",
-        "remark_next_production",
+        "next_production",
         "inactive"
       ],
       "fetchable_suffixes": [
@@ -173,6 +175,42 @@
       "suppressMenuHide": false,
       "enableCellSpan": true
     }
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_13": "BuildGroup1Item13Response"
+    },
+    "defaultItemFormat": [
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
+    ]
   }
 }
-
