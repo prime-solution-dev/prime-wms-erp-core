@@ -24,6 +24,7 @@ var (
 	GET_CUSTOMER_MASTER_ENDPOINT           string
 	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT   string
 	GET_INVENTORY_BY_KEY_ENDPOINT          string
+	GET_PRODUCT_ENDPOINT                   string
 )
 
 // Initialize sets the endpoint values (call after loading .env)
@@ -39,6 +40,7 @@ func Initialize() {
 	GET_ORDER_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/GetOrdersDelivery"
 	GET_CUSTOMER_MASTER_ENDPOINT = GetBaseURL() + "/customer/Customer/GetCustomers"
 	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT = GetBaseURL() + "/warehouse/Warehouse/get-system-config"
+	GET_PRODUCT_ENDPOINT = GetBaseURL() + "/product/Product/GetProduct"
 }
 
 // HTTP Configuration
