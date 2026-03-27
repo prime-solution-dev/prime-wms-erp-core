@@ -18,7 +18,9 @@ FROM alpine:3.20
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates nano
+RUN apk add --no-cache ca-certificates nano tzdata \
+    && cp /usr/share/zoneinfo/Asia/Bangkok /etc/localtime \
+    && echo "Asia/Bangkok" > /etc/timezone
 
 COPY --from=builder /app/wms-erp-core .
 COPY --from=builder /app/.env .
