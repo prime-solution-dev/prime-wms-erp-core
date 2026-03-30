@@ -93,9 +93,11 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if resultCheckAutoApprovalRest.IsAutoApproved {
 
 			creditRequest := []models.CreditRequest{}
+			data := resultCreateApproval.(map[string]interface{})
+			ids := data["id"].([]uuid.UUID)
 			for i := range req {
 				req[i].Status = "COMPLETED"
-				req[i].ApprovalID = resultCreateApproval.([]map[string]interface{})[i]["id"].(uuid.UUID)
+				req[i].ApprovalID = ids[i]
 				creditRequest = append(creditRequest, req[i])
 			}
 			jsonDataUpdateCreditRequest, err := json.Marshal(creditRequest)
