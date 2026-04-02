@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	goodsReceiveService "prime-erp-core/external/goods-receive-service"
-	"prime-erp-core/internal/db"
-	"prime-erp-core/internal/models"
+	"sort"
 	"strings"
 	"time"
+
+	goodsReceiveService "prime-erp-core/external/goods-receive-service"
+	externalProductService "prime-erp-core/external/product-service"
+	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -26,6 +29,9 @@ type GetPurchaseItemRemainRequest struct {
 	NotPurchaseItems []NotPurchaseItem `json:"not_purchase_items,omitempty"`
 	Page             *int              `json:"page"`
 	PageSize         *int              `json:"limit"`
+	PurchaseCodeLike string            `json:"purchase_code_like,omitempty"`
+	ProductCodeLike  string            `json:"product_code_like,omitempty"`
+	ProductNameLike  string            `json:"product_name_like,omitempty"`
 }
 
 type NotPurchaseItem struct {
@@ -58,6 +64,7 @@ type GetPurchaseItemRemainResponseResult struct {
 	DocRefItem           string  `json:"doc_ref_item"`
 	ProductCode          string  `json:"product_code"`
 	ProductDesc          string  `json:"product_desc"`
+	ProductName          string  `json:"product_name"`
 	ProductGroupOneCode  string  `json:"product_group_one_code"`
 	ProductGroupOneName  string  `json:"product_group_one_name"`
 	Qty                  float64 `json:"qty"`
@@ -115,9 +122,12 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 }
 
 func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
-	res := GetPurchaseItemRemainResponse{}
+	res := GetPurchaseItemRemainResponse{
+		ResponseCode: 200,
+		Message:      "success",
+		Daatas:       []GetPurchaseItemRemainResponseResult{},
+	}
 
-	// validatetion
 	if strings.TrimSpace(req.CompanyCode) == "" {
 		return nil, fmt.Errorf("company_code is required")
 	}
@@ -132,16 +142,25 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	poItems := []string{}
 	poItemsCheck := map[string]bool{}
 
-	// fetch purchase (PENDING) - allow upstream filter if supported (cheap)
 	poMap, err := getPurchase(gormx, req)
 	if err != nil {
 		return nil, err
 	}
+
 	if len(poMap) == 0 {
+		page, pageSize, total, totalPages := buildEmptyPagination(req.Page, req.PageSize)
+		res.Page = &page
+		res.PageSize = &pageSize
+		res.Total = &total
+		res.TotalPage = &totalPages
 		return &res, nil
 	}
 
-	// Build PO codes, PO items (filtered by product if provided)
+	productMasterMap, err := getProductMasterMap(req, poMap)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, po := range poMap {
 		poCode := strings.TrimSpace(po.PurchaseCode)
 		if poCode == "" {
@@ -153,7 +172,6 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		}
 
 		for _, poi := range po.Items {
-			// If product filter present, only keep those PO items
 			if len(productSet) > 0 && !inSetTrimUpper(productSet, poi.ProductCode) {
 				continue
 			}
@@ -168,32 +186,32 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		}
 	}
 
-	// If product filter was provided but no matching PO items -> early return empty
 	if len(productSet) > 0 && len(poItems) == 0 {
-		res.Daatas = []GetPurchaseItemRemainResponseResult{}
+		page, pageSize, total, totalPages := buildEmptyPagination(req.Page, req.PageSize)
+		res.Page = &page
+		res.PageSize = &pageSize
+		res.Total = &total
+		res.TotalPage = &totalPages
 		return &res, nil
 	}
 
-	// fetch IB (PENDING) by filtered poCodes + poItems
 	ibDocMap, err := getInbound(poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
 
-	// prepare maps
 	ibCodes := []string{}
 	ibCodesCheck := map[string]bool{}
 	ibItems := []string{}
 	ibItemsCheck := map[string]bool{}
 
-	ibDocMapPo := map[string]documentData{}    // po|item -> ibQty
-	grDocMap := map[string]documentData{}      // grCode|grItem -> grUseQty + ref IB
-	grRemainMapPo := map[string]documentData{} // po|item -> (grUseQty - apMatchedBy4Key) clamp>=0
-	ignoreSourceAp := map[string]bool{}        // po|item|gr|grItem -> true when AP matched by 4-key
-	ibToPO := map[string][2]string{}           // ibCode|ibItem -> [poCode, poItem]
+	ibDocMapPo := map[string]documentData{}
+	grDocMap := map[string]documentData{}
+	grRemainMapPo := map[string]documentData{}
+	ignoreSourceAp := map[string]bool{}
+	ibToPO := map[string][2]string{}
 
 	if len(ibDocMap) > 0 {
-		// build IB lists + build IB->PO map
 		for _, ib := range ibDocMap {
 			ibCode := strings.TrimSpace(ib.DocumentCode)
 			ibItem := strings.TrimSpace(ib.DocumentItem)
@@ -219,27 +237,22 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 			}
 		}
 
-		// sum IB by PO|POItem
 		ibDocMapPo, err = ComputeSumInbound(ibDocMap)
 		if err != nil {
 			return nil, err
 		}
 
-		// fetch GR (COMPLETED)
 		grDocMap, err = getGoodsReceive(ibCodes, ibItems)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	println("in 5 : %s", time.Now().Format(time.RFC3339))
-
 	apDocMap, err := getInvoiceAp(gormx, req, poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
 
-	// compute GRDiff per PO|POItem and ignoreSourceAp
 	if len(grDocMap) > 0 {
 		grRemainMapPo, ignoreSourceAp, err = ComputeReceiveRemain(grDocMap, apDocMap, ibToPO)
 		if err != nil {
@@ -247,21 +260,24 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		}
 	}
 
-	// sum AP by PO|POItem excluding ignored 4-key
 	apDocMapPo, err := ComputeApRemain(apDocMap, ignoreSourceAp)
 	if err != nil {
 		return nil, err
 	}
 
-	// compute remainQty map (skip non-matching product items when filter exists)
 	remainMap := ComputePurchaseRemainQty(poMap, ibDocMapPo, apDocMapPo, grRemainMapPo, productSet)
 
-	// build response (filter product again for safety)
-	results, err := ConvertToResponse(poMap, remainMap, productSet)
+	results, err := ConvertToResponse(poMap, remainMap, productSet, productMasterMap)
 	if err != nil {
 		return nil, err
 	}
-	res.Daatas = results
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].PurchaseCode == results[j].PurchaseCode {
+			return results[i].PurchaseItem < results[j].PurchaseItem
+		}
+		return results[i].PurchaseCode < results[j].PurchaseCode
+	})
 
 	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
 	res.Daatas = paged
@@ -274,7 +290,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 }
 
 func ComputeSumInbound(ibDocMap map[string]documentData) (map[string]documentData, error) {
-	ibDocMapPo := map[string]documentData{} // key -> poCode|poItem
+	ibDocMapPo := map[string]documentData{}
 
 	for _, ib := range ibDocMap {
 		poCode := strings.TrimSpace(ib.DocumentRef)
@@ -302,13 +318,12 @@ func ComputeSumInbound(ibDocMap map[string]documentData) (map[string]documentDat
 func ComputeReceiveRemain(
 	grDocMap map[string]documentData,
 	apDocMap map[string]documentData,
-	ibToPO map[string][2]string, // ibCode|ibItem -> poCode|poItem
+	ibToPO map[string][2]string,
 ) (map[string]documentData, map[string]bool, error) {
 
-	rs := map[string]documentData{}     // key -> poCode|poItem (sum diff)
-	ignoreSourceAp := map[string]bool{} // key -> po|item|gr|grItem
+	rs := map[string]documentData{}
+	ignoreSourceAp := map[string]bool{}
 
-	// sum AP by 4-key (po|item|gr|grItem)
 	apBy4Key := map[string]float64{}
 	for _, ap := range apDocMap {
 		poCode := strings.TrimSpace(ap.DocumentRef)
@@ -322,7 +337,6 @@ func ComputeReceiveRemain(
 		apBy4Key[k4] += ap.Qty
 	}
 
-	// walk GR, resolve po|item via IB->PO
 	for _, gr := range grDocMap {
 		grCode := strings.TrimSpace(gr.DocumentCode)
 		grItem := strings.TrimSpace(gr.DocumentItem)
@@ -349,7 +363,7 @@ func ComputeReceiveRemain(
 
 		diff := gr.Qty - apQty
 		if diff < 0 {
-			diff = 0 // clamp: GR completed usually already goes to AP by confirm qty
+			diff = 0
 		}
 
 		poKey := fmt.Sprintf("%s|%s", poCode, poItem)
@@ -364,7 +378,6 @@ func ComputeReceiveRemain(
 		doc.Qty += diff
 		rs[poKey] = doc
 
-		// mark ignore only when AP matched by 4-key and has qty
 		if hasAP && apQty > 0 {
 			ignoreSourceAp[k4] = true
 		}
@@ -374,7 +387,7 @@ func ComputeReceiveRemain(
 }
 
 func ComputeApRemain(apDocMap map[string]documentData, ignoreSourceAp map[string]bool) (map[string]documentData, error) {
-	apDocMapPo := map[string]documentData{} // key -> poCode|poItem
+	apDocMapPo := map[string]documentData{}
 
 	for _, ap := range apDocMap {
 		poCode := strings.TrimSpace(ap.DocumentRef)
@@ -412,15 +425,13 @@ func ComputePurchaseRemainQty(
 	ibDocMapPo map[string]documentData,
 	apDocMapPo map[string]documentData,
 	grRemainMapPo map[string]documentData,
-	productSet map[string]bool, // optional
+	productSet map[string]bool,
 ) map[string]float64 {
 
-	remainMap := map[string]float64{} // key -> poCode|poItem
+	remainMap := map[string]float64{}
 
 	for poCode, po := range poMap {
 		for _, it := range po.Items {
-
-			// If product filter provided, compute only for those items
 			if len(productSet) > 0 && !inSetTrimUpper(productSet, it.ProductCode) {
 				continue
 			}
@@ -464,21 +475,30 @@ func ComputePurchaseRemainQty(
 func ConvertToResponse(
 	poMap map[string]models.PurchaseResponse,
 	remainMap map[string]float64,
-	productSet map[string]bool, // optional
+	productSet map[string]bool,
+	productMasterMap map[string]externalProductService.GetProductsComponent,
 ) ([]GetPurchaseItemRemainResponseResult, error) {
 
 	rs := []GetPurchaseItemRemainResponseResult{}
 
 	for _, po := range poMap {
 		for _, it := range po.Items {
-
-			// If product filter provided, only return those items
 			if len(productSet) > 0 && !inSetTrimUpper(productSet, it.ProductCode) {
 				continue
 			}
 
 			key := fmt.Sprintf("%s|%s", strings.TrimSpace(po.PurchaseCode), strings.TrimSpace(it.PurchaseItem))
-			remain := remainMap[key] // default 0 if not found
+			remain := remainMap[key]
+
+			productDesc := it.ProductDesc
+			productName := ""
+
+			if pm, ok := productMasterMap[strings.ToUpper(strings.TrimSpace(it.ProductCode))]; ok {
+				productName = strings.TrimSpace(pm.ProductName)
+				if productName != "" {
+					productDesc = productName
+				}
+			}
 
 			r := GetPurchaseItemRemainResponseResult{
 				PurchaseID:           po.ID,
@@ -494,7 +514,8 @@ func ConvertToResponse(
 				PurchaseItem:         it.PurchaseItem,
 				DocRefItem:           it.DocRefItem,
 				ProductCode:          it.ProductCode,
-				ProductDesc:          it.ProductDesc,
+				ProductDesc:          productDesc,
+				ProductName:          productName,
 				ProductGroupOneCode:  it.ProductGroupOneCode,
 				ProductGroupOneName:  it.ProductGroupOneName,
 				Qty:                  it.Qty,
@@ -531,19 +552,17 @@ func ConvertToResponse(
 }
 
 func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]models.PurchaseResponse, error) {
-	rs := map[string]models.PurchaseResponse{} // purchaseCode -> response
+	rs := map[string]models.PurchaseResponse{}
 
 	company := strings.TrimSpace(req.CompanyCode)
 	site := strings.TrimSpace(req.SiteCode)
 
-	// Normalize filters
 	poSet := makeStringSetTrimUpper(req.PurchaseCodes)
 	suppSet := makeStringSetTrimUpper(req.SupplierCodes)
 	prodSet := makeStringSetTrimUpper(req.ProductCodes)
 	approveSet := makeStringSetTrimUpper(req.StatusApprove)
 	paySet := makeStringSetTrimUpper(req.StattusPayment)
-	notPairs := normalizeNotPurchasePairs(req.NotPurchaseItems) // []pair{PO, Item}
-
+	notPairs := normalizeNotPurchasePairs(req.NotPurchaseItems)
 	statusSet := makeStringSetTrimUpper(req.Status)
 
 	q := gormx.Model(&models.Purchase{}).
@@ -571,21 +590,43 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		)
 	}
 
-	// Optional product filter: use EXISTS to avoid join+dup
+	if req.PurchaseCodeLike != "" {
+		q = q.Where("purchase_code ILIKE ?", "%"+req.PurchaseCodeLike+"%")
+	}
+	if req.ProductCodeLike != "" {
+		q = q.Where(`
+			EXISTS (
+				SELECT 1
+				FROM purchase_item pi
+				WHERE pi.purchase_id = purchase.id
+				  AND pi.product_code ILIKE ?
+			)
+		`, "%"+req.ProductCodeLike+"%")
+	}
+	if req.ProductNameLike != "" {
+		q = q.Where(`
+			EXISTS (
+				SELECT 1
+				FROM purchase_item pi
+				WHERE pi.purchase_id = purchase.id
+				  AND pi.product_desc ILIKE ?
+			)
+		`, "%"+req.ProductNameLike+"%")
+	}
+
 	if len(prodSet) > 0 {
 		q = q.Where(`
 			EXISTS (
 				SELECT 1
 				FROM purchase_item pi
 				WHERE pi.purchase_id = purchase.id
-				  AND UPPER(LTRIM(RTRIM(pi.product_code))) IN (?)
+				  AND UPPER(LTRIM(RTRIM(pi.product_code))) IN ?
 			)
 		`, setToSlice(prodSet))
 	}
 
 	if len(notPairs) > 0 {
-		valuesSQL, args := buildValuesPairsSQL(notPairs) // "(?,?),(?,?)", []interface{}{...}
-
+		valuesSQL, args := buildValuesPairsSQL(notPairs)
 		q = q.Where(fmt.Sprintf(`
 			EXISTS (
 				SELECT 1
@@ -674,8 +715,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		return rs, err
 	}
 
-	// build response
-	tmp := map[string]*models.PurchaseResponse{} // purchaseCode -> ptr
+	tmp := map[string]*models.PurchaseResponse{}
 
 	for _, it := range items {
 		pid := it.PurchaseID.String()
@@ -710,12 +750,12 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 }
 
 func getInbound(poCodes []string, poItems []string) (map[string]documentData, error) {
-	rs := map[string]documentData{} // inboundCode|inboundItem -> doc
+	rs := map[string]documentData{}
 
 	reqIb := goodsReceiveService.InboundFilter{
 		InboundItemDocumentRef:     poCodes,
 		InboundItemDocumentRefItem: poItems,
-		Status:                     []string{`PENDING`},
+		Status:                     []string{"PENDING"},
 	}
 
 	resIb, err := goodsReceiveService.GetInbounds(reqIb)
@@ -725,14 +765,14 @@ func getInbound(poCodes []string, poItems []string) (map[string]documentData, er
 
 	for _, ib := range resIb.InboundRes {
 		for _, ibi := range ib.InboundItemRes {
-			ibCode := ib.InboundCode
-			ibItem := ibi.InboundItem
+			ibCode := strings.TrimSpace(ib.InboundCode)
+			ibItem := strings.TrimSpace(ibi.InboundItem)
+			poCode := strings.TrimSpace(ibi.DocumentRef)
+			poItem := strings.TrimSpace(ibi.DocumentRefItem)
 
-			poCode := ibi.DocumentRef
-			poItem := ibi.DocumentRefItem
-
-			qty := ibi.Qty
-			unitCode := ibi.UnitCode
+			if ibCode == "" || ibItem == "" || poCode == "" || poItem == "" {
+				continue
+			}
 
 			key := fmt.Sprintf("%s|%s", ibCode, ibItem)
 			doc, ok := rs[key]
@@ -743,10 +783,10 @@ func getInbound(poCodes []string, poItems []string) (map[string]documentData, er
 					DocumentRef:     poCode,
 					DocumentRefItem: poItem,
 					Qty:             0,
-					UnitCode:        unitCode,
+					UnitCode:        strings.TrimSpace(ibi.UnitCode),
 				}
 			}
-			doc.Qty += qty
+			doc.Qty += ibi.Qty
 			rs[key] = doc
 		}
 	}
@@ -755,12 +795,12 @@ func getInbound(poCodes []string, poItems []string) (map[string]documentData, er
 }
 
 func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentData, error) {
-	rs := map[string]documentData{} // grCode|grItem -> doc (ref = IB)
+	rs := map[string]documentData{}
 
 	reqGr := goodsReceiveService.GoodsReceiveFilter{
 		ReferenceNo:     ibCodes,
 		DocumentRefItem: ibItems,
-		Status:          []string{`COMPLETED`},
+		Status:          []string{"COMPLETED"},
 	}
 
 	resGr, err := goodsReceiveService.GetGoodsReceives(reqGr)
@@ -770,11 +810,14 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 
 	for _, gr := range resGr.GoodsReceive {
 		for _, gri := range gr.GoodsReceiveItem {
-			grCode := gr.ReceiveCode
-			grItem := gri.ReceiveItem
-			ibCode := gr.DocumentRef
-			ibItem := gri.DocumentRefItem
-			unitCode := gri.UnitCode
+			grCode := strings.TrimSpace(gr.ReceiveCode)
+			grItem := strings.TrimSpace(gri.ReceiveItem)
+			ibCode := strings.TrimSpace(gr.DocumentRef)
+			ibItem := strings.TrimSpace(gri.DocumentRefItem)
+
+			if grCode == "" || grItem == "" || ibCode == "" || ibItem == "" {
+				continue
+			}
 
 			key := fmt.Sprintf("%s|%s", grCode, grItem)
 			doc, ok := rs[key]
@@ -785,11 +828,10 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 					DocumentRef:     ibCode,
 					DocumentRefItem: ibItem,
 					Qty:             0,
-					UnitCode:        unitCode,
+					UnitCode:        strings.TrimSpace(gri.UnitCode),
 				}
 			}
 
-			// Use min(GR Qty, GR Confirm Qty) to avoid confirm > base qty
 			grQty := gri.Qty
 			confirmQty := 0.0
 			for _, cf := range gri.GoodsReceiveConfirm {
@@ -813,7 +855,6 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 }
 
 func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []string, poItems []string) (map[string]documentData, error) {
-
 	rs := map[string]documentData{}
 
 	company := strings.TrimSpace(req.CompanyCode)
@@ -826,7 +867,10 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 	if len(poCodesNorm) == 0 {
 		return rs, nil
 	}
-	poItemsNorm := normalizeTrimUpperSlice(poItems) // optional
+	poItemsNorm := normalizeTrimUpperSlice(poItems)
+
+	poCodeSet := makeStringSetTrimUpper(poCodesNorm)
+	poItemSet := makeStringSetTrimUpper(poItemsNorm)
 
 	const chunkSize = 500
 
@@ -841,7 +885,6 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 		UnitCode        string  `gorm:"column:unit_code"`
 	}
 
-	// helper: query 1 chunk ของ poCodes
 	queryChunk := func(codeChunk []string) ([]apRow, error) {
 		q := gormx.
 			Table("invoice_item ii").
@@ -872,7 +915,6 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 		return rows, nil
 	}
 
-	// run chunks
 	for i := 0; i < len(poCodesNorm); i += chunkSize {
 		j := i + chunkSize
 		if j > len(poCodesNorm) {
@@ -888,21 +930,17 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 		for _, r := range rows {
 			invCode := strings.TrimSpace(r.InvoiceCode)
 			invItem := strings.TrimSpace(r.InvoiceItem)
-			if invCode == "" || invItem == "" {
-				continue
-			}
-			if r.Qty == 0 {
+			if invCode == "" || invItem == "" || r.Qty == 0 {
 				continue
 			}
 
 			poCode := strings.TrimSpace(r.DocumentRef)
 			poItem := strings.TrimSpace(r.DocumentRefItem)
 
-			// safety: กันหลุดกรณีมี whitespace/case
-			if len(poCodesNorm) > 0 && !inSetTrimUpper(makeStringSetTrimUpper(poCodesNorm), poCode) {
+			if len(poCodeSet) > 0 && !inSetTrimUpper(poCodeSet, poCode) {
 				continue
 			}
-			if len(poItemsNorm) > 0 && !inSetTrimUpper(makeStringSetTrimUpper(poItemsNorm), poItem) {
+			if len(poItemSet) > 0 && !inSetTrimUpper(poItemSet, poItem) {
 				continue
 			}
 
@@ -931,6 +969,77 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 	return rs, nil
 }
 
+func getProductMasterMap(
+	req GetPurchaseItemRemainRequest,
+	poMap map[string]models.PurchaseResponse,
+) (map[string]externalProductService.GetProductsComponent, error) {
+	rs := map[string]externalProductService.GetProductsComponent{}
+
+	productCodes := []string{}
+	seen := map[string]bool{}
+
+	for _, po := range poMap {
+		for _, it := range po.Items {
+			code := strings.TrimSpace(it.ProductCode)
+			if code == "" {
+				continue
+			}
+			key := strings.ToUpper(code)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			productCodes = append(productCodes, code)
+		}
+	}
+
+	if len(productCodes) == 0 {
+		return rs, nil
+	}
+
+	pageSize := len(productCodes)
+	if pageSize < 1 {
+		pageSize = 50
+	}
+
+	productRes, err := externalProductService.GetProduct(externalProductService.GetProductRequest{
+		CompanyCode: []string{strings.TrimSpace(req.CompanyCode)},
+		SiteCode:    []string{strings.TrimSpace(req.SiteCode)},
+		ProductCode: productCodes,
+		Page:        1,
+		PageSize:    pageSize,
+	})
+	if err != nil {
+		return rs, err
+	}
+
+	for _, p := range productRes.Products {
+		code := strings.TrimSpace(p.ProductCode)
+		if code == "" {
+			continue
+		}
+		rs[strings.ToUpper(code)] = p
+	}
+
+	return rs, nil
+}
+
+func buildEmptyPagination(pagePtr *int, limitPtr *int) (page int, pageSize int, total int, totalPages int) {
+	page = 1
+	pageSize = 50
+	total = 0
+	totalPages = 0
+
+	if pagePtr != nil && *pagePtr > 0 {
+		page = *pagePtr
+	}
+	if limitPtr != nil && *limitPtr > 0 {
+		pageSize = *limitPtr
+	}
+
+	return
+}
+
 func makeStringSetTrimUpper(xs []string) map[string]bool {
 	m := map[string]bool{}
 	for _, x := range xs {
@@ -945,7 +1054,7 @@ func makeStringSetTrimUpper(xs []string) map[string]bool {
 
 func inSetTrimUpper(m map[string]bool, v string) bool {
 	if len(m) == 0 {
-		return true // no filter
+		return true
 	}
 	k := strings.ToUpper(strings.TrimSpace(v))
 	if k == "" {
@@ -959,8 +1068,6 @@ func paginateResults(
 	pagePtr *int,
 	limitPtr *int,
 ) (paged []GetPurchaseItemRemainResponseResult, page int, limit int, total int, totalPages int) {
-
-	// defaults
 	page = 1
 	limit = 50
 	if pagePtr != nil && *pagePtr > 0 {
