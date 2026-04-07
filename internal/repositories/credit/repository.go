@@ -291,10 +291,11 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 		query = query.Where("temporary_increase_credit_limit::text >= ?", increaseCreditLimitLike)
 	}
 	if startDate != nil {
-		query = query.Where("effective_dtm >= '%s' ", startDate.Format("2006-01-02"))
+		query = query.Where("effective_dtm >= ?", startDate.Format("2006-01-02"))
 	}
 	if endDate != nil {
-		query = query.Where("effective_dtm <= '%s' ", endDate.Format("2006-01-02"))
+		query = query.Where("effective_dtm <= ?", endDate.Format("2006-01-02"))
+
 	}
 	if completedDateStart != nil && completedDateEnd != nil {
 		query = query.Where("update_date BETWEEN ? AND ? AND status = ?", completedDateStart, completedDateEnd, "COMPLETED")
