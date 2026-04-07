@@ -73,7 +73,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	if len(approvalValue) > 0 {
 
 		requestDataCheckAutoApprovalRest := map[string]interface{}{
-			"request_user_code": "admin",
+			"request_user_code": userID,
 			"module_code":       "CUSTOMIZE",
 			"topic_code":        "CUSTOMIZE",
 			"md_item_code":      "CTM-CTM7",
@@ -90,6 +90,8 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			return nil, errCheckAutoApprovalRest
 		}
 		resultCheckAutoApprovalRest := checkAutoApprovalRest.(*approvalService.CheckAutoApprovalResponse)
+		//mapResultCreateApproval := resultCreateApproval.(map[string]interface{})
+		//ids := mapResultCreateApproval["id"].([]uuid.UUID)
 		if resultCheckAutoApprovalRest.IsAutoApproved {
 
 			creditRequest := []models.CreditRequest{}
