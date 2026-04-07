@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
@@ -153,11 +154,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
 			poQTYMapResult, exist := poMap[keyConvert]
 			if exist {
-				if movingAvgCost, ok := mapMovingAvgCost[req[i].InvoiceItem[it].ProductCode]; ok {
-					req[i].InvoiceItem[it].PriceUnit = movingAvgCost.MA
-				} else {
-					req[i].InvoiceItem[it].PriceUnit = poQTYMapResult.PriceUnit
-				}
+
 				if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
 					req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
 				} else {
@@ -185,7 +182,37 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
 				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
 
-				totalAmount += req[i].InvoiceItem[it].TotalAmount
+				totalAmount += req[i].InvoiceItem[it].TotalAmount //total cost
+
+				totalBeforeDiscount := 0.0
+				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount + req[i].InvoiceItem[it].TotalDiscount
+				} else {
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent))
+				}
+				if req[i].InvoiceItem[it].UnitUom == "PC" {
+					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Qty
+				}
+				if req[i].InvoiceItem[it].UnitUom == "KG" {
+					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
+				}
+				totalDiscount := 0.0
+				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
+					totalDiscount = totalBeforeDiscount * req[i].InvoiceItem[it].TotalDiscount_percent
+				} else {
+					totalDiscount = req[i].InvoiceItem[it].TotalDiscount
+				}
+				req[i].InvoiceItem[it].TotalDiscount = totalDiscount
+
+				//movingAvgCost ใช้ เฉพาะ fab
+				if req[i].InvoiceType == "AP-FAB" {
+					if movingAvgCost, ok := mapMovingAvgCost[req[i].InvoiceItem[it].ProductCode]; ok {
+						req[i].InvoiceItem[it].PriceUnit = movingAvgCost.MA
+					}
+				}
+
+				//pc
+
 				totalVat += req[i].InvoiceItem[it].TotalVat
 				subtotalExclVat += req[i].InvoiceItem[it].SubtotalExclVat
 				totalDiscount += req[i].InvoiceItem[it].TotalDiscount
@@ -220,6 +247,12 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					Type:    "po",
 				})
 			} */
+
+			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
+			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
+			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
+			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
+
 		}
 		req[i].TotalAmount = totalAmount
 		req[i].TotalVat = totalVat
@@ -285,4 +318,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 
 	return toleranceErrorResponse, nil
+}
+func round2(val float64) float64 {
+	return math.Round(val*100) / 100
 }
