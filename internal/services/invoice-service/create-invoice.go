@@ -18,6 +18,11 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
+	conUserID, _ := ctx.Get("user")
+	userID := ""
+	if conUserID != nil {
+		userID = conUserID.(string)
+	}
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
 	invoiceDepositValue := []models.InvoiceDeposit{}
@@ -26,6 +31,8 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for i, invoice := range req {
 		invoiceID := uuid.New()
 		req[i].ID = invoiceID
+		req[i].CreateBy = userID
+		req[i].UpdateBy = userID
 
 		invoiceIDForReturn = append(invoiceIDForReturn, invoiceID)
 

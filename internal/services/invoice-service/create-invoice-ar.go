@@ -6,10 +6,8 @@ import (
 	"fmt"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
-	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -131,52 +129,68 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			if errCreateInvoice != nil {
 				return nil, errCreateInvoice
 			}
+			requestData := map[string]interface{}{
+				"module":    []string{"INVOICE"},
+				"topic":     []string{"DEPOSIT"},
+				"sub_topic": []string{"CREATE"},
+			}
 
-			depositMapResult, err := interfaceService.GetDeposit(str)
+			hookConfig, err := interfaceService.GetHookConfig(requestData)
 			if err != nil {
 				return nil, err
 			}
-			if len(depositMapResult) > 0 {
-				var deposit []models.Deposit
-
-				for _, v := range depositMapResult {
-					depMap, _ := v.(map[string]interface{})
-
-					totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
-					if err != nil {
-						totalFloat = 0
-					}
-					drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
-					if err != nil {
-						totalFloat = 0
-					}
-					crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
-					if err != nil {
-						totalFloat = 0
-					}
-
-					deposit = append(deposit, models.Deposit{
-						DepositCode:  depMap["anchor"].(string),
-						CustomerCode: req[0].PartyCode,
-						AmountTotal:  totalFloat,
-						AmountUsed:   drFloat,
-						AmountRemain: crFloat,
-						Status:       "PENDING",
-					})
+			if len(hookConfig) > 0 {
+				for _, hookConfigValue := range hookConfig {
+					urlHook = hookConfigValue.HookUrl
 				}
-				if len(deposit) > 0 {
-					jsonBytesCreateDeposit, err := json.Marshal(deposit)
-					if err != nil {
-						return nil, err
-					}
-
-					_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
-					if errDeposit != nil {
-						return nil, errDeposit
-					}
+				_, err := interfaceService.GetDeposits(str, urlHook)
+				if err != nil {
+					return nil, err
 				}
+				/* 	if len(depositMapResult) > 0 {
 
+					var deposit []models.Deposit
+
+					for _, v := range depositMapResult {
+						depMap, _ := v.(map[string]interface{})
+
+						totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
+						if err != nil {
+							totalFloat = 0
+						}
+						drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
+						if err != nil {
+							totalFloat = 0
+						}
+						crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
+						if err != nil {
+							totalFloat = 0
+						}
+
+						deposit = append(deposit, models.Deposit{
+							DepositCode:  depMap["anchor"].(string),
+							CustomerCode: req[0].PartyCode,
+							AmountTotal:  totalFloat,
+							AmountUsed:   drFloat,
+							AmountRemain: crFloat,
+							Status:       "PENDING",
+						})
+					}
+					if len(deposit) > 0 {
+						jsonBytesCreateDeposit, err := json.Marshal(deposit)
+						if err != nil {
+							return nil, err
+						}
+
+						_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
+						if errDeposit != nil {
+							return nil, errDeposit
+						}
+					}
+
+				} */
 			}
+
 			return createInvoiceReturn, nil
 		}
 	} else {
