@@ -20,6 +20,8 @@ type GetSaleRequest struct {
 	StatusApprove        []string    `json:"status_approve"`
 	StatusPayment        []string    `json:"status_payment"`
 	ProductCode          []string    `json:"product_code"`
+	SiteCode             []string    `json:"site_code"`
+	CompanyCode          []string    `json:"company_code"`
 	IsApproved           []bool      `json:"is_approved"`
 	IsAvailableQty       bool        `json:"is_available_qty"`
 	SaleCodeLike         string      `json:"sale_code_like"`
@@ -63,6 +65,8 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// Normal flow without qty filtering - use repository
 	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(
+		req.CompanyCode,
+		req.SiteCode,
 		req.ID,
 		req.SaleCode,
 		req.CustomerCode,
@@ -105,6 +109,8 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 	// Get all sales without pagination first
 	sale, _, _, errApproval := repositorySale.GetSalePreload(
+		req.CompanyCode,
+		req.SiteCode,
 		req.ID,
 		req.SaleCode,
 		req.CustomerCode,

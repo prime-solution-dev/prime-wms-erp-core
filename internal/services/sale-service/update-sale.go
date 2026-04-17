@@ -58,7 +58,10 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
