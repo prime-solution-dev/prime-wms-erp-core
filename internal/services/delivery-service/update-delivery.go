@@ -67,7 +67,10 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := "SYSTEM" // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -159,30 +162,37 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		return nil, err
-	}
-
 	// Check if any delivery is not a draft and was previously a draft before calling external service
+	// This must be done BEFORE committing the transaction to get the old status
 	hasNonDraftDelivery := false
+	newOrderDeliveries := []DeliveryDocumentUpdate{}    // Track deliveries that will create new orders
+	updateOrderDeliveries := []DeliveryDocumentUpdate{} // Track deliveries that need order updates only
+
 	for _, deliveryReq := range req.Deliveries {
 		if !deliveryReq.IsDraft {
-			// Check previous status from database
+			// Check previous status from database (before commit)
 			var previousDelivery models.Delivery
 			if err := gormx.Where("id = ?", deliveryReq.Delivery.ID).First(&previousDelivery).Error; err == nil {
-				// Only create order if previous status was draft (TEMP) and current is not draft
+				// If previous status was draft (TEMP) and current is not draft, create new order
 				if previousDelivery.Status == "TEMP" {
 					hasNonDraftDelivery = true
-					break
+					newOrderDeliveries = append(newOrderDeliveries, deliveryReq)
+				} else {
+					// If already non-draft, only update order
+					updateOrderDeliveries = append(updateOrderDeliveries, deliveryReq)
 				}
 			}
 		}
 	}
 
-	// Only call external service if there are non-draft deliveries
+	if err := tx.Commit().Error; err != nil {
+		return nil, err
+	}
+
+	// Only call external service if there are non-draft deliveries that need new orders
 	var orderCode string
 	if hasNonDraftDelivery {
-		orderRes, err := CreateOrderForUpdate(req.Deliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update external order: %v", err)
 		}
@@ -191,13 +201,11 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	// Call UpdateOrderByDelivery for each non-draft delivery
-	for _, deliveryReq := range req.Deliveries {
-		if !deliveryReq.IsDraft {
-			err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
-			}
+	// Call UpdateOrderByDelivery only for deliveries that need order updates (not new order creation)
+	for _, deliveryReq := range updateOrderDeliveries {
+		err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
 	}
 
@@ -315,6 +323,9 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
+	requestJSON, _ := json.MarshalIndent(createOrderRequest, "", "  ")
+	fmt.Println("CreateGoodsIssueRequest JSON:")
+	fmt.Println(string(requestJSON))
 	fmt.Println("createOrderRequest : ", createOrderRequest)
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {

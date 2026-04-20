@@ -20,6 +20,7 @@ type CreateSaleRequest struct {
 	IsVerifyExpiryDate bool   `json:"is_verify_expiry_date"` // true = verify, if not verified can't create
 	IsVerifyInventory  bool   `json:"is_verify_inventory"`
 	QuotationID        string `json:"quotation_id"`
+	User               string `json:"user"`
 	Status             string `json:"status"` // Status ที่หน้าบ้านส่งมา (APPROVED หรือ WAIT_FOR_APPROVED)
 	Sales              []SaleDocument
 }
@@ -61,10 +62,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := req.User
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 

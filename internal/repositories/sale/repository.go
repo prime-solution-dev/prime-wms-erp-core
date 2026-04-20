@@ -82,7 +82,7 @@ func buildStatusFilterConditions(statusFilters []string) string {
 }
 
 // Create
-func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -90,6 +90,27 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 	if err != nil {
 		return nil, 0, 0, err
 	}
+
+	searchCompanyCode := ""
+	if len(companyCode) > 0 {
+		quotedStrings := make([]string, len(companyCode))
+		for i, s := range companyCode {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchCompanyCode = fmt.Sprintf(` and sale.company_code IN (%s)`, whereInClause)
+	}
+
+	searchSiteCode := ""
+	if len(siteCode) > 0 {
+		quotedStrings := make([]string, len(siteCode))
+		for i, s := range siteCode {
+			quotedStrings[i] = fmt.Sprintf("'%s'", s)
+		}
+		whereInClause := strings.Join(quotedStrings, ", ")
+		searchSiteCode = fmt.Sprintf(` and sale.site_code IN (%s)`, whereInClause)
+	}
+
 	searchID := ""
 	if len(id) > 0 {
 		quotedStrings := make([]string, len(id))
@@ -236,7 +257,7 @@ func GetSalePreload(id []uuid.UUID, saleCode []string, customerCode []string, st
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
 		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
 		Joins("left join delivery_booking_item on sale_item.sale_item = delivery_booking_item.document_ref_item").
-		Where("1=1 " + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
+		Where("1=1 " + searchCompanyCode + searchSiteCode + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
 		Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {
