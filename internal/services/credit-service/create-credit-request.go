@@ -38,7 +38,8 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if req[i].RequestCode == "" {
 			req[i].RequestCode = uuid.New().String()
 		}
-
+		req[i].CreateBy = userID
+		req[i].UpdateBy = userID
 		creditRequestValue = append(creditRequestValue, req[i])
 
 		approval := models.Approval{
@@ -100,11 +101,12 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			for i := range req {
 				req[i].Status = "COMPLETED"
 				req[i].ApprovalID = ids[i]
+				req[i].UpdateBy = userID
 				creditRequest = append(creditRequest, req[i])
 			}
 			jsonDataUpdateCreditRequest, err := json.Marshal(creditRequest)
 			if err != nil {
-				errors.New("Error marshalling data :")
+				return nil, errors.New("Error marshalling data : " + err.Error())
 			}
 
 			_, errUpdateCreditRequest := UpdateCreditRequest(ctx, string(jsonDataUpdateCreditRequest))
