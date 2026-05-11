@@ -8,7 +8,7 @@ pipeline {
         TARGET_BRANCH = 'Kernel-Develop' 
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '47.128.166.228'
-        SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
+        SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.kernaluatWMS' // path ของ secret
         ENV_FILE_KEY = 'kernaluat.env.erp' 
     }
