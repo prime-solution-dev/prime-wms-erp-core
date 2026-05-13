@@ -5,12 +5,12 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Demo' 
+        TARGET_BRANCH = 'Pacifica-uat'
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '18.139.159.17'
-        SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.DemoWMS' 
-        ENV_FILE_KEY = 'Demo.env.erp' 
+        REMOTE_HOST = '13.250.141.97'                   
+        SSH_KEY_PATH = '/home/ec2-user/key/paci-uat.pem' 
+        VAULT_PATH = 'JenkinsWMS/Jenkins.PacificaUATWMS'
+        ENV_FILE_KEY = 'PacificaUAT.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -117,7 +117,6 @@ EOF
         }
     }
 }
-
 stage('Build Docker Image') {
             steps {
                 script {
@@ -180,3 +179,5 @@ stage('Clean Up Repository') {
         }
     }
 }
+
+

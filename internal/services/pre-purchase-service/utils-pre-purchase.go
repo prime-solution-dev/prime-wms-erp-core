@@ -392,8 +392,8 @@ func GetSupplierByCode(supplierReq models.GetSupplierListRequest) (map[string]mo
 	if err != nil {
 		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
 	}
-
-	getSuppliers, err := http.NewRequest("POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
+	endpoint := os.Getenv("base_url_supplier") + "/get-suppliers"
+	getSuppliers, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
@@ -409,7 +409,8 @@ func GetSupplierByCode(supplierReq models.GetSupplierListRequest) (map[string]mo
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
+
+		return nil, errors.New("received non-OK HTTP status: " + resp.Status + " " + endpoint)
 	}
 
 	supplierBody, err := io.ReadAll(resp.Body)
