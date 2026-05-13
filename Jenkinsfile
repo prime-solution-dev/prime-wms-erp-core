@@ -10,7 +10,7 @@ pipeline {
         REMOTE_HOST = '52.76.29.55'                   
         SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-uat.pem' 
         VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxUATWMS' 
-        ENV_FILE_KEY = 'PacificaUAT.env.erp'
+        ENV_FILE_KEY = 'CrossmaxUAT.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
