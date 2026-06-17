@@ -85,8 +85,12 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		/* 	jsonDataApproval, _ := json.Marshal(req[i])
 		req[i].DocumentData = jsonDataApproval */
 		req[i].ApprovalItem = []models.ApprovalItem{}
-		req[i].CreateBy = userID
-		req[i].UpdateBy = userID
+		if userID != "" {
+			req[i].CreateBy = userID
+			req[i].UpdateBy = userID
+		} else {
+			req[i].UpdateBy = req[i].CreateBy
+		}
 		approvalValue = append(approvalValue, req[i])
 	}
 
