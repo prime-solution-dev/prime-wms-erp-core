@@ -141,7 +141,7 @@ stage('Build Docker Image') {
                 script {
                     echo 'Deploying container on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
+                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
                 }
             }
         }
