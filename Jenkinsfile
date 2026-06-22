@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Kernel-Develop' 
+        TARGET_BRANCH = 'Kernel-uat' 
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '47.128.166.228'
         SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
