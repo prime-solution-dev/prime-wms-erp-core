@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115'
         CONTAINER_NAME = 'wms-authentication-core-container'
-        TARGET_BRANCH = 'Thaimetal-Develop'
+        TARGET_BRANCH = 'Thaimetal-uat'
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '18.138.69.85'
         SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
