@@ -4,11 +4,13 @@ pipeline {
         REPO_NAME = 'prime-wms-erp-core'
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115'
-        CONTAINER_NAME = 'wms-authentication-core-container'
+        CONTAINER_NAME = 'wms-erp-core-container'
         TARGET_BRANCH = 'Thaimetal-uat'
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '18.138.69.85'
         SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
+        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS' 
+        ENV_FILE_KEY = 'thaimetaluat.env.erp'
     }
 
     stages {
@@ -29,6 +31,7 @@ pipeline {
                 }
             }
         }
+
         stage('SSH to Remote Server') {
             steps {
                 script {
@@ -50,21 +53,29 @@ pipeline {
                 }
             }
         }
-        stage('Update .env with DB_PASSWORD') {
+        stage('Fetch .env from Vault (Remote)') {
     steps {
         script {
-            echo 'Updating .env file with DB_PASSWORD on remote...'
-            withCredentials([string(credentialsId: 'Jenkinsthaimetaluatserver', variable: 'DB_PASSWORD')]) {
+            echo "Fetching .env from Vault and write to remote server..."
+
+            withVault([vaultSecrets: [
+                [path: "${VAULT_PATH}",
+                 engineVersion: 2,
+                 secretValues: [
+                     [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
+                 ]
+                ]
+            ]]) {
                 sh """
-                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                "cd ${REPO_NAME} && \\
-                 if [ -f cmd/.env ]; then \\
-                     sed -i 's|\\\${DB_PASSWORD}|${DB_PASSWORD}|g' cmd/.env && \\
-                     echo '.env updated successfully!' && \\
-                     cat cmd/.env; \\
-                 else \\
-                     echo '.env file not found!'; \\
-                 fi"
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    cd ${REPO_NAME} &&
+                    mkdir -p cmd &&
+                    cat << "EOF" > cmd/.env
+${AUTHEN_ENV}
+EOF
+                    chmod 600 cmd/.env &&
+                    echo ".env written to remote ${REPO_NAME}/cmd/.env"
+                '
                 """
             }
         }
@@ -83,6 +94,24 @@ pipeline {
                     echo 'Building Docker image on remote server with updated .env...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                     'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
+                }
+            }
+        }
+                stage('Stop and Remove Old Container') {
+            steps {
+                script {
+                    echo "Stopping and removing old container on remote..."
+                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                    "docker ps -aq --filter name=${CONTAINER_NAME} | xargs -r docker stop && docker ps -aq --filter name=${CONTAINER_NAME} | xargs -r docker rm" """
+                }
+            }
+        }
+        stage('Deploy Container') {
+            steps {
+                script {
+                    echo 'Deploying container on remote...'
+                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
                 }
             }
         }
