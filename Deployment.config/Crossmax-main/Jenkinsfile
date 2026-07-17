@@ -5,12 +5,12 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Crossmax-uat'
+        TARGET_BRANCH = 'Crossmax-main'
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '13.251.183.79'                
-        SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-uat.pem' 
-        VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxUATWMS' 
-        ENV_FILE_KEY = 'CrossmaxUAT.env.erp'
+        SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-main.pem' 
+        VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxProdWMS' 
+        ENV_FILE_KEY = 'CrossmaxMain.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
