@@ -33,10 +33,6 @@ type GetHistoryRes struct {
 	EffectiveDtm        *time.Time `json:"effective_dtm"`
 	ExpireDtm           *time.Time `json:"expire_dtm"`
 	RequestDate         *time.Time `json:"request_date"`
-	CreateDtm           *time.Time `json:"create_dtm"`
-	CreateBy            string     `json:"create_by"`
-	UpdateDtm           *time.Time `json:"update_dtm"`
-	UpdateBy            string     `json:"update_by"`
 }
 type ResultHistory struct {
 	Total      int             `json:"total"`
@@ -79,10 +75,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDtm:        creditValue.EffectiveDtm,
 					ExpireDtm:           creditValue.ExpireDtm,
 					RequestDate:         creditValue.RequestDate,
-					CreateDtm:           creditValue.CreateDtm,
-					CreateBy:            creditValue.CreateBy,
-					UpdateDtm:           &creditValue.UpdateDate,
-					UpdateBy:            creditValue.UpdateBy,
 				})
 			}
 			if creditValue.RequestType == "BASE" {
@@ -101,10 +93,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDtm:    creditValue.EffectiveDtm,
 					ExpireDtm:       creditValue.ExpireDtm,
 					RequestDate:     creditValue.RequestDate,
-					CreateDtm:       creditValue.CreateDtm,
-					CreateBy:        creditValue.CreateBy,
-					UpdateDtm:       &creditValue.UpdateDate,
-					UpdateBy:        creditValue.UpdateBy,
 				})
 			}
 		} else {
@@ -124,10 +112,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDtm:        creditValue.EffectiveDtm,
 					ExpireDtm:           creditValue.ExpireDtm,
 					RequestDate:         creditValue.RequestDate,
-					CreateDtm:           creditValue.CreateDtm,
-					CreateBy:            creditValue.CreateBy,
-					UpdateDtm:           &creditValue.UpdateDate,
-					UpdateBy:            creditValue.UpdateBy,
 				}
 			}
 			if creditValue.RequestType == "BASE" {
@@ -146,10 +130,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDtm:    creditValue.EffectiveDtm,
 					ExpireDtm:       creditValue.ExpireDtm,
 					RequestDate:     creditValue.RequestDate,
-					CreateDtm:       creditValue.CreateDtm,
-					CreateBy:        creditValue.CreateBy,
-					UpdateDtm:       &creditValue.UpdateDate,
-					UpdateBy:        creditValue.UpdateBy,
 				}
 				reqCodeAmount[creditValue.CustomerCode] = GetHistoryRes{
 					ID:                  creditValue.ID,
@@ -166,10 +146,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					EffectiveDtm:        creditValue.EffectiveDtm,
 					ExpireDtm:           creditValue.ExpireDtm,
 					RequestDate:         creditValue.RequestDate,
-					CreateDtm:           creditValue.CreateDtm,
-					CreateBy:            creditValue.CreateBy,
-					UpdateDtm:           &creditValue.UpdateDate,
-					UpdateBy:            creditValue.UpdateBy,
 				}
 				reqCode = append(reqCode, creditValue.CustomerCode)
 			}
@@ -213,10 +189,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				SubmitDateTime:      creditExtraValue.CreateDtm,
 				ApproveDateTime:     creditExtraValue.ApproveDate,
 				Status:              isActive,
-				CreateDtm:           creditExtraValue.CreateDtm,
-				CreateBy:            creditExtraValue.CreateBy,
-				UpdateDtm:           &creditExtraValue.UpdateDate,
-				UpdateBy:            creditExtraValue.UpdateBy,
 			})
 
 			reqCodeAmount[creditExtraValue.CreditID.String()] = GetHistoryRes{
@@ -228,10 +200,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				SubmitDateTime:      creditExtraValue.CreateDtm,
 				ApproveDateTime:     creditExtraValue.ApproveDate,
 				Status:              isActive,
-				CreateDtm:           creditExtraValue.CreateDtm,
-				CreateBy:            creditExtraValue.CreateBy,
-				UpdateDtm:           &creditExtraValue.UpdateDate,
-				UpdateBy:            creditExtraValue.UpdateBy,
 			}
 			reqCode = append(reqCode, creditExtraValue.CreditID.String())
 
@@ -245,10 +213,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			SubmitDateTime:  creditValue.CreateDtm,
 			ApproveDateTime: creditValue.ApproveDate,
 			Status:          isActive,
-			CreateDtm:       creditValue.CreateDtm,
-			CreateBy:        creditValue.CreateBy,
-			UpdateDtm:       &creditValue.UpdateDate,
-			UpdateBy:        creditValue.UpdateBy,
 		})
 	}
 	reqCode = slices.DeleteFunc(reqCode, func(v string) bool {
@@ -288,10 +252,6 @@ func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 					SubmitDateTime:      reqCodeAmountMap.SubmitDateTime,
 					ApproveDateTime:     reqCodeAmountMap.ApproveDateTime,
 					Status:              approvalValue.Status,
-					CreateDtm:           reqCodeAmountMap.CreateDtm,
-					CreateBy:            reqCodeAmountMap.CreateBy,
-					UpdateDtm:           reqCodeAmountMap.UpdateDtm,
-					UpdateBy:            reqCodeAmountMap.UpdateBy,
 				})
 			}
 		}

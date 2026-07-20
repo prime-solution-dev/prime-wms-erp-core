@@ -186,17 +186,16 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 				totalBeforeDiscount := 0.0
 				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
-					totalBeforeDiscount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalDiscount //TotalAmount
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount + req[i].InvoiceItem[it].TotalDiscount
 				} else {
-					totalBeforeDiscount = req[i].InvoiceItem[it].SubtotalExclVat / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent)) // TotalAmount
+					totalBeforeDiscount = req[i].InvoiceItem[it].TotalAmount / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent))
 				}
-
-				if req[i].InvoiceItem[it].UnitUom == "KG" {
-					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
-				} else {
+				if req[i].InvoiceItem[it].UnitUom == "PC" {
 					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Qty
 				}
-
+				if req[i].InvoiceItem[it].UnitUom == "KG" {
+					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
+				}
 				totalDiscount := 0.0
 				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
 					totalDiscount = totalBeforeDiscount * req[i].InvoiceItem[it].TotalDiscount_percent

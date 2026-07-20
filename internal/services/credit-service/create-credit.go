@@ -17,11 +17,6 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
 	creditValue := []models.Credit{}
 	creditExtraValue := []models.CreditExtra{}
 	approvalIDForReturn := []uuid.UUID{}
@@ -89,8 +84,6 @@ func CreateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			req[i].ID = creditID
-			req[i].UpdateBy = userID
-			req[i].CreateBy = userID
 			approvalIDForReturn = append(approvalIDForReturn, creditID)
 			req[i].CreditExtra = []models.CreditExtra{}
 

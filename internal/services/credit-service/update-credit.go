@@ -16,11 +16,7 @@ func UpdateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+
 	creditValue := []models.Credit{}
 	creditExtraValue := []models.CreditExtra{}
 
@@ -28,8 +24,6 @@ func UpdateCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for o := range credit.CreditExtra {
 			creditExtraValue = append(creditExtraValue, req[i].CreditExtra[o])
 		}
-		req[i].CreateBy = userID
-		req[i].UpdateBy = userID
 		creditValue = append(creditValue, req[i])
 	}
 
