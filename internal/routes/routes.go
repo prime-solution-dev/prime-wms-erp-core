@@ -81,6 +81,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/UploadPriceList", func(c *gin.Context) {
 		utils.ProcessRequestMultiPart(c, priceService.UploadPricelistMultipart)
 	})
+	price.POST("/UploadPriceListTemplate", func(c *gin.Context) {
+		utils.ProcessRequestMultiPart(c, priceService.UploadPricelistTemplateMultipart)
+	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]
 
