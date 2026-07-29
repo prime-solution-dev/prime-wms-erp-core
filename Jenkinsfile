@@ -105,8 +105,7 @@ stage('Fetch .env from Vault (Remote)') {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
                     cd ${REPO_NAME} &&
-                    mkdir -p cmd &&
-                    cat << "EOF" > cmd/.env
+                    mkdir -p cmd
 ${AUTHEN_ENV}
 EOF
                     chmod 600 cmd/.env &&
