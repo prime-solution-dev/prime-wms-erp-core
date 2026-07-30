@@ -28,7 +28,7 @@ go.work.sum
 .env
 cmd/.env
 
-Jenkinsfile
+
 # Editor/IDE
 # .idea/
 # .vscode/
