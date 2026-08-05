@@ -1,0 +1,274 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item5_pg2_tabs_pg4_columns",
+      "name": "PG02 Tabs with PG04 Column Groups",
+      "description": "Tabs per PRODUCT_GROUP2 where each PRODUCT_GROUP4 size becomes a column group that repeats the full detail block",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG04"
+      },
+      "columns": [
+        {
+          "field": "row_number",
+          "headerName": "#",
+          "width": 70,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "thickness",
+          "headerName": "หนา",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "PG06"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "avg_weight"
+        },
+        {
+          "field": "od",
+          "headerName": "OD",
+          "width": 110,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "PG08"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "line_bundle"
+        },
+        {
+          "field": "stock",
+          "headerName": "Stock",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "stock"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 140,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 180,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 120,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "fixedColumns": [],
+      "columnGroups": [
+        {
+          "headerName": "รอผลิต",
+          "groupId": "awaiting_production",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "awaiting_production_import_date",
+              "headerName": "วัน เข้า",
+              "width": 140,
+              "dataMapping": "import_date"
+            },
+            {
+              "field": "awaiting_production_ton",
+              "headerName": "ตัน",
+              "width": 120,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "ton"
+            },
+            {
+              "field": "awaiting_production_producer",
+              "headerName": "ผู้ผลิต",
+              "width": 140,
+              "dataMapping": "producer"
+            }
+          ]
+        },
+        {
+          "headerName": "ราคา กก",
+          "groupId": "price_kg",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "before_total_net_price_weight",
+              "headerName": "ราคาขาย before",
+              "width": 160,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_total_net_price_weight"
+            },
+            {
+              "field": "total_net_price_weight",
+              "headerName": "ราคาขาย after",
+              "width": 160,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_weight"
+            }
+          ]
+        },
+        {
+          "headerName": "ราคา เส้น",
+          "groupId": "price_line",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "before_total_net_price_unit",
+              "headerName": "ราคาขาย before",
+              "width": 160,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_total_net_price_unit"
+            },
+            {
+              "field": "total_net_price_unit",
+              "headerName": "ราคาขาย after",
+              "width": 160,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_unit"
+            }
+          ]
+        },
+        {
+          "headerName": "ขาย",
+          "groupId": "selling",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "selling_fast",
+              "headerName": "เร็ว",
+              "width": 110,
+              "cellRenderer": "agCheckboxCellRenderer",
+              "dataMapping": "fast"
+            },
+            {
+              "field": "selling_slow",
+              "headerName": "ช้า",
+              "width": 110,
+              "cellRenderer": "agCheckboxCellRenderer",
+              "dataMapping": "slow"
+            }
+          ]
+        }
+      ],
+      "applicableCategories": [],
+      "editable_suffixes": [
+        "awaiting_production_import_date",
+        "awaiting_production_ton",
+        "awaiting_production_producer",
+        "is_highlight",
+        "line_bundle",
+        "total_net_price_weight",
+        "total_net_price_unit",
+        "selling_fast",
+        "selling_slow",
+        "remark",
+        "inactive"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight",
+        "total_net_price_unit"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item5_pg2_tabs_pg4_columns",
+  "tableConfig": {
+    "groupHeaderHeight": 48,
+    "headerHeight": 42,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": false
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-01-23",
+    "description": "Configuration for GROUP_1_ITEM_5 - tabs by PRODUCT_GROUP2 with PRODUCT_GROUP4 column groups"
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_5": "BuildGroup1Item5Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
+  }
+}
+

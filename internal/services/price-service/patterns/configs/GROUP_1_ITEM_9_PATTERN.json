@@ -1,0 +1,186 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group_1_item_9_default",
+      "name": "PG09 Length Matrix",
+      "description": "Single table layout for GROUP_1_ITEM_9 with PRODUCT_GROUP3 column groups and row-span columns for Product Group and Length",
+      "enabled": true,
+      "grouping": {
+        "tabs": "",
+        "rows": "PG02|PG07",
+        "columnGroups": "PG03"
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "PG02",
+          "headerName": "Product Group",
+          "width": 180,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "spanRows": true,
+          "dataMapping": "PG02",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "PG07",
+          "headerName": "ความยาว",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "spanRows": true,
+          "dataMapping": "PG07",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "PG06",
+          "headerName": "Size",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PG06",
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        }
+      ],
+      "columns": [
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 140,
+          "dataMapping": "total_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "dataMapping": "avg_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 130,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 150,
+          "dataMapping": "before_total_net_price_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 150,
+          "dataMapping": "total_net_price_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 130,
+          "dataMapping": "extra_price_weight",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "applicableCategories": [
+        "GROUP_1_ITEM_9"
+      ],
+      "editable_suffixes": [
+        "total_net_price_weight",
+        "remark",
+        "inactive"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group_1_item_9_default",
+  "tableConfig": {
+    "groupHeaderHeight": 60,
+    "headerHeight": 44,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": true,
+      "enableCellSpan": true
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-02-25",
+    "description": "Configuration for GROUP_1_ITEM_9 showing dynamic PRODUCT_GROUP3 columns with row-spanned Product Group and Length headers."
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "PG06": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_9": "BuildGroup1Item9Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
+  }
+}
+

@@ -1,0 +1,285 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group_1_item_8_default",
+      "name": "GROUP_1_ITEM_8 Ship Summary",
+      "description": "Tabular layout for GROUP_1_ITEM_8 with per-thickness summaries",
+      "enabled": true,
+      "grouping": {
+        "tabs": "",
+        "rows": "",
+        "columnGroups": ""
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "PG06",
+          "headerName": "หนา",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "spanRows": true,
+          "cellStyle": {
+            "fontWeight": "600"
+          }
+        }
+      ],
+      "columns": [
+        {
+          "field": "batch_no",
+          "headerName": "Ship No.",
+          "width": 150,
+          "dataMapping": "batch_no"
+        },
+        {
+          "field": "quantity",
+          "headerName": "ลูก",
+          "width": 80,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "stock_quantity"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 120,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra",
+          "width": 110,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "avg_weight"
+        },
+        {
+          "field": "institute",
+          "headerName": "สถาบัน",
+          "width": 140,
+          "dataMapping": "institute"
+        },
+        {
+          "field": "stock",
+          "headerName": "Stock",
+          "width": 120,
+          "dataMapping": "stock"
+        },
+        {
+          "field": "bkk",
+          "headerName": "BKK",
+          "width": 110,
+          "dataMapping": "bkk"
+        },
+        {
+          "field": "code",
+          "headerName": "Code",
+          "width": 110,
+          "dataMapping": "code"
+        },
+        {
+          "field": "supplier_name",
+          "headerName": "โรงงาน",
+          "width": 130,
+          "dataMapping": "supplier_name"
+        },
+        {
+          "field": "grade",
+          "headerName": "เกรด",
+          "width": 120,
+          "dataMapping": "PG03"
+        },
+        {
+          "field": "z_value",
+          "headerName": "Z",
+          "width": 80,
+          "dataMapping": "PG08"
+        },
+        {
+          "field": "face",
+          "headerName": "หน้า",
+          "width": 100,
+          "dataMapping": "PG05"
+        },
+        {
+          "field": "coil_id",
+          "headerName": "Coil ID",
+          "width": 140,
+          "dataMapping": "PG09"
+        },
+        {
+          "field": "country",
+          "headerName": "ปท.",
+          "width": 80,
+          "dataMapping": "country"
+        },
+        {
+          "field": "tsm",
+          "headerName": "สมอ.",
+          "width": 100,
+          "dataMapping": "tsm"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 180,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 120,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "applicableCategories": [
+        "GROUP_1_ITEM_8"
+      ],
+      "editable_suffixes": [
+        "total_net_price_weight",
+        "bkk",
+        "code",
+        "institute",
+        "country",
+        "tsm",
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "before_total_net_price_unit",
+        "total_net_price_unit",
+        "extra_price_unit"
+      ],
+      "summary": {
+        "rowGroupField": "PG06",
+        "labelField": "quantity",
+        "labelValue": "รวม",
+        "columns": [
+          {
+            "field": "quantity",
+            "aggregation": "sum",
+            "applyToColumnGroups": false
+          },
+          {
+            "field": "before_total_net_price_weight",
+            "aggregation": "sum",
+            "applyToColumnGroups": false
+          }
+        ]
+      }
+    }
+  ],
+  "defaultPattern": "pattern_group_1_item_8_default",
+  "tableConfig": {
+    "groupHeaderHeight": 32,
+    "headerHeight": 42,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": false,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "lastUpdated": "2025-02-15",
+    "description": "Base configuration for GROUP_1_ITEM_8 price list layout including summary configuration."
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup1": "PG01",
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_8": "BuildGroup1Item8Response"
+    },
+    "defaultItemFormat": [
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
+    ]
+  }
+}

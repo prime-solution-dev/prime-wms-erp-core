@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 
-	"github.com/prime-solution-dev/prime-erp-core/internal/middleware"
-	"github.com/prime-solution-dev/prime-erp-core/internal/routes"
+	"prime-erp-core/config"
+	"prime-erp-core/internal/cronjob"
+	"prime-erp-core/internal/middleware"
+	"prime-erp-core/internal/routes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -16,6 +18,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file ")
 	}
+	cronjob.AutoStartCronJobs()
+
+	// Initialize endpoint constants after loading .env
+	config.Initialize()
 
 	ginEngine := gin.Default()
 
@@ -23,7 +29,7 @@ func main() {
 
 	routes.RegisterRoutes(ginEngine)
 
-	port := "9199"
+	port := "9115"
 	log.Printf("Starting server on port %s\n", port)
 	if err := ginEngine.Run(":" + port); err != nil {
 		log.Fatalf("Could not start server: %s\n", err)

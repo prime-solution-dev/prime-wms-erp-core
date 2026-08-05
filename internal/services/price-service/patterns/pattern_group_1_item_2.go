@@ -1,0 +1,76 @@
+package patterns
+
+import (
+	"fmt"
+
+	"prime-erp-core/internal/models"
+
+	"github.com/google/uuid"
+)
+
+func BuildGroup1Item2Response(priceListData []models.GetPriceListResponse, groupCode string) (PriceListDetailApiResponse, error) {
+	fmt.Printf("[DEBUG] BuildGroup1Item2Response: Processing %d price list entries\n", len(priceListData))
+	fmt.Printf("[DEBUG] GroupCode: %s\n", groupCode)
+	fmt.Printf("[DEBUG] PriceListData: %+v\n", priceListData)
+
+	config, err := LoadConfiguration(groupCode)
+	if err != nil {
+		return PriceListDetailApiResponse{}, fmt.Errorf("load configuration for %s: %w", groupCode, err)
+	}
+
+	var pattern *PatternConfig
+	for i := range config.Patterns {
+		if config.Patterns[i].ID == config.DefaultPattern && config.Patterns[i].Enabled {
+			pattern = &config.Patterns[i]
+			break
+		}
+	}
+	if pattern == nil {
+		return PriceListDetailApiResponse{}, fmt.Errorf("no enabled pattern found for %s", groupCode)
+	}
+
+	subGroups := make([]models.PriceListSubGroupResponse, 0)
+	for _, priceList := range priceListData {
+		subGroups = append(subGroups, priceList.SubGroups...)
+	}
+
+	columns := buildFixedColumns(pattern)
+	rowData := buildDirectRows(config, pattern, subGroups)
+
+	tableData := make([]map[string]interface{}, len(rowData))
+	for i, row := range rowData {
+		tableData[i] = map[string]interface{}(row)
+	}
+
+	tab := PriceListDetailTabConfig{
+		ID:    uuid.New(),
+		Label: "หมวดเหล็กตัวซี",
+		TableConfig: TableConfig{
+			Title:             "หมวดเหล็กตัวซี",
+			GroupHeaderHeight: intPtr(config.TableConfig.GroupHeaderHeight),
+			HeaderHeight:      intPtr(config.TableConfig.HeaderHeight),
+			Pagination:        boolPtr(config.TableConfig.Pagination),
+			Toolbar: &Toolbar{
+				Show:             boolPtr(config.TableConfig.Toolbar.Show),
+				ShowSearch:       boolPtr(config.TableConfig.Toolbar.ShowSearch),
+				ShowRefresh:      boolPtr(config.TableConfig.Toolbar.ShowRefresh),
+				ShowColumnToggle: boolPtr(config.TableConfig.Toolbar.ShowColumnToggle),
+			},
+			GridOptions: &GridOptions{
+				SuppressMovableColumns: boolPtr(config.TableConfig.GridOptions.SuppressMovableColumns),
+				SuppressMenuHide:       boolPtr(config.TableConfig.GridOptions.SuppressMenuHide),
+				EnableCellSpan:         boolPtr(config.TableConfig.GridOptions.EnableCellSpan),
+			},
+			Columns: columns,
+		},
+		TableData:         tableData,
+		EditableSuffixes:  pattern.EditableSuffixes,
+		FetchableSuffixes: pattern.FetchableSuffixes,
+	}
+
+	return PriceListDetailApiResponse{
+		Id:   uuid.MustParse(priceListData[0].ID),
+		Name: "หมวดเหล็กตัวซี",
+		Tabs: []PriceListDetailTabConfig{tab},
+	}, nil
+}

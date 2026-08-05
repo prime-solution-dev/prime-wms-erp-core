@@ -1,0 +1,43 @@
+meta {
+  name: module-report-buttons
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{URL_DOCUMENT}}/action
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440011",
+    "data": {
+      "company_code": "7eb85b75-e708-4e5d-9010-4b43427c15be",
+      "site_codes": [
+        "PRM-00A"
+      ],
+      "group_codes": [
+        "GROUP_1_ITEM_1",
+        "GROUP_1_ITEM_2",
+        "GROUP_1_ITEM_3",
+        "GROUP_1_ITEM_4",
+        "GROUP_1_ITEM_5",
+        "GROUP_1_ITEM_6",
+        "GROUP_1_ITEM_7",
+        "GROUP_1_ITEM_8",
+        "GROUP_1_ITEM_9",
+        "GROUP_1_ITEM_10",
+        "GROUP_1_ITEM_11",
+        "GROUP_1_ITEM_12",
+        "GROUP_1_ITEM_13"
+      ]
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

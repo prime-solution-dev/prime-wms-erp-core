@@ -1,0 +1,398 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_g6_g3_g5",
+      "name": "PG06 | PG03 | PG05",
+      "description": "Pattern for Steel Sheet Category - Rows by thickness (G6), Columns by size (G5) with grade shown in cells",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG01",
+        "rows": "PG06",
+        "columnGroups": "PG05"
+      },
+      "columns": [
+        {
+          "field": "grade",
+          "headerName": "เกรด",
+          "width": 50,
+          "dataMapping": "PG03"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 50,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 150,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Avg.kg stock",
+          "width": 150,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 170,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 40,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "pg_06",
+          "headerName": "แผ่น mm.",
+          "width": 100,
+          "pinned": "left",
+          "lockPosition": true,
+          "spanRows": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        }
+      ],
+      "applicableCategories": ["หมวดเหล็กแผ่น"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "inactive",
+        "total_net_price_weight", 
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight",
+        "extra_price_weight"
+      ]
+    },
+    {
+      "id": "pattern_g6_g5",
+      "name": "PG06 | PG05",
+      "description": "Pattern for Patterned Steel Sheet Category - Rows by thickness (G6), Columns by size (G5)",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG05"
+      },
+      "columns": [ 
+        {
+        "field": "grade",
+        "headerName": "เกรด",
+        "width": 50,
+        "dataMapping": "PG03"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 50,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 150,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
+          "field": "pg_06",
+          "headerName": "แผ่น mm.",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "spanRows": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        }
+      ],
+      "applicableCategories": ["หมวดเหล็กแผ่นลาย"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "total_net_price_weight", 
+        "inactive",
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight",
+        "extra_price_weight"
+      ]
+    },
+    {
+      "id": "pattern_g3_g8_g5",
+      "name": "PG03 | PG08 | PG05",
+      "description": "Pattern for Special Steel Sheet - Multi-level nested groups: Grade(G3) > Size Type(G8) > Dimensions(G5) > Thickness(G6)",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG02",
+        "rows": "PG06",
+        "columnGroups": "PG03|PG08|PG05"
+      },
+      "columnLevels": [
+        {
+          "level": 1,
+          "field": "PG03",
+          "examples": ["LT", "LPN"]
+        },
+        {
+          "level": 2,
+          "field": "PG05",
+          "examples": ["3090 x 6096", "3667 x 7324", "2438 x 2448"]
+        }
+      ],
+      "columns": [
+        {
+          "field": "thickness",
+          "headerName": "หนา",
+          "width": 80,
+          "dataMapping": "PG06"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 100,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย Before",
+          "width": 130,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย After",
+          "width": 130,
+          "enableTooltip": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 100,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 170,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Avg.kg stock",
+          "width": 170,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 150,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "applicableCategories": ["เหล็กแผ่น special"],
+      "editable_suffixes": [
+        "is_highlight", 
+        "total_net_price_weight", 
+        "inactive",
+        "remark"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight",
+        "extra_price_weight"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_g6_g5",
+  "tableConfig": {
+    "groupHeaderHeight": 40,
+    "headerHeight": 50,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": false,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  },
+  "metadata": {
+    "version": "2.0.0",
+    "lastUpdated": "2025-01-23",
+    "description": "Configuration for price table patterns - supports multiple patterns for different product categories including multi-level nested column groups"
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_1": "BuildGroup1Item1Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
+  }
+}

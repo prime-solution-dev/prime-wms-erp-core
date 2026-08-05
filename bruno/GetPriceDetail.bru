@@ -1,0 +1,29 @@
+meta {
+  name: GetPriceDetail
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{URL_ERP}}/GetPriceDetail
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "company_code": "09dcb573-c95d-4dc1-9a1e-c478cdbfc1c3",
+    "site_codes": [
+      "TMI_WH"
+    ],
+    "group_codes": [
+      "GROUP_1_ITEM_4"
+    ],
+    "sub_group_codes": []
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

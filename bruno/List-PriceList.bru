@@ -1,0 +1,33 @@
+meta {
+  name: List-PriceList
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{URL_ERP}}/GetPriceListGroup
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "company_code": "7eb85b75-e708-4e5d-9010-4b43427c15be",
+    "site_codes": [
+      "PRM-00A"
+    ],
+    "group_codes": [
+      "GROUP_1_ITEM_1"
+    ],
+    "sub_group_codes": []
+  }
+}
+
+settings {
+  encodeUrl: false
+  timeout: 0
+}

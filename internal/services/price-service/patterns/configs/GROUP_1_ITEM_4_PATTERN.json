@@ -1,0 +1,266 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item4_pg2_tabs",
+      "name": "PRODUCT_GROUP2 Tabs Layout",
+      "description": "Multi-tab layout for GROUP_1_ITEM_4 grouped by PRODUCT_GROUP2 with row-spanning Size column",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG02",
+        "rows": "",
+        "columnGroups": ""
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 60,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "size",
+          "headerName": "Size",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PG04_x_PG07",
+          "spanRows": true,
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "600"
+          }
+        },
+        {
+          "field": "thickness",
+          "headerName": "หนา",
+          "width": 110,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PG06",
+          "cellStyle": {
+            "textAlign": "center"
+          }
+        },
+        {
+          "field": "spec",
+          "headerName": "spec",
+          "width": 120,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PG03"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 100,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg stock",
+          "width": 80,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "avg_weight"
+        },
+        {
+          "field": "market_weight",
+          "headerName": "น.น ตลาด",
+          "width": 80,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "market_weight"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 80,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 140,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 140,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellStyle": {
+            "textAlign": "left"
+          },
+          "dataMapping": "line_bundle"
+        },
+        {
+          "field": "remark",
+          "headerName": "หมายเหตุ",
+          "width": 120,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "remark"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 120,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "columnGroups": [
+        {
+          "headerName": "กก.(C)",
+          "groupId": "price_kg",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "before_total_net_price_weight",
+              "headerName": "ราคาขาย before",
+              "width": 450,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_total_net_price_weight"
+            },
+            {
+              "field": "total_net_price_weight",
+              "headerName": "ราคาขาย after",
+              "width": 450,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_weight"
+            }
+          ]
+        },
+        {
+          "headerName": "เส้น",
+          "groupId": "price_line",
+          "openByDefault": true,
+          "children": [
+            {
+              "field": "before_total_net_price_unit",
+              "headerName": "ราคาขาย before",
+              "width": 450,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "before_total_net_price_unit"
+            },
+            {
+              "field": "total_net_price_unit",
+              "headerName": "ราคาขาย after",
+              "width": 450,
+              "cellStyle": {
+                "textAlign": "left"
+              },
+              "dataMapping": "total_net_price_unit"
+            }
+          ]
+        }
+      ],
+      "columns": [],
+      "applicableCategories": [
+        "ท่อเหลี่ยม",
+        "ท่อแบน",
+        "ท่อดำ"
+      ],
+      "editable_suffixes": [
+        "is_highlight",
+        "line_bundle",
+        "total_net_price_weight",
+        "total_net_price_unit",
+        "remark",
+        "inactive",
+        "market_weight"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight",
+        "total_net_price_unit"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item4_pg2_tabs",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,  
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": false,
+      "enableCellSpan": true
+    }
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_4": "BuildGroup1Item4Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
+  }
+}
+

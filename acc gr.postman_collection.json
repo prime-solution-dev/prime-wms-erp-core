@@ -1,0 +1,98 @@
+{
+	"info": {
+		"_postman_id": "0f6d8924-1aad-488b-a9fd-a3f33127d60b",
+		"name": "acc gr",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43625603",
+		"_collection_link": "https://champ-5741577.postman.co/workspace/champ's-Workspace~651e3d54-90af-43c7-838e-71a7da293ab7/collection/43625603-0f6d8924-1aad-488b-a9fd-a3f33127d60b?action=share&source=collection_link&creator=43625603"
+	},
+	"item": [
+		{
+			"name": "GetInvoice",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/invoice/GetInvoice",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"invoice",
+						"GetInvoice"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateInvoice",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n    \t  \r\n\t\"invoice_ref\":\"\",\r\n\t\"invoice_type\":\"inv-001\",\r\n\t\"document_ref_type\":\"GR\",\r\n\t\"document_ref\":\"GR-001\",\r\n\t\"credit_term_day\":3,\r\n\t\"payment_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"document_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"tax_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"tax_invoice\":\"\",\r\n\t\"party_type\":\"SUPPLIER\",\r\n\t\"party_code\":\"SUP-001\",\r\n\t\"due_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"total_amount\":0,\r\n\t\"total_vat\":0,\r\n\t\"status\":\"PENDING\",\r\n\t\"remark\":\"\",\r\n\t\"invoice_item\":[{\r\n        \"invoice_item\":\"1\", \r\n\t \"invoice_qty\":0,\r\n\t \"invoice_unit\":\"\",\r\n\t \"invoice_unit_type\":\"\",\r\n\t \"product_code\":\"P-001\",\r\n\t \"qty\":1,\r\n\t \"unit_code\":\"unit\",\r\n\t \"price_unit\":0,\r\n\t \"unit_uom\":\"\",\r\n\t \"weight_unit\":1,\r\n\t \"avg_weight_unit\":1,\r\n\t \"total_weight\":1,\r\n\t \"total_discount\":1,\r\n\t \"total_discount_percent\":1,\r\n\t \"document_ref_type\":\"PO\",\r\n\t \"document_ref\":\"PO-001\",\r\n\t \"document_ref_item\":\"PO-ITEM-1\",\r\n\t \"source_type\":\"GR\",\r\n\t \"source_code\":\"GR-code\",\r\n\t \"source_item\":\"GR-item\",\r\n\t \"total_amount\":1,\r\n\t \"total_vat\":1,\r\n\t \"status\":\"PENDING\",\r\n\t \"remark\":\"\"\r\n    }] \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/invoice/CreateInvoice",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"invoice",
+						"CreateInvoice"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "UpdateInvoice",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "[{\r\n    \"id\":\"b65d075b-766b-4f2c-948b-c5a39e30c54e\",\t  \r\n\t\"invoice_ref\":\"\",\r\n\t\"invoice_type\":\"inv-0023\",\r\n\t\"document_ref_type\":\"GR\",\r\n\t\"document_ref\":\"GR-001\",\r\n\t\"credit_term_day\":3,\r\n\t\"payment_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"document_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"tax_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"tax_invoice\":\"\",\r\n\t\"party_type\":\"SUPPLIER\",\r\n\t\"party_code\":\"SUP-001\",\r\n\t\"due_date\":\"2025-01-27T10:17:46.43Z\",\r\n\t\"total_amount\":0,\r\n\t\"total_vat\":0,\r\n\t\"status\":\"PENDING\",\r\n\t\"remark\":\"\",\r\n\t\"invoice_item\":[{\r\n        \"id\":\"77104a7b-e046-4e3d-8065-0ce91a5ad2e0\",\r\n        \"invoice_item\":\"1\", \r\n\t \"invoice_qty\":0,\r\n\t \"invoice_unit\":\"\",\r\n\t \"invoice_unit_type\":\"\",\r\n\t \"product_code\":\"P-001\",\r\n\t \"qty\":1,\r\n\t \"unit_code\":\"unit\",\r\n\t \"price_unit\":0,\r\n\t \"unit_uom\":\"\",\r\n\t \"weight_unit\":1,\r\n\t \"avg_weight_unit\":1,\r\n\t \"total_weight\":1,\r\n\t \"total_discount\":1,\r\n\t \"total_discount_percent\":1,\r\n\t \"document_ref_type\":\"PO\",\r\n\t \"document_ref\":\"PO-001\",\r\n\t \"document_ref_item\":\"PO-ITEM-1\",\r\n\t \"source_type\":\"GR\",\r\n\t \"source_code\":\"GR-code\",\r\n\t \"source_item\":\"GR-item\",\r\n\t \"total_amount\":1,\r\n\t \"total_vat\":1,\r\n\t \"status\":\"PENDING\",\r\n\t \"remark\":\"\"\r\n    }] \r\n}]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:9115/invoice/UpdateInvoice",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "9115",
+					"path": [
+						"invoice",
+						"UpdateInvoice"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,193 @@
+{
+  "patterns": [
+    {
+      "id": "pattern_group1_item6_pg2_tabs",
+      "name": "เหล็กฉาก / รางน้ำ",
+      "description": "Fixed-column layout grouped by PG02 with listing, pricing, and logistics fields",
+      "enabled": true,
+      "grouping": {
+        "tabs": "PG02",
+        "rows": "",
+        "columnGroups": ""
+      },
+      "fixedColumns": [
+        {
+          "field": "#",
+          "headerName": "#",
+          "width": 70,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "valueGetter": "node.rowIndex + 1",
+          "cellStyle": {
+            "textAlign": "center",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "field": "item",
+          "headerName": "รายการ",
+          "width": 180,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "item"
+        },
+        {
+          "field": "brand",
+          "headerName": "ยี่ห้อ",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "PG03"
+        },
+        {
+          "field": "total_weight",
+          "headerName": "Weight-spec",
+          "width": 130,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "total_weight"
+        },
+        {
+          "field": "avg_weight",
+          "headerName": "Avg.kg stock",
+          "width": 140,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "dataMapping": "avg_weight"
+        },
+        {
+          "field": "is_highlight",
+          "headerName": "Highlight สีฟ้า",
+          "width": 150,
+          "pinned": "left",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "is_highlight"
+        },
+        {
+          "field": "before_total_net_price_weight",
+          "headerName": "ราคาขาย before",
+          "width": 160,
+          "dataMapping": "before_total_net_price_weight"
+        },
+        {
+          "field": "total_net_price_weight",
+          "headerName": "ราคาขาย after",
+          "width": 160,
+          "dataMapping": "total_net_price_weight"
+        },
+        {
+          "field": "extra_price_weight",
+          "headerName": "Extra (THB)",
+          "width": 140,
+          "dataMapping": "extra_price_weight"
+        },
+        {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 130,
+          "dataMapping": "line_bundle"
+        },
+        {
+          "field": "delivery_date",
+          "headerName": "ส่งมอบ ว/ด/ป",
+          "width": 150,
+          "dataMapping": "delivery_date"
+        },
+        {
+          "field": "ton",
+          "headerName": "จำนวนตัน",
+          "width": 130,
+          "dataMapping": "ton"
+        },
+        {
+          "field": "inactive",
+          "headerName": "Inactive",
+          "width": 110,
+          "pinned": "right",
+          "lockPosition": true,
+          "suppressMovable": true,
+          "cellRenderer": "agCheckboxCellRenderer",
+          "dataMapping": "inactive",
+          "hide": true
+        }
+      ],
+      "columnGroups": [],
+      "columns": [],
+      "itemFormat": [
+        {
+          "type": "group",
+          "value": "PG04"
+        },
+        {
+          "type": "literal",
+          "value": "x"
+        },
+        {
+          "type": "group",
+          "value": "PG07"
+        }
+      ],
+      "applicableCategories": [
+        "เหล็กฉาก",
+        "รางน้ำ"
+      ],
+      "editable_suffixes": [
+        "is_highlight",
+        "line_bundle",
+        "total_net_price_weight",
+        "delivery_date",
+        "ton",
+        "inactive"
+      ],
+      "fetchable_suffixes": [
+        "total_net_price_weight"
+      ]
+    }
+  ],
+  "defaultPattern": "pattern_group1_item6_pg2_tabs",
+  "tableConfig": {
+    "groupHeaderHeight": 50,
+    "headerHeight": 40,
+    "pagination": false,
+    "toolbar": {
+      "show": true,
+      "showSearch": false,
+      "showRefresh": false,
+      "showColumnToggle": false
+    },
+    "gridOptions": {
+      "suppressMovableColumns": true,
+      "suppressMenuHide": false
+    }
+  },
+  "valueMappings": {
+    "groupCodeMappings": {
+      "productGroup2": "PG02",
+      "productGroup6": "PG06",
+      "productGroup7": "PG07",
+      "productGroup5": "PG05",
+      "productGroup3": "PG03",
+      "productGroup4": "PG04",
+      "productGroup9": "PG09",
+      "type": "PG09"
+    },
+    "handlerMappings": {
+      "GROUP_1_ITEM_6": "BuildGroup1Item6Response"
+    },
+    "defaultItemFormat": [
+      {"type": "group", "value": "PG04"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG06"},
+      {"type": "literal", "value": "x"},
+      {"type": "group", "value": "PG07"}
+    ]
+  }
+}
+
