@@ -44,7 +44,7 @@ pipeline {
                     echo "Cloning or updating repository branch: ${TARGET_BRANCH} on remote server..."
                     withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
                         sh """ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                        'git clone -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
+                        'time git clone --depth 1 -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
                         (cd ${REPO_NAME} && git fetch && git checkout ${TARGET_BRANCH} && git pull origin ${TARGET_BRANCH})'"""
                     }
                     echo 'Repository cloned/updated successfully on remote!'
