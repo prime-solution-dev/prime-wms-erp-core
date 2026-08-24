@@ -116,6 +116,24 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// กันจองเกินจำนวนใน sale order โดยไม่นับจำนวนของใบที่กำลังแก้ซ้ำเข้าไปเอง
+	bookingLines := []bookingLine{}
+	editingDeliveryCodes := []string{}
+	for _, deliveryReq := range req.Deliveries {
+		editingDeliveryCodes = append(editingDeliveryCodes, deliveryReq.DeliveryCode)
+		for _, item := range deliveryReq.Items {
+			bookingLines = append(bookingLines, bookingLine{
+				SaleCode:        deliveryReq.DocumentRef,
+				DocumentRefItem: item.DeliveryItem.DocumentRefItem,
+				ProductCode:     item.DeliveryItem.ProductCode,
+				Qty:             item.DeliveryItem.Qty,
+			})
+		}
+	}
+	if err := ValidateBookingQty(gormx, bookingLines, editingDeliveryCodes); err != nil {
+		return nil, err
+	}
+
 	tx := gormx.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error

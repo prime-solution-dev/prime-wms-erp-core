@@ -71,6 +71,22 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
+	// กันจองเกินจำนวนใน sale order ก่อนแตะอะไรทั้งนั้น (ทั้ง DB และ hook ภายนอก)
+	bookingLines := []bookingLine{}
+	for _, deliveryReq := range req {
+		for _, item := range deliveryReq.DeliveryItems {
+			bookingLines = append(bookingLines, bookingLine{
+				SaleCode:        deliveryReq.DocumentRef,
+				DocumentRefItem: item.DocumentRefItem,
+				ProductCode:     item.ProductCode,
+				Qty:             item.Qty,
+			})
+		}
+	}
+	if err := ValidateBookingQty(gormx, bookingLines, nil); err != nil {
+		return nil, err
+	}
+
 	tx := gormx.Begin()
 	if tx.Error != nil {
 		return nil, tx.Error
