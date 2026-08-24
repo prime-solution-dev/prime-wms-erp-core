@@ -60,9 +60,6 @@ type VerifyApproveItem struct {
 	//Option
 	TransportCostUnit       *float64 `json:"transport_cost_unit"`
 	TransportCostUnitWeight *float64 `json:"transport_cost_unit_weight"`
-
-	//Result
-	InventoryCalculation *VerifyInventoryCalculation `json:"inventory_calculation,omitempty"`
 }
 
 type VerifyApproveResponse struct {
@@ -328,50 +325,9 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		}
 
 		res.InventoryCalculations = append(res.InventoryCalculations, invenRes.InventoryCalculations...)
-		applyInventoryCalculationsToDocuments(&res, invenRes.InventoryCalculations)
 	} else {
 		res.IsPassInventory = true
 	}
 
 	return &res, nil
-}
-
-func applyInventoryCalculationsToDocuments(res *VerifyApproveResponse, calculations []VerifyInventoryCalculation) {
-	remainByProduct := map[string]float64{}
-	for _, calculation := range calculations {
-		remainByProduct[calculation.ProductCode] = calculation.AvailableQty
-	}
-
-	for docIndex := range res.Documents {
-		res.Documents[docIndex].IsPassInventory = true
-
-		for itemIndex := range res.Documents[docIndex].Items {
-			item := res.Documents[docIndex].Items[itemIndex]
-			available := remainByProduct[item.ProductCode]
-			allocated := minFloat(item.Qty, available)
-			remain := available - allocated
-			shortage := maxFloat(item.Qty-available, 0)
-			isPass := shortage == 0
-
-			inventoryCalculation := VerifyInventoryCalculation{
-				Subject:      "inventory",
-				DocRef:       res.Documents[docIndex].DocRef,
-				ItemRef:      item.ItemRef,
-				ProductCode:  item.ProductCode,
-				NeedQty:      item.Qty,
-				AvailableQty: available,
-				AllocatedQty: allocated,
-				RemainQty:    remain,
-				ShortageQty:  shortage,
-				IsPass:       isPass,
-			}
-
-			res.Documents[docIndex].Items[itemIndex].InventoryCalculation = &inventoryCalculation
-			remainByProduct[item.ProductCode] = remain
-
-			if !isPass {
-				res.Documents[docIndex].IsPassInventory = false
-			}
-		}
-	}
 }

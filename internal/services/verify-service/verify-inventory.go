@@ -41,8 +41,6 @@ type VerifyInventoryProductAtp struct {
 
 type VerifyInventoryCalculation struct {
 	Subject      string  `json:"subject"`
-	DocRef       string  `json:"doc_ref,omitempty"`
-	ItemRef      string  `json:"item_ref,omitempty"`
 	ProductCode  string  `json:"product_code"`
 	NeedQty      float64 `json:"need_qty"`
 	AvailableQty float64 `json:"available_qty"`
