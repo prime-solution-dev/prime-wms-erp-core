@@ -48,6 +48,15 @@ type ValidateSaleResponse struct {
 	IsPassInventory  bool   `json:"is_pass_inventory"`
 	IsPassExpiryDate bool   `json:"is_pass_expiry_date"`
 	Message          string `json:"message"` // ข้อความอธิบายผลลัพธ์
+
+	// ยอดเครดิตคงเหลือของลูกค้า สำหรับโชว์ "( Balance : x )" ข้างผล Credit limit
+	// nil เมื่อ is_verify_credit = false (เช่น จ่ายเงินสด) เพราะ VerifyApproveLogic ไม่คำนวณให้
+	CreditCalculation *verifyService.VerifyCreditCalculation `json:"credit_calculation,omitempty"`
+	// ผล ATP รายสินค้า สำหรับโชว์ ATP คงเหลือใต้ qty ของ item ที่ is_pass = false
+	// รวม qty ตาม product_code แล้ว 1 product = 1 แถว (VerifyApproveLogic:200-213)
+	InventoryCalculations []verifyService.VerifyInventoryCalculation `json:"inventory_calculations"`
+	// ผลดิบทั้งก้อนจาก VerifyApproveLogic เผื่อหน้าจอต้องใช้ field อื่นเพิ่ม
+	VerifyResult *verifyService.VerifyApproveResponse `json:"verify_result,omitempty"`
 }
 
 // ValidateSale - ตรวจสอบเงื่อนไขการสร้าง Sale Order โดยไม่สร้างข้อมูลจริง
@@ -148,14 +157,24 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			message = "สามารถสร้าง SO ได้ แต่ต้องรออนุมัติเนื่องจากราคาไม่ผ่าน หรือสามารถกลับไปแก้ไข Quotation"
 		}
 
+		// เอกสารถูกสร้างแบบ 1 doc ต่อ 1 company|site (DocRef = TEMP_<company>_<site>)
+		// จึงอ่านเครดิตจาก doc ตัวแรกได้
+		var creditCalculation *verifyService.VerifyCreditCalculation
+		if len(verifyRes.Documents) > 0 {
+			creditCalculation = verifyRes.Documents[0].CreditCalculation
+		}
+
 		responses = append(responses, ValidateSaleResponse{
-			CanCreateSO:      canCreateSO,
-			RecommendStatus:  recommendStatus,
-			IsPassPrice:      verifyRes.IsPassPrice,
-			IsPassCredit:     verifyRes.IsPassCredit,
-			IsPassInventory:  verifyRes.IsPassInventory,
-			IsPassExpiryDate: verifyRes.IsPassExpiryPrice,
-			Message:          message,
+			CanCreateSO:           canCreateSO,
+			RecommendStatus:       recommendStatus,
+			IsPassPrice:           verifyRes.IsPassPrice,
+			IsPassCredit:          verifyRes.IsPassCredit,
+			IsPassInventory:       verifyRes.IsPassInventory,
+			IsPassExpiryDate:      verifyRes.IsPassExpiryPrice,
+			Message:               message,
+			CreditCalculation:     creditCalculation,
+			InventoryCalculations: verifyRes.InventoryCalculations,
+			VerifyResult:          verifyRes,
 		})
 	}
 
