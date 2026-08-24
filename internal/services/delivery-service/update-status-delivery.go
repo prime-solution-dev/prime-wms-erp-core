@@ -65,9 +65,52 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		deliveryOf[delivery.DeliveryCode] = delivery
 	}
 
+	// เดิมไม่เช็คสถานะเดิมเลย สั่งซ้ำกี่รอบก็ยิง WMS ซ้ำทุกรอบ
+	//
+	// ใบที่อยู่สถานะปลายทางอยู่แล้วให้ "ข้าม" ไม่ใช่ทำให้ทั้ง request พัง เพราะ endpoint นี้
+	// รับได้หลายใบต่อครั้งและ status ว่างจะ default เป็น COMPLETED ซึ่งเป็นรูปแบบของ callback
+	// ที่ยิงซ้ำได้ ใบเดียวที่ซ้ำจึงไม่ควรทำให้อีกเก้าใบไม่ถูกอัปเดต
+	toUpdate := []string{}
 	for _, deliveryCode := range req.DeliveryCodes {
-		if _, found := deliveryOf[deliveryCode]; !found {
+		delivery, found := deliveryOf[deliveryCode]
+		if !found {
 			return nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
+		}
+
+		if delivery.Status == req.Status {
+			res = append(res, UpdateStatusDeliveryResponse{
+				DeliveryCode: deliveryCode,
+				Status:       "success",
+				Message:      fmt.Sprintf("Delivery is already %s", req.Status),
+			})
+			continue
+		}
+
+		// ยกเลิกไปแล้วย้อนกลับไม่ได้
+		if delivery.Status == "CANCELED" {
+			return nil, fmt.Errorf("delivery %s is already canceled", deliveryCode)
+		}
+
+		toUpdate = append(toUpdate, deliveryCode)
+	}
+
+	if len(toUpdate) == 0 {
+		return res, nil
+	}
+
+	// ห้ามยกเลิกใบที่คลังหยิบไปทำงานแล้ว หน้าจอปิดปุ่มด้วย isCreateOutbound อยู่แล้ว
+	// แต่ฝั่ง server ไม่เคยบังคับ ยิง API ตรงหรือแข่งจังหวะกันก็ผ่าน
+	if req.Status == "CANCELED" {
+		started, err := deliveriesWithOutbound(toUpdate)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, deliveryCode := range toUpdate {
+			if started[deliveryCode] {
+				return nil, fmt.Errorf(
+					"delivery %s is already being processed in the warehouse and cannot be canceled", deliveryCode)
+			}
 		}
 	}
 
@@ -77,7 +120,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	// แต่ใบแรกๆ ถูกยกเลิกที่ WMS ไปแล้วและไม่มีอะไรย้อนคืน ย้ายมาไว้ก่อนเปิด tx
 	// ทำให้พังตรงไหนก็ตาม ERP ยังไม่ถูกแตะเลย ผู้ใช้กดยกเลิกซ้ำได้
 	if req.Status == "CANCELED" {
-		for _, deliveryCode := range req.DeliveryCodes {
+		for _, deliveryCode := range toUpdate {
 			if _, err := CancelOrder(deliveryOf[deliveryCode]); err != nil {
 				return nil, fmt.Errorf("failed to cancel order for delivery %s: %v", deliveryCode, err)
 			}
@@ -94,7 +137,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		}
 	}()
 
-	for _, deliveryCode := range req.DeliveryCodes {
+	for _, deliveryCode := range toUpdate {
 		delivery := deliveryOf[deliveryCode]
 
 		result := tx.Model(&models.Delivery{}).
@@ -156,4 +199,28 @@ func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResp
 	fmt.Println("cancelOrderResponse : ", cancelOrderResponse)
 
 	return cancelOrderResponse, nil
+}
+
+// deliveriesWithOutbound ถาม WMS ว่าใบไหนถูกสร้าง outbound ไปแล้วบ้าง
+// ใช้กันไม่ให้ยกเลิกใบที่คลังเริ่มทำงานไปแล้ว
+func deliveriesWithOutbound(deliveryCodes []string) (map[string]bool, error) {
+	started := map[string]bool{}
+
+	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+		DeliveryCode: deliveryCodes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read warehouse progress before cancelling: %v", err)
+	}
+
+	for _, order := range orderRes.Orders {
+		for _, orderItem := range order.OrderItem {
+			if len(orderItem.OutboundItem) > 0 {
+				started[order.DocumentRef] = true
+				break
+			}
+		}
+	}
+
+	return started, nil
 }
