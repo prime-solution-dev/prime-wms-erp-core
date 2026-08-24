@@ -240,23 +240,31 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
+
+	// deliveryItemToAdd เป็น list แบนรวมทุกใบ ต้องจัดกลุ่มตาม delivery_id ก่อน
+	// ไม่งั้นการหาแบบ DocumentRefItem + ProductCode จะไปเจอ item ของ "ใบอื่น"
+	// (ที่นี่ใช้ index เทียบไม่ได้ เพราะ req ถูกกรองมาแล้วไม่ตรงกับ deliveryToAdd)
+	itemsOfDelivery := map[uuid.UUID][]models.DeliveryItem{}
+	for _, di := range deliveryItemToAdd {
+		itemsOfDelivery[di.DeliveryID] = append(itemsOfDelivery[di.DeliveryID], di)
+	}
+
 	for _, deliveryReq := range req {
 		// Skip draft deliveries
 		if deliveryReq.IsDraft {
 			continue
 		}
 
+		srcItems := itemsOfDelivery[deliveryReq.ID]
+
 		createOrderItemDetail := []orderExternalService.CreateOrderItemDetail{}
-		for _, item := range deliveryReq.Items {
-			// find corresponding DeliveryItem from deliveryItemToAdd (match by DocumentRefItem + ProductCode)
-			var srcItem *models.DeliveryItem
-			for i := range deliveryItemToAdd {
-				di := &deliveryItemToAdd[i]
-				if di.DocumentRefItem == item.DocumentRefItem && di.ProductCode == item.ProductCode {
-					srcItem = di
-					break
-				}
+		for itemNum, item := range deliveryReq.Items {
+			if itemNum >= len(srcItems) {
+				return orderExternalService.CreateOrderResponse{}, fmt.Errorf(
+					"delivery %s item %d was not prepared for update", deliveryReq.DeliveryCode, itemNum)
 			}
+
+			srcItem := srcItems[itemNum]
 
 			newOrderItemDetail := orderExternalService.CreateOrderItemDetail{
 				OrderItem:         "",
@@ -280,13 +288,9 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
 		}
 
-		deliveryCode := ""
-		for _, d := range deliveryToAdd {
-			if d.DocumentRef == deliveryReq.DocumentRef {
-				deliveryCode = d.DeliveryCode
-				break
-			}
-		}
+		// เดิมหาด้วย DocumentRef ตัวแรกที่เจอ แก้สองใบของ SO เดียวกันในครั้งเดียว
+		// ใบที่สองจะพก delivery_code ของใบแรกไปเป็น document_ref ฝั่ง WMS
+		deliveryCode := deliveryReq.DeliveryCode
 
 		var statusApproveGi string
 		if deliveryReq.PaymentMethod == "CASH" {
@@ -356,9 +360,10 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 
 func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
 	// Find the corresponding delivery from updateDeliveries
+	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
 	for _, d := range updateDeliveries {
-		if d.DocumentRef == deliveryReq.DocumentRef {
+		if d.ID == deliveryReq.ID {
 			delivery = d
 			break
 		}
