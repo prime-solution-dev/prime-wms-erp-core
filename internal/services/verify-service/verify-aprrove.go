@@ -38,10 +38,11 @@ type VerifyApproveDocument struct {
 	Items                        []VerifyApproveItem `json:"items"`
 
 	//Result
-	IsPassPrice       bool `json:"is_pass_price"`
-	IsPassCredit      bool `json:"is_pass_credit"`
-	IsPassExpiryPrice bool `json:"is_pass_expiry_price"`
-	IsPassInventory   bool `json:"is_pass_inventory"`
+	IsPassPrice       bool                     `json:"is_pass_price"`
+	IsPassCredit      bool                     `json:"is_pass_credit"`
+	IsPassExpiryPrice bool                     `json:"is_pass_expiry_price"`
+	IsPassInventory   bool                     `json:"is_pass_inventory"`
+	CreditCalculation *VerifyCreditCalculation `json:"credit_calculation,omitempty"`
 }
 
 type VerifyApproveItem struct {
@@ -59,14 +60,19 @@ type VerifyApproveItem struct {
 	//Option
 	TransportCostUnit       *float64 `json:"transport_cost_unit"`
 	TransportCostUnitWeight *float64 `json:"transport_cost_unit_weight"`
+
+	//Result
+	InventoryCalculation *VerifyInventoryCalculation `json:"inventory_calculation,omitempty"`
 }
 
 type VerifyApproveResponse struct {
-	IsPassPrice       bool                    `json:"is_pass_price"`
-	IsPassCredit      bool                    `json:"is_pass_credit"`
-	IsPassExpiryPrice bool                    `json:"is_pass_expiry_price"`
-	IsPassInventory   bool                    `json:"is_pass_inventory"`
-	Documents         []VerifyApproveDocument `json:"documents"`
+	IsPassPrice           bool                         `json:"is_pass_price"`
+	IsPassCredit          bool                         `json:"is_pass_credit"`
+	IsPassExpiryPrice     bool                         `json:"is_pass_expiry_price"`
+	IsPassInventory       bool                         `json:"is_pass_inventory"`
+	CreditDetails         []VerifyCreditCustomer       `json:"credit_details"`
+	InventoryCalculations []VerifyInventoryCalculation `json:"inventory_calculations"`
+	Documents             []VerifyApproveDocument      `json:"documents"`
 }
 
 func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -93,7 +99,9 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
-		Documents: []VerifyApproveDocument{},
+		CreditDetails:         []VerifyCreditCustomer{},
+		InventoryCalculations: []VerifyInventoryCalculation{},
+		Documents:             []VerifyApproveDocument{},
 	}
 
 	if len(req.Documents) == 0 {
@@ -288,8 +296,12 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		}
 
 		for _, creditCust := range creditRes.Customers {
+			res.CreditDetails = append(res.CreditDetails, creditCust)
+
 			for i, doc := range res.Documents {
 				if doc.CustomerCode == creditCust.CustomerCode {
+					creditCalculation := creditCust.CreditCalculation
+					res.Documents[i].CreditCalculation = &creditCalculation
 					res.Documents[i].IsPassCredit = creditCust.IsPass
 				}
 			}
@@ -314,9 +326,52 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		if res.IsPassInventory && !invenRes.IsPassInventory {
 			res.IsPassInventory = false
 		}
+
+		res.InventoryCalculations = append(res.InventoryCalculations, invenRes.InventoryCalculations...)
+		applyInventoryCalculationsToDocuments(&res, invenRes.InventoryCalculations)
 	} else {
 		res.IsPassInventory = true
 	}
 
 	return &res, nil
+}
+
+func applyInventoryCalculationsToDocuments(res *VerifyApproveResponse, calculations []VerifyInventoryCalculation) {
+	remainByProduct := map[string]float64{}
+	for _, calculation := range calculations {
+		remainByProduct[calculation.ProductCode] = calculation.AvailableQty
+	}
+
+	for docIndex := range res.Documents {
+		res.Documents[docIndex].IsPassInventory = true
+
+		for itemIndex := range res.Documents[docIndex].Items {
+			item := res.Documents[docIndex].Items[itemIndex]
+			available := remainByProduct[item.ProductCode]
+			allocated := minFloat(item.Qty, available)
+			remain := available - allocated
+			shortage := maxFloat(item.Qty-available, 0)
+			isPass := shortage == 0
+
+			inventoryCalculation := VerifyInventoryCalculation{
+				Subject:      "inventory",
+				DocRef:       res.Documents[docIndex].DocRef,
+				ItemRef:      item.ItemRef,
+				ProductCode:  item.ProductCode,
+				NeedQty:      item.Qty,
+				AvailableQty: available,
+				AllocatedQty: allocated,
+				RemainQty:    remain,
+				ShortageQty:  shortage,
+				IsPass:       isPass,
+			}
+
+			res.Documents[docIndex].Items[itemIndex].InventoryCalculation = &inventoryCalculation
+			remainByProduct[item.ProductCode] = remain
+
+			if !isPass {
+				res.Documents[docIndex].IsPassInventory = false
+			}
+		}
+	}
 }
