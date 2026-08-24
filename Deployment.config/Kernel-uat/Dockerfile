@@ -1,4 +1,4 @@
-FROM golang:1.24.0 AS builder
+FROM golang:1.25.0
 
 WORKDIR /app
 
@@ -20,21 +20,26 @@ RUN set -e; \
 COPY . .
 COPY ./cmd/.env .env
 
+RUN go mod tidy
+
 ENV CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64
 
-RUN go build -o wms-erp-core ./cmd
+RUN go build -o wms-document-core ./cmd
 
-FROM alpine:3.20
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    fontconfig \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+RUN mkdir -p /usr/share/fonts/truetype/sukhumvit \
+    && cp /app/assets/fonts/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
+    && fc-cache -fv
 
-RUN apk add --no-cache ca-certificates nano
+ENV FONT_PATH_PREFIX=/app/
 
-COPY --from=builder /app/wms-erp-core .
-COPY --from=builder /app/.env .
+EXPOSE 9106
 
-EXPOSE 9115
-
-CMD ["./wms-erp-core"]
+CMD ["./wms-document-core"]
