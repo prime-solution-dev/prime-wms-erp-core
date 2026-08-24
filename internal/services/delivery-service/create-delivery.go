@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type CreateDeliveryRequest struct {
@@ -147,7 +148,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	deliveryItemToAdd := []models.DeliveryItem{}
 
 	// Generate all delivery codes first
-	deliveryCodes, err := generateDeliveryCodes(ctx, len(req))
+	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
 	if err != nil {
 		return nil, err
 	}
@@ -258,12 +259,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// Update running number after successful creation
-	if err := updateDeliveryRunningConfig(ctx, len(deliveryToAdd)); err != nil {
-		// Log error but don't fail the transaction as deliveries are already created
-		fmt.Printf("Warning: failed to update running config: %v\n", err)
 	}
 
 	// Return the delivery codes of the created deliveries
@@ -409,55 +404,22 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	return createOrderResponse, nil
 }
 
-// updateDeliveryRunningConfig updates the running number configuration for deliveries
-func updateDeliveryRunningConfig(ctx *gin.Context, count int) error {
-	if count <= 0 {
-		return nil // No deliveries created, nothing to update
-	}
-
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_DBS",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
-	if err != nil {
-		return fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	return nil
-}
-
-// generateDeliveryCodes generates delivery codes using system config
-func generateDeliveryCodes(ctx *gin.Context, count int) ([]string, error) {
+// generateDeliveryCodes จองเลขที่ใบจองแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)
+// เดิมแยกเป็นอ่านเลขตอนนี้ แล้วค่อยเดินเลขหลัง insert ซึ่งทำให้สองคนที่กดพร้อมกันได้เลขเดียวกัน
+func generateDeliveryCodes(gormx *gorm.DB, count int) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No deliveries to generate codes for
 	}
 
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_DBS",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
-	}
-
-	deliveryCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_DBS", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate delivery codes: %v", err)
 	}
 
-	deliveryResult, ok := deliveryCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(deliveryResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of delivery codes from system config")
 	}
 
-	return deliveryResult.Data, nil
+	return codes, nil
 }
