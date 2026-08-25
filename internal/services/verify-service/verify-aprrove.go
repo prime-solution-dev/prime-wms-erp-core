@@ -38,10 +38,11 @@ type VerifyApproveDocument struct {
 	Items                        []VerifyApproveItem `json:"items"`
 
 	//Result
-	IsPassPrice       bool `json:"is_pass_price"`
-	IsPassCredit      bool `json:"is_pass_credit"`
-	IsPassExpiryPrice bool `json:"is_pass_expiry_price"`
-	IsPassInventory   bool `json:"is_pass_inventory"`
+	IsPassPrice       bool                     `json:"is_pass_price"`
+	IsPassCredit      bool                     `json:"is_pass_credit"`
+	IsPassExpiryPrice bool                     `json:"is_pass_expiry_price"`
+	IsPassInventory   bool                     `json:"is_pass_inventory"`
+	CreditCalculation *VerifyCreditCalculation `json:"credit_calculation,omitempty"`
 }
 
 type VerifyApproveItem struct {
@@ -62,11 +63,13 @@ type VerifyApproveItem struct {
 }
 
 type VerifyApproveResponse struct {
-	IsPassPrice       bool                    `json:"is_pass_price"`
-	IsPassCredit      bool                    `json:"is_pass_credit"`
-	IsPassExpiryPrice bool                    `json:"is_pass_expiry_price"`
-	IsPassInventory   bool                    `json:"is_pass_inventory"`
-	Documents         []VerifyApproveDocument `json:"documents"`
+	IsPassPrice           bool                         `json:"is_pass_price"`
+	IsPassCredit          bool                         `json:"is_pass_credit"`
+	IsPassExpiryPrice     bool                         `json:"is_pass_expiry_price"`
+	IsPassInventory       bool                         `json:"is_pass_inventory"`
+	CreditDetails         []VerifyCreditCustomer       `json:"credit_details"`
+	InventoryCalculations []VerifyInventoryCalculation `json:"inventory_calculations"`
+	Documents             []VerifyApproveDocument      `json:"documents"`
 }
 
 func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -93,7 +96,9 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
-		Documents: []VerifyApproveDocument{},
+		CreditDetails:         []VerifyCreditCustomer{},
+		InventoryCalculations: []VerifyInventoryCalculation{},
+		Documents:             []VerifyApproveDocument{},
 	}
 
 	if len(req.Documents) == 0 {
@@ -288,8 +293,12 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		}
 
 		for _, creditCust := range creditRes.Customers {
+			res.CreditDetails = append(res.CreditDetails, creditCust)
+
 			for i, doc := range res.Documents {
 				if doc.CustomerCode == creditCust.CustomerCode {
+					creditCalculation := creditCust.CreditCalculation
+					res.Documents[i].CreditCalculation = &creditCalculation
 					res.Documents[i].IsPassCredit = creditCust.IsPass
 				}
 			}
@@ -314,6 +323,8 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 		if res.IsPassInventory && !invenRes.IsPassInventory {
 			res.IsPassInventory = false
 		}
+
+		res.InventoryCalculations = append(res.InventoryCalculations, invenRes.InventoryCalculations...)
 	} else {
 		res.IsPassInventory = true
 	}

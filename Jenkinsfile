@@ -44,7 +44,7 @@ pipeline {
                     echo "Cloning or updating repository branch: ${TARGET_BRANCH} on remote server..."
                     withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
                         sh """ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                        'git clone -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
+                        'time git clone --depth 1 -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
                         (cd ${REPO_NAME} && git fetch && git checkout ${TARGET_BRANCH} && git pull origin ${TARGET_BRANCH})'"""
                     }
                     echo 'Repository cloned/updated successfully on remote!'
@@ -89,30 +89,37 @@ pipeline {
                 }
             }
         }
-        stage('Fetch .env from Vault') {
-            steps {
-                script {
-                    echo "Fetching .env from Vault..."
-
-                    // ดึงค่า .env จาก Vault
-                    withVault([vaultSecrets: [
-                        [path: "${VAULT_PATH}",
-                         engineVersion: 2,
-                         secretValues: [
-                             [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
-                         ]
+stage('Fetch .env from Vault (Remote)') {
+    steps {
+        script {
+            withVault([
+                vaultSecrets: [
+                    [
+                        path: "${VAULT_PATH}",
+                        engineVersion: 2,
+                        secretValues: [
+                            [
+                                envVar: 'AUTHEN_ENV',
+                                vaultKey: "${ENV_FILE_KEY}"
+                            ]
                         ]
-                    ]]) {
-                        sh '''
-                            mkdir -p cmd
-                            echo "$AUTHEN_ENV" > cmd/.env
-                            chmod 600 cmd/.env
-                            echo ".env created at cmd/.env"
-                        '''
-                    }
-                }
+                    ]
+                ]
+            ]) {
+                sh '''
+                    set +x
+
+                    printf '%s\\n' "$AUTHEN_ENV" |
+                    ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                    "cd '$REPO_NAME' && \
+                     mkdir -p cmd && \
+                     cat > cmd/.env && \
+                     chmod 600 cmd/.env"
+                '''
             }
         }
+    }
+}
 stage('Build Docker Image') {
             steps {
                 script {

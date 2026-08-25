@@ -3,7 +3,19 @@ FROM golang:1.24.0 AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
-RUN go mod download
+RUN set -e; \
+    for i in 1 2 3 4 5; do \
+        if GOPROXY=https://proxy.golang.org,direct go mod download; then \
+            echo "Go modules downloaded successfully"; \
+            break; \
+        fi; \
+        echo "go mod download failed - retry $i/5"; \
+        sleep 10; \
+        if [ "$i" = "5" ]; then \
+            echo "go mod download failed after 5 attempts"; \
+            exit 1; \
+        fi; \
+    done
 
 COPY . .
 COPY ./cmd/.env .env

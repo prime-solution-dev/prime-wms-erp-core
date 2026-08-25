@@ -1,16 +1,16 @@
 pipeline {
     agent any
     environment {
-        REPO_NAME = 'prime-wms-document-core'        
-        IMAGE_NAME = 'wms-document-core'
-        PORT = '9106:9106'  
-        CONTAINER_NAME = 'wms-document-core-container'
-        TARGET_BRANCH = 'Kernel-uat'
+        REPO_NAME = 'prime-wms-erp-core'      
+        IMAGE_NAME = 'wms-erp-core'
+        PORT = '9115:9115' 
+        CONTAINER_NAME = 'wms-erp-core-container'
+        TARGET_BRANCH = 'Crossmax-uat'
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '47.128.166.228'
-        SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.kernaluatWMS' // path ของ secret
-        ENV_FILE_KEY = 'kernaluat.env.document' 
+        REMOTE_HOST = '52.76.29.55'                   
+        SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-uat.pem' 
+        VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxUATWMS' 
+        ENV_FILE_KEY = 'CrossmaxUAT.env.erp'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -41,7 +41,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 script {
-                    echo "Cloning repository branch: ${TARGET_BRANCH} on remote server..."
+                    echo "Cloning or updating repository branch: ${TARGET_BRANCH} on remote server..."
                     withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
                         sh """ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                         'time git clone --depth 1 -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
@@ -89,7 +89,7 @@ pipeline {
                 }
             }
         }
-        stage('Fetch .env from Vault (Remote)') {
+stage('Fetch .env from Vault (Remote)') {
     steps {
         script {
             withVault([
@@ -120,16 +120,16 @@ pipeline {
         }
     }
 }
-        stage('Build Docker Image') {
+stage('Build Docker Image') {
             steps {
                 script {
                     echo 'Building Docker image on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
+                    'cd ${REPO_NAME} && docker build --no-cache -t  ${IMAGE_NAME}:latest .'"""
                 }
             }
         }
-                stage('Stop and Remove Old Container') {
+        stage('Stop and Remove Old Container') {
             steps {
                 script {
                     echo 'Stopping and removing old container on remote server...'
@@ -143,7 +143,7 @@ pipeline {
                 script {
                     echo 'Deploying container on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
+                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
                 }
             }
         }
