@@ -173,7 +173,7 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 		select s.sale_code ,s.customer_code, coalesce(s.total_amount, 0) total_amount , coalesce(s.total_transport_cost, 0)  total_transport_cost
 			, coalesce(s.transport_cost_type, '') transport_cost_type
 		from sale s 
-		where s.status = 'PENDING' and (s.is_approved = true or s.status_approve = 'COMPLETED')  
+		where s.status = 'PENDING' and s.payment_method <> 'CASH' and (s.is_approved = true or s.status_approve = 'COMPLETED')  
 			and s.customer_code in ('%s')
 	`, strings.Join(customerStrs, `','`))
 	rowsSale, err := db.ExecuteQuery(sqlx, querySale)

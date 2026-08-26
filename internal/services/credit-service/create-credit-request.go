@@ -38,7 +38,8 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 		if req[i].RequestCode == "" {
 			req[i].RequestCode = uuid.New().String()
 		}
-
+		req[i].CreateBy = userID
+		req[i].UpdateBy = userID
 		creditRequestValue = append(creditRequestValue, req[i])
 
 		approval := models.Approval{
@@ -73,7 +74,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	if len(approvalValue) > 0 {
 
 		requestDataCheckAutoApprovalRest := map[string]interface{}{
-			"request_user_code": "admin",
+			"request_user_code": userID,
 			"module_code":       "CUSTOMIZE",
 			"topic_code":        "CUSTOMIZE",
 			"md_item_code":      "CTM-CTM7",
@@ -90,17 +91,22 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 			return nil, errCheckAutoApprovalRest
 		}
 		resultCheckAutoApprovalRest := checkAutoApprovalRest.(*approvalService.CheckAutoApprovalResponse)
+		//mapResultCreateApproval := resultCreateApproval.(map[string]interface{})
+		//ids := mapResultCreateApproval["id"].([]uuid.UUID)
 		if resultCheckAutoApprovalRest.IsAutoApproved {
 
 			creditRequest := []models.CreditRequest{}
+			data := resultCreateApproval.(map[string]interface{})
+			ids := data["id"].([]uuid.UUID)
 			for i := range req {
 				req[i].Status = "COMPLETED"
-				req[i].ApprovalID = resultCreateApproval.([]map[string]interface{})[i]["id"].(uuid.UUID)
+				req[i].ApprovalID = ids[i]
+				req[i].UpdateBy = userID
 				creditRequest = append(creditRequest, req[i])
 			}
 			jsonDataUpdateCreditRequest, err := json.Marshal(creditRequest)
 			if err != nil {
-				errors.New("Error marshalling data :")
+				return nil, errors.New("Error marshalling data : " + err.Error())
 			}
 
 			_, errUpdateCreditRequest := UpdateCreditRequest(ctx, string(jsonDataUpdateCreditRequest))

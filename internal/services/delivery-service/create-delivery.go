@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type CreateDeliveryRequest struct {
@@ -64,10 +65,27 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Connect to the database
+	// defer ต้องอยู่หลังเช็ค err ไม่งั้นต่อ DB ไม่ได้แล้ว gormx = nil และ CloseGORM จะ panic
 	gormx, err := db.ConnectGORM("prime_erp")
-	defer db.CloseGORM(gormx)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	// กันจองเกินจำนวนใน sale order ก่อนแตะอะไรทั้งนั้น (ทั้ง DB และ hook ภายนอก)
+	bookingLines := []bookingLine{}
+	for _, deliveryReq := range req {
+		for _, item := range deliveryReq.DeliveryItems {
+			bookingLines = append(bookingLines, bookingLine{
+				SaleCode:        deliveryReq.DocumentRef,
+				DocumentRefItem: item.DocumentRefItem,
+				ProductCode:     item.ProductCode,
+				Qty:             item.Qty,
+			})
+		}
+	}
+	if err := ValidateBookingQty(gormx, bookingLines, nil); err != nil {
 		return nil, err
 	}
 
@@ -106,17 +124,23 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			RequestData: req,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, _ := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, hookErr := interfaceService.HookInterface(requestDataCreateHook)
+		if hookErr != nil {
+			// hook เป็นข้อมูลเสริม (external id) ไม่ควรทำให้สร้างใบไม่ได้ แต่ต้องเห็นใน log
+			fmt.Printf("CreateDelivery: delivery hook failed, continuing without external id: %v\n", hookErr)
+		}
 
-		if HookInterfaceValue != nil {
-			externalID := HookInterfaceValue.(map[string]interface{})
-			str, _ := externalID["id"].(string)
-			externalId = str
-			externaldocNo = externalID["last"].(string)
+		// เดิม assert ตรงๆ ทั้ง 2 ชั้น hook ที่ตอบมาไม่ใช่ map หรือไม่มี key "last" จะ panic
+		if hookResult, ok := HookInterfaceValue.(map[string]interface{}); ok {
+			externalId, _ = hookResult["id"].(string)
+			externaldocNo, _ = hookResult["last"].(string)
 		}
 	}
 
-	user := "SYSTEM" // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -124,7 +148,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	deliveryItemToAdd := []models.DeliveryItem{}
 
 	// Generate all delivery codes first
-	deliveryCodes, err := generateDeliveryCodes(ctx, len(req))
+	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +230,15 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	if len(deliveryToAdd) > 0 {
-		if err := tx.Create(&deliveryToAdd).Error; err != nil {
+		// ใช้ = ไม่ใช่ := เพื่อให้ deferred func ด้านบนเห็น err แล้ว Rollback จริง
+		// ของเดิม := บังตัวนอกไว้ ทำให้ deferred เรียก Commit บน tx ที่ล้มไปแล้ว
+		if err = tx.Create(&deliveryToAdd).Error; err != nil {
 			return nil, err
 		}
 	}
 
 	if len(deliveryItemToAdd) > 0 {
-		if err := tx.Create(&deliveryItemToAdd).Error; err != nil {
+		if err = tx.Create(&deliveryItemToAdd).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -233,12 +259,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-	}
-
-	// Update running number after successful creation
-	if err := updateDeliveryRunningConfig(ctx, len(deliveryToAdd)); err != nil {
-		// Log error but don't fail the transaction as deliveries are already created
-		fmt.Printf("Warning: failed to update running config: %v\n", err)
 	}
 
 	// Return the delivery codes of the created deliveries
@@ -264,18 +284,30 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
-	for _, deliveryReq := range req {
+	// deliveryToAdd เรียงตรงกับ req ทีละใบ (สร้างมาจากลูปเดียวกัน) ส่วน deliveryItemToAdd
+	// เป็น list แบนรวมทุกใบ จึงต้องจัดกลุ่มตาม delivery_id ก่อน ไม่งั้นการหาแบบ
+	// DocumentRefItem + ProductCode จะไปเจอ item ของ "ใบอื่น" ในกรณีที่ payload มีหลายใบ
+	itemsOfDelivery := map[uuid.UUID][]models.DeliveryItem{}
+	for _, di := range deliveryItemToAdd {
+		itemsOfDelivery[di.DeliveryID] = append(itemsOfDelivery[di.DeliveryID], di)
+	}
+
+	for num, deliveryReq := range req {
+		if num >= len(deliveryToAdd) {
+			return orderExternalService.CreateOrderResponse{}, fmt.Errorf("delivery at index %d was not created", num)
+		}
+
+		delivery := deliveryToAdd[num]
+		srcItems := itemsOfDelivery[delivery.ID]
+
 		createOrderItemDetail := []orderExternalService.CreateOrderItemDetail{}
-		for _, item := range deliveryReq.DeliveryItems {
-			// find corresponding DeliveryItem from deliveryItemToAdd (match by DocumentRefItem + ProductCode)
-			var srcItem *models.DeliveryItem
-			for i := range deliveryItemToAdd {
-				di := &deliveryItemToAdd[i]
-				if di.DocumentRefItem == item.DocumentRefItem && di.ProductCode == item.ProductCode {
-					srcItem = di
-					break
-				}
+		for itemNum, item := range deliveryReq.DeliveryItems {
+			if itemNum >= len(srcItems) {
+				return orderExternalService.CreateOrderResponse{}, fmt.Errorf(
+					"delivery %s item %d was not created", delivery.DeliveryCode, itemNum)
 			}
+
+			srcItem := srcItems[itemNum]
 
 			newOrderItemDetail := orderExternalService.CreateOrderItemDetail{
 				OrderItem:         "",
@@ -299,13 +331,9 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
 		}
 
-		deliveryCode := ""
-		for _, d := range deliveryToAdd {
-			if d.DocumentRef == deliveryReq.DocumentRef {
-				deliveryCode = d.DeliveryCode
-				break
-			}
-		}
+		// เดิมหาด้วย DocumentRef ตัวแรกที่เจอ จองสองใบให้ SO เดียวกันในครั้งเดียว
+		// ใบที่สองจะพก delivery_code ของใบแรกไปเป็น document_ref ฝั่ง WMS
+		deliveryCode := delivery.DeliveryCode
 
 		var statusApproveGi string
 		if deliveryReq.PaymentMethod == "CASH" {
@@ -376,55 +404,22 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	return createOrderResponse, nil
 }
 
-// updateDeliveryRunningConfig updates the running number configuration for deliveries
-func updateDeliveryRunningConfig(ctx *gin.Context, count int) error {
-	if count <= 0 {
-		return nil // No deliveries created, nothing to update
-	}
-
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_DBS",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
-	if err != nil {
-		return fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	return nil
-}
-
-// generateDeliveryCodes generates delivery codes using system config
-func generateDeliveryCodes(ctx *gin.Context, count int) ([]string, error) {
+// generateDeliveryCodes จองเลขที่ใบจองแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)
+// เดิมแยกเป็นอ่านเลขตอนนี้ แล้วค่อยเดินเลขหลัง insert ซึ่งทำให้สองคนที่กดพร้อมกันได้เลขเดียวกัน
+func generateDeliveryCodes(gormx *gorm.DB, count int) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No deliveries to generate codes for
 	}
 
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_DBS",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
-	}
-
-	deliveryCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_DBS", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate delivery codes: %v", err)
 	}
 
-	deliveryResult, ok := deliveryCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(deliveryResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of delivery codes from system config")
 	}
 
-	return deliveryResult.Data, nil
+	return codes, nil
 }

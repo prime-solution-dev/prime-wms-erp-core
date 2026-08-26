@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	repositorySale "prime-erp-core/internal/repositories/sale"
+	customerService "prime-erp-core/internal/services/customer-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	"time"
 
@@ -37,9 +38,11 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	}
 	resultOutStandingSoRes := []OutStandingSoRes{}
 	invoiceCode := []string{}
+	customerCode := []string{}
 	for _, resultValue := range result {
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
+			customerCode = append(customerCode, resultValue.Sale.CustomerCode)
 		}
 	}
 
@@ -73,6 +76,20 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 	}
 
+	requestData := map[string]interface{}{
+		"customer_code": customerCode,
+	}
+
+	customers, err := customerService.GetCustomers(requestData)
+	if err != nil {
+		return nil, err
+	}
+
+	convertCustomerMap := map[string]customerService.GetCustomerResponse{}
+	for _, customer := range customers.Customers {
+		convertCustomerMap[customer.CustomerCode] = customer
+	}
+
 	for _, resultValue := range result {
 		paidSale := 0.00
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
@@ -82,6 +99,10 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 				paidSale += paymentItemMap
 			}
 
+		}
+		conMapCustomer, exist := convertCustomerMap[resultValue.Sale.CustomerCode]
+		if exist {
+			resultValue.Sale.CustomerName = conMapCustomer.CustomerName
 		}
 
 		detail := OutStandingSoRes{

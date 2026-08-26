@@ -67,23 +67,55 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := "SYSTEM" // TODO: get from ctx
+	user := ctx.GetString("user")
+	if user == "" {
+		user = `system` // fallback
+	}
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
-	updateDeliveries := []models.Delivery{}
-	updateDeliveryItems := []models.DeliveryItem{}
-
+	// อ่านสถานะเดิมของทุกใบก่อน ใช้ทั้งกันไม่ให้แก้ใบที่จบไปแล้ว
+	// และดูว่าใบไหนเพิ่งออกจาก draft (เดิมอ่านทีละใบด้วย gormx ระหว่างที่ tx เปิดค้างอยู่)
+	deliveryIDs := []uuid.UUID{}
 	for _, deliveryReq := range req.Deliveries {
-		tempDelivery := deliveryReq.Delivery
-
-		if tempDelivery.ID == uuid.Nil {
+		if deliveryReq.ID == uuid.Nil {
 			return nil, fmt.Errorf("delivery ID is required for update")
 		}
-
-		if tempDelivery.DeliveryCode == "" {
+		if deliveryReq.DeliveryCode == "" {
 			return nil, fmt.Errorf("delivery code is required for update")
 		}
+		deliveryIDs = append(deliveryIDs, deliveryReq.ID)
+	}
+
+	var previousDeliveries []models.Delivery
+	if err := gormx.Where("id IN ?", deliveryIDs).Find(&previousDeliveries).Error; err != nil {
+		return nil, fmt.Errorf("failed to load deliveries: %v", err)
+	}
+
+	previousOf := map[uuid.UUID]models.Delivery{}
+	for _, delivery := range previousDeliveries {
+		previousOf[delivery.ID] = delivery
+	}
+
+	updateDeliveries := []models.Delivery{}
+	updateDeliveryItems := []models.DeliveryItem{}
+	deliveryUpdateFields := map[uuid.UUID]map[string]interface{}{}
+	itemUpdateFields := map[uuid.UUID]map[string]interface{}{}
+
+	for _, deliveryReq := range req.Deliveries {
+		previous, found := previousOf[deliveryReq.ID]
+		if !found {
+			return nil, fmt.Errorf("delivery with code %s not found", deliveryReq.DeliveryCode)
+		}
+
+		// เดิมไม่ดูสถานะเดิมเลย บังคับเขียนทับเป็น TEMP/PENDING เสมอ
+		// ใบที่คลังส่งจบแล้วจึงถูกดันกลับมาเป็น PENDING ได้จากการแก้อะไรนิดเดียว
+		if previous.Status == "COMPLETED" || previous.Status == "CANCELED" {
+			return nil, fmt.Errorf("delivery %s is already %s and cannot be updated",
+				deliveryReq.DeliveryCode, previous.Status)
+		}
+
+		tempDelivery := deliveryReq.Delivery
 
 		// Convert date fields to date-only format
 		if tempDelivery.DeliveryDate != nil {
@@ -91,7 +123,6 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			tempDelivery.DeliveryDate = &deliveryDateOnly
 		}
 
-		// Only update timestamp and user for update
 		tempDelivery.UpdateDate = nowDateOnly
 		tempDelivery.UpdateBy = user
 		if deliveryReq.IsDraft {
@@ -102,6 +133,26 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		updateDeliveries = append(updateDeliveries, tempDelivery)
 
+		// ระบุคอลัมน์เป็น map ไม่ส่ง struct เพราะ GORM v2 ข้าม zero-value ของ struct ทิ้ง
+		// ทำให้ล้าง license_plate / remark ให้ว่าง หรือตั้ง total_weight เป็น 0 ไม่ติด
+		deliveryUpdateFields[tempDelivery.ID] = map[string]interface{}{
+			"delivery_method":    tempDelivery.DeliveryMethod,
+			"document_ref":       tempDelivery.DocumentRef,
+			"customer_code":      tempDelivery.CustomerCode,
+			"ship_to_address":    tempDelivery.ShipToAddress,
+			"delivery_date":      tempDelivery.DeliveryDate,
+			"delivery_time_code": tempDelivery.DeliveryTimeCode,
+			"license_plate":      tempDelivery.LicensePlate,
+			"contact_name":       tempDelivery.ContactName,
+			"tel":                tempDelivery.Tel,
+			"total_weight":       tempDelivery.TotalWeight,
+			"remark":             tempDelivery.Remark,
+			"booking_slot_type":  tempDelivery.BookingSlotType,
+			"status":             tempDelivery.Status,
+			"update_date":        tempDelivery.UpdateDate,
+			"update_by":          tempDelivery.UpdateBy,
+		}
+
 		for _, item := range deliveryReq.Items {
 			// Ensure item belongs to this delivery
 			item.DeliveryItem.DeliveryID = tempDelivery.ID
@@ -110,6 +161,56 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			item.DeliveryItem.Status = "PENDING"
 
 			updateDeliveryItems = append(updateDeliveryItems, item.DeliveryItem)
+
+			itemUpdateFields[item.DeliveryItem.ID] = map[string]interface{}{
+				"product_code":      item.DeliveryItem.ProductCode,
+				"qty":               item.DeliveryItem.Qty,
+				"unit_code":         item.DeliveryItem.UnitCode,
+				"price_list_unit":   item.DeliveryItem.PriceListUnit,
+				"sale_qty":          item.DeliveryItem.SaleQty,
+				"sale_unit_code":    item.DeliveryItem.SaleUnitCode,
+				"total_weight":      item.DeliveryItem.TotalWeight,
+				"weight":            item.DeliveryItem.Weight,
+				"weight_unit":       item.DeliveryItem.WeightUnit,
+				"document_ref_item": item.DeliveryItem.DocumentRefItem,
+				"remark":            item.DeliveryItem.Remark,
+				"status":            item.DeliveryItem.Status,
+				"update_date":       item.DeliveryItem.UpdateDate,
+				"update_by":         item.DeliveryItem.UpdateBy,
+			}
+		}
+	}
+
+	// กันจองเกินจำนวนใน sale order โดยไม่นับจำนวนของใบที่กำลังแก้ซ้ำเข้าไปเอง
+	bookingLines := []bookingLine{}
+	editingDeliveryCodes := []string{}
+	for _, deliveryReq := range req.Deliveries {
+		editingDeliveryCodes = append(editingDeliveryCodes, deliveryReq.DeliveryCode)
+		for _, item := range deliveryReq.Items {
+			bookingLines = append(bookingLines, bookingLine{
+				SaleCode:        deliveryReq.DocumentRef,
+				DocumentRefItem: item.DeliveryItem.DocumentRefItem,
+				ProductCode:     item.DeliveryItem.ProductCode,
+				Qty:             item.DeliveryItem.Qty,
+			})
+		}
+	}
+	if err := ValidateBookingQty(gormx, bookingLines, editingDeliveryCodes); err != nil {
+		return nil, err
+	}
+
+	// แยกว่าใบไหนต้องสร้าง order ใหม่ (เพิ่งออกจาก draft) กับใบไหนแค่อัปเดต order เดิม
+	newOrderDeliveries := []DeliveryDocumentUpdate{}
+	updateOrderDeliveries := []DeliveryDocumentUpdate{}
+	for _, deliveryReq := range req.Deliveries {
+		if deliveryReq.IsDraft {
+			continue
+		}
+
+		if previousOf[deliveryReq.ID].Status == "TEMP" {
+			newOrderDeliveries = append(newOrderDeliveries, deliveryReq)
+		} else {
+			updateOrderDeliveries = append(updateOrderDeliveries, deliveryReq)
 		}
 	}
 
@@ -127,7 +228,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, delivery := range updateDeliveries {
 		if err := tx.Model(&models.Delivery{}).
 			Where("id = ?", delivery.ID).
-			Updates(delivery).Error; err != nil {
+			Updates(deliveryUpdateFields[delivery.ID]).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update delivery %s: %v", delivery.DeliveryCode, err)
 		}
@@ -153,37 +254,19 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, item := range updateDeliveryItems {
 		if err := tx.Model(&models.DeliveryItem{}).
 			Where("id = ? AND delivery_id = ?", item.ID, item.DeliveryID).
-			Updates(item).Error; err != nil {
+			Updates(itemUpdateFields[item.ID]).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update delivery item %s: %v", item.DeliveryItem, err)
 		}
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		return nil, err
-	}
-
-	// Check if any delivery is not a draft and was previously a draft before calling external service
-	hasNonDraftDelivery := false
-	for _, deliveryReq := range req.Deliveries {
-		if !deliveryReq.IsDraft {
-			// Check previous status from database
-			var previousDelivery models.Delivery
-			if err := gormx.Where("id = ?", deliveryReq.Delivery.ID).First(&previousDelivery).Error; err == nil {
-				// Only create order if previous status was draft (TEMP) and current is not draft
-				if previousDelivery.Status == "TEMP" {
-					hasNonDraftDelivery = true
-					break
-				}
-			}
-		}
-	}
-
-	// Only call external service if there are non-draft deliveries
+	// ยิง WMS ก่อน commit เหมือนที่ create-delivery ทำ
+	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
-	if hasNonDraftDelivery {
-		orderRes, err := CreateOrderForUpdate(req.Deliveries, updateDeliveries, updateDeliveryItems)
+	if len(newOrderDeliveries) > 0 {
+		orderRes, err := CreateOrderForUpdate(newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
+			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
 		}
 		if len(orderRes.OrderCode) > 0 {
@@ -191,14 +274,16 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	// Call UpdateOrderByDelivery for each non-draft delivery
-	for _, deliveryReq := range req.Deliveries {
-		if !deliveryReq.IsDraft {
-			err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries)
-			if err != nil {
-				return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
-			}
+	for _, deliveryReq := range updateOrderDeliveries {
+		if err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries); err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return nil, err
 	}
 
 	// Update response with order code if available
@@ -214,23 +299,31 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
+
+	// deliveryItemToAdd เป็น list แบนรวมทุกใบ ต้องจัดกลุ่มตาม delivery_id ก่อน
+	// ไม่งั้นการหาแบบ DocumentRefItem + ProductCode จะไปเจอ item ของ "ใบอื่น"
+	// (ที่นี่ใช้ index เทียบไม่ได้ เพราะ req ถูกกรองมาแล้วไม่ตรงกับ deliveryToAdd)
+	itemsOfDelivery := map[uuid.UUID][]models.DeliveryItem{}
+	for _, di := range deliveryItemToAdd {
+		itemsOfDelivery[di.DeliveryID] = append(itemsOfDelivery[di.DeliveryID], di)
+	}
+
 	for _, deliveryReq := range req {
 		// Skip draft deliveries
 		if deliveryReq.IsDraft {
 			continue
 		}
 
+		srcItems := itemsOfDelivery[deliveryReq.ID]
+
 		createOrderItemDetail := []orderExternalService.CreateOrderItemDetail{}
-		for _, item := range deliveryReq.Items {
-			// find corresponding DeliveryItem from deliveryItemToAdd (match by DocumentRefItem + ProductCode)
-			var srcItem *models.DeliveryItem
-			for i := range deliveryItemToAdd {
-				di := &deliveryItemToAdd[i]
-				if di.DocumentRefItem == item.DocumentRefItem && di.ProductCode == item.ProductCode {
-					srcItem = di
-					break
-				}
+		for itemNum, item := range deliveryReq.Items {
+			if itemNum >= len(srcItems) {
+				return orderExternalService.CreateOrderResponse{}, fmt.Errorf(
+					"delivery %s item %d was not prepared for update", deliveryReq.DeliveryCode, itemNum)
 			}
+
+			srcItem := srcItems[itemNum]
 
 			newOrderItemDetail := orderExternalService.CreateOrderItemDetail{
 				OrderItem:         "",
@@ -254,13 +347,9 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			createOrderItemDetail = append(createOrderItemDetail, newOrderItemDetail)
 		}
 
-		deliveryCode := ""
-		for _, d := range deliveryToAdd {
-			if d.DocumentRef == deliveryReq.DocumentRef {
-				deliveryCode = d.DeliveryCode
-				break
-			}
-		}
+		// เดิมหาด้วย DocumentRef ตัวแรกที่เจอ แก้สองใบของ SO เดียวกันในครั้งเดียว
+		// ใบที่สองจะพก delivery_code ของใบแรกไปเป็น document_ref ฝั่ง WMS
+		deliveryCode := deliveryReq.DeliveryCode
 
 		var statusApproveGi string
 		if deliveryReq.PaymentMethod == "CASH" {
@@ -315,6 +404,9 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
+	requestJSON, _ := json.MarshalIndent(createOrderRequest, "", "  ")
+	fmt.Println("CreateGoodsIssueRequest JSON:")
+	fmt.Println(string(requestJSON))
 	fmt.Println("createOrderRequest : ", createOrderRequest)
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
@@ -327,9 +419,10 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 
 func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
 	// Find the corresponding delivery from updateDeliveries
+	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
 	for _, d := range updateDeliveries {
-		if d.DocumentRef == deliveryReq.DocumentRef {
+		if d.ID == deliveryReq.ID {
 			delivery = d
 			break
 		}
