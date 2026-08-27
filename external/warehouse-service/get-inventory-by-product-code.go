@@ -3,6 +3,7 @@ package externalService
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,8 +78,14 @@ func GetInventoryWeightByKey(companyCode string, siteCodes []string, keyValues [
 	}
 
 	// Check HTTP status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("inventory service returned status %d: %s", resp.StatusCode, string(body))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
+			return nil, errors.New(errResp.Error)
+		}
+		return nil, fmt.Errorf("API error status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse JSON response

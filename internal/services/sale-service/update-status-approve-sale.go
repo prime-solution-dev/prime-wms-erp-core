@@ -40,6 +40,20 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 	}
 	defer db.CloseGORM(gormx)
 
+	var sale models.Sale
+	if err := gormx.Where("id = ?", req.ID).Take(&sale).Error; err != nil {
+		return nil, fmt.Errorf("sale not found: %v", err)
+	}
+
+	// เดิมไม่เช็คสถานะเลย กด REJECT ใบที่ปิดไปแล้วหรือใบที่ยกเลิกไปแล้วได้
+	// ซึ่งจะดัน status กลับเป็น CANCELED ทั้งที่ของอาจส่งออกไปหมดแล้ว
+	switch sale.Status {
+	case "COMPLETED":
+		return nil, errors.New("sale order is already closed and its approval cannot be changed")
+	case "CANCELED":
+		return nil, errors.New("sale order is canceled and its approval cannot be changed")
+	}
+
 	updateApprovalReq := []struct {
 		ID     uuid.UUID `json:"id"`
 		Status string    `json:"status"`

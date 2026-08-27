@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type CreateQuotationRequest struct {
@@ -85,7 +86,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	verifyReqMap := map[string]verifyService.VerifyApproveRequest{}
 
 	// Generate all quotation codes first
-	quotationCodes, err := generateQuotationCodes(ctx, len(req.Quotations))
+	quotationCodes, err := generateQuotationCodes(gormx, len(req.Quotations))
 	if err != nil {
 		return nil, err
 	}
@@ -323,64 +324,25 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, err
 	}
 
-	// Update running number after successful creation
-	if err := updateQuotationRunningConfig(ctx, len(createQuotations)); err != nil {
-		// Log error but don't fail the transaction as quotations are already created
-		fmt.Printf("Warning: failed to update running config: %v\n", err)
-	}
-
 	return res, nil
 }
 
-// updateQuotationRunningConfig updates the running number configuration for quotations
-func updateQuotationRunningConfig(ctx *gin.Context, count int) error {
+// generateQuotationCodes จองเลขที่เอกสารแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)
+// เดิมแยกเป็นอ่านเลขตอนนี้ แล้วค่อยเดินเลขหลัง insert ซึ่งทำให้สองคนที่กดพร้อมกันได้เลขเดียวกัน
+func generateQuotationCodes(gormx *gorm.DB, count int) ([]string, error) {
 	if count <= 0 {
-		return nil // No quotations created, nothing to update
+		return []string{}, nil
 	}
 
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_QU",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
-	if err != nil {
-		return fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	return nil
-}
-
-// generateQuotationCodes generates quotation codes using system config
-func generateQuotationCodes(ctx *gin.Context, count int) ([]string, error) {
-	if count <= 0 {
-		return []string{}, nil // No quotations to generate codes for
-	}
-
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_QU",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
-	}
-
-	quotationCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_QU", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate quotation codes: %v", err)
 	}
 
-	quotationResult, ok := quotationCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(quotationResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of quotation codes from system config")
 	}
 
-	return quotationResult.Data, nil
+	return codes, nil
 }
