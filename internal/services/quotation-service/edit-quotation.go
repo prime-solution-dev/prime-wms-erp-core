@@ -36,6 +36,20 @@ func EditQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
+	var quotation models.Quotation
+	if err := gormx.Where("quotation_code = ?", req.QuotationCode).Take(&quotation).Error; err != nil {
+		return nil, fmt.Errorf("quotation not found: %v", err)
+	}
+
+	// เดิมไม่เช็คสถานะ ใบที่แปลงเป็น sale order ไปแล้วหรือใบที่ยกเลิกไปแล้ว
+	// ก็ถูกดันกลับมาเป็น PENDING/PENDING ได้ ทั้งที่ SO ที่ออกไปแล้วยังอ้างใบนี้อยู่
+	switch quotation.Status {
+	case "COMPLETED":
+		return nil, errors.New("quotation already converted to a sale order and cannot be edited")
+	case "CANCELED":
+		return nil, errors.New("quotation is canceled and cannot be edited")
+	}
+
 	approvalReq := approvalService.GetApprovalRequest{
 		Page:         1,
 		PageSize:     1,

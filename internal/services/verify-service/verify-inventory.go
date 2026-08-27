@@ -24,8 +24,9 @@ type VerifyInventoryProduct struct {
 }
 
 type VerifyInventoryResponse struct {
-	IsPassInventory bool                        `json:"is_pass_inventory"`
-	ProductAtps     []VerifyInventoryProductAtp `json:"product_atps"`
+	IsPassInventory       bool                         `json:"is_pass_inventory"`
+	ProductAtps           []VerifyInventoryProductAtp  `json:"product_atps"`
+	InventoryCalculations []VerifyInventoryCalculation `json:"inventory_calculations"`
 }
 
 type VerifyInventoryProductAtp struct {
@@ -36,6 +37,17 @@ type VerifyInventoryProductAtp struct {
 	TodayStockQty int    `json:"current_stock_qty"`
 	TodayAtpQty   int    `json:"current_atp_qty"`
 	TotalAtpQty   int    `json:"atp_qty"`
+}
+
+type VerifyInventoryCalculation struct {
+	Subject      string  `json:"subject"`
+	ProductCode  string  `json:"product_code"`
+	NeedQty      float64 `json:"need_qty"`
+	AvailableQty float64 `json:"available_qty"`
+	AllocatedQty float64 `json:"allocated_qty"`
+	RemainQty    float64 `json:"remain_qty"`
+	ShortageQty  float64 `json:"shortage_qty"`
+	IsPass       bool    `json:"is_pass"`
 }
 
 func GetSystemConfigWarehouse() ([]string, error) {
@@ -49,7 +61,7 @@ func GetSystemConfigWarehouse() ([]string, error) {
 	}
 
 	warehouseCodes := []string{}
-	
+
 	// ประมวลผล response และแยก warehouse codes
 	for _, config := range systemConfigData.SystemConfigs {
 		if config.TopicCode == "ATP" && config.ConfigCode == "ATP_CONDITION" && config.Value != "" {
@@ -63,13 +75,14 @@ func GetSystemConfigWarehouse() ([]string, error) {
 			}
 		}
 	}
-	
+
 	return warehouseCodes, nil
 }
 
 func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse, error) {
 	res := &VerifyInventoryResponse{}
 	res.IsPassInventory = true
+	res.InventoryCalculations = []VerifyInventoryCalculation{}
 
 	if len(req.Products) == 0 {
 		return res, fmt.Errorf("require at least one product")
@@ -88,7 +101,7 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 		StorageTypes: req.StorageTypes,
 		ToDate:       req.ToDate,
 	}
-	
+
 	// รวม warehouse codes ถ้ามีข้อมูล
 	if len(warehouseCodes) > 0 {
 		reqAtp.WarehouseCodes = warehouseCodes
@@ -132,25 +145,46 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 
 	for _, p := range req.Products {
 		atpKey := fmt.Sprintf(`%s|%s|%s`, req.CompanyCode, req.SiteCode, p.ProductCode)
-		remain, existAtp := remainingATP[atpKey]
+		available, existAtp := remainingATP[atpKey]
 		if !existAtp {
-			remain = 0
+			available = 0
 		}
 
-		if remain < p.Qty {
+		allocated := minFloat(p.Qty, available)
+		remain := available - allocated
+		shortage := maxFloat(p.Qty-available, 0)
+		isPass := shortage == 0
+
+		res.InventoryCalculations = append(res.InventoryCalculations, VerifyInventoryCalculation{
+			Subject:      "inventory",
+			ProductCode:  p.ProductCode,
+			NeedQty:      p.Qty,
+			AvailableQty: available,
+			AllocatedQty: allocated,
+			RemainQty:    remain,
+			ShortageQty:  shortage,
+			IsPass:       isPass,
+		})
+
+		if !isPass {
 			res.IsPassInventory = false
-			break
 		}
 
-		use := min(p.Qty, remain)
-		remain -= use
 		remainingATP[atpKey] = remain
 	}
 
 	return res, nil
 }
 
-func min(a float64, b float64) float64 {
+func minFloat(a float64, b float64) float64 {
+	if a < b {
+		return a
+	}
+
+	return b
+}
+
+func maxFloat(a float64, b float64) float64 {
 	if a > b {
 		return a
 	}
