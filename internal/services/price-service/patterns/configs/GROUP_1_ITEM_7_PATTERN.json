@@ -151,7 +151,8 @@
         "code",
         "is_highlight",
         "total_net_price_weight",
-        "inactive"
+        "inactive",
+        "remark"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight"

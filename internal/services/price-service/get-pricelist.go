@@ -262,46 +262,12 @@ func getTerms(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGro
 	return res, nil
 }
 
-func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceListGroupResponse, error) {
-	res := []GetPriceListGroupResponse{}
-	cond := ``
 
-	if req.CompanyCode != "" {
-		cond += fmt.Sprintf(` and plg.company_code = '%s' `, req.CompanyCode)
-	}
-
-	if len(req.SiteCodes) > 0 {
-		cond += fmt.Sprintf(` and plg.site_code in ('%s') `, strings.Join(req.SiteCodes, `','`))
-	}
-
-	if req.EffectiveDateFrom != nil {
-		cond += fmt.Sprintf(` and plg.effective_date >= '%s' `, req.EffectiveDateFrom.Format(`2006-01-02`))
-	}
-
-	if req.EffectiveDateTo != nil {
-		cond += fmt.Sprintf(` and plg.effective_date <= '%s' `, req.EffectiveDateTo.Format(`2006-01-02`))
-	}
-
-	if len(req.GroupCodes) > 0 {
-		cond += fmt.Sprintf(` and plg.group_code in ('%s') `, strings.Join(req.GroupCodes, `','`))
-	}
-
-	if len(req.SubGroupCodes) > 0 {
-		cond += fmt.Sprintf(` and plsg.subgroup_key in ('%s') `, strings.Join(req.SubGroupCodes, `','`))
-		// cond += fmt.Sprintf(`
-		// 	and exists (
-		// 		select 0
-		// 		from price_list_group plgx
-		// 		left join price_list_sub_group plsgx on plgx.id = plsgx.price_list_group_id
-		// 		where 1=1
-		// 			and plgx.id = plg.id
-		// 			and plsgx.subgroup_key in ('%s')
-		// 	)
-		// `, strings.Join(req.SubGroupCodes, `','`))
-	}
-
-	// Query Group + SubGroup
-	query := fmt.Sprintf(`
+// buildGroupSubGroupQuery builds the price list group + sub group query.
+// Extracted so the ORDER BY (which keeps detail tables from reshuffling after
+// an update) is covered by a test.
+func buildGroupSubGroupQuery(cond string) string {
+	return fmt.Sprintf(`
 		SELECT 
 			plg.id as group_id,
 			plg.company_code,
@@ -341,7 +307,53 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 		FROM price_list_group plg
 		LEFT JOIN price_list_sub_group plsg ON plg.id = plsg.price_list_group_id
 		WHERE 1=1 %s
-	`, cond)
+		-- Without an explicit order Postgres may return rows in a different order
+		-- after any UPDATE, which reshuffles every price list detail table and makes
+		-- the group picked by GetPriceDetail non-deterministic.
+		ORDER BY plg.group_code, plg.id, plsg.subgroup_key, plsg.id
+`, cond)
+}
+
+func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceListGroupResponse, error) {
+	res := []GetPriceListGroupResponse{}
+	cond := ``
+
+	if req.CompanyCode != "" {
+		cond += fmt.Sprintf(` and plg.company_code = '%s' `, req.CompanyCode)
+	}
+
+	if len(req.SiteCodes) > 0 {
+		cond += fmt.Sprintf(` and plg.site_code in ('%s') `, strings.Join(req.SiteCodes, `','`))
+	}
+
+	if req.EffectiveDateFrom != nil {
+		cond += fmt.Sprintf(` and plg.effective_date >= '%s' `, req.EffectiveDateFrom.Format(`2006-01-02`))
+	}
+
+	if req.EffectiveDateTo != nil {
+		cond += fmt.Sprintf(` and plg.effective_date <= '%s' `, req.EffectiveDateTo.Format(`2006-01-02`))
+	}
+
+	if len(req.GroupCodes) > 0 {
+		cond += fmt.Sprintf(` and plg.group_code in ('%s') `, strings.Join(req.GroupCodes, `','`))
+	}
+
+	if len(req.SubGroupCodes) > 0 {
+		cond += fmt.Sprintf(` and plsg.subgroup_key in ('%s') `, strings.Join(req.SubGroupCodes, `','`))
+		// cond += fmt.Sprintf(`
+		// 	and exists (
+		// 		select 0
+		// 		from price_list_group plgx
+		// 		left join price_list_sub_group plsgx on plgx.id = plsgx.price_list_group_id
+		// 		where 1=1
+		// 			and plgx.id = plg.id
+		// 			and plsgx.subgroup_key in ('%s')
+		// 	)
+		// `, strings.Join(req.SubGroupCodes, `','`))
+	}
+
+	// Query Group + SubGroup
+	query := buildGroupSubGroupQuery(cond)
 	//println(query)
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
@@ -349,6 +361,9 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 	}
 
 	groupMap := map[string]*PriceListGroup{}
+	// Map iteration order is random in Go; keep the query's order so the caller
+	// always sees the same group first.
+	groupOrder := []string{}
 
 	for _, row := range rows {
 		groupID := toString(row["group_id"])
@@ -371,6 +386,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				group.EffectiveDate = *t
 			}
 			groupMap[groupID] = group
+			groupOrder = append(groupOrder, groupID)
 		}
 
 		// Append SubGroup
@@ -478,8 +494,8 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 
 	// convert map to slice
 	res = []GetPriceListGroupResponse{}
-	for _, g := range groupMap {
-		res = append(res, GetPriceListGroupResponse{PriceListGroup: *g})
+	for _, groupID := range groupOrder {
+		res = append(res, GetPriceListGroupResponse{PriceListGroup: *groupMap[groupID]})
 	}
 
 	return res, nil

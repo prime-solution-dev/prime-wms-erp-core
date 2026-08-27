@@ -2,7 +2,7 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_10_default",
-      "name": "หมวดเหล็กเส้น",
+      "name": "หมวดเหล็กสี่เหลี่ยมตัน",
       "description": "Dynamic table for PG09 with PG09 price breakouts per item/length.",
       "enabled": true,
       "grouping": {
@@ -183,12 +183,26 @@
       "GROUP_1_ITEM_10": "BuildGroup1Item10Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
     ]
   }
 }
-

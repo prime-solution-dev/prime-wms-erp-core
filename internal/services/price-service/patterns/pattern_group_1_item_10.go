@@ -49,8 +49,8 @@ func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, grou
 			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
 			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
 			if lengthI == lengthJ {
-				weightI := fmt.Sprintf("%v", mergedRows[i]["weight_spec"])
-				weightJ := fmt.Sprintf("%v", mergedRows[j]["weight_spec"])
+				weightI := fmt.Sprintf("%v", mergedRows[i]["total_weight"])
+				weightJ := fmt.Sprintf("%v", mergedRows[j]["total_weight"])
 				return weightI < weightJ
 			}
 			return lengthI < lengthJ
