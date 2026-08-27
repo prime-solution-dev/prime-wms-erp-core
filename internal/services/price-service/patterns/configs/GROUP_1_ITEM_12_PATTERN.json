@@ -5,7 +5,16 @@
       "name": "PG09 Nested Matrix",
       "description": "Nested PG09 -> PG07 matrix with fixed PG2/PG1/Type/Size columns",
       "enabled": true,
-      "requiredGroupCodes": ["GROUP_1_ITEM_12", "GROUP_1_ITEM_14", "GROUP_1_ITEM_15", "GROUP_1_ITEM_16", "GROUP_1_ITEM_17", "GROUP_1_ITEM_18", "GROUP_1_ITEM_19", "GROUP_1_ITEM_20" ],
+      "requiredGroupCodes": [
+        "GROUP_1_ITEM_12",
+        "GROUP_1_ITEM_14",
+        "GROUP_1_ITEM_15",
+        "GROUP_1_ITEM_16",
+        "GROUP_1_ITEM_17",
+        "GROUP_1_ITEM_18",
+        "GROUP_1_ITEM_19",
+        "GROUP_1_ITEM_20"
+      ],
       "grouping": {
         "tabs": "",
         "rows": "PG02|PG01|PG08|PG04|PG03",
@@ -15,12 +24,19 @@
         {
           "level": 1,
           "field": "PG09",
-          "examples": ["Sys", "จีน"]
+          "examples": [
+            "Sys",
+            "จีน"
+          ]
         },
         {
           "level": 2,
           "field": "PG07",
-          "examples": ["6m", "9m", "12m"]
+          "examples": [
+            "6m",
+            "9m",
+            "12m"
+          ]
         }
       ],
       "fixedColumns": [
@@ -217,11 +233,18 @@
       "GROUP_1_ITEM_12": "BuildGroup1Item12Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG03"
+      }
     ]
   }
 }

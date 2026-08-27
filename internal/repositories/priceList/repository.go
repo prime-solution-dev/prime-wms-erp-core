@@ -31,12 +31,41 @@ func GetPriceListGroup(companyCode string, siteCode string, groupCodes []string)
 	if err := query.
 		Preload("PriceListGroupTerms").
 		Preload("PriceListGroupExtras.PriceListGroupExtraKeys").
+		// Without an explicit order Postgres is free to return the sub groups in a
+		// different order after an update, which reshuffles the detail table.
+		Preload("PriceListSubGroups", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("subgroup_key").Order("id")
+		}).
 		Preload("PriceListSubGroups.PriceListSubGroupKeys").
 		Find(&priceListGroups).Error; err != nil {
 		return priceListGroups, err
 	}
 
 	return priceListGroups, nil
+}
+
+// GetPriceListGroupCodesByIDs returns the distinct group codes for the given
+// price list group IDs. Used to cascade a base price update into the sub groups.
+func GetPriceListGroupCodesByIDs(ids []uuid.UUID) ([]string, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	groupCodes := []string{}
+	if err := gormx.Model(&models.PriceListGroup{}).
+		Where("id IN ?", ids).
+		Distinct().
+		Pluck("group_code", &groupCodes).Error; err != nil {
+		return nil, err
+	}
+
+	return groupCodes, nil
 }
 
 // GetPriceListSubGroupByID loads a price list sub group (with keys) by sub group ID.
