@@ -41,7 +41,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 script {
-                    echo "Cloning or updating repository branch: ${TARGET_BRANCH} on remote server..."
+                    echo "Cloning repository branch: ${TARGET_BRANCH} on remote server..."
                     withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
                         sh """ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                         'time git clone --depth 1 -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
@@ -92,42 +92,44 @@ pipeline {
 stage('Fetch .env from Vault (Remote)') {
     steps {
         script {
-            echo "Fetching .env from Vault and write to remote server..."
-
-            withVault([vaultSecrets: [
-                [path: "${VAULT_PATH}",
-                 engineVersion: 2,
-                 secretValues: [
-                     [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
-                 ]
+            withVault([
+                vaultSecrets: [
+                    [
+                        path: "${VAULT_PATH}",
+                        engineVersion: 2,
+                        secretValues: [
+                            [
+                                envVar: 'AUTHEN_ENV',
+                                vaultKey: "${ENV_FILE_KEY}"
+                            ]
+                        ]
+                    ]
                 ]
-            ]]) {
-                sh """
-                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
-                    cd ${REPO_NAME} &&
-                                        mkdir -p cmd &&
-                    cat << "EOF" > cmd/.env
-${AUTHEN_ENV}
-EOF
-                    chmod 600 cmd/.env &&
-                    echo ".env written to remote ${REPO_NAME}/cmd/.env"
-                '
-                """
+            ]) {
+                sh '''
+                    set +x
+
+                    printf '%s\\n' "$AUTHEN_ENV" |
+                    ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                    "cd '$REPO_NAME' && \
+                     mkdir -p cmd && \
+                     cat > cmd/.env && \
+                     chmod 600 cmd/.env"
+                '''
             }
         }
     }
 }
-
-stage('Build Docker Image') {
+        stage('Build Docker Image') {
             steps {
                 script {
                     echo 'Building Docker image on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t  ${IMAGE_NAME}:latest .'"""
+                    'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
                 }
             }
         }
-        stage('Stop and Remove Old Container') {
+                stage('Stop and Remove Old Container') {
             steps {
                 script {
                     echo 'Stopping and removing old container on remote server...'
@@ -141,7 +143,7 @@ stage('Build Docker Image') {
                 script {
                     echo 'Deploying container on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
+                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
                 }
             }
         }
@@ -180,3 +182,7 @@ stage('Clean Up Repository') {
         }
     }
 }
+
+
+
+

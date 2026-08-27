@@ -203,33 +203,45 @@ type GoodsReceiveConfirmSerial struct {
 }
 
 func GetGoodsReceives(jsonPayload GoodsReceiveFilter) (GoddsReceiveResult, error) {
+
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
-		return GoddsReceiveResult{}, errors.New("Error marshaling struct to JSON:" + err.Error())
+		return GoddsReceiveResult{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
 	req, err := http.NewRequest("POST", config.GET_GOODS_RECEIVE_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return GoddsReceiveResult{}, errors.New("Error parsing DateTo: " + err.Error())
+		return GoddsReceiveResult{}, errors.New("Error creating request: " + err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return GoddsReceiveResult{}, errors.New("Error parsing DateTo: " + err.Error())
+		return GoddsReceiveResult{}, errors.New("Error sending request: " + err.Error())
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		return GoddsReceiveResult{}, errors.New("Error reading response body: " + err.Error())
+	}
+
+	// เดิมข้ามการเช็ค status ทำให้ปลายทางตอบ 500 แล้วเราคืน struct เปล่ากับ error = nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
+			return GoddsReceiveResult{}, errors.New(errResp.Error)
+		}
+		return GoddsReceiveResult{}, fmt.Errorf("API error status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var dataRes GoddsReceiveResult
-	err = json.Unmarshal(body, &dataRes)
-	if err != nil {
-		fmt.Println("Response Status:", err)
+	if err = json.Unmarshal(body, &dataRes); err != nil {
+		return GoddsReceiveResult{}, errors.New("Error parsing response: " + err.Error())
 	}
 
 	return dataRes, nil
