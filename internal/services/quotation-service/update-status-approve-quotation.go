@@ -42,6 +42,20 @@ func UpdateStatusApproveQuotation(ctx *gin.Context, jsonPayload string) (interfa
 	}
 	defer db.CloseGORM(gormx)
 
+	var quotation models.Quotation
+	if err := gormx.Where("id = ?", req.ID).Take(&quotation).Error; err != nil {
+		return nil, fmt.Errorf("quotation not found: %v", err)
+	}
+
+	// เดิมไม่เช็คสถานะเลย กด REJECT ใบที่แปลงเป็น sale order ไปแล้วได้
+	// ซึ่งจะดัน status เป็น CANCELED และ item ทั้งใบเป็น CANCELED ทั้งที่ SO ยังเดินอยู่
+	switch quotation.Status {
+	case "COMPLETED":
+		return nil, errors.New("quotation already converted to a sale order and its approval cannot be changed")
+	case "CANCELED":
+		return nil, errors.New("quotation is canceled and its approval cannot be changed")
+	}
+
 	updateApprovalReq := []struct {
 		ID     uuid.UUID `json:"id"`
 		Status string    `json:"status"`
