@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type CreateSaleRequest struct {
@@ -71,7 +72,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	createSaleDeposits := []models.SaleDeposit{}
 
 	// Generate all sale codes first
-	saleCodes, err := generateSaleCodes(ctx, len(req.Sales))
+	saleCodes, err := generateSaleCodes(gormx, len(req.Sales))
 	if err != nil {
 		return nil, err
 	}
@@ -266,12 +267,6 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, err
 	}
 
-	// Update running number after successful creation
-	if err := updateSaleRunningConfig(ctx, len(createSales)); err != nil {
-		// Log error but don't fail the transaction as sales are already created
-		fmt.Printf("Warning: failed to update running config: %v\n", err)
-	}
-
 	// ถ้า status เป็น WAIT_FOR_APPROVED ให้ส่ง sale id ไปสร้าง RequestApproveSale
 	if req.Status == "WAIT_FOR_APPROVED" {
 		for _, sale := range createSales {
@@ -294,55 +289,22 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-// updateSaleRunningConfig updates the running number configuration for sales
-func updateSaleRunningConfig(ctx *gin.Context, count int) error {
+// generateSaleCodes จองเลขที่เอกสารแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)
+// เดิมแยกเป็นอ่านเลขตอนนี้ แล้วค่อยเดินเลขหลัง insert ซึ่งทำให้สองคนที่กดพร้อมกันได้เลขเดียวกัน
+func generateSaleCodes(gormx *gorm.DB, count int) ([]string, error) {
 	if count <= 0 {
-		return nil // No sales created, nothing to update
+		return []string{}, nil
 	}
 
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_SO",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqJSON))
-	if err != nil {
-		return fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	return nil
-}
-
-// generateSaleCodes generates sale codes using system config
-func generateSaleCodes(ctx *gin.Context, count int) ([]string, error) {
-	if count <= 0 {
-		return []string{}, nil // No sales to generate codes for
-	}
-
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: "RUNNING_SO",
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
-	}
-
-	saleCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_SO", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sale codes: %v", err)
 	}
 
-	saleResult, ok := saleCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(saleResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of sale codes from system config")
 	}
 
-	return saleResult.Data, nil
+	return codes, nil
 }

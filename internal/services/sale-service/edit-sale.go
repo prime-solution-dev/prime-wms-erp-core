@@ -36,6 +36,20 @@ func EditSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
+	var sale models.Sale
+	if err := gormx.Where("sale_code = ?", req.SaleCode).Take(&sale).Error; err != nil {
+		return nil, fmt.Errorf("sale not found: %v", err)
+	}
+
+	// เดิมไม่เช็คสถานะ ใบที่ปิดไปแล้วหรือใบที่ยกเลิกไปแล้วถูกดันกลับมาเป็น
+	// PENDING/PENDING ได้ ทั้งที่ใบจองคิวส่งกับ order ฝั่งคลังยังอ้างใบนี้อยู่
+	switch sale.Status {
+	case "COMPLETED":
+		return nil, errors.New("sale order is already closed and cannot be edited")
+	case "CANCELED":
+		return nil, errors.New("sale order is canceled and cannot be edited")
+	}
+
 	approvalReq := approvalService.GetApprovalRequest{
 		Page:         1,
 		PageSize:     1,

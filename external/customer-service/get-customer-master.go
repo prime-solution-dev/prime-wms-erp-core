@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"prime-erp-core/config"
 	"time"
@@ -62,31 +62,43 @@ func GetCustomer(jsonPayload GetCustomerRequest) (ResultCustomerResponse, error)
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
-		return ResultCustomerResponse{}, errors.New("Error marshaling struct to JSON:")
-	}
-	reqProduct, err := http.NewRequest("POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return ResultCustomerResponse{}, errors.New("Error parsing DateTo: " + err.Error())
+		return ResultCustomerResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	reqProduct.Header.Set("Content-Type", "application/json")
-
-	// Create a client and execute the request
-	client := &http.Client{}
-	resp, err := client.Do(reqProduct)
+	req, err := http.NewRequest("POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return ResultCustomerResponse{}, errors.New("Error parsing DateTo: " + err.Error())
+		return ResultCustomerResponse{}, errors.New("Error creating request: " + err.Error())
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return ResultCustomerResponse{}, errors.New("Error sending request: " + err.Error())
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		return ResultCustomerResponse{}, errors.New("Error reading response body: " + err.Error())
 	}
-	var customers ResultCustomerResponse
-	err = json.Unmarshal(body, &customers)
-	if err != nil {
-		fmt.Println("Response Status:", err)
+
+	// เดิมข้ามการเช็ค status ทำให้ปลายทางตอบ 500 แล้วเราคืน struct เปล่ากับ error = nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
+			return ResultCustomerResponse{}, errors.New(errResp.Error)
+		}
+		return ResultCustomerResponse{}, fmt.Errorf("API error status %d: %s", resp.StatusCode, string(body))
 	}
-	return customers, nil
+
+	var dataRes ResultCustomerResponse
+	if err = json.Unmarshal(body, &dataRes); err != nil {
+		return ResultCustomerResponse{}, errors.New("Error parsing response: " + err.Error())
+	}
+
+	return dataRes, nil
 }

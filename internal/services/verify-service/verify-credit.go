@@ -24,8 +24,19 @@ type VerifyCreditCustomer struct {
 	NeedAmount   float64 `json:"need_amount"`
 
 	//Result
-	RemainCredit float64 `json:"remain_credit"`
-	IsPass       bool    `json:"is_pass"`
+	CreditCalculation VerifyCreditCalculation `json:"credit_calculation"`
+	IsPass            bool                    `json:"is_pass"`
+}
+
+type VerifyCreditCalculation struct {
+	Subject          string  `json:"subject"`
+	CreditLimit      float64 `json:"credit_limit"`
+	ExtraCreditLimit float64 `json:"extra_credit_limit"`
+	RemainDeposit    float64 `json:"remain_deposit"`
+	UsedCredit       float64 `json:"used_credit"`
+	RemainCredit     float64 `json:"remain_credit"`
+	NeedAmount       float64 `json:"need_amount"`
+	FinalCredit      float64 `json:"final_credit"`
 }
 
 func VerifyCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -70,9 +81,18 @@ func VerifyCreditLogic(sqlx *sqlx.DB, req VerifyCreditRequest) (*VerifyCreditRes
 	for _, rCustomer := range req.Customers {
 		for _, credit := range creditCustomer.CreditCustomers {
 			if credit.CustomerCode == rCustomer.CustomerCode {
-				rCustomer.RemainCredit = credit.Balance
+				rCustomer.CreditCalculation = VerifyCreditCalculation{
+					Subject:          "credit",
+					CreditLimit:      credit.Credit,
+					ExtraCreditLimit: credit.Extra,
+					RemainDeposit:    credit.RemainDeposit,
+					UsedCredit:       credit.Used,
+					RemainCredit:     credit.Balance,
+					NeedAmount:       rCustomer.NeedAmount,
+					FinalCredit:      credit.Balance - rCustomer.NeedAmount,
+				}
 
-				if (credit.Balance - rCustomer.NeedAmount) >= 0 {
+				if rCustomer.CreditCalculation.FinalCredit >= 0 {
 					rCustomer.IsPass = true
 				} else {
 					rCustomer.IsPass = false
