@@ -59,7 +59,7 @@ func getValidationErrorMessage(fieldError validator.FieldError) string {
 		return fmt.Sprintf("%s must be at most %s", field, fieldError.Param())
 	case "omitempty":
 		return fmt.Sprintf("%s is invalid", field)
-	case "uuid4":
+	case "uuid", "uuid4":
 		return fmt.Sprintf("%s must be a valid UUID", field)
 	default:
 		return fmt.Sprintf("%s failed validation for tag '%s'", field, tag)
