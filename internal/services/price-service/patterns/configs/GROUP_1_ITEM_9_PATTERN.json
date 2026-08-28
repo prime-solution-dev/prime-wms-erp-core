@@ -2,7 +2,7 @@
   "patterns": [
     {
       "id": "pattern_group_1_item_9_default",
-      "name": "PG09 Length Matrix",
+      "name": "หมวดเหล็กเส้น",
       "description": "Single table layout for GROUP_1_ITEM_9 with PRODUCT_GROUP3 column groups and row-span columns for Product Group and Length",
       "enabled": true,
       "grouping": {
@@ -117,6 +117,15 @@
           }
         },
         {
+          "field": "line_bundle",
+          "headerName": "เส้น/มัด",
+          "width": 120,
+          "dataMapping": "line_bundle",
+          "cellStyle": {
+            "textAlign": "left"
+          }
+        },
+        {
           "field": "inactive",
           "headerName": "Inactive",
           "width": 110,
@@ -131,7 +140,9 @@
       "editable_suffixes": [
         "total_net_price_weight",
         "remark",
-        "inactive"
+        "inactive",
+        "is_highlight",
+        "line_bundle"
       ],
       "fetchable_suffixes": [
         "total_net_price_weight"
@@ -175,12 +186,26 @@
       "GROUP_1_ITEM_9": "BuildGroup1Item9Response"
     },
     "defaultItemFormat": [
-      {"type": "group", "value": "PG04"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG06"},
-      {"type": "literal", "value": "x"},
-      {"type": "group", "value": "PG07"}
+      {
+        "type": "group",
+        "value": "PG04"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG06"
+      },
+      {
+        "type": "literal",
+        "value": "x"
+      },
+      {
+        "type": "group",
+        "value": "PG07"
+      }
     ]
   }
 }
-

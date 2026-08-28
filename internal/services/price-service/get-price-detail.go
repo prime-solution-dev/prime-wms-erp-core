@@ -398,8 +398,15 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}, nil
 	}
 
-	// Determine the pattern handler from the group's code
-	dataGroupCode := priceListData[0].GroupCode
+	// Determine the pattern handler from the group code that was actually requested.
+	// A config may pull in extra groups through requiredGroupCodes (the HB/WF page and
+	// the coil page each render several groups in one table), and those extra groups
+	// have no handler of their own - picking the handler off priceListData[0] resolved
+	// whichever group the database happened to return first.
+	dataGroupCode := groupCode
+	if dataGroupCode == "" {
+		dataGroupCode = priceListData[0].GroupCode
+	}
 	if dataGroupCode == "" {
 		return nil, fmt.Errorf("GroupCode is missing in price list data")
 	}
