@@ -1,11 +1,13 @@
 package groupService_test
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -42,5 +44,16 @@ func TestSyncGroupMasterRejectsAnEmptySnapshot(t *testing.T) {
 func TestSyncGroupMasterRejectsANilConnection(t *testing.T) {
 	if _, err := groupService.SyncGroupMasterWithDB(nil, validSyncRequest()); err == nil {
 		t.Fatal("a nil connection must return an error")
+	}
+}
+
+// The handler is what the route actually calls; a malformed body must be rejected before it ever
+// reaches the database.
+func TestSyncGroupMasterRejectsBrokenJson(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+	if _, err := groupService.SyncGroupMaster(ctx, `{`); err == nil {
+		t.Fatal("broken JSON must return an error")
 	}
 }

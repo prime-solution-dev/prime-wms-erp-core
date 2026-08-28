@@ -5,6 +5,7 @@ package groupService_test
 import (
 	"context"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -224,5 +226,39 @@ func TestSyncGroupMasterAcceptsGroupsWithoutItems(t *testing.T) {
 	}
 	if itemCount != 0 {
 		t.Errorf("the stale items must be gone, count = %d", itemCount)
+	}
+}
+
+// The handler is the route's entry point: it must resolve its own connection from the environment
+// and land the snapshot, not just delegate correctly in theory.
+func TestSyncGroupMasterHandlerWritesTheSnapshot(t *testing.T) {
+	seedExistingGroup(t)
+
+	groupID := uuid.New()
+	payload := fmt.Sprintf(`{"groups":[{"id":%q,"group_code":"PG01","group_name":"Product Group","seq":1}],`+
+		`"group_items":[{"id":%q,"group_id":%q,"item_code":"BU01","item_name":"Bulk"}]}`,
+		groupID, uuid.New(), groupID)
+
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+	got, err := groupService.SyncGroupMaster(ctx, payload)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	response, ok := got.(*groupService.SyncGroupMasterResponse)
+	if !ok {
+		t.Fatalf("want a SyncGroupMasterResponse, got %#v", got)
+	}
+	if response.GroupsSynced != 1 || response.GroupItemsSynced != 1 {
+		t.Errorf("counts = %d/%d, want 1/1", response.GroupsSynced, response.GroupItemsSynced)
+	}
+
+	var groups []models.Group
+	if err := groupTestDB.Find(&groups).Error; err != nil {
+		t.Fatalf("read groups: %v", err)
+	}
+	if len(groups) != 1 || groups[0].ID != groupID {
+		t.Errorf("the handler did not land the snapshot: %+v", groups)
 	}
 }
