@@ -27,8 +27,15 @@ func TestSyncGroupMasterRejectsAnEmptySnapshot(t *testing.T) {
 	req := validSyncRequest()
 	req.Groups = nil
 
-	if _, err := groupService.SyncGroupMasterWithDB(nil, req); err == nil {
+	// Asserting the message, not just err != nil: this call also passes a nil connection, so a
+	// generic check would still pass if the guards were ever reordered and the nil check fired
+	// first — leaving the wipe-protection untested.
+	_, err := groupService.SyncGroupMasterWithDB(nil, req)
+	if err == nil {
 		t.Fatal("an empty snapshot must return an error")
+	}
+	if err.Error() != "groups cannot be empty" {
+		t.Errorf("the empty-snapshot guard must fire first, got %v", err)
 	}
 }
 
