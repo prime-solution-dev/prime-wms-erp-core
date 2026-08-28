@@ -1,12 +1,15 @@
 SHELL := /usr/bin/fish
 
-.PHONY: test test-integration tidy seed-price-list-test seed-price-list-formulas
+.PHONY: test test-integration test-integration-group tidy seed-price-list-test seed-price-list-formulas
 
 test:
 	go test ./...
 
 test-integration:
 	go test -v -tags=integration ./internal/repositories/priceList
+
+test-integration-group:
+	go test -v -tags=integration ./internal/services/group-service
 
 tidy:
 	go mod tidy

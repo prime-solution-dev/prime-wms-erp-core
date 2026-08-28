@@ -392,14 +392,24 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
+		// A base-price update cascades over every sub group of every group — 1,200+
+		// rows against a remote database. Reading each row and inserting each history
+		// record one at a time cost three round trips per row and pushed the request
+		// past the client's 180s timeout, so both are done in bulk here and only the
+		// UPDATE (which carries per-row values) stays inside the loop.
+		//
+		// No Preload on the read: only scalar columns are used below.
+		oldSubGroups, err := loadSubGroupsForUpdate(tx, reqs.Changes)
+		if err != nil {
+			return err
+		}
+
+		histories := make([]models.PriceListSubGroupHistory, 0, len(reqs.Changes))
+
 		for _, req := range reqs.Changes {
-			// Retrieve existing sub_group record
-			oldSubGroup := models.PriceListSubGroup{}
-			if err := tx.Model(&models.PriceListSubGroup{}).
-				Where("id = ?", req.SubGroupID).
-				Preload("PriceListSubGroupKeys").
-				First(&oldSubGroup).Error; err != nil {
-				return err
+			oldSubGroup, ok := oldSubGroups[req.SubGroupID]
+			if !ok {
+				return gorm.ErrRecordNotFound
 			}
 
 			now := time.Now().UTC()
@@ -434,10 +444,7 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				UpdateDtm:                 oldSubGroup.UpdateDtm,
 			}
 
-			// Insert old record into history table
-			if err := tx.Model(&models.PriceListSubGroupHistory{}).Create(&historyRecord).Error; err != nil {
-				return err
-			}
+			histories = append(histories, historyRecord)
 
 			// Prepare update map
 			updateMap := make(map[string]interface{})
@@ -529,8 +536,51 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 			}
 		}
 
+		if len(histories) > 0 {
+			if err := tx.CreateInBatches(&histories, subGroupHistoryBatchSize).Error; err != nil {
+				return err
+			}
+		}
+
 		return nil
 	})
+}
+
+// subGroupHistoryBatchSize keeps each history INSERT well under PostgreSQL's
+// 65535 bind-parameter limit; the history row has ~28 columns.
+const subGroupHistoryBatchSize = 500
+
+// loadSubGroupsForUpdate reads every sub group the changes refer to in one query,
+// keyed by id. Ids that do not exist are simply absent from the map, which the
+// caller turns into gorm.ErrRecordNotFound to match the previous row-by-row read.
+func loadSubGroupsForUpdate(tx *gorm.DB, changes []models.UpdatePriceListSubGroupItem) (map[uuid.UUID]models.PriceListSubGroup, error) {
+	ids := make([]uuid.UUID, 0, len(changes))
+	seen := make(map[uuid.UUID]bool, len(changes))
+	for _, change := range changes {
+		if seen[change.SubGroupID] {
+			continue
+		}
+		seen[change.SubGroupID] = true
+		ids = append(ids, change.SubGroupID)
+	}
+
+	subGroups := make(map[uuid.UUID]models.PriceListSubGroup, len(ids))
+	if len(ids) == 0 {
+		return subGroups, nil
+	}
+
+	rows := []models.PriceListSubGroup{}
+	if err := tx.Model(&models.PriceListSubGroup{}).
+		Where("id IN ?", ids).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, row := range rows {
+		subGroups[row.ID] = row
+	}
+
+	return subGroups, nil
 }
 
 func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]models.PriceListSubGroupFormulasMap, error) {

@@ -35,6 +35,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	group.POST("/GetGroupMaster", func(c *gin.Context) {
 		utils.ProcessRequest(c, groupService.GetGroup)
 	})
+	group.POST("/SyncGroupMaster", func(c *gin.Context) {
+		utils.ProcessRequest(c, groupService.SyncGroupMaster)
+	})
 
 	//price
 	price := ctx.Group("/price")
