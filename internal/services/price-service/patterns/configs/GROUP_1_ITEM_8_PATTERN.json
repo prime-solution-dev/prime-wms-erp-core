@@ -196,7 +196,9 @@
         "institute",
         "country",
         "tsm",
-        "remark"
+        "remark",
+        "is_highlight",
+        "inactive"
       ],
       "fetchable_suffixes": [
         "before_total_net_price_unit",
