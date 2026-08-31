@@ -5,11 +5,11 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115'
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Thaimetal-main' 
-        REMOTE_USER = 'ec2-user'
+        TARGET_BRANCH = 'Thaimetal-main'
+        REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '54.179.75.32'
         SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS' // path ของ secret
+        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS'
         ENV_FILE_KEY = 'thaimetalprd.env.erp'
     }
 
