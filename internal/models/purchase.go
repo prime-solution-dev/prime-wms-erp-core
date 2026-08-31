@@ -545,6 +545,7 @@ type UpdateStatusApprovePurchaseRequest struct {
 	PurchaseCode  string    `json:"purchase_code"`
 	IsApproved    bool      `json:"is_approved"`
 	StatusApprove string    `json:"status_approve"`
+	Remark        string    `json:"remark"`
 }
 
 type CompleteStatusPaymentPurchaseRequest struct {

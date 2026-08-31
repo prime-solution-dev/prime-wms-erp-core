@@ -294,6 +294,7 @@ func UpdatePOToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprov
 		mapUpdateList[req.PurchaseCode] = models.Approval{
 			DocumentCode: req.PurchaseCode,
 			Status:       req.StatusApprove,
+			Remark:       req.Remark,
 		}
 	}
 
