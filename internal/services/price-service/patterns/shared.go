@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"prime-erp-core/internal/models"
 	"regexp"
 	"sort"
@@ -516,22 +517,69 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
-// getAvgProductFromInventory extracts AvgProduct from the first InventoryWeight entry
-// Returns 0.0 if inventory data is not available
-func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) string {
+// getAvgProductFromInventory extracts AvgWeight from the first InventoryWeight entry.
+// Returns 0 (not an empty string) when inventory data is unavailable so the grid
+// renders "0" instead of a blank cell and can format the value as a number.
+func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
 	if len(sg.InventoryWeight) > 0 {
-		return fmt.Sprintf("%.2f", sg.InventoryWeight[0].AvgWeight)
+		return roundTo2(sg.InventoryWeight[0].AvgWeight)
 	}
-	return ""
+	return 0
 }
 
 // getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry
 // Returns 0.0 if inventory data is not available
 func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
 	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].TotalWeight
+		return sg.InventoryWeight[0].WeightSpec
 	}
 	return 0.0
+}
+
+// getQtyFromInventory extracts the on-hand quantity (จำนวน / ลูก) from the first
+// InventoryWeight entry. Returns 0 when inventory data is unavailable so the grid
+// shows "0" rather than a blank cell.
+func getQtyFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	if len(sg.InventoryWeight) > 0 {
+		inv := sg.InventoryWeight[0]
+		if inv.SumQty != 0 {
+			return inv.SumQty
+		}
+		return inv.TotalQty
+	}
+	return 0
+}
+
+func roundTo2(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
+// udfNumeric reads a numeric udf_json value. The grid saves these fields through
+// both number and text cell editors, so the same key can be stored as a JSON
+// number or a JSON string. Numeric strings are parsed; a non-numeric string is
+// passed through unchanged so whatever the user typed still round-trips instead
+// of coming back blank. Returns nil only when the key is absent or empty.
+func udfNumeric(udfData map[string]interface{}, key string) interface{} {
+	raw, ok := udfData[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return nil
+		}
+		if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
+			return f
+		}
+		return v
+	}
+	return raw
 }
 
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
@@ -1063,7 +1111,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
-		var lineBundleValue *float64
+		var lineBundleValue interface{}
 		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
@@ -1101,12 +1149,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					inactiveValue = inactive
 					hasInactiveValue = true
 				}
-				if lb, ok := udfData["line_bundle"].(float64); ok {
-					lineBundleValue = &lb
-				} else if lb, ok := udfData["line_bundle"].(int); ok {
-					lbFloat := float64(lb)
-					lineBundleValue = &lbFloat
-				}
+				lineBundleValue = udfNumeric(udfData, "line_bundle")
 				if sq, ok := udfData["stock_quantity"]; ok {
 					stockQuantityValue = sq
 				}
@@ -1319,12 +1362,16 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				row[fieldName] = stockValue
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[fieldName] = *lineBundleValue
+					row[fieldName] = lineBundleValue
 				} else {
 					row[fieldName] = nil
 				}
 			case "stock_quantity":
-				row[fieldName] = stockQuantityValue
+				if stockQuantityValue != nil {
+					row[fieldName] = stockQuantityValue
+				} else {
+					row[fieldName] = getQtyFromInventory(sg)
+				}
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
 					row[fieldName] = batchNoValue
@@ -1437,8 +1484,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
-		var lineBundleValue *float64
-		var marketWeightValue *float64
+		var lineBundleValue interface{}
+		var marketWeightValue interface{}
 		var odValue interface{}
 		var stockValue interface{}
 		var importDateValue interface{}
@@ -1485,18 +1532,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					inactiveValue = inactive
 					hasInactiveValue = true
 				}
-				if lb, ok := udfData["line_bundle"].(float64); ok {
-					lineBundleValue = &lb
-				} else if lb, ok := udfData["line_bundle"].(int); ok {
-					lbFloat := float64(lb)
-					lineBundleValue = &lbFloat
-				}
-				if mw, ok := udfData["market_weight"].(float64); ok {
-					marketWeightValue = &mw
-				} else if mw, ok := udfData["market_weight"].(int); ok {
-					mwFloat := float64(mw)
-					marketWeightValue = &mwFloat
-				}
+				lineBundleValue = udfNumeric(udfData, "line_bundle")
+				marketWeightValue = udfNumeric(udfData, "market_weight")
 				if od, ok := udfData["od"]; ok {
 					odValue = od
 				}
@@ -1643,13 +1680,13 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.ExtraPriceWeight
 			case "market_weight":
 				if marketWeightValue != nil {
-					row[fixedCol.Field] = *marketWeightValue
+					row[fixedCol.Field] = marketWeightValue
 				} else {
 					row[fixedCol.Field] = nil
 				}
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[fixedCol.Field] = *lineBundleValue
+					row[fixedCol.Field] = lineBundleValue
 				} else {
 					row[fixedCol.Field] = nil
 				}
@@ -1719,7 +1756,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if stockQuantityValue != nil {
 					row[fixedCol.Field] = stockQuantityValue
 				} else {
-					row[fixedCol.Field] = nil
+					row[fixedCol.Field] = getQtyFromInventory(sg)
 				}
 			case "batch_no":
 				if sg.BatchNo != "" {
@@ -1910,7 +1947,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[colConfig.Field] = sg.PriceWeight
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[colConfig.Field] = *lineBundleValue
+					row[colConfig.Field] = lineBundleValue
 				} else {
 					row[colConfig.Field] = nil
 				}
@@ -1972,7 +2009,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if stockQuantityValue != nil {
 					row[colConfig.Field] = stockQuantityValue
 				} else {
-					row[colConfig.Field] = nil
+					row[colConfig.Field] = getQtyFromInventory(sg)
 				}
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
@@ -2305,7 +2342,13 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 					row[fieldName] = false
 				}
 			case "remark":
-				row[fieldName] = remarkValue
+				// remark lives on the price_list_sub_group column; the udf copy only
+				// exists for rows saved before that was settled.
+				if sg.Remark != "" {
+					row[fieldName] = sg.Remark
+				} else {
+					row[fieldName] = remarkValue
+				}
 			case "price_weight":
 				row[fieldName] = sg.PriceWeight
 			case "before_total_net_price_weight":
@@ -2787,5 +2830,8 @@ func GetDefaultHandlers() map[string]PriceTableHandler {
 		"GROUP_1_ITEM_21": func(data []models.GetPriceListResponse, _ string) (PriceListDetailApiResponse, error) {
 			return BuildGroup1Item1Response(data)
 		},
+		// ม้วนลาย is the second tab of the coil page, not a page of its own - the
+		// Base Price list still links to it directly, so it renders the same table.
+		"GROUP_1_ITEM_22": BuildGroup1Item7Response,
 	}
 }

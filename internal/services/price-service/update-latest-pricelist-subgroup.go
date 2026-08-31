@@ -41,6 +41,14 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
 	}
 
+	return RunUpdateLatestPriceListSubGroup(req)
+}
+
+// RunUpdateLatestPriceListSubGroup recalculates and persists the latest sub group
+// prices. Split out of the HTTP handler so other services (notably the base price
+// update) can cascade into it without going through gin.
+func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+
 	// Determine update type, defaulting to "subgroup" for backward compatibility
 	updateType := req.UpdateType
 	if updateType == "" {

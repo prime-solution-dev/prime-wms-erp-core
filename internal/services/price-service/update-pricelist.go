@@ -11,6 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
+// seams for unit testing: allow stubbing the cascade dependencies
+var getPriceListGroupCodesByIDsFunc = priceListRepository.GetPriceListGroupCodesByIDs
+var runUpdateLatestSubGroupFunc = RunUpdateLatestPriceListSubGroup
+
 func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdatePriceListBaseRequest{}
 
@@ -61,7 +65,39 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 		return nil, err
 	}
 
+	// The detail pages read their prices from price_list_sub_group, which is not
+	// touched above. Recalculate them here so the new base price is stamped as the
+	// "after" price (and the previous "after" moves to "before") right away,
+	// instead of only when someone happens to hit /price/SubGroup/UpdateLatest.
+	if err := cascadeBasePriceToSubGroups(priceListGroup); err != nil {
+		return nil, err
+	}
+
 	return nil, nil
+}
+
+func cascadeBasePriceToSubGroups(priceListGroup []models.PriceListGroup) error {
+	ids := make([]uuid.UUID, 0, len(priceListGroup))
+	for _, group := range priceListGroup {
+		ids = append(ids, group.ID)
+	}
+
+	groupCodes, err := getPriceListGroupCodesByIDsFunc(ids)
+	if err != nil {
+		return fmt.Errorf("failed to resolve group codes for base price cascade: %w", err)
+	}
+	if len(groupCodes) == 0 {
+		return nil
+	}
+
+	if _, err := runUpdateLatestSubGroupFunc(models.UpdateLatestPriceListSubGroupRequest{
+		UpdateType: "group",
+		GroupCodes: groupCodes,
+	}); err != nil {
+		return fmt.Errorf("failed to cascade base price to sub groups: %w", err)
+	}
+
+	return nil
 }
 
 // checkForOverlappingConditions validates that no conditions overlap

@@ -290,15 +290,15 @@ type InventoryWeightResponse struct {
 	SerialCode        string  `json:"serial_code,omitempty"`
 	SupplierCode      string  `json:"supplier_code"`
 	SupplierName      string  `json:"supplier_name"`
-	AvgProduct        float64 `json:"avg_product,omitempty"`
-	AvgBatch          float64 `json:"avg_batch,omitempty"`
-	AvgSerial         float64 `json:"avg_serial,omitempty"`
-	AvgWeight         float64 `json:"avg_weight,omitempty"`
-	WeightSpec        float64 `json:"weight_spec,omitempty"`
-	SumQty            float64 `json:"sum_qty,omitempty"`
-	SumWeight         float64 `json:"sum_weight,omitempty"`
-	TotalQty          float64 `json:"total_qty,omitempty"`
-	TotalWeight       float64 `json:"total_weight,omitempty"`
+	AvgProduct        float64 `json:"avg_product"`
+	AvgBatch          float64 `json:"avg_batch"`
+	AvgSerial         float64 `json:"avg_serial"`
+	AvgWeight         float64 `json:"avg_weight"`
+	WeightSpec        float64 `json:"weight_spec"`
+	SumQty            float64 `json:"sum_qty"`
+	SumWeight         float64 `json:"sum_weight"`
+	TotalQty          float64 `json:"total_qty"`
+	TotalWeight       float64 `json:"total_weight"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -439,7 +439,7 @@ type UpdateLatestPriceListSubGroupRequest struct {
 	// - "group"   : update all subgroups under the given group_codes
 	UpdateType  string   `json:"update_type" binding:"omitempty,oneof=subgroup group"`
 	GroupCodes  []string `json:"group_codes" binding:"omitempty,dive"`
-	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid4"`
+	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid"`
 }
 
 type UpdatePriceListGroupExtraKeyRequest struct {
