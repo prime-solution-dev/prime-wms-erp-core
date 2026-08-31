@@ -300,6 +300,7 @@ func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map
 			updateApprovalReq = append(updateApprovalReq, models.Approval{
 				ID:     approval.ID,
 				Status: mapped.Status,
+				Remark: mapped.Remark,
 			})
 		} else {
 			return fmt.Errorf("approval request for document code %s not found", approval.DocumentCode)

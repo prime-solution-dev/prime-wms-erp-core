@@ -156,11 +156,6 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
-	productMasterMap, err := getProductMasterMap(req, poMap)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, po := range poMap {
 		poCode := strings.TrimSpace(po.PurchaseCode)
 		if poCode == "" {
@@ -267,7 +262,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 
 	remainMap := ComputePurchaseRemainQty(poMap, ibDocMapPo, apDocMapPo, grRemainMapPo, productSet)
 
-	results, err := ConvertToResponse(poMap, remainMap, productSet, productMasterMap)
+	results, err := ConvertToResponse(poMap, remainMap, productSet, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -280,6 +275,12 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	})
 
 	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
+	productMasterMap, err := getProductMasterMap(req, paged)
+	if err != nil {
+		return nil, err
+	}
+	enrichProductMaster(paged, productMasterMap)
+
 	res.Daatas = paged
 	res.Page = &page
 	res.PageSize = &pageSize
@@ -489,6 +490,9 @@ func ConvertToResponse(
 
 			key := fmt.Sprintf("%s|%s", strings.TrimSpace(po.PurchaseCode), strings.TrimSpace(it.PurchaseItem))
 			remain := remainMap[key]
+			if remain <= 0 {
+				continue
+			}
 
 			productDesc := it.ProductDesc
 			productName := ""
@@ -564,6 +568,27 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	paySet := makeStringSetTrimUpper(req.StattusPayment)
 	notPairs := normalizeNotPurchasePairs(req.NotPurchaseItems)
 	statusSet := makeStringSetTrimUpper(req.Status)
+	productNameSet := map[string]bool{}
+
+	if strings.TrimSpace(req.ProductNameLike) != "" {
+		var err error
+		productNameSet, err = getProductCodesByNameLike(req)
+		if err != nil {
+			return rs, err
+		}
+		if len(productNameSet) == 0 {
+			return rs, nil
+		}
+
+		if len(prodSet) > 0 {
+			prodSet = intersectStringSets(prodSet, productNameSet)
+			if len(prodSet) == 0 {
+				return rs, nil
+			}
+		} else {
+			prodSet = productNameSet
+		}
+	}
 
 	q := gormx.Model(&models.Purchase{}).
 		Where("company_code = ? AND site_code = ?", company, site)
@@ -590,10 +615,10 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 		)
 	}
 
-	if req.PurchaseCodeLike != "" {
-		q = q.Where("purchase_code ILIKE ?", "%"+req.PurchaseCodeLike+"%")
+	if strings.TrimSpace(req.PurchaseCodeLike) != "" {
+		q = q.Where("purchase_code ILIKE ?", "%"+strings.TrimSpace(req.PurchaseCodeLike)+"%")
 	}
-	if req.ProductCodeLike != "" {
+	if strings.TrimSpace(req.ProductCodeLike) != "" {
 		q = q.Where(`
 			EXISTS (
 				SELECT 1
@@ -601,19 +626,8 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 				WHERE pi.purchase_id = purchase.id
 				  AND pi.product_code ILIKE ?
 			)
-		`, "%"+req.ProductCodeLike+"%")
+		`, "%"+strings.TrimSpace(req.ProductCodeLike)+"%")
 	}
-	if req.ProductNameLike != "" {
-		q = q.Where(`
-			EXISTS (
-				SELECT 1
-				FROM purchase_item pi
-				WHERE pi.purchase_id = purchase.id
-				  AND pi.product_desc ILIKE ?
-			)
-		`, "%"+req.ProductNameLike+"%")
-	}
-
 	if len(prodSet) > 0 {
 		q = q.Where(`
 			EXISTS (
@@ -677,6 +691,9 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 
 	if len(prodSet) > 0 {
 		itemQ = itemQ.Where("UPPER(LTRIM(RTRIM(purchase_item.product_code))) IN ?", setToSlice(prodSet))
+	}
+	if strings.TrimSpace(req.ProductCodeLike) != "" {
+		itemQ = itemQ.Where("purchase_item.product_code ILIKE ?", "%"+strings.TrimSpace(req.ProductCodeLike)+"%")
 	}
 
 	if len(notPairs) > 0 {
@@ -969,28 +986,71 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 	return rs, nil
 }
 
+func getProductCodesByNameLike(req GetPurchaseItemRemainRequest) (map[string]bool, error) {
+	rs := map[string]bool{}
+
+	company := strings.TrimSpace(req.CompanyCode)
+	site := strings.TrimSpace(req.SiteCode)
+	productNameLike := strings.TrimSpace(req.ProductNameLike)
+	if company == "" || site == "" || productNameLike == "" {
+		return rs, nil
+	}
+
+	const pageSize = 1000
+	totalPages := 1
+
+	for page := 1; page <= totalPages; page++ {
+		productRes, err := externalProductService.GetProduct(externalProductService.GetProductRequest{
+			CompanyCode:     []string{company},
+			SiteCode:        []string{site},
+			ProductNameLike: productNameLike,
+			Page:            page,
+			PageSize:        pageSize,
+		})
+		if err != nil {
+			return rs, err
+		}
+
+		if productRes.TotalPages > totalPages {
+			totalPages = productRes.TotalPages
+		}
+
+		for _, p := range productRes.Products {
+			code := strings.ToUpper(strings.TrimSpace(p.ProductCode))
+			if code == "" {
+				continue
+			}
+			rs[code] = true
+		}
+
+		if productRes.TotalPages <= 0 {
+			break
+		}
+	}
+
+	return rs, nil
+}
+
 func getProductMasterMap(
 	req GetPurchaseItemRemainRequest,
-	poMap map[string]models.PurchaseResponse,
+	results []GetPurchaseItemRemainResponseResult,
 ) (map[string]externalProductService.GetProductsComponent, error) {
 	rs := map[string]externalProductService.GetProductsComponent{}
 
 	productCodes := []string{}
 	seen := map[string]bool{}
 
-	for _, po := range poMap {
-		for _, it := range po.Items {
-			code := strings.TrimSpace(it.ProductCode)
-			if code == "" {
-				continue
-			}
-			key := strings.ToUpper(code)
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			productCodes = append(productCodes, code)
+	for _, result := range results {
+		code := strings.TrimSpace(result.ProductCode)
+		if code == "" {
+			continue
 		}
+		key := strings.ToUpper(code)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		productCodes = append(productCodes, code)
 	}
 
 	if len(productCodes) == 0 {
@@ -1024,6 +1084,24 @@ func getProductMasterMap(
 	return rs, nil
 }
 
+func enrichProductMaster(
+	results []GetPurchaseItemRemainResponseResult,
+	productMasterMap map[string]externalProductService.GetProductsComponent,
+) {
+	for i := range results {
+		pm, ok := productMasterMap[strings.ToUpper(strings.TrimSpace(results[i].ProductCode))]
+		if !ok {
+			continue
+		}
+
+		productName := strings.TrimSpace(pm.ProductName)
+		results[i].ProductName = productName
+		if productName != "" {
+			results[i].ProductDesc = productName
+		}
+	}
+}
+
 func buildEmptyPagination(pagePtr *int, limitPtr *int) (page int, pageSize int, total int, totalPages int) {
 	page = 1
 	pageSize = 50
@@ -1032,6 +1110,11 @@ func buildEmptyPagination(pagePtr *int, limitPtr *int) (page int, pageSize int, 
 
 	if pagePtr != nil && *pagePtr > 0 {
 		page = *pagePtr
+	}
+	if limitPtr != nil && *limitPtr == 0 {
+		page = 1
+		pageSize = 0
+		return
 	}
 	if limitPtr != nil && *limitPtr > 0 {
 		pageSize = *limitPtr
@@ -1063,6 +1146,16 @@ func inSetTrimUpper(m map[string]bool, v string) bool {
 	return m[k]
 }
 
+func intersectStringSets(a map[string]bool, b map[string]bool) map[string]bool {
+	rs := map[string]bool{}
+	for k := range a {
+		if b[k] {
+			rs[k] = true
+		}
+	}
+	return rs
+}
+
 func paginateResults(
 	all []GetPurchaseItemRemainResponseResult,
 	pagePtr *int,
@@ -1073,6 +1166,9 @@ func paginateResults(
 	if pagePtr != nil && *pagePtr > 0 {
 		page = *pagePtr
 	}
+	if limitPtr != nil && *limitPtr == 0 {
+		limit = 0
+	}
 	if limitPtr != nil && *limitPtr > 0 {
 		limit = *limitPtr
 	}
@@ -1080,6 +1176,9 @@ func paginateResults(
 	total = len(all)
 	if total == 0 {
 		return []GetPurchaseItemRemainResponseResult{}, page, limit, 0, 0
+	}
+	if limit == 0 {
+		return all, 1, total, total, 1
 	}
 
 	totalPages = int(math.Ceil(float64(total) / float64(limit)))
