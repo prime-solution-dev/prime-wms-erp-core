@@ -9,7 +9,7 @@ pipeline {
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '18.138.69.85'
         SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS' 
+        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS'
         ENV_FILE_KEY = 'thaimetaluat.env.erp'
     }
 

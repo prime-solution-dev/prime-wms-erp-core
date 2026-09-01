@@ -261,7 +261,7 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove string, completedDateStart *time.Time, completedDateEnd *time.Time, createDateStart *time.Time, createDateEnd *time.Time) ([]models.CreditRequest, int, int, error) {
+func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove *bool, completedDateStart *time.Time, completedDateEnd *time.Time, createDateStart *time.Time, createDateEnd *time.Time) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -306,6 +306,13 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if page == 0 {
 		page = 1
 	}
+	/* if pendingApprove != nil {
+		status := "0"
+		if !*pendingApprove {
+			status = "1"
+		}
+		query = query.Where("is_approve = ?", status)
+	} */
 
 	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
 	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
@@ -327,6 +334,19 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
     `).
 		Where("1=1").
 		Group("customer_code")
+
+	if pendingApprove != nil {
+		approveValue := 0
+
+		if *pendingApprove {
+			approveValue = 1
+		}
+
+		baseQuery = baseQuery.Having(
+			"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) = ?",
+			approveValue,
+		)
+	}
 
 	// ===== นับจำนวน group จริง =====
 	var totalRecords int64
