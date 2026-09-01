@@ -205,8 +205,14 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			remainDepositMap[depositValue.CustomerCode] = depositValue.AmountRemain
 		}
 	}
-
+	filteredCredit := make([]models.CreditRequest, 0)
 	for i := range credit {
+
+		if req.PendingApprove != nil {
+			if credit[i].IsApprove != *req.PendingApprove {
+				continue
+			}
+		}
 
 		requestDataGetConsumend := map[string]interface{}{
 			"customer_code": credit[i].CustomerCode,
@@ -237,7 +243,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 		}
 		credit[i].BalanceCreditLimit = (credit[i].Amount + credit[i].TemporaryIncreaseCreditLimit) - credit[i].ConsumedCredit
-
+		filteredCredit = append(filteredCredit, credit[i])
 	}
 
 	resultApproval := ResultCreditRequest{
@@ -245,7 +251,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		Page:          req.Page,
 		PageSize:      req.PageSize,
 		TotalPages:    totalPages,
-		CreditRequest: credit,
+		CreditRequest: filteredCredit,
 	}
 
 	return resultApproval, nil

@@ -306,13 +306,13 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if page == 0 {
 		page = 1
 	}
-	if pendingApprove != nil {
+	/* if pendingApprove != nil {
 		status := "0"
 		if !*pendingApprove {
 			status = "1"
 		}
 		query = query.Where("is_approve = ?", status)
-	}
+	} */
 
 	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
 	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
@@ -334,6 +334,19 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
     `).
 		Where("1=1").
 		Group("customer_code")
+
+	if pendingApprove != nil {
+		approveValue := 0
+
+		if *pendingApprove {
+			approveValue = 1
+		}
+
+		baseQuery = baseQuery.Having(
+			"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) = ?",
+			approveValue,
+		)
+	}
 
 	// ===== นับจำนวน group จริง =====
 	var totalRecords int64
