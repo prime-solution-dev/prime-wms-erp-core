@@ -261,7 +261,233 @@ func GetCreditRequest(id []uuid.UUID, customerCode []string, isAction []bool, re
 	return creditRequest, totalPages, int(totalRecords), err
 
 }
-func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove *bool, completedDateStart *time.Time, completedDateEnd *time.Time, createDateStart *time.Time, createDateEnd *time.Time) ([]models.CreditRequest, int, int, error) {
+
+func GetCreditRequestPreload(
+	id []uuid.UUID,
+	customerCode []string,
+	isAction []bool,
+	page int,
+	pageSize int,
+	customerCodeLike string,
+	customerNameLike string,
+	creditLimitLike float64,
+	increaseCreditLimitLike float64,
+	startDate *time.Time,
+	endDate *time.Time,
+	customerStatus *bool,
+	pendingApprove *bool,
+	completedDateStart *time.Time,
+	completedDateEnd *time.Time,
+	createDateStart *time.Time,
+	createDateEnd *time.Time,
+) ([]models.CreditRequest, int, int, error) {
+
+	creditRequest := []models.CreditRequest{}
+
+	gormx, err := db.ConnectGORM(`prime_erp`)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer db.CloseGORM(gormx)
+
+	if page == 0 {
+		page = 1
+	}
+
+	// =========================
+	// Base Query
+	// =========================
+
+	query := gormx.Model(&models.CreditRequest{})
+
+	if len(id) > 0 {
+		query = query.Where("id IN (?)", id)
+	}
+
+	if len(customerCode) > 0 {
+		query = query.Where("customer_code IN (?)", customerCode)
+	}
+
+	if len(isAction) > 0 {
+		query = query.Where("is_action IN (?)", isAction)
+	}
+
+	if customerCodeLike != "" {
+		likePattern := fmt.Sprintf("%%%s%%", customerCodeLike)
+		query = query.Where("customer_code ILIKE ?", likePattern)
+	}
+
+	if creditLimitLike > 0 {
+		query = query.Where("amount >= ?", creditLimitLike)
+	}
+
+	if increaseCreditLimitLike > 0 {
+		query = query.Where(
+			"temporary_increase_credit_limit >= ?",
+			increaseCreditLimitLike,
+		)
+	}
+
+	if startDate != nil {
+		query = query.Where(
+			"effective_dtm >= ?",
+			startDate.Format("2006-01-02"),
+		)
+	}
+
+	if endDate != nil {
+		query = query.Where(
+			"effective_dtm <= ?",
+			endDate.Format("2006-01-02"),
+		)
+	}
+
+	if completedDateStart != nil && completedDateEnd != nil {
+		query = query.Where(
+			"update_date BETWEEN ? AND ? AND status = ?",
+			completedDateStart,
+			completedDateEnd,
+			"COMPLETED",
+		)
+	}
+
+	if createDateStart != nil && createDateEnd != nil {
+		query = query.Where(
+			"create_date BETWEEN ? AND ?",
+			createDateStart,
+			createDateEnd,
+		)
+	}
+
+	// =========================
+	// Group Query
+	// =========================
+
+	baseQuery := query.
+		Select(`
+			customer_code,
+			SUM(
+				CASE
+					WHEN request_type = 'BASE'
+					THEN amount
+					ELSE 0
+				END
+			) AS amount,
+
+			SUM(
+				CASE
+					WHEN request_type = 'EXTRA'
+					THEN amount
+					ELSE 0
+				END
+			) AS temporary_increase_credit_limit,
+
+			MAX(
+				CASE
+					WHEN status = 'PENDING'
+					THEN 1
+					ELSE 0
+				END
+			) AS is_approve,
+
+			MIN(
+				CASE
+					WHEN request_type = 'BASE'
+					THEN effective_dtm
+				END
+			) AS effective_dtm,
+
+			MAX(
+				CASE
+					WHEN status = 'APPROVED'
+					THEN approve_date
+				END
+			) AS approve_date,
+
+			MAX(
+				CASE
+					WHEN request_type = 'BASE'
+					THEN expire_dtm
+				END
+			) AS expire_dtm
+		`).
+		Group("customer_code")
+
+	// =========================
+	// Pending Approve Filter
+	// =========================
+
+	if pendingApprove != nil {
+
+		approveValue := 0
+
+		if *pendingApprove {
+			approveValue = 1
+		}
+
+		baseQuery = baseQuery.Having(
+			"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) = ?",
+			approveValue,
+		)
+	}
+
+	// =========================
+	// Count
+	// =========================
+
+	var totalRecords int64
+
+	countQuery := gormx.
+		Session(&gorm.Session{}).
+		Table("(?) AS sub", baseQuery)
+
+	err = countQuery.Count(&totalRecords).Error
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	// =========================
+	// Pagination
+	// =========================
+
+	if pageSize == 0 {
+		pageSize = int(totalRecords)
+
+		if pageSize == 0 {
+			pageSize = 1
+		}
+	}
+
+	offset := (page - 1) * pageSize
+
+	totalPages := int(
+		math.Ceil(
+			float64(totalRecords) / float64(pageSize),
+		),
+	)
+
+	// =========================
+	// Get Data
+	// =========================
+
+	dataQuery := gormx.
+		Session(&gorm.Session{}).
+		Table("(?) AS sub", baseQuery)
+
+	err = dataQuery.
+		Order("sub.is_approve DESC").
+		Limit(pageSize).
+		Offset(offset).
+		Find(&creditRequest).Error
+
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	return creditRequest, totalPages, int(totalRecords), nil
+}
+
+/* func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []bool, page int, pageSize int, customerCodeLike string, customerNameLike string, creditLimitLike float64, increaseCreditLimitLike float64, startDate *time.Time, endDate *time.Time, customerStatus *bool, pendingApprove *bool, completedDateStart *time.Time, completedDateEnd *time.Time, createDateStart *time.Time, createDateEnd *time.Time) ([]models.CreditRequest, int, int, error) {
 	creditRequest := []models.CreditRequest{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -306,21 +532,21 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 	if page == 0 {
 		page = 1
 	}
-	/* if pendingApprove != nil {
+	 if pendingApprove != nil {
 		status := "0"
 		if !*pendingApprove {
 			status = "1"
 		}
 		query = query.Where("is_approve = ?", status)
-	} */
+	}
 
-	/* 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
+	 	err = query.Order("is_approve desc").Select("customer_code, SUM(CASE WHEN request_type = 'BASE' THEN amount ELSE 0 END) AS amount, " +
 	"SUM(CASE WHEN request_type = 'EXTRA' THEN amount ELSE 0 END) AS temporary_increase_credit_limit, " +
 	"MAX(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS is_approve, " +
 	"MIN(CASE WHEN request_type = 'BASE' THEN effective_dtm ELSE NULL END) AS effective_dtm, " +
 	"MAX(CASE WHEN status = 'APPROVED' THEN approve_date END) AS approve_date, " +
 	"MAX(CASE WHEN request_type = 'BASE' THEN expire_dtm ELSE NULL END) AS expire_dtm ").
-	Where("1=1").Group("customer_code").Find(&creditRequest).Error */
+	Where("1=1").Group("customer_code").Find(&creditRequest).Error
 
 	baseQuery := query.
 		Select(`
@@ -350,7 +576,7 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 
 	// ===== นับจำนวน group จริง =====
 	var totalRecords int64
-	err = query.Session(&gorm.Session{}).
+	err = gormx.Session(&gorm.Session{}).
 		Table("(?) as sub", baseQuery).
 		Count(&totalRecords).Error
 	if err != nil {
@@ -374,7 +600,7 @@ func GetCreditRequestPreload(id []uuid.UUID, customerCode []string, isAction []b
 
 	return creditRequest, totalPages, int(totalRecords), err
 
-}
+} */
 
 func CreateCreditRequest(creditRequest []models.CreditRequest) (err error) {
 	gormx, err := db.ConnectGORM(`prime_erp`)
