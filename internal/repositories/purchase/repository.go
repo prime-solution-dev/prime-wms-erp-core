@@ -21,6 +21,20 @@ func CreatePurchase(gormx *gorm.DB, purchases []models.Purchase) error {
 	})
 }
 
+func applyItemsProductGroupOneNameLike(query, gormx *gorm.DB, value string) *gorm.DB {
+	if value == "" {
+		return query
+	}
+
+	likePattern := "%" + value + "%"
+	sub := gormx.Model(&models.PurchaseItem{}).
+		Select("1").
+		Where("purchase.id = purchase_item.purchase_id").
+		Where("(product_group_code ILIKE ? OR product_group_name ILIKE ?)", likePattern, likePattern)
+
+	return query.Where("EXISTS (?)", sub)
+}
+
 // Get
 // Get
 func GetPurchaseList(
@@ -122,13 +136,7 @@ func GetPurchaseList(
 		query = query.Where("EXISTS (?)", sub)
 	}
 
-	if itemsProductGroupOneNameLike != "" {
-		sub := gormx.Model(&models.PurchaseItem{}).
-			Select("1").
-			Where("purchase.id = purchase_item.purchase_id").
-			Where("product_group_code ILIKE ?", "%"+itemsProductGroupOneNameLike+"%")
-		query = query.Where("EXISTS (?)", sub)
-	}
+	query = applyItemsProductGroupOneNameLike(query, gormx, itemsProductGroupOneNameLike)
 
 	if startCreateDate != nil {
 		query = query.Where("create_dtm >= ?", startCreateDate.Format("2006-01-02"))
