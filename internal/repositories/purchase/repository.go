@@ -392,29 +392,23 @@ func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err erro
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
+		// purchase_item is a per-purchase running number (1, 2, 3, ...), so it is
+		// only unique within a purchase. Always scope the update by purchase_id.
 		if len(purchaseCodes) > 0 {
-			var purchaseItemCodes []string
-			subQuery := tx.Model(&models.Purchase{}).
-				Select("id").
-				Where("purchase_code IN ?", purchaseCodes)
+			q := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id IN (?)", tx.Model(&models.Purchase{}).
+					Select("id").
+					Where("purchase_code IN ?", purchaseCodes))
 
-			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id IN (?)", subQuery).
-				Pluck("purchase_item", &purchaseItemCodes).Error; err != nil {
-				return err
+			if len(purchaseItems) > 0 {
+				q = q.Where("purchase_item IN ?", purchaseItems)
 			}
 
-			purchaseItems = append(purchaseItems, purchaseItemCodes...)
-		}
-
-		if len(purchaseItems) > 0 {
-			if result := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_item IN ?", purchaseItems).
-				Updates(map[string]interface{}{
-					"status_payment": "COMPLETED",
-					"update_dtm":     time.Now().UTC(),
-				}); result.Error != nil {
-				err = result.Error
+			if result := q.Updates(map[string]interface{}{
+				"status_payment": "COMPLETED",
+				"update_dtm":     time.Now().UTC(),
+			}); result.Error != nil {
+				return result.Error
 			}
 		}
 
