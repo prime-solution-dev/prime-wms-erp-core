@@ -456,3 +456,117 @@ func TestBuildBasedPriceTab_UsesProvidedLastUpdated(t *testing.T) {
 		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
 	}
 }
+
+// ครอบสาขาที่เหลือของ buildExportTableTyped: group key ซ้ำข้าม subgroup (merge ชื่อ/seq),
+// การเรียงคอลัมน์ dynamic, การข้าม subgroup ที่ inactive, การเติมค่าจาก InventoryWeight,
+// key ที่เป็นค่าว่าง และ UDF key ที่ไม่มีใน static list
+func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testing.T) {
+	activeUdf, err := json.Marshal(map[string]interface{}{"custom_udf": "X1"})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+	inactiveUdf, err := json.Marshal(map[string]interface{}{"inactive": true})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:      uuid.New(),
+						UdfJson: activeUdf,
+						GroupKeys: []GroupKey{
+							// seq 0 + ไม่มีชื่อ เจอก่อน แล้วอีก subgroup มาเติมทีหลัง
+							{Code: "DYN_B", Value: "vb", Seq: 0},
+							{Code: "", Value: "ignored", Seq: 1},
+						},
+						InventoryWeight: []models.InventoryWeightResponse{
+							{
+								ProductCode:  "0012345",
+								BatchNo:      "B-9",
+								SupplierName: "โรงงานเหล็ก",
+								SiteCode:     "S1",
+								SumQty:       3,
+								TotalQty:     7,
+								AvgWeight:    1.5,
+								WeightSpec:   2.5,
+								TotalWeight:  10.5,
+							},
+						},
+					},
+					{
+						ID:        uuid.New(),
+						UdfJson:   inactiveUdf,
+						GroupKeys: []GroupKey{{Code: "DYN_A", Value: "va", Seq: 2}},
+					},
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							// code เดิมที่เจอแล้ว แต่รอบนี้มีทั้งชื่อและ seq -> ต้อง merge เข้าของเดิม
+							{Code: "DYN_B", Value: "vb", Seq: 1},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	nameByCode := func(code string) string {
+		switch code {
+		case "DYN_A":
+			return "กลุ่มเอ"
+		case "DYN_B":
+			return "กลุ่มบี"
+		default:
+			return ""
+		}
+	}
+
+	data := buildExportTableTyped(groups, nameByCode, func(string) string { return "แปลงแล้ว" })
+
+	// subgroup ที่ inactive ถูกข้าม เหลือ 2 แถว
+	if len(data.Rows) != 2 {
+		t.Fatalf("expected 2 rows (inactive subgroup skipped), got %d", len(data.Rows))
+	}
+
+	count := map[string]int{}
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		count[c.Field]++
+		headers[c.Field] = c.HeaderName
+	}
+	if count["DYN_B"] != 1 {
+		t.Fatalf("expected DYN_B merged into one column, got %d", count["DYN_B"])
+	}
+	if headers["DYN_B"] != "กลุ่มบี" {
+		t.Fatalf("expected merged column to pick up the DB name, got %q", headers["DYN_B"])
+	}
+	if _, ok := headers[""]; ok {
+		t.Fatal("empty group key code must not become a column")
+	}
+	if headers["custom_udf"] != "custom_udf" {
+		t.Fatalf("expected UDF key to become its own column, got %q", headers["custom_udf"])
+	}
+
+	inv := data.Rows[0]
+	// รหัสสินค้าต้องคงเป็น string ไม่งั้น leading zero หายตอนเขียนลง Excel
+	if inv["code"] != "0012345" {
+		t.Fatalf("expected product code to stay a string, got %#v", inv["code"])
+	}
+	if inv["stock"] != float64(3) || inv["quantity"] != float64(3) {
+		t.Fatalf("expected stock and quantity to come from SumQty, got %#v / %#v", inv["stock"], inv["quantity"])
+	}
+	if inv["stock_quantity"] != float64(7) {
+		t.Fatalf("expected stock_quantity to come from TotalQty, got %#v", inv["stock_quantity"])
+	}
+	if inv["warehouse"] != "S1" || inv["batch_no"] != "B-9" {
+		t.Fatalf("expected warehouse/batch_no from inventory, got %#v / %#v", inv["warehouse"], inv["batch_no"])
+	}
+	if inv["DYN_B"] != "แปลงแล้ว" {
+		t.Fatalf("expected group key value to be mapped through itemNameByCode, got %#v", inv["DYN_B"])
+	}
+}
