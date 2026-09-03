@@ -303,3 +303,87 @@ func TestBuildExportTableTyped_QuantityHeadersAreDistinct(t *testing.T) {
 		t.Fatalf("expected quantity header %q, got %q", "จำนวน", headers["quantity"])
 	}
 }
+
+// group_name ที่ client ตั้งไว้ใน DB ต้องชนะหัวคอลัมน์ hardcode ของ PG01-PG10
+func TestBuildExportTableTyped_GroupNameOverridesStaticHeader(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG04", Value: "V4", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	groupNameByCode := func(code string) string {
+		switch code {
+		case "PG01":
+			return "กลุ่มสินค้าตามที่ลูกค้าตั้ง"
+		case "PG04":
+			return "กลุ่มที่สี่"
+		default:
+			return ""
+		}
+	}
+
+	data := buildExportTableTyped(groups, groupNameByCode, func(string) string { return "" })
+
+	headers := map[string]string{}
+	count := map[string]int{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+		count[c.Field]++
+	}
+
+	// PG01 มีใน static list -> ต้องถูกเขียนทับด้วยชื่อจาก DB ไม่ใช่ "หมวดหลัก"
+	if headers["PG01"] != "กลุ่มสินค้าตามที่ลูกค้าตั้ง" {
+		t.Fatalf("expected PG01 header from DB, got %q", headers["PG01"])
+	}
+	// PG04 ไม่มีใน static list -> ต้องถูกเพิ่มเข้ามาพร้อมชื่อจาก DB
+	if headers["PG04"] != "กลุ่มที่สี่" {
+		t.Fatalf("expected PG04 header from DB, got %q", headers["PG04"])
+	}
+	// เขียนทับ ไม่ใช่เพิ่มคอลัมน์ใหม่
+	if count["PG01"] != 1 {
+		t.Fatalf("expected exactly one PG01 column, got %d", count["PG01"])
+	}
+}
+
+// DB ไม่มีชื่อกลุ่ม -> ต้องคงหัว static ไว้ ไม่ใช่กลายเป็นค่าว่างหรือรหัสดิบ
+func TestBuildExportTableTyped_StaticHeaderIsFallback(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:        uuid.New(),
+						GroupKeys: []GroupKey{{Code: "PG01", Value: "V1", Seq: 1}},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	for _, c := range data.Columns {
+		if c.Field == "PG01" {
+			if c.HeaderName != "หมวดหลัก" {
+				t.Fatalf("expected static fallback header %q, got %q", "หมวดหลัก", c.HeaderName)
+			}
+			return
+		}
+	}
+	t.Fatal("expected a PG01 column")
+}

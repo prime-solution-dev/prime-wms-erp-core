@@ -293,19 +293,26 @@ func buildExportTableTyped(
 		{Field: "spec", HeaderName: "spec"},
 	}
 
-	// seen กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
-	seen := make(map[string]bool, len(columns))
-	for _, c := range columns {
-		seen[c.Field] = true
+	// colIndex กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
+	// ค่า >= 0 คือ index ใน columns, ค่า -1 คือ field ที่ห้ามเป็นคอลัมน์เด็ดขาด
+	const excludedColumn = -1
+	colIndex := make(map[string]int, len(columns))
+	for i, c := range columns {
+		colIndex[c.Field] = i
 	}
 
 	// is_highlight เป็น flag สำหรับทำสีตัวอักษร ไม่ใช่คอลัมน์ที่ผู้ใช้ต้องเห็น
 	// ต้องกันไว้ที่นี่ ไม่งั้น loop UDF ด้านล่างจะเติมกลับเข้ามา
-	seen["is_highlight"] = true
+	colIndex["is_highlight"] = excludedColumn
 
 	// Then add dynamic group key columns (sorted by seq, then code)
+	// group_name ที่ client ตั้งไว้ใน DB ชนะหัวคอลัมน์ hardcode ของ static list เสมอ
+	// static header เหลือหน้าที่เป็น fallback เมื่อ DB ไม่มีชื่อกลุ่มให้
 	for _, c := range cols {
-		if seen[c.code] {
+		if i, ok := colIndex[c.code]; ok {
+			if i != excludedColumn && c.name != "" {
+				columns[i].HeaderName = c.name
+			}
 			continue
 		}
 		header := c.name
@@ -313,7 +320,7 @@ func buildExportTableTyped(
 			header = c.code
 		}
 		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
-		seen[c.code] = true
+		colIndex[c.code] = len(columns) - 1
 	}
 
 	// Collect all unique UDF keys from all subgroups' udf_json data dynamically
@@ -340,12 +347,12 @@ func buildExportTableTyped(
 
 	// Generate dynamic UDF columns with headers
 	for _, key := range udfKeys {
-		if seen[key] {
+		if _, ok := colIndex[key]; ok {
 			continue
 		}
 		// Use key as header (can be enhanced with mapping later if needed)
 		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
-		seen[key] = true
+		colIndex[key] = len(columns) - 1
 	}
 
 	// Build rows: 1 row per subgroup.
