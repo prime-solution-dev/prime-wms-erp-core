@@ -77,8 +77,19 @@ func TestBuildExportTableTyped_ColumnsAndRows(t *testing.T) {
 	if len(resp.Columns) < 3 {
 		t.Fatalf("expected at least 3 group columns, got %d", len(resp.Columns))
 	}
-	if resp.Columns[0].Field != "PRODUCT_GROUP1" || resp.Columns[0].HeaderName != "หมวดหลัก" {
-		t.Fatalf("unexpected first column: %+v", resp.Columns[0])
+	// static column มาก่อน dynamic group key เสมอ จึงเช็กว่ามีคอลัมน์อยู่ ไม่เช็กลำดับ
+	var productGroup1 *ExportColumn
+	for i := range resp.Columns {
+		if resp.Columns[i].Field == "PRODUCT_GROUP1" {
+			productGroup1 = &resp.Columns[i]
+			break
+		}
+	}
+	if productGroup1 == nil {
+		t.Fatal("expected a PRODUCT_GROUP1 column")
+	}
+	if productGroup1.HeaderName != "หมวดหลัก" {
+		t.Fatalf("unexpected PRODUCT_GROUP1 header: %q", productGroup1.HeaderName)
 	}
 
 	if len(resp.Rows) != 1 {
@@ -196,5 +207,47 @@ func TestFormatTimestamp_CrossesDateBoundary(t *testing.T) {
 	got := formatTimestamp(time.Date(2026, 9, 2, 20, 0, 0, 0, time.UTC))
 	if got != "3/9/2026 03:00" {
 		t.Fatalf("expected %q, got %q", "3/9/2026 03:00", got)
+	}
+}
+
+// group key code และ UDF key ชนกับ static column ได้ ต้องไม่ทำให้คอลัมน์ซ้ำ
+func TestBuildExportTableTyped_NoDuplicateColumns(t *testing.T) {
+	udfJson, err := json.Marshal(map[string]interface{}{
+		"line_bundle": 10,
+		"coil_id":     "C-001",
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:      uuid.New(),
+						UdfJson: udfJson,
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG02", Value: "V2", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	count := map[string]int{}
+	for _, c := range data.Columns {
+		count[c.Field]++
+	}
+	for field, n := range count {
+		if n > 1 {
+			t.Fatalf("column %q appears %d times, expected exactly once", field, n)
+		}
 	}
 }

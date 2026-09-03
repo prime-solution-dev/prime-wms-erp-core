@@ -294,13 +294,23 @@ func buildExportTableTyped(
 		{Field: "spec", HeaderName: "spec"},
 	}
 
+	// seen กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
+	seen := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		seen[c.Field] = true
+	}
+
 	// Then add dynamic group key columns (sorted by seq, then code)
 	for _, c := range cols {
+		if seen[c.code] {
+			continue
+		}
 		header := c.name
 		if header == "" {
 			header = c.code
 		}
 		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
+		seen[c.code] = true
 	}
 
 	// Collect all unique UDF keys from all subgroups' udf_json data dynamically
@@ -327,8 +337,12 @@ func buildExportTableTyped(
 
 	// Generate dynamic UDF columns with headers
 	for _, key := range udfKeys {
+		if seen[key] {
+			continue
+		}
 		// Use key as header (can be enhanced with mapping later if needed)
 		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
+		seen[key] = true
 	}
 
 	// Build rows: 1 row per subgroup.
