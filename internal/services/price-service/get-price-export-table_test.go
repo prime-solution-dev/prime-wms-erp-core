@@ -387,3 +387,39 @@ func TestBuildExportTableTyped_StaticHeaderIsFallback(t *testing.T) {
 	}
 	t.Fatal("expected a PG01 column")
 }
+
+// group_name ที่เป็นช่องว่างล้วนต้องไม่ลบหัวคอลัมน์ static ทิ้ง
+func TestBuildExportTableTyped_BlankGroupNameKeepsStaticHeader(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG04", Value: "V4", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "   " }, func(string) string { return "" })
+
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+	}
+
+	if headers["PG01"] != "หมวดหลัก" {
+		t.Fatalf("expected static fallback header %q, got %q", "หมวดหลัก", headers["PG01"])
+	}
+	// PG04 ไม่มีใน static list -> ต้องถอยไปใช้รหัสกลุ่ม ไม่ใช่ช่องว่าง
+	if headers["PG04"] != "PG04" {
+		t.Fatalf("expected PG04 header to fall back to the code, got %q", headers["PG04"])
+	}
+}

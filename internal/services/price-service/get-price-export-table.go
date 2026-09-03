@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"sort"
+	"strings"
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -309,13 +310,16 @@ func buildExportTableTyped(
 	// group_name ที่ client ตั้งไว้ใน DB ชนะหัวคอลัมน์ hardcode ของ static list เสมอ
 	// static header เหลือหน้าที่เป็น fallback เมื่อ DB ไม่มีชื่อกลุ่มให้
 	for _, c := range cols {
+		// group_name ที่เป็นช่องว่างล้วนถือว่าไม่มีชื่อ ไม่งั้นหัวคอลัมน์ที่มีความหมาย
+		// จะถูกเขียนทับด้วยช่องว่าง
+		name := strings.TrimSpace(c.name)
 		if i, ok := colIndex[c.code]; ok {
-			if i != excludedColumn && c.name != "" {
-				columns[i].HeaderName = c.name
+			if i != excludedColumn && name != "" {
+				columns[i].HeaderName = name
 			}
 			continue
 		}
-		header := c.name
+		header := name
 		if header == "" {
 			header = c.code
 		}
