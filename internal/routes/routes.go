@@ -329,6 +329,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
 		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})
+	purchase.POST("/ValidateAPOverPurchase", func(c *gin.Context) {
+		utils.ProcessRequest(c, xService.ValidateAPOverPurchaseRest)
+	})
 
 	//purchase
 	purchase.POST("/CreatePO", func(c *gin.Context) {
