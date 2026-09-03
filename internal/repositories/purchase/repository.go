@@ -61,6 +61,7 @@ func GetPurchaseList(
 	itemsProductGroupOneNameLike string,
 	startCreateDate *time.Time,
 	endCreateDate *time.Time,
+	usedStatus []string,
 ) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -102,6 +103,12 @@ func GetPurchaseList(
 
 	if len(status) > 0 {
 		query = query.Where("status IN ?", status)
+	}
+
+	// Partial ถูกตัดสินจาก used_status ไม่ใช่ status_approve (ดู
+	// convertStatusToStatusWording ฝั่ง web) จึงต้องกรองแยกออกมา
+	if len(usedStatus) > 0 {
+		query = query.Where("used_status IN ?", usedStatus)
 	}
 
 	if purchaseCodeLike != "" {
