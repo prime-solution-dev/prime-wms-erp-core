@@ -524,6 +524,10 @@ func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[s
 // bangkok คือ timezone ที่ใช้แสดงผลทุกเวลาในรายงาน
 // container ของ service นี้เป็น alpine ที่ไม่ได้ติดตั้ง tzdata และไม่ได้ตั้ง ENV TZ
 // LoadLocation จึงล้มเหลวได้ ต้องมี FixedZone สำรองไว้เสมอ
+//
+// resolve ครั้งเดียวตอน package init ต่างจาก picking_enrich.go ของ document-core
+// ที่เรียก LoadLocation ใหม่ทุกครั้ง — ตั้งใจให้ต่าง เพราะ *time.Location อ่านพร้อมกันได้
+// และ formatTimestamp ถูกเรียกต่อแถวในรายงานที่มีหลักพันแถว
 var bangkok = func() *time.Location {
 	loc, err := time.LoadLocation("Asia/Bangkok")
 	if err != nil {
