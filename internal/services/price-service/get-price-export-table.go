@@ -91,6 +91,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 			}
 			return ""
 		},
+		nil,
 	)
 
 	// Collect all unique company codes and site codes from the response
@@ -170,7 +171,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 
 	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, paymentTermMap)
+	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, nil)
 
 	response := GetPriceExportTableResponse{
 		Tabs: []ExportTab{detailTab, basedPriceTab},
@@ -436,17 +437,17 @@ func buildDetailTab(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
 	itemNameByCode func(code string) string,
+	lastUpdated *time.Time,
 ) ExportTab {
 	// Reuse existing logic but get the old response structure.
 	oldResponse := buildExportTableTyped(groups, groupNameByCode, itemNameByCode)
 
-	now := time.Now()
 	return ExportTab{
 		Name: "Detail",
 		Headers: ExportTabHeaders{
 			Report:      "Pricelist",
-			LastUpdated: formatTimestamp(now),
-			Download:    formatTimestamp(now),
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
 		},
 		Columns: oldResponse.Columns,
 		Rows:    oldResponse.Rows,
@@ -454,9 +455,7 @@ func buildDetailTab(
 }
 
 // buildBasedPriceTab creates the "Based price" tab with group-level data and Terms.
-func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[string]GetPaymentTermResponse) ExportTab {
-	now := time.Now()
-
+func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[string]GetPaymentTermResponse, lastUpdated *time.Time) ExportTab {
 	// Build columns.
 	columns := []ExportColumn{
 		{Field: "product", HeaderName: "สินค้า"},
@@ -541,8 +540,8 @@ func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[s
 		Name: "Based price",
 		Headers: ExportTabHeaders{
 			Report:      "Pricelist- Based price",
-			LastUpdated: formatTimestamp(now),
-			Download:    formatTimestamp(now),
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
 		},
 		Columns: columns,
 		Rows:    rows,
@@ -567,6 +566,15 @@ var bangkok = func() *time.Location {
 // formatTimestamp formats time as "DD/MM/YYYY HH:MM" (Thai date format) in Asia/Bangkok.
 func formatTimestamp(t time.Time) string {
 	return t.In(bangkok).Format("2/1/2006 15:04")
+}
+
+// formatOptionalTimestamp คืนสตริงว่างเมื่อไม่มีค่า
+// excel_generator ฝั่ง document-core ข้ามการเขียนหัวเรื่องที่ค่าว่างอยู่แล้ว
+func formatOptionalTimestamp(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return formatTimestamp(*t)
 }
 
 // getGroupNameByCode looks up group name from group code.

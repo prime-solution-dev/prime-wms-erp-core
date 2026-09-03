@@ -155,7 +155,7 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 	}
 
 	var _ map[string]models.GetGroupResponse = groupMap
-	tab := buildBasedPriceTab(groups, paymentTermMap)
+	tab := buildBasedPriceTab(groups, paymentTermMap, nil)
 
 	if tab.Name != "Based price" {
 		t.Fatalf("expected tab name 'Based price', got %s", tab.Name)
@@ -421,5 +421,38 @@ func TestBuildExportTableTyped_BlankGroupNameKeepsStaticHeader(t *testing.T) {
 	// PG04 ไม่มีใน static list -> ต้องถอยไปใช้รหัสกลุ่ม ไม่ใช่ช่องว่าง
 	if headers["PG04"] != "PG04" {
 		t.Fatalf("expected PG04 header to fall back to the code, got %q", headers["PG04"])
+	}
+}
+
+// Last Updated ต้องเป็นเวลาที่ราคาถูกแก้ล่าสุด ไม่ใช่เวลาที่กด export
+func TestBuildDetailTab_UsesProvidedLastUpdated(t *testing.T) {
+	lastUpdated := time.Date(2026, 8, 20, 3, 15, 0, 0, time.UTC)
+
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, &lastUpdated)
+
+	if tab.Headers.LastUpdated != "20/8/2026 10:15" {
+		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
+	}
+	if tab.Headers.Download == tab.Headers.LastUpdated {
+		t.Fatal("Download must be the export time, not the last-updated time")
+	}
+}
+
+// ไม่มีข้อมูลราคาเลย -> ปล่อยหัวเรื่องว่าง (excel_generator ข้ามแถวที่ค่าว่าง)
+func TestBuildDetailTab_NilLastUpdatedLeavesHeaderEmpty(t *testing.T) {
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, nil)
+
+	if tab.Headers.LastUpdated != "" {
+		t.Fatalf("expected empty LastUpdated, got %q", tab.Headers.LastUpdated)
+	}
+}
+
+func TestBuildBasedPriceTab_UsesProvidedLastUpdated(t *testing.T) {
+	lastUpdated := time.Date(2026, 8, 20, 3, 15, 0, 0, time.UTC)
+
+	tab := buildBasedPriceTab(nil, map[string]GetPaymentTermResponse{}, &lastUpdated)
+
+	if tab.Headers.LastUpdated != "20/8/2026 10:15" {
+		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
 	}
 }
