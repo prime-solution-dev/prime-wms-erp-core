@@ -8,8 +8,14 @@ import (
 	"github.com/lib/pq"
 )
 
-// getPriceLastUpdated คืนเวลาที่ราคาถูกแก้ล่าสุดในขอบเขตเดียวกับที่ export
+// getPriceLastUpdated คืนเวลาที่ราคาถูกแก้ล่าสุด
 // คืน nil เมื่อไม่มีแถวที่ตรงเงื่อนไข ผู้เรียกจะปล่อยหัวเรื่อง Last Updated ให้ว่าง
+//
+// กรองแค่ CompanyCode / SiteCodes / GroupCodes เท่านั้น ซึ่งเป็นทุกฟิลด์ที่ caller
+// ปัจจุบัน (document-core GetPriceExportTableRequest) ส่งมาได้ ยังไม่ครอบคลุม
+// EffectiveDateFrom/To และ SubGroupCodes ที่ getGroupSubGroup ใช้กรองข้อมูล export จริง
+// ถ้าวันหนึ่งมี caller ส่งฟิลด์เหล่านั้นมา ต้องมาเพิ่มเงื่อนไขที่ query นี้ด้วย
+// ไม่งั้น Last Updated จะมาจากข้อมูลที่กว้างกว่าที่ export จริง
 //
 // ใช้ bind parameter แทนการต่อสตริงแบบ getGroupSubGroup เพราะเป็นโค้ดใหม่
 // และ cardinality() ทำให้ตัวกรองที่ไม่ได้ส่งมาไม่มีผลกับเงื่อนไข

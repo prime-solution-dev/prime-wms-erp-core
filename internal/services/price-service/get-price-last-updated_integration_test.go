@@ -16,6 +16,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+// เทสต์ในไฟล์นี้ไม่ parallel-safe — แชร์ container/ตารางเดียวกันและ cleanup ด้วย
+// DELETE FROM ก่อนเริ่มแต่ละเคส ห้ามใส่ t.Parallel()
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 	req := tc.ContainerRequest{

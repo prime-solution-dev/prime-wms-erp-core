@@ -75,7 +75,8 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 	// (พฤติกรรมเดียวกับตอน inventory service ล้มเหลวด้านล่าง)
 	lastUpdated, err := getPriceLastUpdated(sqlxDB, req)
 	if err != nil {
-		fmt.Printf("Warning: failed to get price last updated: %v\n", err)
+		fmt.Printf("Warning: failed to get price last updated (company=%s, sites=%v, groups=%v): %v\n",
+			req.CompanyCode, req.SiteCodes, req.GroupCodes, err)
 		lastUpdated = nil
 	}
 
