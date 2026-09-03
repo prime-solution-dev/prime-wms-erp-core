@@ -13,13 +13,32 @@ import (
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest, purchaseCode string) models.PurchaseItem {
+// NextPurchaseItemSeq returns the running number to assign to the first item
+// that has no purchase_item yet: max(existing numeric purchase_item) + 1.
+func NextPurchaseItemSeq(items []models.PurchaseItemFormRequest) int {
+	max := 0
+	for _, item := range items {
+		if item.PurchaseItem == nil {
+			continue
+		}
+		if n, err := strconv.Atoi(strings.TrimSpace(*item.PurchaseItem)); err == nil && n > max {
+			max = n
+		}
+	}
+	return max + 1
+}
+
+// seq is the running number (1, 2, 3, ...) used as purchase_item when the
+// request does not carry one. Items keep the purchase_item they arrive with.
+func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRequest, seq int) models.PurchaseItem {
 	now := time.Now().UTC()
 
 	id := uuid.New()
@@ -37,9 +56,8 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 		createDtm = *req.CreateDtm
 	}
 
-	t := time.Now()
-	purchaseItem := fmt.Sprintf("%s-%v", purchaseCode, t.UnixNano())
-	if req.PurchaseItem != nil {
+	purchaseItem := strconv.Itoa(seq)
+	if req.PurchaseItem != nil && strings.TrimSpace(*req.PurchaseItem) != "" {
 		purchaseItem = *req.PurchaseItem
 	}
 

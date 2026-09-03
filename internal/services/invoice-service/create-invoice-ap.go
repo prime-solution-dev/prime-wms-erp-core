@@ -221,22 +221,22 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				poQTY := poQTYMapResult.Qty + (poQTYMapResult.Qty * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
 
-					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 						Index:   it,
 						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
 						Status:  "error",
 						Type:    "qty",
-					})
+					}) */
 
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.TotalWeight {
-						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+						/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 							Index:   it,
 							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.TotalWeight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
-						})
+						}) */
 					}
 				}
 			} /*  else {

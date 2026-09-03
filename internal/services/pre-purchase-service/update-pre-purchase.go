@@ -35,8 +35,21 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, r := range req {
 		prePurchase := MapUpdatePOBigLotRequestToPrePurchase(r)
 
+		// request ของ update ไม่ได้ส่ง pre_purchase_code มา ต้องอ่านจาก DB
+		// ไม่งั้น item ที่เพิ่งเพิ่มจะได้ pre_item ที่ไม่มีรหัส PO นำหน้า
+		prePurchaseCode := ""
+		if err := gormx.Model(&models.PrePurchase{}).
+			Where("id = ?", r.ID).
+			Pluck("pre_purchase_code", &prePurchaseCode).Error; err != nil {
+			return nil, errors.New("failed to get pre-purchase code: " + err.Error())
+		}
+
+		seq := NextPreItemSeq(r.PrePurchaseItems)
 		for _, itemReq := range r.PrePurchaseItems {
-			item := MapUpdatePOBigLotRequestToPrePurchaseItem(itemReq, prePurchase.UpdateBy, time.Now().UTC(), prePurchase.PrePurchaseCode)
+			item := MapUpdatePOBigLotRequestToPrePurchaseItem(itemReq, prePurchase.UpdateBy, time.Now().UTC(), prePurchaseCode, seq)
+			if itemReq.PreItem == nil || *itemReq.PreItem == "" {
+				seq++
+			}
 			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
 		}
 

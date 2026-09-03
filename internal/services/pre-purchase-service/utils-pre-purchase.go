@@ -11,6 +11,8 @@ import (
 	"prime-erp-core/internal/models"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -159,11 +161,42 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 	}
 }
 
-func MapUpdatePOBigLotRequestToPrePurchaseItem(reqItem models.UpdatePOBigLotItemRequest, user string, now time.Time, prePurchaseCode string) models.PrePurchaseItem {
-	preItem := ""
-	if reqItem.PreItem == nil {
-		preItem = fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
-	} else {
+// BuildPreItemCode สร้างเลข item ของ big lot PO เป็น running number ต่อท้ายรหัส PO
+// ห้ามใช้ timestamp เพราะ item ที่ถูกสร้างในวินาทีเดียวกันจะได้เลขซ้ำกัน
+func BuildPreItemCode(prePurchaseCode string, seq int) string {
+	return fmt.Sprintf("%s-%03d", prePurchaseCode, seq)
+}
+
+// NextPreItemSeq คืนเลขลำดับถัดไปสำหรับ item ที่ยังไม่มี pre_item
+// นับเฉพาะ suffix ที่เป็นตัวเลข 3 หลักตามรูปแบบของ BuildPreItemCode
+// ของเดิมที่เป็น timestamp 6 หลักจึงไม่ถูกนับ และเลขใหม่จะเริ่มที่ 001
+func NextPreItemSeq(items []models.UpdatePOBigLotItemRequest) int {
+	maxSeq := 0
+	for _, item := range items {
+		if item.PreItem == nil {
+			continue
+		}
+
+		code := strings.TrimSpace(*item.PreItem)
+		idx := strings.LastIndex(code, "-")
+		if idx < 0 || len(code)-idx-1 != 3 {
+			continue
+		}
+
+		seq, err := strconv.Atoi(code[idx+1:])
+		if err != nil || seq <= maxSeq {
+			continue
+		}
+
+		maxSeq = seq
+	}
+
+	return maxSeq + 1
+}
+
+func MapUpdatePOBigLotRequestToPrePurchaseItem(reqItem models.UpdatePOBigLotItemRequest, user string, now time.Time, prePurchaseCode string, seq int) models.PrePurchaseItem {
+	preItem := BuildPreItemCode(prePurchaseCode, seq)
+	if reqItem.PreItem != nil && *reqItem.PreItem != "" {
 		preItem = *reqItem.PreItem
 	}
 
