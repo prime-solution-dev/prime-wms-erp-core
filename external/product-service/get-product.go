@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"prime-erp-core/config"
 	"prime-erp-core/internal/models"
@@ -143,31 +143,43 @@ func GetProduct(jsonPayload GetProductRequest) (GetProductsResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
-		return GetProductsResponse{}, errors.New("Error marshaling struct to JSON:")
+		return GetProductsResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
+
 	req, err := http.NewRequest("POST", config.GET_PRODUCT_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return GetProductsResponse{}, errors.New("Error parsing DateTo: " + err.Error())
+		return GetProductsResponse{}, errors.New("Error creating request: " + err.Error())
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 
-	// Create a client and execute the request
-	client := &http.Client{}
+	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return GetProductsResponse{}, errors.New("Error parsing DateTo: " + err.Error())
+		return GetProductsResponse{}, errors.New("Error sending request: " + err.Error())
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		return GetProductsResponse{}, errors.New("Error reading response body: " + err.Error())
 	}
-	var res GetProductsResponse
-	err = json.Unmarshal(body, &res)
-	if err != nil {
-		fmt.Println("Response Status:", err)
+
+	// เดิมข้ามการเช็ค status ทำให้ปลายทางตอบ 500 แล้วเราคืน struct เปล่ากับ error = nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
+			return GetProductsResponse{}, errors.New(errResp.Error)
+		}
+		return GetProductsResponse{}, fmt.Errorf("API error status %d: %s", resp.StatusCode, string(body))
 	}
-	return res, nil
+
+	var dataRes GetProductsResponse
+	if err = json.Unmarshal(body, &dataRes); err != nil {
+		return GetProductsResponse{}, errors.New("Error parsing response: " + err.Error())
+	}
+
+	return dataRes, nil
 }
