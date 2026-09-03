@@ -298,7 +298,43 @@ Expected: FAIL — `column "PG01" appears 2 times, expected exactly once`
 
 > `udfKeyMap` ไม่ถูกแตะ — มันคุมว่า row จะได้ค่า UDF ไหนบ้าง ไม่ใช่คอลัมน์
 
-- [ ] **Step 4: รัน test ให้ผ่าน**
+- [ ] **Step 4: ซ่อม assertion เดิมที่ค้างอยู่**
+
+`TestBuildExportTableTyped_ColumnsAndRows` **fail อยู่แล้วบน `origin/Develop` ก่อนงานนี้เริ่ม**
+สาเหตุคือมันยัง assert ว่าคอลัมน์แรกคือ `PRODUCT_GROUP1` ทั้งที่ static column `PG01`
+ถูกเพิ่มเข้ามาทีหลังและมาก่อนใน list ตัว assertion ล้าสมัย ไม่ใช่โค้ดผิด
+
+เนื่องจาก Task นี้แก้ตรรกะการสร้างคอลัมน์อยู่แล้ว ให้ซ่อม assertion นี้ไปด้วย
+แก้บล็อกนี้ใน `get-price-export-table_test.go`:
+
+```go
+	if resp.Columns[0].Field != "PRODUCT_GROUP1" || resp.Columns[0].HeaderName != "หมวดหลัก" {
+		t.Fatalf("unexpected first column: %+v", resp.Columns[0])
+	}
+```
+
+เป็น:
+
+```go
+	// static column มาก่อน dynamic group key เสมอ จึงเช็กว่ามีคอลัมน์อยู่ ไม่เช็กลำดับ
+	var productGroup1 *ExportColumn
+	for i := range resp.Columns {
+		if resp.Columns[i].Field == "PRODUCT_GROUP1" {
+			productGroup1 = &resp.Columns[i]
+			break
+		}
+	}
+	if productGroup1 == nil {
+		t.Fatal("expected a PRODUCT_GROUP1 column")
+	}
+	if productGroup1.HeaderName != "หมวดหลัก" {
+		t.Fatalf("unexpected PRODUCT_GROUP1 header: %q", productGroup1.HeaderName)
+	}
+```
+
+ห้ามแตะ assertion อื่นในฟังก์ชันนี้
+
+- [ ] **Step 5: รัน test ให้ผ่าน**
 
 ```bash
 cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -run TestBuildExportTableTyped -v
@@ -306,7 +342,10 @@ cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -run Tes
 
 Expected: PASS ทั้ง `_ColumnsAndRows` เดิมและ `_NoDuplicateColumns` ใหม่
 
-- [ ] **Step 5: Commit**
+> `TestUpdateLatestPriceListSubGroup_WithFormulas` และ `TestUpdateLatestPriceListSubGroup_WithInventoryData`
+> ก็ fail อยู่ก่อนแล้วบน Develop เช่นกัน แต่ไม่เกี่ยวกับโค้ดที่แผนนี้แตะ **ปล่อยไว้** และรายงานให้ผู้ใช้ทราบ
+
+- [ ] **Step 6: Commit**
 
 ```bash
 cd $WT/prime-wms-erp-core
@@ -429,10 +468,14 @@ Expected: FAIL ทั้งสอง — `is_highlight must not be an exported c
 - [ ] **Step 4: รัน test ให้ผ่าน**
 
 ```bash
-cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -v
+cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -run TestBuildExportTableTyped -v
 ```
 
-Expected: PASS ทุกเคสในแพ็กเกจ
+Expected: PASS ทุกเคสของ `TestBuildExportTableTyped*`
+
+> ทั้งแพ็กเกจจะยังมี `TestUpdateLatestPriceListSubGroup_WithFormulas` และ
+> `TestUpdateLatestPriceListSubGroup_WithInventoryData` fail อยู่ ซึ่ง fail มาก่อนงานนี้
+> และไม่เกี่ยวกับโค้ดที่แผนนี้แตะ **อย่าพยายามซ่อม** ให้รายงานไว้เฉยๆ
 
 - [ ] **Step 5: Commit**
 
@@ -603,10 +646,11 @@ func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[s
 - [ ] **Step 4: รัน test ทั้งแพ็กเกจให้ผ่าน**
 
 ```bash
-cd $WT/prime-wms-erp-core && go build ./... && go test ./internal/services/price-service/ -v
+cd $WT/prime-wms-erp-core && go build ./... && go test ./internal/services/price-service/ -run 'TestFormatTimestamp|TestBuild' -v
 ```
 
-Expected: build สำเร็จ, PASS ทุกเคส
+Expected: build สำเร็จ, PASS ทุกเคสของ `TestFormatTimestamp*` และ `TestBuild*`
+(`TestUpdateLatestPriceListSubGroup_*` fail มาก่อนงานนี้ ปล่อยไว้)
 
 - [ ] **Step 5: Commit**
 
@@ -907,10 +951,10 @@ Expected: PASS ทั้งสามเคส
 - [ ] **Step 6: รัน unit test และ build**
 
 ```bash
-cd $WT/prime-wms-erp-core && go build ./... && go vet ./internal/services/price-service/ && go test ./internal/services/price-service/
+cd $WT/prime-wms-erp-core && go build ./... && go vet ./internal/services/price-service/ && go test ./internal/services/price-service/ -run 'TestFormatTimestamp|TestBuild' -v
 ```
 
-Expected: build ผ่าน, vet ไม่มี output, test `ok`
+Expected: build ผ่าน, vet ไม่มี output, PASS ทุกเคสของ `TestFormatTimestamp*` และ `TestBuild*`
 
 - [ ] **Step 7: เพิ่ม Makefile target**
 
@@ -1482,7 +1526,9 @@ Expected: แต่ละ repo push ขึ้น branch `feature/pricelist-expor
 
 ## เกณฑ์ความสำเร็จ (ตรวจครบก่อนปิดงาน)
 
-- [ ] `go test ./...` ผ่านทั้ง erp-core และ document-core
+- [ ] `go test ./...` ของ document-core ผ่านทั้งหมด
+- [ ] erp-core: `go test ./internal/services/price-service/ -run 'TestFormatTimestamp|TestBuild'` ผ่านทั้งหมด
+  (`TestUpdateLatestPriceListSubGroup_WithFormulas` และ `_WithInventoryData` fail อยู่ก่อนงานนี้บน Develop — ไม่ใช่ขอบเขตของแผนนี้)
 - [ ] `go test -tags=integration ./internal/services/price-service` ผ่าน (ต้องมี Docker)
 - [ ] `yarn build` ของ web ผ่าน
 - [ ] Export จริงแล้วเวลาใน Excel ตรงกับเวลาไทยที่กดปุ่ม
