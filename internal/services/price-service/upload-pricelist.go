@@ -30,6 +30,23 @@ type CreatePricelistRequest struct {
 	SubGroupKeys     []PriceListSubGroupKeyDTO
 	ExtraKeys        []PriceListGroupExtraKeyDTO
 	SubGroupFormulas []PriceListSubGroupFormulasCreateDTO
+	Formulas         []PriceListFormulaCreateDTO
+	// ReplaceAll wipes every price list row of the (company_code, site_code)
+	// pairs present in Groups before inserting, inside the same transaction.
+	ReplaceAll bool
+}
+
+// PriceListFormulaCreateDTO is the master formula row from the
+// "price_list_formulars" sheet, loaded into table price_list_formulas.
+type PriceListFormulaCreateDTO struct {
+	ID          string
+	FormulaCode string
+	Name        string
+	Uom         string
+	FormulaType string
+	Expression  string
+	Params      string
+	Rounding    int
 }
 
 type PriceListSubGroupFormulasCreateDTO struct {
@@ -60,9 +77,9 @@ type PriceListGroupTermCreateDTO struct {
 	GroupCode   string
 	TermCode    string
 	Pdc         float64
-	PdcPercent  int
+	PdcPercent  float64
 	Due         float64
-	DuePercent  int
+	DuePercent  float64
 	CreateBy    string
 }
 
@@ -73,7 +90,8 @@ type PriceListGroupExtraCreateDTO struct {
 	ExtraKey       string // GEN from price_list_group_extra.PGxx
 	ConditionCode  string
 	Operator       string
-	ValueInt       int
+	ValueInt       float64
+	RowNo          int // 1-based row in the extra sheet; each row is its own record
 	LengthExtraKey int
 	CondRangeMin   float64
 	CondRangeMax   float64
@@ -159,6 +177,9 @@ func UploadPricelistMultipart(ctx *gin.Context) (interface{}, error) {
 	if err != nil {
 		return &CreatePricelistResponse{ResponseCode: 1, Message: err.Error()}, nil
 	}
+	// replace_all=true wipes the existing price list of every (company_code,
+	// site_code) in the file before inserting, in the same transaction.
+	req.ReplaceAll = parseBoolLoose(ctx.PostForm("replace_all"))
 
 	return CreatePricelist(gormx, *req)
 }
@@ -171,10 +192,13 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		now := time.Now()
 
 		groupKey := func(c, s, g string) string { return c + "|" + s + "|" + g }
-		subKey := func(c, s, g, sg string) string { return groupKey(c, s, g) + "|SUB|" + sg }
 		extraKey := func(c, s, g, ek string) string { return groupKey(c, s, g) + "|EXTRA|" + ek }
-		// extraRowKey includes condition_code so each (extra_key, condition_code) gets a unique id
-		extraRowKey := func(c, s, g, ek, cond string) string { return extraKey(c, s, g, ek) + "|COND|" + cond }
+
+		if req.ReplaceAll {
+			if err := deleteAllPriceListByScope(tx, req.Groups); err != nil {
+				return err
+			}
+		}
 
 		// ---------- map IDs ----------
 		groupIDs := map[string]uuid.UUID{}
@@ -240,19 +264,23 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 		}
 
-		subGroupIDs := map[string]uuid.UUID{}
-		for _, s := range req.SubGroups {
-			subGroupIDs[subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)] = uuid.New()
+		// One id per source row, like extraIDs below: two rows may share the same
+		// subgroup_key (same PG combination) while carrying different subgroup_code,
+		// and dedup/ON CONFLICT run on subgroup_code. Keying ids by subgroup_key handed
+		// both rows the same uuid and they collided on price_list_sub_group_pkey.
+		subGroupIDs := make([]uuid.UUID, len(req.SubGroups))
+		for i := range req.SubGroups {
+			subGroupIDs[i] = uuid.New()
 		}
 
-		// One id per (group, extra_key, condition_code) to avoid duplicate primary key
-		extraIDs := map[string]uuid.UUID{}
+		// One id per source row: the same (extra_key, condition_code) may legitimately
+		// repeat with different operator / cond_range, and each is its own record.
+		extraIDs := map[int]uuid.UUID{}
 		extraKeyToGroupExtraID := map[string]uuid.UUID{} // first extra id per extra_key, for ExtraKeys FK
 		for _, e := range req.Extras {
 			ek := extraKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey)
-			erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
 			id := uuid.New()
-			extraIDs[erk] = id
+			extraIDs[e.RowNo] = id
 			if _, ok := extraKeyToGroupExtraID[ek]; !ok {
 				extraKeyToGroupExtraID[ek] = id
 			}
@@ -323,9 +351,8 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		extraRecs := make([]map[string]any, 0, len(req.Extras))
 		for _, e := range req.Extras {
 			gk := groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)
-			erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
 			extraRecs = append(extraRecs, map[string]any{
-				"id":                  extraIDs[erk],
+				"id":                  extraIDs[e.RowNo],
 				"price_list_group_id": groupIDs[gk],
 				"extra_key":           e.ExtraKey,
 				"condition_code":      e.ConditionCode,
@@ -342,11 +369,10 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		}
 
 		subRecs := make([]map[string]any, 0, len(req.SubGroups))
-		for _, s := range req.SubGroups {
+		for i, s := range req.SubGroups {
 			gk := groupKey(s.CompanyCode, s.SiteCode, s.GroupCode)
-			sk := subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)
 			subRecs = append(subRecs, map[string]any{
-				"id":                            subGroupIDs[sk],
+				"id":                            subGroupIDs[i],
 				"price_list_group_id":           groupIDs[gk],
 				"subgroup_key":                  s.SubGroupKey,
 				"is_trading":                    s.IsTrading,
@@ -510,9 +536,8 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			extraRecs = make([]map[string]any, 0, len(req.Extras))
 			for _, e := range req.Extras {
 				gk := groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)
-				erk := extraRowKey(e.CompanyCode, e.SiteCode, e.GroupCode, e.ExtraKey, e.ConditionCode)
 				extraRecs = append(extraRecs, map[string]any{
-					"id":                  extraIDs[erk],
+					"id":                  extraIDs[e.RowNo],
 					"price_list_group_id": groupIDs[gk],
 					"extra_key":           e.ExtraKey,
 					"condition_code":      e.ConditionCode,
@@ -529,11 +554,10 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 			}
 
 			subRecs = make([]map[string]any, 0, len(req.SubGroups))
-			for _, s := range req.SubGroups {
+			for i, s := range req.SubGroups {
 				gk := groupKey(s.CompanyCode, s.SiteCode, s.GroupCode)
-				sk := subKey(s.CompanyCode, s.SiteCode, s.GroupCode, s.SubGroupKey)
 				subRecs = append(subRecs, map[string]any{
-					"id":                            subGroupIDs[sk],
+					"id":                            subGroupIDs[i],
 					"price_list_group_id":           groupIDs[gk],
 					"subgroup_key":                  s.SubGroupKey,
 					"is_trading":                    s.IsTrading,
@@ -575,34 +599,47 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 				})
 			}
 		}
+		// Terms and extras are a full replacement for the groups in this upload:
+		// delete first so re-uploading the same file does not accumulate rows
+		// (same contract price_list_group_key / price_list_sub_group_key already use).
+		touchedGroupIDs := make([]uuid.UUID, 0, len(req.Terms)+len(req.Extras))
+		seenTouchedGroup := map[uuid.UUID]bool{}
+		for _, t := range req.Terms {
+			if id, ok := groupIDs[groupKey(t.CompanyCode, t.SiteCode, t.GroupCode)]; ok && !seenTouchedGroup[id] {
+				seenTouchedGroup[id] = true
+				touchedGroupIDs = append(touchedGroupIDs, id)
+			}
+		}
+		for _, e := range req.Extras {
+			if id, ok := groupIDs[groupKey(e.CompanyCode, e.SiteCode, e.GroupCode)]; ok && !seenTouchedGroup[id] {
+				seenTouchedGroup[id] = true
+				touchedGroupIDs = append(touchedGroupIDs, id)
+			}
+		}
+		if len(touchedGroupIDs) > 0 {
+			if err := tx.Exec(
+				"DELETE FROM price_list_group_extra_key k USING price_list_group_extra e "+
+					"WHERE k.group_extra_id = e.id AND e.price_list_group_id IN ?", touchedGroupIDs,
+			).Error; err != nil {
+				return err
+			}
+			if err := tx.Table("price_list_group_extra").
+				Where("price_list_group_id IN ?", touchedGroupIDs).Delete(nil).Error; err != nil {
+				return err
+			}
+			if err := tx.Table("price_list_group_term").
+				Where("price_list_group_id IN ?", touchedGroupIDs).Delete(nil).Error; err != nil {
+				return err
+			}
+		}
+
 		if len(termRecs) > 0 {
 			if err := tx.Table("price_list_group_term").CreateInBatches(termRecs, batchSize).Error; err != nil {
 				return err
 			}
 		}
 		if len(extraRecs) > 0 {
-			// Deduplicate extraRecs by id (keep last occurrence) to avoid "cannot affect row a second time" error
-			extraRecsMap := make(map[uuid.UUID]map[string]any)
-			for _, rec := range extraRecs {
-				var id uuid.UUID
-				switch v := rec["id"].(type) {
-				case uuid.UUID:
-					id = v
-				case string:
-					if parsed, err := uuid.Parse(v); err == nil {
-						id = parsed
-					} else {
-						continue
-					}
-				default:
-					continue
-				}
-				extraRecsMap[id] = rec
-			}
-			deduplicatedExtraRecs := make([]map[string]any, 0, len(extraRecsMap))
-			for _, rec := range extraRecsMap {
-				deduplicatedExtraRecs = append(deduplicatedExtraRecs, rec)
-			}
+			deduplicatedExtraRecs := extraRecs
 
 			if err := tx.Table("price_list_group_extra").
 				Clauses(clause.OnConflict{
@@ -626,10 +663,10 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 
 			// Query back actual extra IDs after upsert to ensure we have correct IDs for foreign key references
 			type ExtraIDResult struct {
-				ID             uuid.UUID `gorm:"column:id"`
+				ID               uuid.UUID `gorm:"column:id"`
 				PriceListGroupID uuid.UUID `gorm:"column:price_list_group_id"`
-				ExtraKey       string    `gorm:"column:extra_key"`
-				ConditionCode  string    `gorm:"column:condition_code"`
+				ExtraKey         string    `gorm:"column:extra_key"`
+				ConditionCode    string    `gorm:"column:condition_code"`
 			}
 			var actualExtras []ExtraIDResult
 
@@ -953,6 +990,42 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 				return err
 			}
 		}
+		// Master formulas must exist before formulas_map rows reference them.
+		if len(req.Formulas) > 0 {
+			formulaRecs := make([]map[string]any, 0, len(req.Formulas))
+			for _, f := range req.Formulas {
+				id, err := uuid.Parse(f.ID)
+				if err != nil {
+					id = uuid.New()
+				}
+				params := f.Params
+				if params == "" {
+					params = "{}"
+				}
+				formulaRecs = append(formulaRecs, map[string]any{
+					"id":           id,
+					"formula_code": f.FormulaCode,
+					"name":         f.Name,
+					"uom":          f.Uom,
+					"formula_type": f.FormulaType,
+					"expression":   f.Expression,
+					"params":       params,
+					"rounding":     f.Rounding,
+					"create_dtm":   now,
+				})
+			}
+			if err := tx.Table("price_list_formulas").
+				Clauses(clause.OnConflict{
+					Columns: []clause.Column{{Name: "formula_code"}},
+					DoUpdates: clause.AssignmentColumns([]string{
+						"name", "uom", "formula_type", "expression", "params", "rounding",
+					}),
+				}).
+				CreateInBatches(formulaRecs, batchSize).Error; err != nil {
+				return err
+			}
+		}
+
 		if len(subGroupFormulasRecs) > 0 {
 			// Delete existing subgroup formulas for the subgroups being processed
 			subGroupCodesToDelete := make([]string, 0, len(subGroupFormulasRecs))
@@ -986,6 +1059,62 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		return &CreatePricelistResponse{ResponseCode: 1, Message: err.Error()}, nil
 	}
 	return res, nil
+}
+
+// deleteAllPriceListByScope removes every price list row belonging to the
+// (company_code, site_code) pairs of the uploaded groups, children first so the
+// FKs hold. History is wiped too: price_list_group_history has no ON DELETE
+// CASCADE, so leaving it would make the final group delete fail. Only the
+// price_list_formulas master is left alone.
+func deleteAllPriceListByScope(tx *gorm.DB, groups []PriceListGroupCreateDTO) error {
+	type scope struct{ company, site string }
+	seen := map[scope]bool{}
+	var where []string
+	var args []interface{}
+	for _, g := range groups {
+		sc := scope{g.CompanyCode, g.SiteCode}
+		if seen[sc] {
+			continue
+		}
+		seen[sc] = true
+		where = append(where, "(company_code = ? AND site_code = ?)")
+		args = append(args, g.CompanyCode, g.SiteCode)
+	}
+	if len(where) == 0 {
+		return nil
+	}
+
+	var groupIDs []uuid.UUID
+	if err := tx.Table("price_list_group").
+		Where(strings.Join(where, " OR "), args...).
+		Pluck("id", &groupIDs).Error; err != nil {
+		return err
+	}
+	if len(groupIDs) == 0 {
+		return nil
+	}
+
+	stmts := []string{
+		"DELETE FROM price_list_subgroup_formulas_map m USING price_list_sub_group sg " +
+			"WHERE m.price_list_subgroup_code = sg.subgroup_code AND sg.price_list_group_id IN ?",
+		"DELETE FROM price_list_sub_group_key k USING price_list_sub_group sg " +
+			"WHERE k.sub_group_id = sg.id AND sg.price_list_group_id IN ?",
+		"DELETE FROM price_list_sub_group WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_group_extra_key k USING price_list_group_extra e " +
+			"WHERE k.group_extra_id = e.id AND e.price_list_group_id IN ?",
+		"DELETE FROM price_list_group_extra WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_group_term WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_group_key WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_sub_group_history WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_group_history WHERE price_list_group_id IN ?",
+		"DELETE FROM price_list_group WHERE id IN ?",
+	}
+	for _, q := range stmts {
+		if err := tx.Exec(q, groupIDs).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest, error) {
@@ -1062,6 +1191,17 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 		v, _ := strconv.ParseFloat(s, 64)
 		return v
 	}
+	// Excel percent cells come back already formatted ("1.0%"), not as "0.01".
+	// ponytail: precision follows the sheet's own display format (0.0% here);
+	// read the raw cell value if a template ever needs more decimals than it shows.
+	parsePercent := func(s string) float64 {
+		s = strings.TrimSpace(s)
+		if strings.HasSuffix(s, "%") {
+			v, _ := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(s, "%")), 64)
+			return v / 100
+		}
+		return parseFloat(s)
+	}
 	parseInt := func(s string) int {
 		s = strings.TrimSpace(s)
 		if s == "" {
@@ -1076,10 +1216,15 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range groupRows {
+	seenGroupCode := map[string]int{}
+	for i, r := range groupRows {
 		if r["company_code"] == "" || r["site_code"] == "" || r["group_code"] == "" {
 			return nil, fmt.Errorf("price_list_group: company_code, site_code, group_code are required")
 		}
+		if first, dup := seenGroupCode[r["group_code"]]; dup {
+			return nil, fmt.Errorf("price_list_group: group_code %q ซ้ำ (แถว %d และ %d) — แต่ละกลุ่มต้องมี group_code ไม่ซ้ำกัน", r["group_code"], first+2, i+2)
+		}
+		seenGroupCode[r["group_code"]] = i
 
 		ed, err := parseTime(r["effective_date"])
 		if err != nil {
@@ -1127,16 +1272,16 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 			GroupCode:   r["group_code"],
 			TermCode:    r["term_code"],
 			Pdc:         parseFloat(r["pdc"]),
-			PdcPercent:  parseInt(r["pdc_percent"]),
+			PdcPercent:  parsePercent(r["pdc_percent"]),
 			Due:         parseFloat(r["due"]),
-			DuePercent:  parseInt(r["due_percent"]),
+			DuePercent:  parsePercent(r["due_percent"]),
 			CreateBy:    r["create_by"],
 		})
 	}
 
 	// ---- extra : gen extra_key + create extra_key rows from same PG01..PG10 ----
 	extraRows, _ := readSheet("price_list_group_extra")
-	for _, r := range extraRows {
+	for i, r := range extraRows {
 		if r["company_code"] == "" || r["site_code"] == "" || r["group_code"] == "" {
 			return nil, fmt.Errorf("price_list_group_extra: company_code, site_code, group_code, condition_code are required")
 		}
@@ -1152,8 +1297,9 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 			GroupCode:      r["group_code"],
 			ExtraKey:       exKey,
 			ConditionCode:  r["condition_code"],
+			RowNo:          i + 2,
 			Operator:       r["operator"],
-			ValueInt:       parseInt(r["value_int"]),
+			ValueInt:       parseFloat(r["value_int"]),
 			LengthExtraKey: parseInt(r["length_extra_key"]),
 			CondRangeMin:   parseFloat(r["cond_range_min"]),
 			CondRangeMax:   parseFloat(r["cond_range_max"]),
@@ -1178,9 +1324,16 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range subRows {
+	seenSubGroupCode := map[string]int{}
+	for i, r := range subRows {
 		if r["company_code"] == "" || r["site_code"] == "" || r["group_code"] == "" {
 			return nil, fmt.Errorf("price_list_sub_group: company_code, site_code, group_code are required")
+		}
+		if code := r["subgroup_code"]; code != "" {
+			if first, dup := seenSubGroupCode[code]; dup {
+				return nil, fmt.Errorf("price_list_sub_group: subgroup_code %q ซ้ำ (แถว %d และ %d)", code, first+2, i+2)
+			}
+			seenSubGroupCode[code] = i
 		}
 
 		subKeyVal, sKeys := genKeyFromCols(r, pgCols)
@@ -1242,6 +1395,29 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 		}
 	}
 
+	// ---- price_list_formulars (master formulas; optional sheet) ----
+	knownFormulaCodes := map[string]bool{}
+	formulaRows, _ := readSheet("price_list_formulars")
+	for i, r := range formulaRows {
+		if r["formula_code"] == "" {
+			return nil, fmt.Errorf("price_list_formulars (แถว %d): formula_code is required", i+2)
+		}
+		if r["params"] != "" && !json.Valid([]byte(r["params"])) {
+			return nil, fmt.Errorf("price_list_formulars (formula_code=%s): params invalid json", r["formula_code"])
+		}
+		knownFormulaCodes[r["formula_code"]] = true
+		req.Formulas = append(req.Formulas, PriceListFormulaCreateDTO{
+			ID:          r["id"],
+			FormulaCode: r["formula_code"],
+			Name:        r["name"],
+			Uom:         r["uom"],
+			FormulaType: r["formula_type"],
+			Expression:  r["expression"],
+			Params:      r["params"],
+			Rounding:    parseInt(r["rounding"]),
+		})
+	}
+
 	// ---- formulas_map ----
 	formulasRows, err := readSheet("formulas_map")
 	if err != nil {
@@ -1250,6 +1426,15 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	for _, r := range formulasRows {
 		if r["subgroup_code"] == "" || r["formula_code_default"] == "" || r["formula_code_convert"] == "" {
 			return nil, fmt.Errorf("formulas_map: subgroup_code, formula_code are required")
+		}
+		// Only cross-check when the master sheet is present; otherwise the codes
+		// must already exist in price_list_formulas and the FK will say so.
+		if len(knownFormulaCodes) > 0 {
+			for _, code := range []string{r["formula_code_default"], r["formula_code_convert"]} {
+				if !knownFormulaCodes[code] {
+					return nil, fmt.Errorf("formulas_map (subgroup_code=%s): formula_code %q ไม่มีใน sheet price_list_formulars", r["subgroup_code"], code)
+				}
+			}
 		}
 		req.SubGroupFormulas = append(req.SubGroupFormulas, PriceListSubGroupFormulasCreateDTO{
 			SubGroupCode: r["subgroup_code"],
