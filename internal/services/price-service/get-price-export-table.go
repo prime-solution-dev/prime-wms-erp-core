@@ -521,9 +521,20 @@ func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[s
 	}
 }
 
-// formatTimestamp formats time as "DD/MM/YYYY HH:MM" (Thai date format).
+// bangkok คือ timezone ที่ใช้แสดงผลทุกเวลาในรายงาน
+// container ของ service นี้เป็น alpine ที่ไม่ได้ติดตั้ง tzdata และไม่ได้ตั้ง ENV TZ
+// LoadLocation จึงล้มเหลวได้ ต้องมี FixedZone สำรองไว้เสมอ
+var bangkok = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		return time.FixedZone("ICT", 7*60*60)
+	}
+	return loc
+}()
+
+// formatTimestamp formats time as "DD/MM/YYYY HH:MM" (Thai date format) in Asia/Bangkok.
 func formatTimestamp(t time.Time) string {
-	return t.Format("2/1/2006 15:04")
+	return t.In(bangkok).Format("2/1/2006 15:04")
 }
 
 // getGroupNameByCode looks up group name from group code.

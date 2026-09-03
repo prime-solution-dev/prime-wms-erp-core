@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"prime-erp-core/internal/models"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -178,5 +179,22 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 	// Check term fields
 	if row["term_T1_pdc_baht"] != 0.23 {
 		t.Fatalf("expected term_T1_pdc_baht 0.23, got %v", row["term_T1_pdc_baht"])
+	}
+}
+
+// update_dtm ถูกเขียนเป็น UTC (update-pricelist.go:27) และ container เป็น alpine
+// ที่ไม่มี tzdata เวลาที่แสดงในรายงานจึงต้องถูกแปลงเป็นเวลาไทยอย่างชัดเจน
+func TestFormatTimestamp_ConvertsToBangkok(t *testing.T) {
+	got := formatTimestamp(time.Date(2026, 9, 3, 2, 30, 0, 0, time.UTC))
+	if got != "3/9/2026 09:30" {
+		t.Fatalf("expected %q, got %q", "3/9/2026 09:30", got)
+	}
+}
+
+// export ก่อน 07:00 น. เวลาไทย ต้องไม่ทำให้วันที่ย้อนไปหนึ่งวัน
+func TestFormatTimestamp_CrossesDateBoundary(t *testing.T) {
+	got := formatTimestamp(time.Date(2026, 9, 2, 20, 0, 0, 0, time.UTC))
+	if got != "3/9/2026 03:00" {
+		t.Fatalf("expected %q, got %q", "3/9/2026 03:00", got)
 	}
 }
