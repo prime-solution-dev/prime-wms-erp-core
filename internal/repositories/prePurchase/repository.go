@@ -26,16 +26,16 @@ func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 }
 
 // Get
-func GetPOBigLotList(
-	prePurchaseCodes []string,
-	supplierCodes []string,
-	productGroupCodes []string,
-	statusApprove []string,
-	companyCode,
-	siteCode string,
-	page int,
-	pageSize int,
-) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, int, int, int, int, error) {
+	prePurchaseCodes := req.PrePurchaseCodes
+	supplierCodes := req.SupplierCodes
+	productGroupCodes := req.ProductGroupCodes
+	statusApprove := req.StatusApprove
+	companyCode := req.CompanyCode
+	siteCode := req.SiteCode
+	page := req.Page
+	pageSize := req.PageSize
+
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -66,6 +66,24 @@ func GetPOBigLotList(
 			Select("1").
 			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
 			Where("hierarchy_code IN ?", productGroupCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
+	// partial search จากช่องค้นหาบนหัวตาราง (modal Big lot PO selection)
+	if req.PrePurchaseCodeLike != "" {
+		query = query.Where("pre_purchase_code ILIKE ?", "%"+req.PrePurchaseCodeLike+"%")
+	}
+
+	if req.SupplierCodeLike != "" {
+		query = query.Where("supplier_code ILIKE ?", "%"+req.SupplierCodeLike+"%")
+	}
+
+	if req.ProductGroupCodeLike != "" {
+		sub := gormx.Model(&models.PrePurchaseItem{}).
+			Select("1").
+			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
+			Where("hierarchy_code ILIKE ?", "%"+req.ProductGroupCodeLike+"%")
 
 		query = query.Where("EXISTS (?)", sub)
 	}
