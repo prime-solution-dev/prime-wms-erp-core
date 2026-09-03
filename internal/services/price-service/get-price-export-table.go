@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"sort"
+	"strings"
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -69,6 +70,16 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		return nil, fmt.Errorf("GetTerms error: %w", err)
 	}
 
+	// Last Updated ต้องเป็นเวลาที่ราคาถูกแก้ล่าสุด ไม่ใช่เวลาที่กด export
+	// ถ้า query ล้มเหลวไม่ควรทำให้ export ทั้งใบพัง — ปล่อยหัวเรื่องว่างแทน
+	// (พฤติกรรมเดียวกับตอน inventory service ล้มเหลวด้านล่าง)
+	lastUpdated, err := getPriceLastUpdated(sqlxDB, req)
+	if err != nil {
+		fmt.Printf("Warning: failed to get price last updated (company=%s, sites=%v, groups=%v): %v\n",
+			req.CompanyCode, req.SiteCodes, req.GroupCodes, err)
+		lastUpdated = nil
+	}
+
 	// Enrich subgroup keys with group_name and value_name (required for columns and table values).
 	groupMap, groupItemMap, paymentTermMap, err := getGroupAndItemMappings()
 	if err != nil {
@@ -90,6 +101,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 			}
 			return ""
 		},
+		lastUpdated,
 	)
 
 	// Collect all unique company codes and site codes from the response
@@ -169,7 +181,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 
 	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, paymentTermMap)
+	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, lastUpdated)
 
 	response := GetPriceExportTableResponse{
 		Tabs: []ExportTab{detailTab, basedPriceTab},
@@ -265,7 +277,7 @@ func buildExportTableTyped(
 		{Field: "remark", HeaderName: "Remark"},
 		{Field: "line_bundle", HeaderName: "เส้น/มัด"},
 		{Field: "stock", HeaderName: "Stock"},
-		{Field: "stock_quantity", HeaderName: "จำนวน"},
+		{Field: "stock_quantity", HeaderName: "จำนวนรวม"},
 		{Field: "quantity", HeaderName: "จำนวน"},
 		{Field: "batch_no", HeaderName: "Ship No."},
 		{Field: "brand", HeaderName: "ยี่ห้อ"},
@@ -287,20 +299,43 @@ func buildExportTableTyped(
 		{Field: "fast", HeaderName: "เร็ว"},
 		{Field: "slow", HeaderName: "ช้า"},
 		{Field: "inactive", HeaderName: "Inactive"},
-		{Field: "is_highlight", HeaderName: "Highlight สีฟ้า"},
 		{Field: "coil_id", HeaderName: "Coil ID"},
 		{Field: "supplier_name", HeaderName: "โรงงาน"},
 		{Field: "size", HeaderName: "ขนาด"},
 		{Field: "spec", HeaderName: "spec"},
 	}
 
+	// colIndex กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
+	// ค่า >= 0 คือ index ใน columns, ค่า -1 คือ field ที่ห้ามเป็นคอลัมน์เด็ดขาด
+	const excludedColumn = -1
+	colIndex := make(map[string]int, len(columns))
+	for i, c := range columns {
+		colIndex[c.Field] = i
+	}
+
+	// is_highlight เป็น flag สำหรับทำสีตัวอักษร ไม่ใช่คอลัมน์ที่ผู้ใช้ต้องเห็น
+	// ต้องกันไว้ที่นี่ ไม่งั้น loop UDF ด้านล่างจะเติมกลับเข้ามา
+	colIndex["is_highlight"] = excludedColumn
+
 	// Then add dynamic group key columns (sorted by seq, then code)
+	// group_name ที่ client ตั้งไว้ใน DB ชนะหัวคอลัมน์ hardcode ของ static list เสมอ
+	// static header เหลือหน้าที่เป็น fallback เมื่อ DB ไม่มีชื่อกลุ่มให้
 	for _, c := range cols {
-		header := c.name
+		// group_name ที่เป็นช่องว่างล้วนถือว่าไม่มีชื่อ ไม่งั้นหัวคอลัมน์ที่มีความหมาย
+		// จะถูกเขียนทับด้วยช่องว่าง
+		name := strings.TrimSpace(c.name)
+		if i, ok := colIndex[c.code]; ok {
+			if i != excludedColumn && name != "" {
+				columns[i].HeaderName = name
+			}
+			continue
+		}
+		header := name
 		if header == "" {
 			header = c.code
 		}
 		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
+		colIndex[c.code] = len(columns) - 1
 	}
 
 	// Collect all unique UDF keys from all subgroups' udf_json data dynamically
@@ -327,8 +362,12 @@ func buildExportTableTyped(
 
 	// Generate dynamic UDF columns with headers
 	for _, key := range udfKeys {
+		if _, ok := colIndex[key]; ok {
+			continue
+		}
 		// Use key as header (can be enhanced with mapping later if needed)
 		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
+		colIndex[key] = len(columns) - 1
 	}
 
 	// Build rows: 1 row per subgroup.
@@ -408,17 +447,17 @@ func buildDetailTab(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
 	itemNameByCode func(code string) string,
+	lastUpdated *time.Time,
 ) ExportTab {
 	// Reuse existing logic but get the old response structure.
 	oldResponse := buildExportTableTyped(groups, groupNameByCode, itemNameByCode)
 
-	now := time.Now()
 	return ExportTab{
 		Name: "Detail",
 		Headers: ExportTabHeaders{
 			Report:      "Pricelist",
-			LastUpdated: formatTimestamp(now),
-			Download:    formatTimestamp(now),
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
 		},
 		Columns: oldResponse.Columns,
 		Rows:    oldResponse.Rows,
@@ -426,9 +465,7 @@ func buildDetailTab(
 }
 
 // buildBasedPriceTab creates the "Based price" tab with group-level data and Terms.
-func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[string]GetPaymentTermResponse) ExportTab {
-	now := time.Now()
-
+func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[string]GetPaymentTermResponse, lastUpdated *time.Time) ExportTab {
 	// Build columns.
 	columns := []ExportColumn{
 		{Field: "product", HeaderName: "สินค้า"},
@@ -513,17 +550,41 @@ func buildBasedPriceTab(groups []GetPriceListGroupResponse, paymentTermMap map[s
 		Name: "Based price",
 		Headers: ExportTabHeaders{
 			Report:      "Pricelist- Based price",
-			LastUpdated: formatTimestamp(now),
-			Download:    formatTimestamp(now),
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
 		},
 		Columns: columns,
 		Rows:    rows,
 	}
 }
 
-// formatTimestamp formats time as "DD/MM/YYYY HH:MM" (Thai date format).
+// bangkok คือ timezone ที่ใช้แสดงผลทุกเวลาในรายงาน
+// container ของ service นี้เป็น alpine ที่ไม่ได้ติดตั้ง tzdata และไม่ได้ตั้ง ENV TZ
+// LoadLocation จึงล้มเหลวได้ ต้องมี FixedZone สำรองไว้เสมอ
+//
+// resolve ครั้งเดียวตอน package init ต่างจาก picking_enrich.go ของ document-core
+// ที่เรียก LoadLocation ใหม่ทุกครั้ง — ตั้งใจให้ต่าง เพราะ *time.Location อ่านพร้อมกันได้
+// และ formatTimestamp ถูกเรียกต่อแถวในรายงานที่มีหลักพันแถว
+var bangkok = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		return time.FixedZone("ICT", 7*60*60)
+	}
+	return loc
+}()
+
+// formatTimestamp formats time as "DD/MM/YYYY HH:MM" (Thai date format) in Asia/Bangkok.
 func formatTimestamp(t time.Time) string {
-	return t.Format("2/1/2006 15:04")
+	return t.In(bangkok).Format("2/1/2006 15:04")
+}
+
+// formatOptionalTimestamp คืนสตริงว่างเมื่อไม่มีค่า
+// excel_generator ฝั่ง document-core ข้ามการเขียนหัวเรื่องที่ค่าว่างอยู่แล้ว
+func formatOptionalTimestamp(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return formatTimestamp(*t)
 }
 
 // getGroupNameByCode looks up group name from group code.
