@@ -265,7 +265,7 @@ func buildExportTableTyped(
 		{Field: "remark", HeaderName: "Remark"},
 		{Field: "line_bundle", HeaderName: "เส้น/มัด"},
 		{Field: "stock", HeaderName: "Stock"},
-		{Field: "stock_quantity", HeaderName: "จำนวน"},
+		{Field: "stock_quantity", HeaderName: "จำนวนรวม"},
 		{Field: "quantity", HeaderName: "จำนวน"},
 		{Field: "batch_no", HeaderName: "Ship No."},
 		{Field: "brand", HeaderName: "ยี่ห้อ"},
@@ -287,7 +287,6 @@ func buildExportTableTyped(
 		{Field: "fast", HeaderName: "เร็ว"},
 		{Field: "slow", HeaderName: "ช้า"},
 		{Field: "inactive", HeaderName: "Inactive"},
-		{Field: "is_highlight", HeaderName: "Highlight สีฟ้า"},
 		{Field: "coil_id", HeaderName: "Coil ID"},
 		{Field: "supplier_name", HeaderName: "โรงงาน"},
 		{Field: "size", HeaderName: "ขนาด"},
@@ -299,6 +298,10 @@ func buildExportTableTyped(
 	for _, c := range columns {
 		seen[c.Field] = true
 	}
+
+	// is_highlight เป็น flag สำหรับทำสีตัวอักษร ไม่ใช่คอลัมน์ที่ผู้ใช้ต้องเห็น
+	// ต้องกันไว้ที่นี่ ไม่งั้น loop UDF ด้านล่างจะเติมกลับเข้ามา
+	seen["is_highlight"] = true
 
 	// Then add dynamic group key columns (sorted by seq, then code)
 	for _, c := range cols {

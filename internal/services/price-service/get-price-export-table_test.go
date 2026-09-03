@@ -251,3 +251,55 @@ func TestBuildExportTableTyped_NoDuplicateColumns(t *testing.T) {
 		}
 	}
 }
+
+// is_highlight ใช้ทำสีตัวอักษรฝั่ง document-core จึงต้องอยู่ใน row แต่ไม่ใช่คอลัมน์
+func TestBuildExportTableTyped_DropsIsHighlightColumnButKeepsValue(t *testing.T) {
+	udfJson, err := json.Marshal(map[string]interface{}{"is_highlight": true})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{ID: uuid.New(), UdfJson: udfJson},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	for _, c := range data.Columns {
+		if c.Field == "is_highlight" {
+			t.Fatal("is_highlight must not be an exported column")
+		}
+	}
+
+	if len(data.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(data.Rows))
+	}
+	if data.Rows[0]["is_highlight"] != true {
+		t.Fatalf("is_highlight value must survive for cell styling, got %v", data.Rows[0]["is_highlight"])
+	}
+}
+
+// stock_quantity (TotalQty) กับ quantity (SumQty) เคยใช้หัวเดียวกันคือ "จำนวน"
+func TestBuildExportTableTyped_QuantityHeadersAreDistinct(t *testing.T) {
+	data := buildExportTableTyped(nil, func(string) string { return "" }, func(string) string { return "" })
+
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+	}
+
+	if headers["stock_quantity"] != "จำนวนรวม" {
+		t.Fatalf("expected stock_quantity header %q, got %q", "จำนวนรวม", headers["stock_quantity"])
+	}
+	if headers["quantity"] != "จำนวน" {
+		t.Fatalf("expected quantity header %q, got %q", "จำนวน", headers["quantity"])
+	}
+}
