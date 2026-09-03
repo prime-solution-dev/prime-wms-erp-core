@@ -493,6 +493,239 @@ Claude-Session: https://claude.ai/code/session_01CJDm4YYEArAiyKLADRMoVE"
 
 ---
 
+## Task 2b: ให้ group_name จาก DB ชนะหัวคอลัมน์ hardcode (F8)
+
+**Files:**
+- Modify: `prime-wms-erp-core/internal/services/price-service/get-price-export-table.go` (`buildExportTableTyped`)
+- Test: `prime-wms-erp-core/internal/services/price-service/get-price-export-table_test.go`
+
+**บริบท:** `PG01`–`PG10` เป็นรหัส group key จริงในระบบ (`upload-pricelist.go:21`) และหัวคอลัมน์มาได้จากสองแหล่ง — static list ที่ hardcode ชื่อไทยไว้ในโค้ด (`หมวดหลัก`, `หมวดย่อย`, …) กับ `group_name` ใน DB ที่แต่ละ client ตั้งเองได้ ก่อน Task 2 ไฟล์มีคอลัมน์ซ้ำสองอันจึงเห็นทั้งสองชื่อ พอ Task 2 dedupe แล้ว **หัว hardcode ชนะเสมอ** และชื่อที่ client ตั้งไว้จริงหายไป
+
+ผู้ใช้ตัดสินใจแล้วว่า **`group_name` จาก DB ต้องชนะ** ส่วน static header เป็นแค่ fallback เมื่อ DB ไม่มีชื่อ
+การแก้นี้ทำให้ `PG04` (ซึ่งไม่มีใน static list) ใช้กติกาเดียวกับ `PG01`–`PG03` และ `PG05`–`PG10` โดยอัตโนมัติ ไม่ต้องเติม `PG04` เข้า static list
+
+**Design:** ยุบ `seen map[string]bool` เป็น `colIndex map[string]int` แผนที่เดียว โดย
+- ค่า `>= 0` คือ index ของคอลัมน์ใน `columns` (ใช้เขียนทับ HeaderName ได้)
+- ค่า `-1` คือ field ที่ห้ามเป็นคอลัมน์เด็ดขาด (ตอนนี้มีแค่ `is_highlight`)
+
+- [ ] **Step 1: เขียน failing test**
+
+เพิ่มท้าย `get-price-export-table_test.go`:
+
+```go
+// group_name ที่ client ตั้งไว้ใน DB ต้องชนะหัวคอลัมน์ hardcode ของ PG01-PG10
+func TestBuildExportTableTyped_GroupNameOverridesStaticHeader(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG04", Value: "V4", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	groupNameByCode := func(code string) string {
+		switch code {
+		case "PG01":
+			return "กลุ่มสินค้าตามที่ลูกค้าตั้ง"
+		case "PG04":
+			return "กลุ่มที่สี่"
+		default:
+			return ""
+		}
+	}
+
+	data := buildExportTableTyped(groups, groupNameByCode, func(string) string { return "" })
+
+	headers := map[string]string{}
+	count := map[string]int{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+		count[c.Field]++
+	}
+
+	// PG01 มีใน static list -> ต้องถูกเขียนทับด้วยชื่อจาก DB ไม่ใช่ "หมวดหลัก"
+	if headers["PG01"] != "กลุ่มสินค้าตามที่ลูกค้าตั้ง" {
+		t.Fatalf("expected PG01 header from DB, got %q", headers["PG01"])
+	}
+	// PG04 ไม่มีใน static list -> ต้องถูกเพิ่มเข้ามาพร้อมชื่อจาก DB
+	if headers["PG04"] != "กลุ่มที่สี่" {
+		t.Fatalf("expected PG04 header from DB, got %q", headers["PG04"])
+	}
+	// เขียนทับ ไม่ใช่เพิ่มคอลัมน์ใหม่
+	if count["PG01"] != 1 {
+		t.Fatalf("expected exactly one PG01 column, got %d", count["PG01"])
+	}
+}
+
+// DB ไม่มีชื่อกลุ่ม -> ต้องคงหัว static ไว้ ไม่ใช่กลายเป็นค่าว่างหรือรหัสดิบ
+func TestBuildExportTableTyped_StaticHeaderIsFallback(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:        uuid.New(),
+						GroupKeys: []GroupKey{{Code: "PG01", Value: "V1", Seq: 1}},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	for _, c := range data.Columns {
+		if c.Field == "PG01" {
+			if c.HeaderName != "หมวดหลัก" {
+				t.Fatalf("expected static fallback header %q, got %q", "หมวดหลัก", c.HeaderName)
+			}
+			return
+		}
+	}
+	t.Fatal("expected a PG01 column")
+}
+```
+
+- [ ] **Step 2: รัน test ให้เห็นว่าล้มเหลว**
+
+```bash
+cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -run 'TestBuildExportTableTyped_(GroupNameOverrides|StaticHeaderIsFallback)' -v
+```
+
+Expected: `_GroupNameOverridesStaticHeader` FAIL ด้วย `expected PG01 header from DB, got "หมวดหลัก"`
+(`_StaticHeaderIsFallback` จะผ่านอยู่แล้ว เพราะพฤติกรรมปัจจุบันคือ static ชนะเสมอ — เก็บไว้กัน regression)
+
+- [ ] **Step 3: เขียนโค้ดให้ผ่าน**
+
+แทนที่บล็อกนี้ทั้งหมด:
+
+```go
+	// seen กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
+	seen := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		seen[c.Field] = true
+	}
+
+	// is_highlight เป็น flag สำหรับทำสีตัวอักษร ไม่ใช่คอลัมน์ที่ผู้ใช้ต้องเห็น
+	// ต้องกันไว้ที่นี่ ไม่งั้น loop UDF ด้านล่างจะเติมกลับเข้ามา
+	seen["is_highlight"] = true
+
+	// Then add dynamic group key columns (sorted by seq, then code)
+	for _, c := range cols {
+		if seen[c.code] {
+			continue
+		}
+		header := c.name
+		if header == "" {
+			header = c.code
+		}
+		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
+		seen[c.code] = true
+	}
+```
+
+ด้วย:
+
+```go
+	// colIndex กันคอลัมน์ซ้ำ — group key code และ UDF key ชนกับ static column ได้
+	// ค่า >= 0 คือ index ใน columns, ค่า -1 คือ field ที่ห้ามเป็นคอลัมน์เด็ดขาด
+	const excludedColumn = -1
+	colIndex := make(map[string]int, len(columns))
+	for i, c := range columns {
+		colIndex[c.Field] = i
+	}
+
+	// is_highlight เป็น flag สำหรับทำสีตัวอักษร ไม่ใช่คอลัมน์ที่ผู้ใช้ต้องเห็น
+	// ต้องกันไว้ที่นี่ ไม่งั้น loop UDF ด้านล่างจะเติมกลับเข้ามา
+	colIndex["is_highlight"] = excludedColumn
+
+	// Then add dynamic group key columns (sorted by seq, then code)
+	// group_name ที่ client ตั้งไว้ใน DB ชนะหัวคอลัมน์ hardcode ของ static list เสมอ
+	// static header เหลือหน้าที่เป็น fallback เมื่อ DB ไม่มีชื่อกลุ่มให้
+	for _, c := range cols {
+		if i, ok := colIndex[c.code]; ok {
+			if i != excludedColumn && c.name != "" {
+				columns[i].HeaderName = c.name
+			}
+			continue
+		}
+		header := c.name
+		if header == "" {
+			header = c.code
+		}
+		columns = append(columns, ExportColumn{Field: c.code, HeaderName: header})
+		colIndex[c.code] = len(columns) - 1
+	}
+```
+
+และแก้ loop UDF จาก:
+
+```go
+	for _, key := range udfKeys {
+		if seen[key] {
+			continue
+		}
+		// Use key as header (can be enhanced with mapping later if needed)
+		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
+		seen[key] = true
+	}
+```
+
+เป็น:
+
+```go
+	for _, key := range udfKeys {
+		if _, ok := colIndex[key]; ok {
+			continue
+		}
+		// Use key as header (can be enhanced with mapping later if needed)
+		columns = append(columns, ExportColumn{Field: key, HeaderName: key})
+		colIndex[key] = len(columns) - 1
+	}
+```
+
+> `udfKeyMap` **ห้ามแตะ** — คนละเรื่องกัน มันคุมค่าใน row ไม่ใช่คอลัมน์
+
+- [ ] **Step 4: รัน test ให้ผ่าน**
+
+```bash
+cd $WT/prime-wms-erp-core && go test ./internal/services/price-service/ -run TestBuildExportTableTyped -v
+```
+
+Expected: PASS ทุกเคสของ `TestBuildExportTableTyped*` (6 เคส)
+
+ตรวจเป็นพิเศษว่า `_ColumnsAndRows` เดิมยังผ่าน — มันใช้ `groupNameByCode` ที่คืน `"หมวดหลัก"` ให้ `PRODUCT_GROUP1`
+ซึ่งไม่ได้อยู่ใน static list จึงยังเข้า path เพิ่มคอลัมน์ใหม่เหมือนเดิม
+
+- [ ] **Step 5: Commit**
+
+```bash
+cd $WT/prime-wms-erp-core
+git add internal/services/price-service/get-price-export-table.go internal/services/price-service/get-price-export-table_test.go
+git commit -m "fix: ให้ group_name จาก DB ชนะหัวคอลัมน์ hardcode ใน price list export
+
+หลัง dedupe ของ Task 2 หัว hardcode ชนะเสมอ ทำให้ชื่อกลุ่มที่ client
+ตั้งไว้จริงหายไปจากไฟล์ กลับ priority ให้ DB ชนะ static เป็น fallback
+ผลพลอยได้คือ PG04 ที่ไม่มีใน static list ใช้กติกาเดียวกับตัวอื่นแล้ว
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CJDm4YYEArAiyKLADRMoVE"
+```
+
+---
+
 ## Task 4: รับ lastUpdated เข้า tab builder (F2 ส่วนแรก)
 
 **Files:**
@@ -1534,6 +1767,7 @@ Expected: แต่ละ repo push ขึ้น branch `feature/pricelist-expor
 - [ ] Export จริงแล้วเวลาใน Excel ตรงกับเวลาไทยที่กดปุ่ม
 - [ ] `Last Updated` แสดงเวลาแก้ราคาล่าสุด ไม่เท่ากับ `Download`
 - [ ] ไม่มีหัวคอลัมน์ซ้ำในชีต Detail
+- [ ] หัวคอลัมน์ `PG01`–`PG10` ใช้ `group_name` ที่ตั้งไว้ใน DB ไม่ใช่ชื่อ hardcode
 - [ ] ไม่มีคอลัมน์ `Highlight สีฟ้า` แต่สีตัวอักษรยังทำงาน
 - [ ] `จำนวนรวม` กับ `จำนวน` แยกหัวกัน
 - [ ] ราคาและจำนวนในชีตเป็นตัวเลขที่ sum ได้
