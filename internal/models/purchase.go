@@ -204,14 +204,17 @@ type CreatePOBigLotRequest struct {
 }
 
 type GetPOBigLotListRequest struct {
-	PrePurchaseCodes  []string `json:"pre_purchase_codes"`
-	SupplierCodes     []string `json:"supplier_codes"`
-	ProductGroupCodes []string `json:"product_group_codes"`
-	StatusApprove     []string `json:"status_approve"`
-	CompanyCode       string   `json:"company_code"`
-	SiteCode          string   `json:"site_code"`
-	Page              int      `json:"page"`
-	PageSize          int      `json:"page_size"`
+	PrePurchaseCodes     []string `json:"pre_purchase_codes"`
+	SupplierCodes        []string `json:"supplier_codes"`
+	ProductGroupCodes    []string `json:"product_group_codes"`
+	StatusApprove        []string `json:"status_approve"`
+	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
+	SupplierCodeLike     string   `json:"supplier_code_like"`
+	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	CompanyCode          string   `json:"company_code"`
+	SiteCode             string   `json:"site_code"`
+	Page                 int      `json:"page"`
+	PageSize             int      `json:"page_size"`
 }
 
 type GetPOBigLotItemResponse struct {
