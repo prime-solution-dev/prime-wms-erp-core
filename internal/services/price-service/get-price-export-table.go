@@ -70,6 +70,15 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		return nil, fmt.Errorf("GetTerms error: %w", err)
 	}
 
+	// Last Updated ต้องเป็นเวลาที่ราคาถูกแก้ล่าสุด ไม่ใช่เวลาที่กด export
+	// ถ้า query ล้มเหลวไม่ควรทำให้ export ทั้งใบพัง — ปล่อยหัวเรื่องว่างแทน
+	// (พฤติกรรมเดียวกับตอน inventory service ล้มเหลวด้านล่าง)
+	lastUpdated, err := getPriceLastUpdated(sqlxDB, req)
+	if err != nil {
+		fmt.Printf("Warning: failed to get price last updated: %v\n", err)
+		lastUpdated = nil
+	}
+
 	// Enrich subgroup keys with group_name and value_name (required for columns and table values).
 	groupMap, groupItemMap, paymentTermMap, err := getGroupAndItemMappings()
 	if err != nil {
@@ -91,7 +100,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 			}
 			return ""
 		},
-		nil,
+		lastUpdated,
 	)
 
 	// Collect all unique company codes and site codes from the response
@@ -171,7 +180,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 
 	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, nil)
+	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, lastUpdated)
 
 	response := GetPriceExportTableResponse{
 		Tabs: []ExportTab{detailTab, basedPriceTab},
