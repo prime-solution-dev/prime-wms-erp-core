@@ -1448,6 +1448,13 @@ func TestGenerateExcelFromExportResponse_WritesNumbersAsNumbers(t *testing.T) {
 }
 ```
 
+> **แก้ระหว่างทำจริง:** assertion นี้ผิด พิสูจน์แล้ว (ทั้ง implementer และ reviewer เขียนโปรแกรม
+> ทดสอบ excelize v2.10.0 แยกกัน) ว่า `SetCellValue` ด้วย `float64`/`int`/`int64` คืน
+> `CellTypeUnset` (0) เสมอ เพราะ OOXML ไม่ใส่ attribute `"t"` ให้ตัวเลข ส่วน `string` คืน
+> `CellTypeSharedString` (7) และ `bool` คืน `CellTypeBool` (1) ของจริงจึง assert
+> `== excelize.CellTypeUnset` พร้อมเช็ค `GetCellValue` ควบคู่ เพราะเช็ค type อย่างเดียว
+> ปล่อยให้ "ชนิดถูกแต่ค่าผิด" ผ่านได้
+
 - [ ] **Step 2: รัน test ให้เห็นว่าล้มเหลว**
 
 ```bash
