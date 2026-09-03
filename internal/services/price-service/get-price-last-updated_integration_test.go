@@ -3,8 +3,6 @@
 package priceService
 
 import (
-	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -12,86 +10,40 @@ import (
 	"prime-erp-core/internal/db"
 
 	"github.com/google/uuid"
-	tc "github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/jmoiron/sqlx"
 )
 
-// เทสต์ในไฟล์นี้ไม่ parallel-safe — แชร์ container/ตารางเดียวกันและ cleanup ด้วย
+// TestMain กับ schema ของแพ็กเกจนี้อยู่ใน upload-pricelist_integration_test.go
+// ซึ่งสร้าง price_list_group และ price_list_sub_group พร้อมคอลัมน์ update_dtm ให้แล้ว
+// ที่นั่นตั้งแต่ env ของ GORM ไว้อย่างเดียว ไฟล์นี้ใช้ sqlx จึงต้อง map ต่อเอง
+//
+// เทสต์ในไฟล์นี้ไม่ parallel-safe — แชร์ตารางเดียวกันกับเทสต์อื่นและ cleanup ด้วย
 // DELETE FROM ก่อนเริ่มแต่ละเคส ห้ามใส่ t.Parallel()
-func TestMain(m *testing.M) {
-	ctx := context.Background()
-	req := tc.ContainerRequest{
-		Image:        "postgres:16",
-		Env:          map[string]string{"POSTGRES_PASSWORD": "test", "POSTGRES_USER": "test", "POSTGRES_DB": "testdb"},
-		ExposedPorts: []string{"5432/tcp"},
-		WaitingFor:   wait.ForListeningPort("5432/tcp").WithStartupTimeout(60 * time.Second),
-	}
-	container, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{ContainerRequest: req, Started: true})
-	if err != nil {
-		fmt.Printf("failed to start postgres container: %v\n", err)
-		os.Exit(1)
+func connectSqlxForTest(t *testing.T) *sqlx.DB {
+	t.Helper()
+
+	if os.Getenv("database_sqlx_url_prime_erp") == "" {
+		dsn := os.Getenv("database_gorm_url_prime_erp")
+		if dsn == "" {
+			t.Fatal("TestMain did not set database_gorm_url_prime_erp")
+		}
+		os.Setenv("database_sqlx_url_prime_erp", dsn)
 	}
 
-	host, err := container.Host(ctx)
-	if err != nil {
-		fmt.Printf("failed to get host: %v\n", err)
-		_ = container.Terminate(ctx)
-		os.Exit(1)
-	}
-	mapped, err := container.MappedPort(ctx, "5432/tcp")
-	if err != nil {
-		fmt.Printf("failed to get mapped port: %v\n", err)
-		_ = container.Terminate(ctx)
-		os.Exit(1)
-	}
-	os.Setenv("database_sqlx_url_prime_erp",
-		fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable", host, mapped.Port()))
-
-	if err := createLastUpdatedSchema(); err != nil {
-		fmt.Printf("failed to create schema: %v\n", err)
-		_ = container.Terminate(ctx)
-		os.Exit(1)
-	}
-
-	code := m.Run()
-	_ = container.Terminate(ctx)
-	os.Exit(code)
-}
-
-func createLastUpdatedSchema() error {
-	sqlxDB, err := db.ConnectSqlx("prime_erp")
-	if err != nil {
-		return err
-	}
-	defer sqlxDB.Close()
-
-	_, err = sqlxDB.Exec(`
-		CREATE TABLE IF NOT EXISTS price_list_group (
-			id uuid PRIMARY KEY,
-			company_code text,
-			site_code text,
-			group_code text,
-			update_dtm timestamptz
-		);
-		CREATE TABLE IF NOT EXISTS price_list_sub_group (
-			id uuid PRIMARY KEY,
-			price_list_group_id uuid,
-			update_dtm timestamptz
-		);
-	`)
-	return err
-}
-
-func TestGetPriceLastUpdated_ReturnsLatestOfGroupAndSubGroup(t *testing.T) {
 	sqlxDB, err := db.ConnectSqlx("prime_erp")
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	defer sqlxDB.Close()
+	t.Cleanup(func() { sqlxDB.Close() })
 
 	if _, err := sqlxDB.Exec(`DELETE FROM price_list_sub_group; DELETE FROM price_list_group;`); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
+	return sqlxDB
+}
+
+func TestGetPriceLastUpdated_ReturnsLatestOfGroupAndSubGroup(t *testing.T) {
+	sqlxDB := connectSqlxForTest(t)
 
 	groupID := uuid.New()
 	groupUpdated := time.Date(2026, 8, 20, 3, 0, 0, 0, time.UTC)
@@ -123,15 +75,7 @@ func TestGetPriceLastUpdated_ReturnsLatestOfGroupAndSubGroup(t *testing.T) {
 }
 
 func TestGetPriceLastUpdated_NoMatchingRowsReturnsNil(t *testing.T) {
-	sqlxDB, err := db.ConnectSqlx("prime_erp")
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer sqlxDB.Close()
-
-	if _, err := sqlxDB.Exec(`DELETE FROM price_list_sub_group; DELETE FROM price_list_group;`); err != nil {
-		t.Fatalf("cleanup: %v", err)
-	}
+	sqlxDB := connectSqlxForTest(t)
 
 	got, err := getPriceLastUpdated(sqlxDB, GetPriceListGroupRequest{CompanyCode: "NOPE"})
 	if err != nil {
@@ -144,15 +88,7 @@ func TestGetPriceLastUpdated_NoMatchingRowsReturnsNil(t *testing.T) {
 
 // group ที่ยังไม่มี sub group ต้องยังคืน update_dtm ของ group เอง
 func TestGetPriceLastUpdated_GroupWithoutSubGroup(t *testing.T) {
-	sqlxDB, err := db.ConnectSqlx("prime_erp")
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer sqlxDB.Close()
-
-	if _, err := sqlxDB.Exec(`DELETE FROM price_list_sub_group; DELETE FROM price_list_group;`); err != nil {
-		t.Fatalf("cleanup: %v", err)
-	}
+	sqlxDB := connectSqlxForTest(t)
 
 	groupUpdated := time.Date(2026, 8, 25, 1, 0, 0, 0, time.UTC)
 	if _, err := sqlxDB.Exec(
