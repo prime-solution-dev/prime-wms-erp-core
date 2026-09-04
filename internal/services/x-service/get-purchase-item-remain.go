@@ -507,7 +507,7 @@ func ConvertToResponse(
 
 			actualWeightUnit := 0.0
 			if it.TotalWeight > 0 {
-				actualWeightUnit = it.Qty / it.TotalWeight
+				actualWeightUnit = it.TotalWeight / it.Qty
 			}
 
 			r := GetPurchaseItemRemainResponseResult{
