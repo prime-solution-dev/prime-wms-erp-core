@@ -101,7 +101,7 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 }
 
 // validateAPOverPurchaseLines checks all request lines after grouping duplicate PO items.
-// UNIT compares weight; WEIGHT compares quantity, as defined by the API contract.
+// UNIT compares quantity; WEIGHT compares total weight.
 func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMap map[string]apOverPurchaseAmount, usedMap map[string]apOverPurchaseAmount, tolerance float64) []ValidateAPOverPurchaseResponseData {
 	requested := map[string]float64{}
 	for _, line := range lines {
@@ -303,16 +303,16 @@ func purchaseItemKey(purchaseCode, purchaseItem string) string {
 
 func requestedAmount(line ValidateAPOverPurchaseRequestData, validateUnit string) float64 {
 	if validateUnit == "UNIT" {
-		return line.TotalWeight
+		return line.Qty
 	}
-	return line.Qty
+	return line.TotalWeight
 }
 
 func validationAmounts(validateUnit string, po, used apOverPurchaseAmount) (float64, float64) {
 	if validateUnit == "UNIT" {
-		return po.TotalWeight, used.TotalWeight
+		return po.Qty, used.Qty
 	}
-	return po.Qty, used.Qty
+	return po.TotalWeight, used.TotalWeight
 }
 
 func formatAPAmount(value float64) string {
