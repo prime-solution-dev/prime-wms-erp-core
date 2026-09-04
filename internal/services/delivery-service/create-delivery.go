@@ -184,7 +184,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			LicensePlate:     deliveryReq.LicensePlate,
 			ContactName:      deliveryReq.ContactName,
 			Tel:              deliveryReq.Tel,
-			TotalWeight:      deliveryReq.TotalWeight,
+			TotalWeight:      roundWeight(deliveryReq.TotalWeight),
 			Remark:           deliveryReq.Remark,
 			Status: func() string {
 				if deliveryReq.IsDraft {
@@ -214,8 +214,8 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				ProductCode:     deliveryItem.ProductCode,
 				Qty:             deliveryItem.Qty,
 				UnitCode:        deliveryItem.UnitCode,
-				Weight:          deliveryItem.Weight,
-				WeightUnit:      deliveryItem.WeightUnit,
+				Weight:          roundWeight(deliveryItem.Weight),
+				WeightUnit:      roundWeight(deliveryItem.WeightUnit),
 				Status:          "PENDING",
 				DocumentRefItem: deliveryItem.DocumentRefItem,
 				Remark:          deliveryItem.Remark,
@@ -323,8 +323,8 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCode,
 				SaleMethod:        item.SaleMethod,
-				Weight:            item.Weight,
-				WeightUnit:        item.WeightUnit,
+				Weight:            roundWeight(item.Weight),
+				WeightUnit:        roundWeight(item.WeightUnit),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
