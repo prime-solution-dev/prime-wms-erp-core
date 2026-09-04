@@ -101,7 +101,9 @@ func MapPurchaseItemFormRequestToPurchaseItemModel(req models.PurchaseItemFormRe
 
 func MapPurchaseFormRequestToPurchaseModel(req models.PurchaseFormRequest) models.Purchase {
 	now := time.Now().UTC()
-	deliveryDate := &time.Time{}
+	// ไม่ default เป็น zero time (0001-01-01) — ถ้าไม่ส่งมาให้เก็บ NULL
+	// ไม่งั้น GET จะคืน "0001-01-01" → FE แสดง "01 Jan-1"
+	var deliveryDate *time.Time
 	if req.DeliveryDate != nil {
 		utcDate := req.DeliveryDate.UTC()
 		deliveryDate = &utcDate
@@ -173,6 +175,13 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		docRef = *purchase.DocRef
 	}
 
+	// คืน "" เมื่อไม่มีวันจัดส่ง (nil หรือ zero time) — กัน nil panic + กัน "0001-01-01"
+	// ที่ทำให้ FE แสดง "01 Jan-1"
+	deliveryDateStr := ""
+	if purchase.DeliveryDate != nil && !purchase.DeliveryDate.IsZero() {
+		deliveryDateStr = purchase.DeliveryDate.Format(time.RFC3339)
+	}
+
 	return models.PurchaseResponse{
 		ID:              purchase.ID.String(),
 		PurchaseCode:    purchase.PurchaseCode,
@@ -187,7 +196,7 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		SupplierAddress: purchase.SupplierAddress,
 		SupplierPhone:   purchase.SupplierPhone,
 		SupplierEmail:   purchase.SupplierEmail,
-		DeliveryDate:    purchase.DeliveryDate.Format(time.RFC3339),
+		DeliveryDate:    deliveryDateStr,
 		DeliveryAddress: purchase.DeliveryAddress,
 		Status:          purchase.Status,
 		TotalAmount:     purchase.TotalAmount,

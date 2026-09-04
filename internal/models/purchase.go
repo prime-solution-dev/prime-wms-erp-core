@@ -208,6 +208,7 @@ type GetPOBigLotListRequest struct {
 	SupplierCodes        []string `json:"supplier_codes"`
 	ProductGroupCodes    []string `json:"product_group_codes"`
 	StatusApprove        []string `json:"status_approve"`
+	Status               []string `json:"status"`
 	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
 	SupplierCodeLike     string   `json:"supplier_code_like"`
 	ProductGroupCodeLike string   `json:"product_group_code_like"`
@@ -444,6 +445,7 @@ type GetPurchaseRequest struct {
 	StatusPayment                []string   `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
+	UsedStatus                   []string   `json:"used_status"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`

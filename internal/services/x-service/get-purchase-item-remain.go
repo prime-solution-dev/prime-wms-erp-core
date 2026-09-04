@@ -83,6 +83,7 @@ type GetPurchaseItemRemainResponseResult struct {
 	TotalVat             float64 `json:"total_vat"`
 	SubtotalExclVat      float64 `json:"subtotal_excl_vat"`
 	WeightUnit           float64 `json:"weight_unit"`
+	ActualWeightUnit     float64 `json:"actual_weight_unit"`
 	TotalWeight          float64 `json:"total_weight"`
 	StatusItem           string  `json:"status_item"`
 	StatusPaymentItem    string  `json:"status_payment_item"`
@@ -504,6 +505,11 @@ func ConvertToResponse(
 				}
 			}
 
+			actualWeightUnit := 0.0
+			if it.TotalWeight > 0 {
+				actualWeightUnit = it.TotalWeight / it.Qty
+			}
+
 			r := GetPurchaseItemRemainResponseResult{
 				PurchaseID:           po.ID,
 				PurchaseCode:         po.PurchaseCode,
@@ -538,6 +544,7 @@ func ConvertToResponse(
 				TotalVat:             it.TotalVat,
 				SubtotalExclVat:      it.SubtotalExclVat,
 				WeightUnit:           it.WeightUnit,
+				ActualWeightUnit:     actualWeightUnit,
 				TotalWeight:          it.TotalWeight,
 				StatusItem:           it.Status,
 				StatusPaymentItem:    it.StatusPayment,
