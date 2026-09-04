@@ -46,6 +46,7 @@ type GetDeliveryRequest struct {
 	ShipSlotDateEnd          *time.Time `json:"ship_slot_date_end"`
 	DeliveryTimeNameLike     string     `json:"delivery_time_name_like"`
 	StatusFilter             []string   `json:"status_filter"`
+	PickPackFilter           []string   `json:"pick_pack_filter"`
 	Page                     int        `json:"page"`
 	PageSize                 int        `json:"page_size"`
 }
@@ -81,6 +82,7 @@ type GetDeliveryResponse struct {
 	UpdateBy         string                                        `gorm:"type:varchar(50)" json:"update_by"`
 	SaleOrder        models.Sale                                   `gorm:"foreignKey:DocumentRef;references:SaleCode" json:"sale_order"`
 	Order            orderExternalService.GetOrderDeliveryResponse `gorm:"-" json:"order"`
+	PickPackStatus   string                                        `gorm:"-" json:"pick_pack_status"`
 	Items            []GetDeliveryItemResponse                     `gorm:"foreignKey:DeliveryID" json:"items"`
 }
 
@@ -141,6 +143,84 @@ func buildStatusConditions(statusFilters []string) ([]string, []interface{}) {
 	}
 
 	return conditions, args
+}
+
+// pickPackFilterValues คือ 6 ค่าที่ ComputePickPackStatus คืนได้ (ดู pick-pack-status.go)
+var pickPackFilterValues = map[string]bool{
+	PickPackStatusDraft:       true,
+	PickPackStatusCanceled:    true,
+	PickPackStatusCompleted:   true,
+	PickPackStatusNew:         true,
+	PickPackStatusPendingPick: true,
+	PickPackStatusPendingPack: true,
+}
+
+// normalizePickPackFilter กรองค่าที่ไม่รู้จักออกจาก pick_pack_filter เหลือแต่ค่าที่ใช้กรองได้จริง
+// (ตัวพิมพ์เล็ก ไม่ซ้ำ) ตามที่ระบุว่า "ignore unknown values"
+func normalizePickPackFilter(filter []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, f := range filter {
+		lf := strings.ToLower(f)
+		if pickPackFilterValues[lf] && !seen[lf] {
+			seen[lf] = true
+			result = append(result, lf)
+		}
+	}
+	return result
+}
+
+// impliedDeliveryStatuses แปลงค่ากรอง pick_pack_filter (ที่ normalize แล้ว) เป็นชุด delivery_booking.status
+// ที่เป็นไปได้ เพื่อใช้ตีกรอบ query ฝั่ง DB ก่อน แล้วค่อยกรองละเอียดในหน่วยความจำ:
+// draft->TEMP, canceled->CANCELED, completed->COMPLETED, new/pending-pick/pending-pack->PENDING
+func impliedDeliveryStatuses(validPickPackFilter []string) []string {
+	seen := make(map[string]bool)
+	var statuses []string
+	for _, f := range validPickPackFilter {
+		var status string
+		switch f {
+		case PickPackStatusDraft:
+			status = "TEMP"
+		case PickPackStatusCanceled:
+			status = "CANCELED"
+		case PickPackStatusCompleted:
+			status = "COMPLETED"
+		case PickPackStatusNew, PickPackStatusPendingPick, PickPackStatusPendingPack:
+			status = "PENDING"
+		}
+		if status != "" && !seen[status] {
+			seen[status] = true
+			statuses = append(statuses, status)
+		}
+	}
+	return statuses
+}
+
+// computePageBounds คำนวณขอบเขต slice (start, end) และจำนวนหน้าทั้งหมด จากจำนวนแถวที่ match
+// ทั้งหมด, หน้าที่ขอ, และขนาดหน้า เป็น pure function ล้วนๆ แยกออกมาจาก path ที่กรองด้วย
+// pick_pack_filter เพื่อให้ unit test เรียกตรงๆ ได้โดยไม่ต้องมี DB
+//
+//   - totalRecords <= 0: ไม่มีอะไรให้แบ่งหน้า คืน (0, 0, 0)
+//   - page หรือ pageSize <= 0: เดิม (path ไม่ filter) ใช้สูตรคืนทั้งหมดเป็นหน้าเดียว คงพฤติกรรมนี้ไว้
+//   - page เลยหน้าสุดท้ายไปแล้ว: คืน start=end=totalRecords (slice ว่างแต่ index ยังใช้ slicing ได้ปลอดภัย)
+func computePageBounds(totalRecords, page, pageSize int) (start, end, totalPages int) {
+	if totalRecords <= 0 {
+		return 0, 0, 0
+	}
+	if pageSize <= 0 || page <= 0 {
+		return 0, totalRecords, totalRecords
+	}
+
+	totalPages = int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	start = (page - 1) * pageSize
+	if start >= totalRecords {
+		return totalRecords, totalRecords, totalPages
+	}
+	end = start + pageSize
+	if end > totalRecords {
+		end = totalRecords
+	}
+	return start, end, totalPages
 }
 
 // getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
@@ -333,6 +413,88 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// pick_pack_filter: กรอง delivery ตาม pick/pack status ที่คำนวณจากข้อมูล order (in-memory)
+	// เพราะ status นี้ไม่ได้เก็บใน DB ตรงๆ ต้องดึงข้อมูลมาคำนวณก่อนถึงจะรู้
+	//
+	// เช็คจาก req.PickPackFilter (ค่าดิบที่ผู้เรียกส่งมา) ไม่ใช่ผลจาก normalizePickPackFilter เพื่อแยก
+	// สองกรณีออกจากกันให้ชัด: (1) ไม่ได้ส่ง pick_pack_filter มาเลย (req.PickPackFilter ว่าง) ต้องตกไป
+	// path เดิมด้านล่างที่ไม่กรองอะไรตาม pick/pack status; (2) ส่ง pick_pack_filter มาแต่ค่าที่ส่งมา
+	// ไม่มีตัวไหนรู้จักเลย (เช่น พิมพ์ "cancelled" ซึ่ง pick_pack_filter รองรับแค่ "canceled" ต่างจาก
+	// status_filter ที่รองรับทั้งสองสะกด) ต้องตีความว่าผู้เรียก "ตั้งใจจะกรอง" แต่กรองแล้วไม่มีอะไร match
+	// เลย จึงต้องคืนหน้าว่าง total=0 ไม่ใช่ตกไป path ไม่กรองซึ่งจะคืนข้อมูลทั้งตารางกลับไปแทน
+	if len(req.PickPackFilter) > 0 {
+		validPickPackFilter := normalizePickPackFilter(req.PickPackFilter)
+		if len(validPickPackFilter) == 0 {
+			return ResultDeliveryResponse{
+				Total:      0,
+				Page:       req.Page,
+				PageSize:   req.PageSize,
+				TotalPages: 0,
+				Deliveries: []GetDeliveryResponse{},
+			}, nil
+		}
+
+		// ตีกรอบ query ด้วย delivery status ที่ pick_pack_filter เป็นไปได้ก่อน (AND กับเงื่อนไขอื่นๆ
+		// รวมถึง status_filter ด้านบน) เพื่อไม่ให้ต้องดึงทั้งตารางมากรองในหน่วยความจำ
+		query = query.Where("delivery_booking.status IN ?", impliedDeliveryStatuses(validPickPackFilter))
+
+		var allRows []GetDeliveryResponse
+		if err := query.Find(&allRows).Error; err != nil {
+			fmt.Println(err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
+			return nil, err
+		}
+
+		// GetOrderDelivery สำหรับทั้งชุดที่ตีกรอบไว้ (ไม่ใช่แค่หน้าเดียว) เพราะต้องคำนวณ
+		// pick_pack_status ให้ครบก่อนถึงจะกรอง+แบ่งหน้าในหน่วยความจำได้
+		orderDeliveryResponse, err := GetOrderDeliveryForDelivery(allRows)
+		if err != nil {
+			fmt.Println("Error in GetOrderDelivery:", err)
+			// ต่างจาก path ไม่กรอง (ด้านล่าง) ที่ปล่อยผ่านได้เพราะข้อมูล order เป็นแค่ของตกแต่งหน้าจอ
+			// เท่านั้น แต่ที่นี่ order data ถูกเอาไปคำนวณ pick_pack_status จริง ถ้าดึงไม่ได้ ทุกแถวที่
+			// status='PENDING' จะกลายเป็น "new" ไปหมด (order ว่าง -> new ตาม ComputePickPackStatus ข้อ
+			// 4/6) ทำให้คนกรองหา pending-pick/pending-pack เห็นรายการว่างหรือขาดหายไปแบบเงียบๆ พร้อม
+			// 200 OK ทั้งที่ order-service กำลังล่มอยู่ ต้องคืน error ให้ request ทั้งก้อนล้มแทนที่จะตอบ
+			// ข้อมูลที่คำนวณมาจากข้อมูล order ที่หายไป
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order data for pick/pack filter: " + err.Error()})
+			return nil, err
+		}
+
+		orderMap := make(map[string]orderExternalService.GetOrderDeliveryResponse)
+		for _, order := range orderDeliveryResponse.Orders {
+			orderMap[order.DocumentRef] = order
+		}
+		for i := range allRows {
+			if matchingOrder, exists := orderMap[allRows[i].DeliveryCode]; exists {
+				allRows[i].Order = matchingOrder
+			}
+		}
+
+		filterSet := make(map[string]bool, len(validPickPackFilter))
+		for _, f := range validPickPackFilter {
+			filterSet[f] = true
+		}
+
+		var filtered []GetDeliveryResponse
+		for i := range allRows {
+			allRows[i].PickPackStatus = ComputePickPackStatus(allRows[i].Status, allRows[i].Order)
+			if filterSet[allRows[i].PickPackStatus] {
+				filtered = append(filtered, allRows[i])
+			}
+		}
+
+		totalRecords := len(filtered)
+		start, end, totalPages := computePageBounds(totalRecords, req.Page, req.PageSize)
+
+		return ResultDeliveryResponse{
+			Total:      totalRecords,
+			Page:       req.Page,
+			PageSize:   req.PageSize,
+			TotalPages: totalPages,
+			Deliveries: filtered[start:end],
+		}, nil
+	}
+
 	// Build base query for counting
 	countQuery := gormx.Model(&GetDeliveryResponse{}).
 		Joins("LEFT JOIN time ON delivery_booking.delivery_time_code = time.code").
@@ -467,7 +629,11 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(res)
 	if err != nil {
 		fmt.Println("Error in GetOrderDelivery:", err)
-		// continue without orders
+		// path นี้ (ไม่มี pick_pack_filter) ไม่ทำให้ request ทั้งก้อนล้มเมื่อ order-service เรียกไม่สำเร็จ
+		// เพราะที่นี่ order data ใช้แค่ตกแต่งหน้าจอ (field "order" ใน response) และคำนวณ pick_pack_status
+		// เพื่อแสดงผลเฉยๆ ไม่ได้เอาไปกรองแถวออก ต่างจาก path ที่มี pick_pack_filter (ด้านบน) ที่ order
+		// data ผิดพลาดแล้วจะทำให้แถว PENDING กลายเป็น "new" ผิดๆ และหลุดออกจากผลการกรอง จึงต้อง fail
+		// ดังๆ ที่นั่นแทน ส่วนที่นี่ยังปล่อยแถวไปแบบไม่มี order ผูกได้ตามเดิม
 	} else {
 		// Map orders from orderDeliveryResponse to delivery header
 		// Create map for efficient lookup of orders by delivery_code
@@ -487,6 +653,11 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				delivery.Order = matchingOrder
 			}
 		}
+	}
+
+	// คำนวณ pick_pack_status ให้ทุกแถวเสมอ ไม่ว่าจะใช้ pick_pack_filter หรือไม่ (ทันทีหลังผูก order data)
+	for i := range res {
+		res[i].PickPackStatus = ComputePickPackStatus(res[i].Status, res[i].Order)
 	}
 
 	resultDelivery := ResultDeliveryResponse{
