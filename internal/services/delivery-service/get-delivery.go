@@ -47,6 +47,7 @@ type GetDeliveryRequest struct {
 	DeliveryTimeNameLike     string     `json:"delivery_time_name_like"`
 	StatusFilter             []string   `json:"status_filter"`
 	PickPackFilter           []string   `json:"pick_pack_filter"`
+	PaymentFilter            []string   `json:"payment_filter"`
 	Page                     int        `json:"page"`
 	PageSize                 int        `json:"page_size"`
 }
@@ -143,6 +144,56 @@ func buildStatusConditions(statusFilters []string) ([]string, []interface{}) {
 	}
 
 	return conditions, args
+}
+
+// paymentFilterValues คือ 2 ค่าที่ payment_filter รับ ("cash" กับ "non-cash")
+var paymentFilterValues = map[string]bool{
+	"cash":     true,
+	"non-cash": true,
+}
+
+// buildPaymentFilterCondition แปลง payment_filter เป็นเงื่อนไข EXISTS/NOT EXISTS บนตาราง sale
+// (คีย์ด้วย sale.sale_code = delivery_booking.document_ref)
+//
+// หมายเหตุ: query กับ countQuery มี LEFT JOIN sale อยู่แล้ว (บรรทัด 352 และ 556) และ sale_code เป็น
+// unique index จึงไม่มีปัญหาแถวซ้ำ จะเขียนเงื่อนไขบน sale.payment_method ที่ join มาแล้วก็ได้เหมือนกัน
+// ที่เลือก EXISTS เพราะตัวเงื่อนไขไม่ผูกกับ join นั้น ถ้าวันหน้ามีคนถอดหรือแก้ join (มันมีไว้ให้ตัวกรอง
+// อื่น) ตัวกรองนี้ยังทำงานถูกอยู่ และ NOT EXISTS อ่านง่ายกว่าเวลาต้องครอบคลุมแถวที่ join ไม่เจอ
+// ค่าถูก parameterize ผ่าน ? ไม่ interpolate ลงในสตริง
+//
+//   - "cash": ต้องมี sale ที่ sale.payment_method = 'CASH' เป๊ะๆ -> EXISTS
+//   - "non-cash": ทุกอย่างที่ไม่ใช่ cash ข้างบน ครอบคลุม payment_method อื่น, ว่าง/null, และ booking ที่
+//     document_ref ไม่ match sale แถวไหนเลย -> NOT EXISTS (... payment_method = 'CASH') ตัวเดียวครอบคลุม
+//     ครบทุกกรณีในคำสั่งเดียว โดยไม่ต้องแจกแจงเป็นเงื่อนไขย่อย
+//
+// หมายเหตุ (จงใจต่างจาก normalizePickPackFilter/impliedDeliveryStatuses): "cash" กับ "non-cash" คือ
+// ทุกความเป็นไปได้ (exhaustive) ของ booking ทุกแถว ไม่เหมือน pick_pack_filter ที่ค่าที่ส่งมาอาจ "พิมพ์ผิด"
+// แล้วต้องตีความว่าตั้งใจกรองแต่กรองแล้วไม่มีอะไร match (คืนว่างทั้งหน้า) เพราะค่าที่รู้จักเป็นแค่ส่วนหนึ่ง
+// ของ status ที่เป็นไปได้ทั้งหมด ที่นี่ตรงกันข้าม: ค่าที่ไม่รู้จักล้วน (พิมพ์ผิดทั้งหมด) หรือไม่ส่งมาเลย
+// กับการเลือกครบทั้ง "cash" และ "non-cash" ล้วนแปลว่า "ทุกแถว" เหมือนกันทั้งคู่ ("ไม่มีตัวกรองที่ใช้ได้"
+// กับ "เลือกครบทุกกลุ่ม" คือเซตเดียวกันเมื่อสองค่านี้ exhaustive) จึงต้องถือว่า "ไม่กรอง" เหมือนกัน ไม่ใช่
+// คืนผลว่างแบบ pick_pack_filter
+func buildPaymentFilterCondition(paymentFilters []string) (string, []interface{}) {
+	seen := make(map[string]bool)
+	for _, f := range paymentFilters {
+		lf := strings.ToLower(f)
+		if paymentFilterValues[lf] {
+			seen[lf] = true
+		}
+	}
+
+	hasCash := seen["cash"]
+	hasNonCash := seen["non-cash"]
+
+	switch {
+	case hasCash && !hasNonCash:
+		return "EXISTS (SELECT 1 FROM sale WHERE sale.sale_code = delivery_booking.document_ref AND sale.payment_method = ?)", []interface{}{"CASH"}
+	case hasNonCash && !hasCash:
+		return "NOT EXISTS (SELECT 1 FROM sale WHERE sale.sale_code = delivery_booking.document_ref AND sale.payment_method = ?)", []interface{}{"CASH"}
+	default:
+		// ทั้งสองค่า หรือไม่มีค่าไหนใช้ได้เลย (ว่าง/ไม่รู้จักล้วน) -> ไม่กรอง (ดูหมายเหตุด้านบน)
+		return "", nil
+	}
 }
 
 // pickPackFilterValues คือ 6 ค่าที่ ComputePickPackStatus คืนได้ (ดู pick-pack-status.go)
@@ -413,6 +464,13 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
+	// payment_filter: AND กับ status_filter/pick_pack_filter ด้านบน/ล่าง เนื่องจาก query ตัวนี้ถูกใช้ร่วมกัน
+	// ทั้ง path ไม่กรอง (ด้านล่าง) และ path pick_pack_filter (ด้านล่างถัดไป) การเติมเงื่อนไขตรงนี้จุดเดียว
+	// จึงครอบคลุมทั้งสอง path โดยไม่ต้องเติมซ้ำ
+	if condition, args := buildPaymentFilterCondition(req.PaymentFilter); condition != "" {
+		query = query.Where(condition, args...)
+	}
+
 	// pick_pack_filter: กรอง delivery ตาม pick/pack status ที่คำนวณจากข้อมูล order (in-memory)
 	// เพราะ status นี้ไม่ได้เก็บใน DB ตรงๆ ต้องดึงข้อมูลมาคำนวณก่อนถึงจะรู้
 	//
@@ -601,6 +659,12 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			combinedCondition := "(" + strings.Join(conditions, " OR ") + ")"
 			countQuery = countQuery.Where(combinedCondition, args...)
 		}
+	}
+
+	// payment_filter: ต้องเติมเงื่อนไขเดียวกันกับ query (ด้านบน) เพื่อให้ total ตรงกับแถวที่ query จะคืนจริง
+	// (path นี้คือ path ไม่มี pick_pack_filter ซึ่งใช้ countQuery หา total แยกจาก query ที่ใช้ดึงข้อมูลหน้า)
+	if condition, args := buildPaymentFilterCondition(req.PaymentFilter); condition != "" {
+		countQuery = countQuery.Where(condition, args...)
 	}
 
 	var count int64

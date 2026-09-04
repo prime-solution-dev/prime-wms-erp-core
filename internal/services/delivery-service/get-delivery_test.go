@@ -164,6 +164,85 @@ func TestImpliedDeliveryStatuses(t *testing.T) {
 	}
 }
 
+func TestBuildPaymentFilterCondition(t *testing.T) {
+	const existsCash = "EXISTS (SELECT 1 FROM sale WHERE sale.sale_code = delivery_booking.document_ref AND sale.payment_method = ?)"
+	const notExistsCash = "NOT EXISTS (SELECT 1 FROM sale WHERE sale.sale_code = delivery_booking.document_ref AND sale.payment_method = ?)"
+
+	tests := []struct {
+		name          string
+		input         []string
+		wantCondition string
+		wantArgs      []interface{}
+	}{
+		{
+			name:          "cash alone",
+			input:         []string{"cash"},
+			wantCondition: existsCash,
+			wantArgs:      []interface{}{"CASH"},
+		},
+		{
+			name:          "non-cash alone",
+			input:         []string{"non-cash"},
+			wantCondition: notExistsCash,
+			wantArgs:      []interface{}{"CASH"},
+		},
+		{
+			name:          "both values selected means no filtering",
+			input:         []string{"cash", "non-cash"},
+			wantCondition: "",
+			wantArgs:      nil,
+		},
+		{
+			name:          "neither value (empty input) means no filtering",
+			input:         []string{},
+			wantCondition: "",
+			wantArgs:      nil,
+		},
+		{
+			name:          "nil input means no filtering",
+			input:         nil,
+			wantCondition: "",
+			wantArgs:      nil,
+		},
+		{
+			name:          "unrecognized value alone means no filtering",
+			input:         []string{"credit"},
+			wantCondition: "",
+			wantArgs:      nil,
+		},
+		{
+			name:          "unrecognized value mixed with a valid one still filters on the valid one",
+			input:         []string{"credit", "cash"},
+			wantCondition: existsCash,
+			wantArgs:      []interface{}{"CASH"},
+		},
+		{
+			name:          "duplicates of cash still produce a single cash condition",
+			input:         []string{"cash", "CASH", "cash"},
+			wantCondition: existsCash,
+			wantArgs:      []interface{}{"CASH"},
+		},
+		{
+			name:          "duplicates of non-cash still produce a single non-cash condition",
+			input:         []string{"non-cash", "Non-Cash", "non-cash"},
+			wantCondition: notExistsCash,
+			wantArgs:      []interface{}{"CASH"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotCondition, gotArgs := buildPaymentFilterCondition(tt.input)
+			if gotCondition != tt.wantCondition {
+				t.Errorf("buildPaymentFilterCondition(%v) condition = %q, want %q", tt.input, gotCondition, tt.wantCondition)
+			}
+			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
+				t.Errorf("buildPaymentFilterCondition(%v) args = %v, want %v", tt.input, gotArgs, tt.wantArgs)
+			}
+		})
+	}
+}
+
 func TestNormalizePickPackFilter(t *testing.T) {
 	tests := []struct {
 		name  string
