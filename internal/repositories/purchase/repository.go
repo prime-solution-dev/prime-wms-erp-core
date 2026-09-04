@@ -377,13 +377,23 @@ func UpdatePurchaseStatusApprove(purchases []models.UpdateStatusApprovePurchaseR
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
 		for _, purchase := range purchases {
+			updates := map[string]interface{}{
+				"status_approve": purchase.StatusApprove,
+				"is_approved":    purchase.IsApproved,
+				"update_dtm":     time.Now().UTC(),
+			}
+			// sync lifecycle status ตามตาราง: Approved(COMPLETED)→status COMPLETED,
+			// Reject→status CANCELLED (ให้ filter/display สถานะตรงกัน). PROCESS/REVIEW
+			// ไม่แตะ status (คง PENDING). รับของยัง gate ที่ status_approve ไม่ใช่ status
+			switch purchase.StatusApprove {
+			case "COMPLETED":
+				updates["status"] = "COMPLETED"
+			case "REJECT":
+				updates["status"] = "CANCELLED"
+			}
 			if result := tx.Model(&models.Purchase{}).
 				Where("id = ?", purchase.ID).
-				Updates(map[string]interface{}{
-					"status_approve": purchase.StatusApprove,
-					"is_approved":    purchase.IsApproved,
-					"update_dtm":     time.Now().UTC(),
-				}); result.Error != nil {
+				Updates(updates); result.Error != nil {
 				err = result.Error
 			}
 		}
