@@ -31,6 +31,7 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 	supplierCodes := req.SupplierCodes
 	productGroupCodes := req.ProductGroupCodes
 	statusApprove := req.StatusApprove
+	status := req.Status
 	companyCode := req.CompanyCode
 	siteCode := req.SiteCode
 	page := req.Page
@@ -59,6 +60,10 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 
 	if len(statusApprove) > 0 {
 		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
 	}
 
 	if len(productGroupCodes) > 0 {
