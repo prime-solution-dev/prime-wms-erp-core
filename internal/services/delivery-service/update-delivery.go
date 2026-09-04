@@ -145,7 +145,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			"license_plate":      tempDelivery.LicensePlate,
 			"contact_name":       tempDelivery.ContactName,
 			"tel":                tempDelivery.Tel,
-			"total_weight":       tempDelivery.TotalWeight,
+			"total_weight":       roundWeight(tempDelivery.TotalWeight),
 			"remark":             tempDelivery.Remark,
 			"booking_slot_type":  tempDelivery.BookingSlotType,
 			"status":             tempDelivery.Status,
@@ -163,20 +163,25 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			updateDeliveryItems = append(updateDeliveryItems, item.DeliveryItem)
 
 			itemUpdateFields[item.DeliveryItem.ID] = map[string]interface{}{
-				"product_code":      item.DeliveryItem.ProductCode,
-				"qty":               item.DeliveryItem.Qty,
-				"unit_code":         item.DeliveryItem.UnitCode,
-				"price_list_unit":   item.DeliveryItem.PriceListUnit,
-				"sale_qty":          item.DeliveryItem.SaleQty,
-				"sale_unit_code":    item.DeliveryItem.SaleUnitCode,
-				"total_weight":      item.DeliveryItem.TotalWeight,
-				"weight":            item.DeliveryItem.Weight,
-				"weight_unit":       item.DeliveryItem.WeightUnit,
-				"document_ref_item": item.DeliveryItem.DocumentRefItem,
-				"remark":            item.DeliveryItem.Remark,
-				"status":            item.DeliveryItem.Status,
-				"update_date":       item.DeliveryItem.UpdateDate,
-				"update_by":         item.DeliveryItem.UpdateBy,
+				"product_code":    item.DeliveryItem.ProductCode,
+				"qty":             item.DeliveryItem.Qty,
+				"unit_code":       item.DeliveryItem.UnitCode,
+				"price_list_unit": item.DeliveryItem.PriceListUnit,
+				"sale_qty":        item.DeliveryItem.SaleQty,
+				"sale_unit_code":  item.DeliveryItem.SaleUnitCode,
+				"total_weight":    roundWeight(item.DeliveryItem.TotalWeight),
+				"weight":          roundWeight(item.DeliveryItem.Weight),
+				"weight_unit":     roundWeight(item.DeliveryItem.WeightUnit),
+				"remark":          item.DeliveryItem.Remark,
+				"status":          item.DeliveryItem.Status,
+				"update_date":     item.DeliveryItem.UpdateDate,
+				"update_by":       item.DeliveryItem.UpdateBy,
+			}
+			// document_ref_item คือ key ชี้บรรทัดใน SO ใช้ตรวจจองเกินและแสดงผลหน้าจอ
+			// หน้าบ้านเคยส่งค่าว่างมาทับจนใบจองหาบรรทัด SO ไม่เจอ (DBS202609-0004/0005)
+			// จึงเขียนทับเฉพาะเมื่อมีค่าจริง ค่าว่างให้คงของเดิมไว้
+			if item.DeliveryItem.DocumentRefItem != "" {
+				itemUpdateFields[item.DeliveryItem.ID]["document_ref_item"] = item.DeliveryItem.DocumentRefItem
 			}
 		}
 	}
@@ -339,8 +344,8 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCodeForOrder,
 				SaleMethod:        item.SaleMethodForOrder,
-				Weight:            item.Weight,
-				WeightUnit:        item.WeightUnit,
+				Weight:            roundWeight(item.Weight),
+				WeightUnit:        roundWeight(item.WeightUnit),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
@@ -432,8 +437,11 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	orderItems := []externalService.UpdateOrderByDeliveryItemDetail{}
 	for _, item := range deliveryReq.Items {
 		orderItem := externalService.UpdateOrderByDeliveryItemDetail{
-			OrderItem:            "",
-			DocumentRefItem:      item.DocumentRefItem,
+			OrderItem: "",
+			// ฝั่ง WMS ใช้ document_ref_item ชี้กลับมาที่ "บรรทัดของใบจอง" (delivery_item)
+			// เหมือนตอน CreateOrder ไม่ใช่ key ของบรรทัด SO — เดิมส่ง SO key มา หน้าจอ
+			// จองคิวเลยจับคู่ CO กับใบจองไม่เจอ (hasOutbound/calculateBookedUsage)
+			DocumentRefItem:      item.DeliveryItem.DeliveryItem,
 			ProductCode:          item.ProductCode,
 			ProductType:          "normal",
 			InterfaceOrderQty:    item.Qty,
@@ -445,9 +453,9 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 			SerialCode:           "",
 			SaleUnitCode:         item.SaleUnitCodeForOrder,
 			SaleMethod:           item.SaleMethodForOrder,
-			InterfaceOrderWeight: item.Weight,
-			Weight:               item.Weight,
-			WeightUnit:           item.WeightUnit,
+			InterfaceOrderWeight: roundWeight(item.Weight),
+			Weight:               roundWeight(item.Weight),
+			WeightUnit:           roundWeight(item.WeightUnit),
 			MfgDate:              nil,
 			ExpDate:              nil,
 			LocationCode:         "",

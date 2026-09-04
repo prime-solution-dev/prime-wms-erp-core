@@ -31,6 +31,7 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 	supplierCodes := req.SupplierCodes
 	productGroupCodes := req.ProductGroupCodes
 	statusApprove := req.StatusApprove
+	status := req.Status
 	companyCode := req.CompanyCode
 	siteCode := req.SiteCode
 	page := req.Page
@@ -59,6 +60,10 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 
 	if len(statusApprove) > 0 {
 		query = query.Where("status_approve IN ?", statusApprove)
+	}
+
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
 	}
 
 	if len(productGroupCodes) > 0 {
@@ -197,13 +202,22 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 	}()
 
 	for _, prePurchase := range prePurchases {
-		// update pre_purchase
-		if result := tx.Model(&models.PrePurchase{}).
-			Where("id = ?", prePurchase.ID).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"status_approve": prePurchase.StatusApprove,
 			"is_approved":    prePurchase.IsApproved,
 			"update_dtm":     time.Now().UTC(),
-		}); result.Error != nil {
+		}
+		// sync lifecycle status ตามตาราง (เหมือน Normal): Approved→COMPLETED, Reject→CANCELLED
+		// ให้ filter/display Big lot ตรงกัน (Big lot ใช้ตารางเดียวกับ Normal)
+		switch prePurchase.StatusApprove {
+		case "COMPLETED":
+			updates["status"] = "COMPLETED"
+		case "REJECT":
+			updates["status"] = "CANCELLED"
+		}
+		// update pre_purchase
+		if result := tx.Model(&models.PrePurchase{}).
+			Where("id = ?", prePurchase.ID).Updates(updates); result.Error != nil {
 			err = result.Error
 			return
 		}
