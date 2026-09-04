@@ -202,13 +202,22 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 	}()
 
 	for _, prePurchase := range prePurchases {
-		// update pre_purchase
-		if result := tx.Model(&models.PrePurchase{}).
-			Where("id = ?", prePurchase.ID).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"status_approve": prePurchase.StatusApprove,
 			"is_approved":    prePurchase.IsApproved,
 			"update_dtm":     time.Now().UTC(),
-		}); result.Error != nil {
+		}
+		// sync lifecycle status ตามตาราง (เหมือน Normal): Approved→COMPLETED, Reject→CANCELLED
+		// ให้ filter/display Big lot ตรงกัน (Big lot ใช้ตารางเดียวกับ Normal)
+		switch prePurchase.StatusApprove {
+		case "COMPLETED":
+			updates["status"] = "COMPLETED"
+		case "REJECT":
+			updates["status"] = "CANCELLED"
+		}
+		// update pre_purchase
+		if result := tx.Model(&models.PrePurchase{}).
+			Where("id = ?", prePurchase.ID).Updates(updates); result.Error != nil {
 			err = result.Error
 			return
 		}
