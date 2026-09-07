@@ -22,6 +22,7 @@ type CreateDeliveryRequest struct {
 	CompanyCode       string                       `json:"company_code"`
 	SiteCode          string                       `json:"site_code"`
 	DeliveryMethod    string                       `json:"delivery_method"`
+	DeliveryCode      string                       `json:"delivery_code"`
 	DocumentRef       string                       `json:"document_ref"`
 	CustomerCode      string                       `json:"customer_code"`
 	SoldToCode        string                       `json:"sold_to_code"`
@@ -114,6 +115,15 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	// เจนเลขที่ใบจองก่อนยิง hook เพื่อให้ปลายทางได้ delivery_code ไปด้วย
+	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
+	if err != nil {
+		return nil, err
+	}
+	for i := range req {
+		req[i].DeliveryCode = deliveryCodes[i]
+	}
+
 	if len(hookConfig) > 0 {
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
@@ -146,12 +156,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	deliveryToAdd := []models.Delivery{}
 	deliveryItemToAdd := []models.DeliveryItem{}
-
-	// Generate all delivery codes first
-	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
-	if err != nil {
-		return nil, err
-	}
 
 	for num, deliveryReq := range req {
 		deliveryId := uuid.New()
