@@ -16,11 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/gorm"
 )
 
 const (
-	testCompanyCode = "C001"
-	testSiteCode    = "S001"
+	testCompanyCode  = "C001"
+	testSiteCode     = "S001"
+	testDateSiteCode = "S002"
 )
 
 func TestMain(m *testing.M) {
@@ -82,11 +84,12 @@ func seed() error {
 	rows := []struct {
 		code          string
 		supplierCode  string
+		supplierName  string
 		hierarchyCode string
 	}{
-		{"PB202609-0012", "SUP-STEEL-01", "PG01_1"},
-		{"PB202609-0013", "SUP-STEEL-02", "PG01_2"},
-		{"PB202510-0099", "VENDOR-77", "PG02_9"},
+		{"PB202609-0012", "SUP-STEEL-01", "Siam Steel Co.", "PG01_1"},
+		{"PB202609-0013", "SUP-STEEL-02", "Bangkok Steel Ltd.", "PG01_2"},
+		{"PB202510-0099", "VENDOR-77", "Thai Plastic", "PG02_9"},
 	}
 
 	for _, row := range rows {
@@ -97,6 +100,7 @@ func seed() error {
 			CompanyCode:     testCompanyCode,
 			SiteCode:        testSiteCode,
 			SupplierCode:    row.supplierCode,
+			SupplierName:    row.supplierName,
 			Status:          "PENDING",
 			StatusApprove:   "COMPLETED",
 			CreateDtm:       now,
@@ -110,6 +114,38 @@ func seed() error {
 				CreateDtm:     now,
 				UpdateDtm:     now,
 			}},
+		}
+
+		if err := gormx.Create(&prePurchase).Error; err != nil {
+			return err
+		}
+	}
+
+	return seedCreateDateRows(gormx)
+}
+
+// แถวสำหรับทดสอบช่วง create date อยู่คนละ site เพื่อไม่ให้กระทบ test ชุดอื่น
+var createDateRows = []struct {
+	code      string
+	createDtm time.Time
+}{
+	{"PB-DATE-0902", time.Date(2025, 9, 2, 9, 0, 0, 0, time.UTC)},
+	{"PB-DATE-0903", time.Date(2025, 9, 3, 14, 0, 0, 0, time.UTC)},
+	{"PB-DATE-0904", time.Date(2025, 9, 4, 9, 0, 0, 0, time.UTC)},
+}
+
+func seedCreateDateRows(gormx *gorm.DB) error {
+	for _, row := range createDateRows {
+		prePurchase := models.PrePurchase{
+			ID:              uuid.New(),
+			PrePurchaseCode: row.code,
+			CompanyCode:     testCompanyCode,
+			SiteCode:        testDateSiteCode,
+			SupplierCode:    "SUP-01",
+			Status:          "PENDING",
+			StatusApprove:   "COMPLETED",
+			CreateDtm:       row.createDtm,
+			UpdateDtm:       row.createDtm,
 		}
 
 		if err := gormx.Create(&prePurchase).Error; err != nil {
@@ -224,4 +260,41 @@ func TestGetPOBigLotList_NoFilterReturnsAll(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 3, total)
 	assert.Len(t, list, 3)
+}
+
+func TestGetPOBigLotList_SupplierNameLike(t *testing.T) {
+	req := baseRequest()
+	req.SupplierNameLike = "steel"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupCodeLikePartial(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupCodeLike = "G01_2"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0013"}, codesOf(list))
+}
+
+// ปลายช่วงต้องนับทั้งวัน แถวที่สร้างตอนบ่ายของวันสุดท้ายต้องไม่หลุด
+func TestGetPOBigLotList_CreateDateRangeIncludesLastDay(t *testing.T) {
+	start := time.Date(2025, 9, 2, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 9, 3, 23, 59, 59, 0, time.UTC)
+
+	req := baseRequest()
+	req.SiteCode = testDateSiteCode
+	req.StartCreateDate = &start
+	req.EndCreateDate = &end
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, total)
+	assert.ElementsMatch(t, []string{"PB-DATE-0902", "PB-DATE-0903"}, codesOf(list))
 }
