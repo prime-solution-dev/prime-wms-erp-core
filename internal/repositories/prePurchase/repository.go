@@ -84,6 +84,18 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 		query = query.Where("supplier_code ILIKE ?", "%"+req.SupplierCodeLike+"%")
 	}
 
+	if req.SupplierNameLike != "" {
+		query = query.Where("supplier_name ILIKE ?", "%"+req.SupplierNameLike+"%")
+	}
+
+	if req.StartCreateDate != nil {
+		query = query.Where("create_dtm >= ?", *req.StartCreateDate)
+	}
+
+	if req.EndCreateDate != nil {
+		query = query.Where("create_dtm <= ?", *req.EndCreateDate)
+	}
+
 	if req.ProductGroupCodeLike != "" {
 		sub := gormx.Model(&models.PrePurchaseItem{}).
 			Select("1").
