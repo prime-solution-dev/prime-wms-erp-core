@@ -84,6 +84,18 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 		query = query.Where("supplier_code ILIKE ?", "%"+req.SupplierCodeLike+"%")
 	}
 
+	if req.SupplierNameLike != "" {
+		query = query.Where("supplier_name ILIKE ?", "%"+req.SupplierNameLike+"%")
+	}
+
+	if req.StartCreateDate != nil {
+		query = query.Where("create_dtm >= ?", *req.StartCreateDate)
+	}
+
+	if req.EndCreateDate != nil {
+		query = query.Where("create_dtm <= ?", *req.EndCreateDate)
+	}
+
 	if req.ProductGroupCodeLike != "" {
 		sub := gormx.Model(&models.PrePurchaseItem{}).
 			Select("1").
@@ -207,11 +219,10 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 			"is_approved":    prePurchase.IsApproved,
 			"update_dtm":     time.Now().UTC(),
 		}
-		// sync lifecycle status ตามตาราง (เหมือน Normal): Approved→COMPLETED, Reject→CANCELLED
-		// ให้ filter/display Big lot ตรงกัน (Big lot ใช้ตารางเดียวกับ Normal)
+		// Approved: คง status=PENDING (approved = PENDING + status_approve=COMPLETED)
+		// ให้ Plan GR/รับของยังเห็น PO (เหมือน Normal). Reject→CANCELLED. status เป็น
+		// COMPLETED ต่อเมื่อรับของครบ (used_status)
 		switch prePurchase.StatusApprove {
-		case "COMPLETED":
-			updates["status"] = "COMPLETED"
 		case "REJECT":
 			updates["status"] = "CANCELLED"
 		}

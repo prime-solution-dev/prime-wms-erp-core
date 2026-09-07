@@ -145,11 +145,13 @@ func GetPurchaseList(
 
 	query = applyItemsProductGroupOneNameLike(query, gormx, itemsProductGroupOneNameLike)
 
+	// ส่ง time.Time เข้า GORM ตรงๆ การ Format เป็น "2006-01-02" จะตัดเวลาทิ้ง
+	// ทำให้ปลายช่วงกลายเป็นเที่ยงคืนและ PO ของวันสุดท้ายหลุดทั้งวัน
 	if startCreateDate != nil {
-		query = query.Where("create_dtm >= ?", startCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm >= ?", *startCreateDate)
 	}
 	if endCreateDate != nil {
-		query = query.Where("create_dtm <= ?", endCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm <= ?", *endCreateDate)
 	}
 
 	if len(productCodes) > 0 {
@@ -382,12 +384,11 @@ func UpdatePurchaseStatusApprove(purchases []models.UpdateStatusApprovePurchaseR
 				"is_approved":    purchase.IsApproved,
 				"update_dtm":     time.Now().UTC(),
 			}
-			// sync lifecycle status ตามตาราง: Approved(COMPLETED)→status COMPLETED,
-			// Reject→status CANCELLED (ให้ filter/display สถานะตรงกัน). PROCESS/REVIEW
-			// ไม่แตะ status (คง PENDING). รับของยัง gate ที่ status_approve ไม่ใช่ status
+			// Approved: คง status=PENDING ไว้ (approved = PENDING + status_approve=COMPLETED)
+			// เพื่อให้ Plan GR/รับของ (getPurchaseItemRemain default WHERE status='PENDING')
+			// ยังเห็น PO อยู่ status จะเป็น COMPLETED ก็ต่อเมื่อรับของครบ (used_status).
+			// Reject→status CANCELLED (reject ไม่ควรรับของ). PROCESS/REVIEW/COMPLETED ไม่แตะ status
 			switch purchase.StatusApprove {
-			case "COMPLETED":
-				updates["status"] = "COMPLETED"
 			case "REJECT":
 				updates["status"] = "CANCELLED"
 			}

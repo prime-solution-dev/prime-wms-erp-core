@@ -16,11 +16,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/gorm"
 )
 
 const (
-	testCompanyCode = "C001"
-	testSiteCode    = "S001"
+	testCompanyCode  = "C001"
+	testSiteCode     = "S001"
+	testDateSiteCode = "S002"
 )
 
 func TestMain(m *testing.M) {
@@ -126,6 +128,40 @@ func seed() error {
 				CreateDtm:        now,
 				UpdateDtm:        now,
 			}},
+		}
+
+		if err := gormx.Create(&purchase).Error; err != nil {
+			return err
+		}
+	}
+
+	return seedCreateDateRows(gormx)
+}
+
+// แถวสำหรับทดสอบช่วง create date อยู่คนละ site เพื่อไม่ให้กระทบ test ชุดสถานะ
+var createDateRows = []struct {
+	code      string
+	createDtm time.Time
+}{
+	{"PO-DATE-0902", time.Date(2025, 9, 2, 9, 0, 0, 0, time.UTC)},
+	{"PO-DATE-0903", time.Date(2025, 9, 3, 14, 0, 0, 0, time.UTC)},
+	{"PO-DATE-0904", time.Date(2025, 9, 4, 9, 0, 0, 0, time.UTC)},
+}
+
+func seedCreateDateRows(gormx *gorm.DB) error {
+	for _, row := range createDateRows {
+		purchase := models.Purchase{
+			ID:            uuid.New(),
+			PurchaseCode:  row.code,
+			PurchaseType:  "NORMAL",
+			CompanyCode:   testCompanyCode,
+			SiteCode:      testDateSiteCode,
+			SupplierCode:  "SUP-01",
+			SupplierName:  "Supplier One",
+			Status:        "PENDING",
+			StatusApprove: "PENDING",
+			CreateDtm:     row.createDtm,
+			UpdateDtm:     row.createDtm,
 		}
 
 		if err := gormx.Create(&purchase).Error; err != nil {
@@ -245,4 +281,23 @@ func TestGetPurchaseList_NoStatusFilterReturnsEverything(t *testing.T) {
 	list := query(t, statusFilter{})
 
 	assert.Len(t, list, len(seedRows))
+}
+
+// ปลายช่วงต้องนับทั้งวัน PO ที่สร้างตอนบ่ายของวันสุดท้ายต้องไม่หลุด
+func TestGetPurchaseList_CreateDateRangeIncludesLastDay(t *testing.T) {
+	start := time.Date(2025, 9, 2, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 9, 3, 23, 59, 59, 0, time.UTC)
+
+	list, total, _, _, _, err := GetPurchaseList(
+		nil, nil, nil, nil, false, nil, nil, nil, nil, nil,
+		testCompanyCode, testDateSiteCode,
+		1, 50,
+		"", "", "", "", "", "", "",
+		&start, &end,
+		nil,
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, total)
+	assert.ElementsMatch(t, []string{"PO-DATE-0902", "PO-DATE-0903"}, codesOf(list))
 }
