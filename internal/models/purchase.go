@@ -212,10 +212,14 @@ type GetPOBigLotListRequest struct {
 	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
 	SupplierCodeLike     string   `json:"supplier_code_like"`
 	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	SupplierNameLike     string   `json:"supplier_name_like"`
 	CompanyCode          string   `json:"company_code"`
 	SiteCode             string   `json:"site_code"`
 	Page                 int      `json:"page"`
 	PageSize             int      `json:"page_size"`
+
+	StartCreateDate *time.Time `json:"start_create_date"`
+	EndCreateDate   *time.Time `json:"end_create_date"`
 }
 
 type GetPOBigLotItemResponse struct {
