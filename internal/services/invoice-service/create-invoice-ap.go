@@ -94,34 +94,51 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				case "PCS":
 					validateUnit = "UNIT"
 				}
+				validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
+					PurchaseCode: invoiceItem.DocumentRef,
+					PurchaseItem: invoiceItem.DocumentRefItem,
+					Qty:          invoiceItem.Qty,
+					TotalWeight:  invoiceItem.Weight,
+					ValidateUnit: validateUnit,
+				})
 			}
-			validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
-				PurchaseCode: invoiceItem.DocumentRef,
-				PurchaseItem: invoiceItem.DocumentRefItem,
-				Qty:          invoiceItem.Qty,
-				TotalWeight:  invoiceItem.Weight,
-				ValidateUnit: validateUnit,
-			})
-		}
-	}
-	validatePayload, err := json.Marshal(validateRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
-	}
-	validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
-	if err != nil {
-		return nil, err
-	}
-	validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
-	if !ok {
-		return nil, errors.New("invalid AP over-purchase validation response")
-	}
-	for _, validation := range validateResponse.Datas {
-		if validation.Status == "ERROR" {
-			return validateResponse, nil
-		}
-	}
 
+		}
+	}
+	toleranceErrorResponse := ToleranceErrorResponse{}
+	if len(validateRequest.Datas) > 0 {
+
+		validatePayload, err := json.Marshal(validateRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
+		}
+		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
+		if err != nil {
+			return nil, err
+		}
+		validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
+		if !ok {
+			return nil, errors.New("invalid AP over-purchase validation response")
+		}
+
+		for _, validation := range validateResponse.Datas {
+			if validation.Status == "ERROR" {
+				errorType := strings.ToLower(validation.ValidateUnit)
+				if validation.ValidateUnit == "UNIT" {
+					errorType = "qty"
+				}
+				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					Index:   validation.Index,
+					Message: validation.Message,
+					Status:  "error",
+					Type:    errorType,
+				})
+			}
+		}
+		if len(toleranceErrorResponse.ToleranceError) > 0 {
+			return toleranceErrorResponse, nil
+		}
+	}
 	topicCodes := []string{"INVOICE"}
 	configCodes := []string{"AP"}
 
@@ -139,7 +156,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		tolerance = floatVal
 	}
-	toleranceErrorResponse := ToleranceErrorResponse{}
 
 	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
 	if errGetSupplierByCode != nil {
