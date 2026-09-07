@@ -91,12 +91,16 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 	var sumSubTotalExclDiscountExclVat float64
 
 	for _, item := range prePurchaseItems {
+		// ProductGroupName ใช้ HierarchyType เพราะ pre_purchase_item ไม่มีคอลัมน์ชื่อกลุ่มสินค้า
+		// ของตัวเอง — หน้าจอส่ง itemName มาลง product_group_type (ดู PrePurchaseItemTable.vue
+		// handleSelectProductGroup) จึงเป็นแหล่งเดียวของชื่อ ถ้าไม่ส่งต่อ ช่อง "รายการ" ใน PDF จะว่าง
 		items = append(items, models.GetPOBigLotItemResponse{
 			ID:                   item.ID.String(),
 			PrePurchaseID:        item.PrePurchaseID.String(),
 			PreItem:              item.PreItem,
 			ProductGroupType:     item.HierarchyType,
 			ProductGroupCode:     item.HierarchyCode,
+			ProductGroupName:     item.HierarchyType,
 			Qty:                  item.Qty,
 			Unit:                 item.Unit,
 			PurchaseQty:          item.PurchaseQty,
