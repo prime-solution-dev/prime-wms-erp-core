@@ -86,10 +86,11 @@ func seed() error {
 		supplierCode  string
 		supplierName  string
 		hierarchyCode string
+		hierarchyType string
 	}{
-		{"PB202609-0012", "SUP-STEEL-01", "Siam Steel Co.", "PG01_1"},
-		{"PB202609-0013", "SUP-STEEL-02", "Bangkok Steel Ltd.", "PG01_2"},
-		{"PB202510-0099", "VENDOR-77", "Thai Plastic", "PG02_9"},
+		{"PB202609-0012", "SUP-STEEL-01", "Siam Steel Co.", "PG01_1", "เหล็กแบนตัด"},
+		{"PB202609-0013", "SUP-STEEL-02", "Bangkok Steel Ltd.", "PG01_2", "เหล็กแบนพับ"},
+		{"PB202510-0099", "VENDOR-77", "Thai Plastic", "PG02_9", "ท่อพลาสติก"},
 	}
 
 	for _, row := range rows {
@@ -110,6 +111,7 @@ func seed() error {
 				PrePurchaseID: id,
 				PreItem:       row.code + "-001",
 				HierarchyCode: row.hierarchyCode,
+				HierarchyType: row.hierarchyType,
 				Status:        "PENDING",
 				CreateDtm:     now,
 				UpdateDtm:     now,
@@ -223,6 +225,51 @@ func TestGetPOBigLotList_ProductGroupCodeLike(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+// ชื่อกลุ่มสินค้าเก็บใน hierarchy_type — คอลัมน์ Product group บนหน้าจอแสดงค่านี้
+// ผู้ใช้จึงค้นด้วยชื่อที่เห็น
+func TestGetPOBigLotList_ProductGroupNameLike(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "เหล็กแบน"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupNameLikeNarrowsToOne(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "ท่อพลาสติก"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202510-0099"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupNameLikeNoMatch(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "ไม่มีกลุ่มนี้"
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, total)
+	assert.Empty(t, list)
+}
+
+// code กับ name เป็นคนละคอลัมน์ ส่งพร้อมกันต้อง AND ไม่ใช่ทับกัน
+func TestGetPOBigLotList_ProductGroupNameAndCodeAreCombinedWithAnd(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "เหล็กแบน"
+	req.ProductGroupCodeLike = "PG01_2"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0013"}, codesOf(list))
 }
 
 func TestGetPOBigLotList_LikeFiltersAreCombinedWithAnd(t *testing.T) {
