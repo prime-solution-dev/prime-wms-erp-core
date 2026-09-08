@@ -1,0 +1,691 @@
+pipeline {
+    agent any
+    environment {
+        // =========================================================
+        // Application
+        // =========================================================
+
+        APP_NAME       = 'prime-wms-erp-core'
+        CONTAINER_NAME = 'prime-wms-erp-core-container'
+
+
+        // =========================================================
+        // Git
+        // =========================================================
+
+        TARGET_BRANCH = 'Thaimetal-main'
+
+
+        // =========================================================
+        // Harbor
+        // =========================================================
+
+        HARBOR_URL     = 'harbor.prime-solution.cc'
+        HARBOR_PROJECT = 'prime-wms'
+
+        HARBOR_IMAGE = "${HARBOR_URL}/${HARBOR_PROJECT}/${APP_NAME}"
+
+
+        // =========================================================
+        // Remote Kubernetes Server
+        // =========================================================
+
+        REMOTE_USER  = 'ubuntu'
+        REMOTE_HOST  = '54.179.75.32'
+        SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
+
+
+        // =========================================================
+        // Vault
+        // =========================================================
+
+        VAULT_PATH   = 'JenkinsWMS/jenkins.PRDTMIWMS'
+        ENV_FILE_KEY = 'thaimetalprd.env.erp'
+
+
+        // =========================================================
+        // Kubernetes
+        // =========================================================
+
+        K8S_NAMESPACE  = 'prime-wms'
+        K8S_DEPLOYMENT = 'prime-wms-erp-core'
+
+        HARBOR_PULL_SECRET = 'harbor-registry'
+
+
+        // =========================================================
+        // Remote Directory
+        // =========================================================
+
+        REMOTE_APP_DIR = '/opt/prime-wms-erp-core'
+
+
+        // =========================================================
+        // Deployment Config
+        // =========================================================
+
+        K8S_CONFIG_DIR = 'Deployment.config.k8s/Thaimetal-main'
+    }
+
+
+    stages {
+
+        // =========================================================
+        // 1. Checkout Source
+        // =========================================================
+
+        stage('Checkout') {
+
+            steps {
+
+                echo '=========================================='
+                echo "Checkout Branch: ${TARGET_BRANCH}"
+                echo '=========================================='
+
+                checkout([
+                    $class: 'GitSCM',
+
+                    branches: [[
+                        name: "*/${TARGET_BRANCH}"
+                    ]],
+
+                    userRemoteConfigs: scm.userRemoteConfigs,
+
+                    extensions: [
+                        [$class: 'CleanBeforeCheckout']
+                    ]
+                ])
+            }
+        }
+
+
+        // =========================================================
+        // 2. Get Git Commit
+        // =========================================================
+
+        stage('Get Git Commit') {
+
+            steps {
+
+                script {
+
+                    env.GIT_COMMIT_FULL = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short=12 HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    echo """
+==========================================
+Git Information
+==========================================
+
+Branch:
+${TARGET_BRANCH}
+
+Commit Full:
+${GIT_COMMIT_FULL}
+
+Commit Tag:
+${GIT_COMMIT_SHORT}
+
+Harbor Image:
+${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+
+==========================================
+"""
+                }
+            }
+        }
+
+
+        // =========================================================
+        // 3. Validate Deployment Files
+        // =========================================================
+
+        stage('Validate Deployment Files') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    echo "=========================================="
+                    echo "Validate Deployment Files"
+                    echo "=========================================="
+
+                    test -f "$K8S_CONFIG_DIR/Dockerfile"
+                    echo "Dockerfile      : OK"
+
+                    test -f "$K8S_CONFIG_DIR/deployment.yaml"
+                    echo "deployment.yaml : OK"
+
+                    test -f "$K8S_CONFIG_DIR/service.yaml"
+                    echo "service.yaml    : OK"
+
+                    test -f "$K8S_CONFIG_DIR/Jenkinsfile" || true
+
+                    echo "=========================================="
+                    echo "Validation Complete"
+                    echo "=========================================="
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 4. Build Docker Image
+        // =========================================================
+
+        stage('Build Docker Image') {
+
+            steps {
+
+                echo '=========================================='
+                echo "Build: ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}"
+                echo '=========================================='
+
+                sh '''
+                    set -e
+
+                    docker build \
+                        -f "$K8S_CONFIG_DIR/Dockerfile" \
+                        -t "$HARBOR_IMAGE:$GIT_COMMIT_SHORT" \
+                        .
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 5. Login Harbor
+        // =========================================================
+
+        stage('Login Harbor') {
+
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-robot',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        set +x
+
+                        echo "=========================================="
+                        echo "Login Harbor"
+                        echo "=========================================="
+
+                        printf '%s\\n' "$HARBOR_PASSWORD" |
+                        docker login "$HARBOR_URL" \
+                            --username "$HARBOR_USER" \
+                            --password-stdin
+                    '''
+                }
+            }
+        }
+
+
+        // =========================================================
+        // 6. Push Harbor
+        // =========================================================
+
+        stage('Push Harbor') {
+
+            steps {
+
+                echo '=========================================='
+                echo "Push Harbor Image"
+                echo "${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}"
+                echo '=========================================='
+
+                sh '''
+                    set -e
+
+                    docker push \
+                        "$HARBOR_IMAGE:$GIT_COMMIT_SHORT"
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 7. Prepare Remote Server
+        // =========================================================
+
+        stage('Prepare Remote Server') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    ssh \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$REMOTE_USER@$REMOTE_HOST" \
+                        "
+                            sudo mkdir -p '$REMOTE_APP_DIR/k8s' &&
+                            sudo chown -R '$REMOTE_USER':'$REMOTE_USER' '$REMOTE_APP_DIR'
+                        "
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 8. Prepare Kubernetes Namespace
+        // =========================================================
+
+        stage('Prepare Kubernetes Namespace') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    ssh \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$REMOTE_USER@$REMOTE_HOST" \
+                        "
+                            kubectl create namespace '$K8S_NAMESPACE' \
+                                --dry-run=client \
+                                -o yaml |
+                            kubectl apply -f -
+                        "
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 9. Create / Update Harbor Pull Secret
+        // =========================================================
+
+        stage('Prepare Harbor Pull Secret') {
+
+            steps {
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'harbor-robot',
+                        usernameVariable: 'HARBOR_USER',
+                        passwordVariable: 'HARBOR_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        set +x
+
+                        printf '%s\\n%s\\n' \
+                            "$HARBOR_USER" \
+                            "$HARBOR_PASSWORD" |
+                        ssh \
+                            -i "$SSH_KEY_PATH" \
+                            -o StrictHostKeyChecking=no \
+                            "$REMOTE_USER@$REMOTE_HOST" \
+                            '
+                                set -e
+
+                                IFS= read -r HARBOR_USER
+                                IFS= read -r HARBOR_PASSWORD
+
+                                kubectl create secret docker-registry harbor-registry \
+                                    --namespace prime-wms \
+                                    --docker-server=harbor.prime-solution.cc \
+                                    --docker-username="$HARBOR_USER" \
+                                    --docker-password="$HARBOR_PASSWORD" \
+                                    --dry-run=client \
+                                    -o yaml |
+                                kubectl apply -f -
+                            '
+                    '''
+                }
+            }
+        }
+
+
+        // =========================================================
+        // 10. Upload Kubernetes YAML
+        // =========================================================
+
+        stage('Upload Kubernetes YAML') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    echo "=========================================="
+                    echo "Upload Kubernetes Manifest"
+                    echo "=========================================="
+
+                    scp \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$K8S_CONFIG_DIR/deployment.yaml" \
+                        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_APP_DIR/k8s/deployment.yaml"
+
+
+                    scp \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$K8S_CONFIG_DIR/service.yaml" \
+                        "$REMOTE_USER@$REMOTE_HOST:$REMOTE_APP_DIR/k8s/service.yaml"
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 11. Fetch .env From Vault
+        // =========================================================
+
+        stage('Fetch .env from Vault') {
+
+            steps {
+
+                script {
+
+                    withVault([
+                        vaultSecrets: [
+                            [
+                                path: "${VAULT_PATH}",
+                                engineVersion: 2,
+
+                                secretValues: [
+                                    [
+                                        envVar: 'AUTHEN_ENV',
+                                        vaultKey: "${ENV_FILE_KEY}"
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]) {
+
+                        sh '''
+                            set +x
+
+                            echo "=========================================="
+                            echo "Fetch Environment From Vault"
+                            echo "=========================================="
+
+                            printf '%s\\n' "$AUTHEN_ENV" |
+                            ssh \
+                                -i "$SSH_KEY_PATH" \
+                                -o StrictHostKeyChecking=no \
+                                "$REMOTE_USER@$REMOTE_HOST" \
+                                "
+                                    cat > '$REMOTE_APP_DIR/.env' &&
+                                    chmod 600 '$REMOTE_APP_DIR/.env'
+                                "
+                        '''
+                    }
+                }
+            }
+        }
+
+
+        // =========================================================
+        // 12. Deploy Kubernetes
+        // =========================================================
+
+        stage('Deploy Kubernetes') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    ssh \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$REMOTE_USER@$REMOTE_HOST" \
+                        "bash -s" <<EOF
+
+set -e
+
+echo "=========================================="
+echo "Create / Update Application Secret"
+echo "=========================================="
+
+kubectl create secret generic "${APP_NAME}-env" \
+    --namespace "${K8S_NAMESPACE}" \
+    --from-env-file="${REMOTE_APP_DIR}/.env" \
+    --dry-run=client \
+    -o yaml |
+kubectl apply -f -
+
+
+echo "=========================================="
+echo "Render Deployment Image"
+echo "=========================================="
+
+sed \
+    "s|IMAGE_TAG|${GIT_COMMIT_SHORT}|g" \
+    "${REMOTE_APP_DIR}/k8s/deployment.yaml" \
+    > "${REMOTE_APP_DIR}/k8s/deployment.rendered.yaml"
+
+
+echo "Deployment Image:"
+
+grep "image:" \
+    "${REMOTE_APP_DIR}/k8s/deployment.rendered.yaml" || true
+
+
+echo "=========================================="
+echo "Apply Kubernetes Deployment"
+echo "=========================================="
+
+kubectl apply \
+    -f "${REMOTE_APP_DIR}/k8s/deployment.rendered.yaml"
+
+
+echo "=========================================="
+echo "Apply Kubernetes Service"
+echo "=========================================="
+
+kubectl apply \
+    -f "${REMOTE_APP_DIR}/k8s/service.yaml"
+
+
+echo "=========================================="
+echo "Wait Rollout"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    rollout status \
+    deployment/"${K8S_DEPLOYMENT}" \
+    --timeout=300s
+
+
+echo "=========================================="
+echo "Deployment Completed"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get deployment "${K8S_DEPLOYMENT}"
+
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get pods \
+    -l app="${APP_NAME}" \
+    -o wide
+
+EOF
+                '''
+            }
+        }
+
+
+        // =========================================================
+        // 13. Verify Deployment
+        // =========================================================
+
+        stage('Verify Deployment') {
+
+            steps {
+
+                sh '''
+                    set -e
+
+                    ssh \
+                        -i "$SSH_KEY_PATH" \
+                        -o StrictHostKeyChecking=no \
+                        "$REMOTE_USER@$REMOTE_HOST" \
+                        "bash -s" <<EOF
+
+echo "=========================================="
+echo "Deployment Image"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get deployment "${K8S_DEPLOYMENT}" \
+    -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+echo
+echo
+
+
+echo "=========================================="
+echo "Deployment Status"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get deployment "${K8S_DEPLOYMENT}"
+
+
+echo
+echo "=========================================="
+echo "Pods"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get pods \
+    -l app="${APP_NAME}" \
+    -o wide
+
+
+echo
+echo "=========================================="
+echo "Services"
+echo "=========================================="
+
+kubectl \
+    --namespace "${K8S_NAMESPACE}" \
+    get service "${APP_NAME}"
+
+EOF
+                '''
+            }
+        }
+    }
+
+
+    // =============================================================
+    // Post Actions
+    // =============================================================
+
+    post {
+
+        always {
+
+            sh '''
+                set +e
+
+                echo "=========================================="
+                echo "Cleanup"
+                echo "=========================================="
+
+                docker logout "$HARBOR_URL" || true
+
+
+                ssh \
+                    -i "$SSH_KEY_PATH" \
+                    -o StrictHostKeyChecking=no \
+                    "$REMOTE_USER@$REMOTE_HOST" \
+                    "
+                        rm -f '$REMOTE_APP_DIR/.env'
+                    " || true
+            '''
+        }
+
+
+        success {
+
+            echo """
+==========================================
+DEPLOYMENT SUCCESS
+==========================================
+
+Application:
+${APP_NAME}
+
+Branch:
+${TARGET_BRANCH}
+
+Commit:
+${GIT_COMMIT_SHORT}
+
+Harbor Image:
+${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+
+Remote Server:
+${REMOTE_USER}@${REMOTE_HOST}
+
+Namespace:
+${K8S_NAMESPACE}
+
+Deployment:
+${K8S_DEPLOYMENT}
+
+==========================================
+"""
+        }
+
+
+        failure {
+
+            echo """
+==========================================
+DEPLOYMENT FAILED
+==========================================
+
+Application:
+${APP_NAME}
+
+Branch:
+${TARGET_BRANCH}
+
+Commit:
+${GIT_COMMIT_SHORT}
+
+Harbor Image:
+${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+
+Remote Server:
+${REMOTE_USER}@${REMOTE_HOST}
+
+Namespace:
+${K8S_NAMESPACE}
+
+==========================================
+"""
+        }
+    }
+}
