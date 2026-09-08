@@ -14,7 +14,8 @@ import (
 )
 
 type ValidateAPOverPurchaseRequest struct {
-	Datas []ValidateAPOverPurchaseRequestData `json:"datas"`
+	InvoiceCode string                              `json:"invoice_code"` // Optional current invoice code to exclude when saving an existing AP.
+	Datas       []ValidateAPOverPurchaseRequestData `json:"datas"`
 }
 
 type ValidateAPOverPurchaseRequestData struct {
@@ -84,7 +85,7 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 	if err != nil {
 		return nil, err
 	}
-	usedMap, err := loadUsedAPAmounts(gormx, purchaseCodes, purchaseItems)
+	usedMap, err := loadUsedAPAmounts(gormx, purchaseCodes, purchaseItems, req.InvoiceCode)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +232,7 @@ func loadPurchaseAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) 
 	return amounts, nil
 }
 
-func loadUsedAPAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) (map[string]apOverPurchaseAmount, error) {
+func loadUsedAPAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string, invoiceCode string) (map[string]apOverPurchaseAmount, error) {
 	amounts := map[string]apOverPurchaseAmount{}
 	if len(purchaseCodes) == 0 || len(purchaseItems) == 0 {
 		return amounts, nil
@@ -244,7 +245,7 @@ func loadUsedAPAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) (m
 		Weight       float64 `gorm:"column:weight"`
 	}
 	rows := []usedRow{}
-	if err := gormx.Table("invoice_item ii").
+	query := gormx.Table("invoice_item ii").
 		Select(`ii.document_ref AS purchase_code, ii.document_ref_item AS purchase_item,
 			COALESCE(SUM(ii.qty), 0) AS qty, COALESCE(SUM(ii.weight), 0) AS weight`).
 		Joins("JOIN invoice i ON i.id = ii.invoice_id").
@@ -252,8 +253,12 @@ func loadUsedAPAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) (m
 		Where("i.invoice_type IN ?", []string{"AP", "AP-FAB"}).
 		Where("i.status IN ?", []string{"PENDING", "COMPLETED"}).
 		Where("ii.document_ref IN ?", purchaseCodes).
-		Where("ii.document_ref_item IN ?", purchaseItems).
-		Group("ii.document_ref, ii.document_ref_item").
+		Where("ii.document_ref_item IN ?", purchaseItems)
+	if invoiceCode = strings.TrimSpace(invoiceCode); invoiceCode != "" {
+		// Exclude the entire saved invoice; its replacement amounts are in req.Datas.
+		query = query.Where("i.invoice_code <> ?", invoiceCode)
+	}
+	if err := query.Group("ii.document_ref, ii.document_ref_item").
 		Scan(&rows).Error; err != nil {
 		return nil, fmt.Errorf("failed to load used AP amounts: %w", err)
 	}

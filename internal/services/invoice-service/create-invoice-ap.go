@@ -91,9 +91,10 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				switch strings.ToUpper(strings.TrimSpace(poItem.PurchaseUnit)) {
 				case "KG":
 					validateUnit = "WEIGHT"
-				case "PCS":
+				default:
 					validateUnit = "UNIT"
 				}
+
 				validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
 					PurchaseCode: invoiceItem.DocumentRef,
 					PurchaseItem: invoiceItem.DocumentRefItem,
