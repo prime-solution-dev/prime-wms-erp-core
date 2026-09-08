@@ -22,6 +22,7 @@ type CreateDeliveryRequest struct {
 	CompanyCode       string                       `json:"company_code"`
 	SiteCode          string                       `json:"site_code"`
 	DeliveryMethod    string                       `json:"delivery_method"`
+	DeliveryCode      string                       `json:"delivery_code"`
 	DocumentRef       string                       `json:"document_ref"`
 	CustomerCode      string                       `json:"customer_code"`
 	SoldToCode        string                       `json:"sold_to_code"`
@@ -114,14 +115,27 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(hookConfig) > 0 {
+	// เจนเลขที่ใบจองก่อนยิง hook เพื่อให้ปลายทางได้ delivery_code ไปด้วย
+	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
+	if err != nil {
+		return nil, err
+	}
+	for i := range req {
+		req[i].DeliveryCode = deliveryCodes[i]
+	}
+
+	// TRCloud ไม่เอาบรรทัดที่จอง 0 ชิ้น ตัด item qty 0 และใบที่ไม่เหลือ item ออกก่อนยิง hook
+	// (ตัด req ที่ส่งเข้า hook เท่านั้น ฝั่ง insert ลง DB ยังใช้ req เดิมครบทุกบรรทัด)
+	hookReq := buildHookRequest(req)
+
+	if len(hookConfig) > 0 && len(hookReq) > 0 {
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: hookReq,
 			UrlHook:     urlHook,
 		}
 		HookInterfaceValue, hookErr := interfaceService.HookInterface(requestDataCreateHook)
@@ -146,12 +160,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	deliveryToAdd := []models.Delivery{}
 	deliveryItemToAdd := []models.DeliveryItem{}
-
-	// Generate all delivery codes first
-	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
-	if err != nil {
-		return nil, err
-	}
 
 	for num, deliveryReq := range req {
 		deliveryId := uuid.New()
@@ -402,6 +410,32 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
+}
+
+// buildHookRequest ตัดบรรทัดที่ qty <= 0 ออกจาก payload ที่จะยิงเข้า hook
+// ใบที่กรองแล้วไม่เหลือ item เลย ตัดทั้งใบทิ้ง ไม่ส่งหัวใบเปล่าไปให้ปลายทาง
+func buildHookRequest(req []CreateDeliveryRequest) []CreateDeliveryRequest {
+	hookReq := make([]CreateDeliveryRequest, 0, len(req))
+
+	// deliveryReq เป็น copy จาก range อยู่แล้ว เขียนทับ DeliveryItems ไม่กระทบ req ตัวจริง
+	for _, deliveryReq := range req {
+		items := make([]CreateDeliveryItemsRequest, 0, len(deliveryReq.DeliveryItems))
+		for _, item := range deliveryReq.DeliveryItems {
+			if item.Qty <= 0 {
+				continue
+			}
+			items = append(items, item)
+		}
+
+		if len(items) == 0 {
+			continue
+		}
+
+		deliveryReq.DeliveryItems = items
+		hookReq = append(hookReq, deliveryReq)
+	}
+
+	return hookReq
 }
 
 // generateDeliveryCodes จองเลขที่ใบจองแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)

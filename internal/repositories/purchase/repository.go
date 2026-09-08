@@ -145,11 +145,13 @@ func GetPurchaseList(
 
 	query = applyItemsProductGroupOneNameLike(query, gormx, itemsProductGroupOneNameLike)
 
+	// ส่ง time.Time เข้า GORM ตรงๆ การ Format เป็น "2006-01-02" จะตัดเวลาทิ้ง
+	// ทำให้ปลายช่วงกลายเป็นเที่ยงคืนและ PO ของวันสุดท้ายหลุดทั้งวัน
 	if startCreateDate != nil {
-		query = query.Where("create_dtm >= ?", startCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm >= ?", *startCreateDate)
 	}
 	if endCreateDate != nil {
-		query = query.Where("create_dtm <= ?", endCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm <= ?", *endCreateDate)
 	}
 
 	if len(productCodes) > 0 {
