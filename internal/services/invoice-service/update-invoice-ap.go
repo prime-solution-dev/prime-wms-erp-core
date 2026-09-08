@@ -87,7 +87,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	toleranceErrorResponse := ToleranceErrorResponse{}
 	if len(validateRequest.Datas) > 0 {
-
+		validateRequest.InvoiceCode = req[0].InvoiceCode
 		validatePayload, err := json.Marshal(validateRequest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
