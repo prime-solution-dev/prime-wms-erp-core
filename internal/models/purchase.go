@@ -212,6 +212,7 @@ type GetPOBigLotListRequest struct {
 	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
 	SupplierCodeLike     string   `json:"supplier_code_like"`
 	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	ProductGroupNameLike string   `json:"product_group_name_like"`
 	SupplierNameLike     string   `json:"supplier_name_like"`
 	CompanyCode          string   `json:"company_code"`
 	SiteCode             string   `json:"site_code"`

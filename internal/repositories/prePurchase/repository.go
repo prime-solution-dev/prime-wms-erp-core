@@ -105,6 +105,19 @@ func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, i
 		query = query.Where("EXISTS (?)", sub)
 	}
 
+	// ชื่อกลุ่มสินค้าอยู่ในคอลัมน์ hierarchy_type ไม่ใช่คอลัมน์ชื่อของตัวเอง —
+	// หน้าจอ Big lot ส่ง itemName ลง product_group_type ตอนสร้าง (ดู
+	// PrePurchaseItemTable.vue handleSelectProductGroup) และคอลัมน์ Product group
+	// ในตารางก็แสดงค่านี้ ผู้ใช้จึงค้นด้วยชื่อที่เห็น ไม่ใช่ code
+	if req.ProductGroupNameLike != "" {
+		sub := gormx.Model(&models.PrePurchaseItem{}).
+			Select("1").
+			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
+			Where("hierarchy_type ILIKE ?", "%"+req.ProductGroupNameLike+"%")
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
