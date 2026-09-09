@@ -220,3 +220,65 @@ func TestIssuedBySaleItemIgnoresLinesWithoutSaleItem(t *testing.T) {
 		t.Errorf("บรรทัดที่ไม่มี sale_item ต้องถูกข้าม ได้ qty=%v weight=%v", qty, weight)
 	}
 }
+
+// SO202609-0011 = 10 PCS ส่งครบ 10 -> ปิด
+// SO202609-0009 บรรทัด 50 PCS เพิ่งส่งไป 30 -> ไม่ปิด
+// บรรทัดกิโล 500 kg ส่ง 487 (ขาด 2.6%) -> ปิด เพราะอยู่ในระยะผ่อนผัน 3%
+func TestSelectDeliveredSaleItemsPicksOnlyLinesThatMetTheTarget(t *testing.T) {
+	items := []models.SaleItem{
+		{SaleItem: "SALE-DONE", Qty: 10, TotalWeight: 51.5, SaleUnit: "PC", SaleUnitType: "PC", Status: "PENDING"},
+		{SaleItem: "SALE-PARTIAL", Qty: 50, TotalWeight: 145, SaleUnit: "PC", SaleUnitType: "PC", Status: "PENDING"},
+		{SaleItem: "SALE-KG", Qty: 53, TotalWeight: 500, SaleUnit: "KG", SaleUnitType: "KG", Status: "PENDING"},
+		{SaleItem: "SALE-ALREADY", Qty: 5, TotalWeight: 5, SaleUnit: "PC", SaleUnitType: "PC", Status: "COMPLETED"},
+	}
+
+	issuedQty := map[string]float64{
+		"SALE-DONE":    10,
+		"SALE-PARTIAL": 30,
+		"SALE-KG":      53,
+		"SALE-ALREADY": 5,
+	}
+	issuedWeight := map[string]float64{
+		"SALE-DONE":    51.55,
+		"SALE-PARTIAL": 87,
+		"SALE-KG":      487,
+		"SALE-ALREADY": 5,
+	}
+
+	got := selectDeliveredSaleItems(items, issuedQty, issuedWeight, 3)
+
+	if len(got) != 2 {
+		t.Fatalf("selectDeliveredSaleItems = %v, want 2 รายการ (SALE-DONE, SALE-KG)", got)
+	}
+	if got[0] != "SALE-DONE" || got[1] != "SALE-KG" {
+		t.Errorf("selectDeliveredSaleItems = %v, want [SALE-DONE SALE-KG]", got)
+	}
+}
+
+// บรรทัด KG_SPEC ต้องวัดด้วยชิ้น ไม่ใช่น้ำหนัก (SO202609-0001 = 6 ชิ้น / 120 kg)
+func TestSelectDeliveredSaleItemsUsesQtyForKgSpec(t *testing.T) {
+	items := []models.SaleItem{
+		{SaleItem: "SALE-KGSPEC", Qty: 6, TotalWeight: 120, SaleUnit: "KG", SaleUnitType: "KG_SPEC", Status: "PENDING"},
+	}
+
+	got := selectDeliveredSaleItems(items,
+		map[string]float64{"SALE-KGSPEC": 6},
+		map[string]float64{"SALE-KGSPEC": 0},
+		3)
+
+	if len(got) != 1 || got[0] != "SALE-KGSPEC" {
+		t.Errorf("selectDeliveredSaleItems = %v, want [SALE-KGSPEC] (ครบ 6 ชิ้นแล้วแม้ไม่มีน้ำหนัก)", got)
+	}
+}
+
+func TestSelectDeliveredSaleItemsSkipsLinesWithNoIssueAtAll(t *testing.T) {
+	items := []models.SaleItem{
+		{SaleItem: "SALE-NONE", Qty: 10, SaleUnit: "PC", SaleUnitType: "PC", Status: "PENDING"},
+	}
+
+	got := selectDeliveredSaleItems(items, map[string]float64{}, map[string]float64{}, 3)
+
+	if len(got) != 0 {
+		t.Errorf("selectDeliveredSaleItems = %v, want ว่าง", got)
+	}
+}

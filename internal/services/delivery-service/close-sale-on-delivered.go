@@ -2,9 +2,17 @@ package deliveryService
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
+	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/models"
+	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
+	saleService "prime-erp-core/internal/services/sale-service"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // โหมดตัดสินว่า "ส่งครบ" ของ 1 บรรทัดขาย ดูจากจำนวนชิ้นหรือจากน้ำหนัก
@@ -86,4 +94,170 @@ func issuedBySaleItem(lines []deliveryLine, issuedQty map[string]float64, issued
 	}
 
 	return qtyOf, weightOf
+}
+
+// defaultToleranceSOPercent ใช้เมื่ออ่าน config ไม่ได้ (ค่าจริงของ TMI ตอนนี้คือ 3)
+const defaultToleranceSOPercent = 5.0
+
+// selectDeliveredSaleItems คืนรหัสบรรทัดขายที่ส่งของถึงเป้าแล้วและยังไม่ถูกปิด
+//
+// กติกา "บรรทัดนี้จบงานแล้ว" ใช้ของ sale-service ที่เดียว (saleService.IsSaleItemClosed)
+// ไม่ประกาศ map ซ้ำ เพื่อไม่ให้สองที่เพี้ยนออกจากกันภายหลัง
+func selectDeliveredSaleItems(items []models.SaleItem, issuedQty map[string]float64, issuedWeight map[string]float64, tolerancePercent float64) []string {
+	delivered := []string{}
+
+	for _, item := range items {
+		if saleService.IsSaleItemClosed(item.Status) {
+			continue
+		}
+
+		issued := issuedQty[item.SaleItem]
+		if saleItemCompletionMode(item.SaleUnit, item.SaleUnitType) == completionModeWeight {
+			issued = issuedWeight[item.SaleItem]
+		}
+
+		if !isFullyDelivered(completionTarget(item), issued, tolerancePercent) {
+			continue
+		}
+
+		delivered = append(delivered, item.SaleItem)
+	}
+
+	return delivered
+}
+
+// toleranceSOPercent อ่านระยะผ่อนผันจาก system_config ของ ERP เอง (topic SO / TOLERANCE_SO)
+func toleranceSOPercent() float64 {
+	configs, err := systemConfigRepository.GetSystemConfig([]string{"SO"}, []string{"TOLERANCE_SO"})
+	if err != nil || len(configs) == 0 {
+		return defaultToleranceSOPercent
+	}
+
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(configs[0].Value), 64)
+	if err != nil {
+		return defaultToleranceSOPercent
+	}
+
+	return parsed
+}
+
+// CloseSalesFullyDelivered ปิดบรรทัดขาย (และหัวใบเมื่อครบทุกบรรทัด) ของ SO ที่ส่งของครบแล้ว
+//
+// เรียกหลัง commit ของ UpdateStatusDelivery เท่านั้น และผู้เรียกต้อง "log ทิ้ง" ถ้าพัง
+// ห้ามคืน error ขึ้นไปให้ hook เพราะ hook ORDER/DELIVERY/UPDATE ถูกยิงระหว่างที่
+// wms-order-service ยังไม่ commit การคืน error จะทำให้ pack confirm ทั้งใบล้ม
+// ทั้งที่สต็อกกับ GI ตัดไปแล้ว (ดูคอมเมนต์ที่ confirm-order-outbound.go:205-208)
+func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) error {
+	codes := []string{}
+	seen := map[string]bool{}
+	for _, saleCode := range saleCodes {
+		if saleCode == "" || seen[saleCode] {
+			continue
+		}
+		seen[saleCode] = true
+		codes = append(codes, saleCode)
+	}
+
+	if len(codes) == 0 {
+		return nil
+	}
+
+	var sales []models.Sale
+	if err := gormx.Where("sale_code IN ? AND status NOT IN ?", codes, []string{"COMPLETED", "CANCELED"}).
+		Find(&sales).Error; err != nil {
+		return fmt.Errorf("failed to load sales %v: %v", codes, err)
+	}
+
+	if len(sales) == 0 {
+		return nil
+	}
+
+	saleIDs := make([]uuid.UUID, 0, len(sales))
+	openSaleCodes := make([]string, 0, len(sales))
+	for _, sale := range sales {
+		saleIDs = append(saleIDs, sale.ID)
+		openSaleCodes = append(openSaleCodes, sale.SaleCode)
+	}
+
+	var saleItems []models.SaleItem
+	if err := gormx.Where("sale_id IN ?", saleIDs).Find(&saleItems).Error; err != nil {
+		return fmt.Errorf("failed to load sale items of %v: %v", openSaleCodes, err)
+	}
+
+	if len(saleItems) == 0 {
+		return nil
+	}
+
+	// ใบจองทุกใบของ SO เหล่านี้ ใบที่ยกเลิกไม่นับเพราะของถูกคืนไปแล้ว
+	var deliveries []models.Delivery
+	if err := gormx.Where("document_ref IN ? AND status <> ?", openSaleCodes, "CANCELED").
+		Find(&deliveries).Error; err != nil {
+		return fmt.Errorf("failed to load delivery bookings of %v: %v", openSaleCodes, err)
+	}
+
+	if len(deliveries) == 0 {
+		return nil
+	}
+
+	deliveryIDs := make([]uuid.UUID, 0, len(deliveries))
+	deliveryCodes := make([]string, 0, len(deliveries))
+	deliveryCodeOf := map[uuid.UUID]string{}
+	for _, delivery := range deliveries {
+		deliveryIDs = append(deliveryIDs, delivery.ID)
+		deliveryCodes = append(deliveryCodes, delivery.DeliveryCode)
+		deliveryCodeOf[delivery.ID] = delivery.DeliveryCode
+	}
+
+	var bookedItems []models.DeliveryItem
+	if err := gormx.Where("delivery_id IN ?", deliveryIDs).Find(&bookedItems).Error; err != nil {
+		return fmt.Errorf("failed to load delivery booking items of %v: %v", openSaleCodes, err)
+	}
+
+	lines := make([]deliveryLine, 0, len(bookedItems))
+	for _, item := range bookedItems {
+		lines = append(lines, deliveryLine{
+			DeliveryCode: deliveryCodeOf[item.DeliveryID],
+			DeliveryItem: item.DeliveryItem,
+			SaleItemCode: item.DocumentRefItem,
+		})
+	}
+
+	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+		DeliveryCode: deliveryCodes,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to read WMS progress of %v: %v", deliveryCodes, err)
+	}
+
+	issuedQtyByLine, issuedWeightByLine, closed := foldWmsIssued(orderRes.Orders)
+	issuedQty, issuedWeight := issuedBySaleItem(lines, issuedQtyByLine, issuedWeightByLine, closed)
+
+	toClose := selectDeliveredSaleItems(saleItems, issuedQty, issuedWeight, toleranceSOPercent())
+	if len(toClose) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	tx := gormx.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	_, completedSaleCodes, err := saleService.MarkSaleItemsCompleted(tx, toClose, "COMPLETED", user, nowDateOnly)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	fmt.Printf("CloseSalesFullyDelivered: closed %d sale items %v, completed sales %v\n",
+		len(toClose), toClose, completedSaleCodes)
+
+	return nil
 }

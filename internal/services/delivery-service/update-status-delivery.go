@@ -183,6 +183,22 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		return nil, err
 	}
 
+	// ใบจองที่เพิ่งปิด แปลว่าของออกไปแล้ว ให้ไปดูว่า SO ต้นทางส่งครบหรือยัง
+	//
+	// ต้องทำหลัง commit และ "log ทิ้งถ้าพัง" ห้ามคืน error — hook ORDER/DELIVERY/UPDATE
+	// ยิงเข้ามาระหว่างที่ wms-order-service ยังไม่ commit ถ้าเราคืน error ฝั่งนั้นจะ rollback
+	// แล้วยืนยัน pack ล้มทั้งใบ ทั้งที่สต็อกกับ GI ตัดไปแล้ว
+	if req.Status == "COMPLETED" {
+		saleCodes := []string{}
+		for _, deliveryCode := range toUpdate {
+			saleCodes = append(saleCodes, deliveryOf[deliveryCode].DocumentRef)
+		}
+
+		if err := CloseSalesFullyDelivered(gormx, saleCodes, user); err != nil {
+			fmt.Printf("UpdateStatusDelivery: cannot close sales of %v: %v\n", toUpdate, err)
+		}
+	}
+
 	return res, nil
 }
 
