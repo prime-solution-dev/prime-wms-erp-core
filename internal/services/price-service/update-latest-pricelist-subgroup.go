@@ -267,7 +267,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 					case "pcs":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceUnit,
-							Extra:      extraPriceWeight,
+							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
 							Pcs:        pcs,
@@ -287,7 +287,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 					case "kg":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceUnit,
+							Extra:      extraPriceWeight,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
 							Pcs:        pcs,
