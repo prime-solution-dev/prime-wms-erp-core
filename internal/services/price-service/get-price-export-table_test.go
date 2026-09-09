@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"prime-erp-core/internal/models"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -76,8 +77,19 @@ func TestBuildExportTableTyped_ColumnsAndRows(t *testing.T) {
 	if len(resp.Columns) < 3 {
 		t.Fatalf("expected at least 3 group columns, got %d", len(resp.Columns))
 	}
-	if resp.Columns[0].Field != "PRODUCT_GROUP1" || resp.Columns[0].HeaderName != "หมวดหลัก" {
-		t.Fatalf("unexpected first column: %+v", resp.Columns[0])
+	// static column มาก่อน dynamic group key เสมอ จึงเช็กว่ามีคอลัมน์อยู่ ไม่เช็กลำดับ
+	var productGroup1 *ExportColumn
+	for i := range resp.Columns {
+		if resp.Columns[i].Field == "PRODUCT_GROUP1" {
+			productGroup1 = &resp.Columns[i]
+			break
+		}
+	}
+	if productGroup1 == nil {
+		t.Fatal("expected a PRODUCT_GROUP1 column")
+	}
+	if productGroup1.HeaderName != "หมวดหลัก" {
+		t.Fatalf("unexpected PRODUCT_GROUP1 header: %q", productGroup1.HeaderName)
 	}
 
 	if len(resp.Rows) != 1 {
@@ -143,7 +155,7 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 	}
 
 	var _ map[string]models.GetGroupResponse = groupMap
-	tab := buildBasedPriceTab(groups, paymentTermMap)
+	tab := buildBasedPriceTab(groups, paymentTermMap, nil)
 
 	if tab.Name != "Based price" {
 		t.Fatalf("expected tab name 'Based price', got %s", tab.Name)
@@ -178,5 +190,383 @@ func TestBuildBasedPriceTab_Structure(t *testing.T) {
 	// Check term fields
 	if row["term_T1_pdc_baht"] != 0.23 {
 		t.Fatalf("expected term_T1_pdc_baht 0.23, got %v", row["term_T1_pdc_baht"])
+	}
+}
+
+// update_dtm ถูกเขียนเป็น UTC (update-pricelist.go:27) และ container เป็น alpine
+// ที่ไม่มี tzdata เวลาที่แสดงในรายงานจึงต้องถูกแปลงเป็นเวลาไทยอย่างชัดเจน
+func TestFormatTimestamp_ConvertsToBangkok(t *testing.T) {
+	got := formatTimestamp(time.Date(2026, 9, 3, 2, 30, 0, 0, time.UTC))
+	if got != "3/9/2026 09:30" {
+		t.Fatalf("expected %q, got %q", "3/9/2026 09:30", got)
+	}
+}
+
+// export ก่อน 07:00 น. เวลาไทย ต้องไม่ทำให้วันที่ย้อนไปหนึ่งวัน
+func TestFormatTimestamp_CrossesDateBoundary(t *testing.T) {
+	got := formatTimestamp(time.Date(2026, 9, 2, 20, 0, 0, 0, time.UTC))
+	if got != "3/9/2026 03:00" {
+		t.Fatalf("expected %q, got %q", "3/9/2026 03:00", got)
+	}
+}
+
+// group key code และ UDF key ชนกับ static column ได้ ต้องไม่ทำให้คอลัมน์ซ้ำ
+func TestBuildExportTableTyped_NoDuplicateColumns(t *testing.T) {
+	udfJson, err := json.Marshal(map[string]interface{}{
+		"line_bundle": 10,
+		"coil_id":     "C-001",
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:      uuid.New(),
+						UdfJson: udfJson,
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG02", Value: "V2", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	count := map[string]int{}
+	for _, c := range data.Columns {
+		count[c.Field]++
+	}
+	for field, n := range count {
+		if n > 1 {
+			t.Fatalf("column %q appears %d times, expected exactly once", field, n)
+		}
+	}
+}
+
+// is_highlight ใช้ทำสีตัวอักษรฝั่ง document-core จึงต้องอยู่ใน row แต่ไม่ใช่คอลัมน์
+func TestBuildExportTableTyped_DropsIsHighlightColumnButKeepsValue(t *testing.T) {
+	udfJson, err := json.Marshal(map[string]interface{}{"is_highlight": true})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{ID: uuid.New(), UdfJson: udfJson},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	for _, c := range data.Columns {
+		if c.Field == "is_highlight" {
+			t.Fatal("is_highlight must not be an exported column")
+		}
+	}
+
+	if len(data.Rows) != 1 {
+		t.Fatalf("expected 1 row, got %d", len(data.Rows))
+	}
+	if data.Rows[0]["is_highlight"] != true {
+		t.Fatalf("is_highlight value must survive for cell styling, got %v", data.Rows[0]["is_highlight"])
+	}
+}
+
+// stock_quantity (TotalQty) กับ quantity (SumQty) เคยใช้หัวเดียวกันคือ "จำนวน"
+func TestBuildExportTableTyped_QuantityHeadersAreDistinct(t *testing.T) {
+	data := buildExportTableTyped(nil, func(string) string { return "" }, func(string) string { return "" })
+
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+	}
+
+	if headers["stock_quantity"] != "จำนวนรวม" {
+		t.Fatalf("expected stock_quantity header %q, got %q", "จำนวนรวม", headers["stock_quantity"])
+	}
+	if headers["quantity"] != "จำนวน" {
+		t.Fatalf("expected quantity header %q, got %q", "จำนวน", headers["quantity"])
+	}
+}
+
+// group_name ที่ client ตั้งไว้ใน DB ต้องชนะหัวคอลัมน์ hardcode ของ PG01-PG10
+func TestBuildExportTableTyped_GroupNameOverridesStaticHeader(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG04", Value: "V4", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	groupNameByCode := func(code string) string {
+		switch code {
+		case "PG01":
+			return "กลุ่มสินค้าตามที่ลูกค้าตั้ง"
+		case "PG04":
+			return "กลุ่มที่สี่"
+		default:
+			return ""
+		}
+	}
+
+	data := buildExportTableTyped(groups, groupNameByCode, func(string) string { return "" })
+
+	headers := map[string]string{}
+	count := map[string]int{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+		count[c.Field]++
+	}
+
+	// PG01 มีใน static list -> ต้องถูกเขียนทับด้วยชื่อจาก DB ไม่ใช่ "หมวดหลัก"
+	if headers["PG01"] != "กลุ่มสินค้าตามที่ลูกค้าตั้ง" {
+		t.Fatalf("expected PG01 header from DB, got %q", headers["PG01"])
+	}
+	// PG04 ไม่มีใน static list -> ต้องถูกเพิ่มเข้ามาพร้อมชื่อจาก DB
+	if headers["PG04"] != "กลุ่มที่สี่" {
+		t.Fatalf("expected PG04 header from DB, got %q", headers["PG04"])
+	}
+	// เขียนทับ ไม่ใช่เพิ่มคอลัมน์ใหม่
+	if count["PG01"] != 1 {
+		t.Fatalf("expected exactly one PG01 column, got %d", count["PG01"])
+	}
+}
+
+// DB ไม่มีชื่อกลุ่ม -> ต้องคงหัว static ไว้ ไม่ใช่กลายเป็นค่าว่างหรือรหัสดิบ
+func TestBuildExportTableTyped_StaticHeaderIsFallback(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:        uuid.New(),
+						GroupKeys: []GroupKey{{Code: "PG01", Value: "V1", Seq: 1}},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+
+	for _, c := range data.Columns {
+		if c.Field == "PG01" {
+			if c.HeaderName != "หมวดหลัก" {
+				t.Fatalf("expected static fallback header %q, got %q", "หมวดหลัก", c.HeaderName)
+			}
+			return
+		}
+	}
+	t.Fatal("expected a PG01 column")
+}
+
+// group_name ที่เป็นช่องว่างล้วนต้องไม่ลบหัวคอลัมน์ static ทิ้ง
+func TestBuildExportTableTyped_BlankGroupNameKeepsStaticHeader(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							{Code: "PG01", Value: "V1", Seq: 1},
+							{Code: "PG04", Value: "V4", Seq: 2},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	data := buildExportTableTyped(groups, func(string) string { return "   " }, func(string) string { return "" })
+
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		headers[c.Field] = c.HeaderName
+	}
+
+	if headers["PG01"] != "หมวดหลัก" {
+		t.Fatalf("expected static fallback header %q, got %q", "หมวดหลัก", headers["PG01"])
+	}
+	// PG04 ไม่มีใน static list -> ต้องถอยไปใช้รหัสกลุ่ม ไม่ใช่ช่องว่าง
+	if headers["PG04"] != "PG04" {
+		t.Fatalf("expected PG04 header to fall back to the code, got %q", headers["PG04"])
+	}
+}
+
+// Last Updated ต้องเป็นเวลาที่ราคาถูกแก้ล่าสุด ไม่ใช่เวลาที่กด export
+func TestBuildDetailTab_UsesProvidedLastUpdated(t *testing.T) {
+	lastUpdated := time.Date(2026, 8, 20, 3, 15, 0, 0, time.UTC)
+
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, &lastUpdated)
+
+	if tab.Headers.LastUpdated != "20/8/2026 10:15" {
+		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
+	}
+	if tab.Headers.Download == tab.Headers.LastUpdated {
+		t.Fatal("Download must be the export time, not the last-updated time")
+	}
+}
+
+// ไม่มีข้อมูลราคาเลย -> ปล่อยหัวเรื่องว่าง (excel_generator ข้ามแถวที่ค่าว่าง)
+func TestBuildDetailTab_NilLastUpdatedLeavesHeaderEmpty(t *testing.T) {
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, nil)
+
+	if tab.Headers.LastUpdated != "" {
+		t.Fatalf("expected empty LastUpdated, got %q", tab.Headers.LastUpdated)
+	}
+}
+
+func TestBuildBasedPriceTab_UsesProvidedLastUpdated(t *testing.T) {
+	lastUpdated := time.Date(2026, 8, 20, 3, 15, 0, 0, time.UTC)
+
+	tab := buildBasedPriceTab(nil, map[string]GetPaymentTermResponse{}, &lastUpdated)
+
+	if tab.Headers.LastUpdated != "20/8/2026 10:15" {
+		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
+	}
+}
+
+// ครอบสาขาที่เหลือของ buildExportTableTyped: group key ซ้ำข้าม subgroup (merge ชื่อ/seq),
+// การเรียงคอลัมน์ dynamic, การข้าม subgroup ที่ inactive, การเติมค่าจาก InventoryWeight,
+// key ที่เป็นค่าว่าง และ UDF key ที่ไม่มีใน static list
+func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testing.T) {
+	activeUdf, err := json.Marshal(map[string]interface{}{"custom_udf": "X1"})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+	inactiveUdf, err := json.Marshal(map[string]interface{}{"inactive": true})
+	if err != nil {
+		t.Fatalf("failed to marshal udf json: %v", err)
+	}
+
+	groups := []GetPriceListGroupResponse{
+		{
+			PriceListGroup: PriceListGroup{
+				ID:        uuid.New(),
+				GroupCode: "G1",
+				SubGroups: []SubGroup{
+					{
+						ID:      uuid.New(),
+						UdfJson: activeUdf,
+						GroupKeys: []GroupKey{
+							// seq 0 + ไม่มีชื่อ เจอก่อน แล้วอีก subgroup มาเติมทีหลัง
+							{Code: "DYN_B", Value: "vb", Seq: 0},
+							{Code: "", Value: "ignored", Seq: 1},
+						},
+						InventoryWeight: []models.InventoryWeightResponse{
+							{
+								ProductCode:  "0012345",
+								BatchNo:      "B-9",
+								SupplierName: "โรงงานเหล็ก",
+								SiteCode:     "S1",
+								SumQty:       3,
+								TotalQty:     7,
+								AvgWeight:    1.5,
+								WeightSpec:   2.5,
+								TotalWeight:  10.5,
+							},
+						},
+					},
+					{
+						ID:        uuid.New(),
+						UdfJson:   inactiveUdf,
+						GroupKeys: []GroupKey{{Code: "DYN_A", Value: "va", Seq: 2}},
+					},
+					{
+						ID: uuid.New(),
+						GroupKeys: []GroupKey{
+							// code เดิมที่เจอแล้ว แต่รอบนี้มีทั้งชื่อและ seq -> ต้อง merge เข้าของเดิม
+							{Code: "DYN_B", Value: "vb", Seq: 1},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	nameByCode := func(code string) string {
+		switch code {
+		case "DYN_A":
+			return "กลุ่มเอ"
+		case "DYN_B":
+			return "กลุ่มบี"
+		default:
+			return ""
+		}
+	}
+
+	data := buildExportTableTyped(groups, nameByCode, func(string) string { return "แปลงแล้ว" })
+
+	// subgroup ที่ inactive ถูกข้าม เหลือ 2 แถว
+	if len(data.Rows) != 2 {
+		t.Fatalf("expected 2 rows (inactive subgroup skipped), got %d", len(data.Rows))
+	}
+
+	count := map[string]int{}
+	headers := map[string]string{}
+	for _, c := range data.Columns {
+		count[c.Field]++
+		headers[c.Field] = c.HeaderName
+	}
+	if count["DYN_B"] != 1 {
+		t.Fatalf("expected DYN_B merged into one column, got %d", count["DYN_B"])
+	}
+	if headers["DYN_B"] != "กลุ่มบี" {
+		t.Fatalf("expected merged column to pick up the DB name, got %q", headers["DYN_B"])
+	}
+	if _, ok := headers[""]; ok {
+		t.Fatal("empty group key code must not become a column")
+	}
+	if headers["custom_udf"] != "custom_udf" {
+		t.Fatalf("expected UDF key to become its own column, got %q", headers["custom_udf"])
+	}
+
+	inv := data.Rows[0]
+	// รหัสสินค้าต้องคงเป็น string ไม่งั้น leading zero หายตอนเขียนลง Excel
+	if inv["code"] != "0012345" {
+		t.Fatalf("expected product code to stay a string, got %#v", inv["code"])
+	}
+	if inv["stock"] != float64(3) || inv["quantity"] != float64(3) {
+		t.Fatalf("expected stock and quantity to come from SumQty, got %#v / %#v", inv["stock"], inv["quantity"])
+	}
+	if inv["stock_quantity"] != float64(7) {
+		t.Fatalf("expected stock_quantity to come from TotalQty, got %#v", inv["stock_quantity"])
+	}
+	if inv["warehouse"] != "S1" || inv["batch_no"] != "B-9" {
+		t.Fatalf("expected warehouse/batch_no from inventory, got %#v / %#v", inv["warehouse"], inv["batch_no"])
+	}
+	if inv["DYN_B"] != "แปลงแล้ว" {
+		t.Fatalf("expected group key value to be mapped through itemNameByCode, got %#v", inv["DYN_B"])
 	}
 }

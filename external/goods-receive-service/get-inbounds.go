@@ -111,7 +111,7 @@ type InboundItemRes struct {
 	CartonNo        string              `json:"carton_no"`
 	LineProduct     int                 `json:"line_product"`
 	TotalWeight     float64             `json:"total_weight"`
-	WeightUnit      string              `json:"weight_unit"`
+	WeightUnit      float64             `json:"weight_unit"`
 	SerialNo        []InboundItemSerial `json:"serial_no"`
 }
 

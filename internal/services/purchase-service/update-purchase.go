@@ -7,6 +7,7 @@ import (
 	"prime-erp-core/internal/models"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -43,10 +44,15 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		purchase.UpdateBy = userCode
 		purchase.UpdateDtm = time.Now().UTC()
 
-		// Map purchase items
+		// Map purchase items: existing lines keep their purchase_item,
+		// new lines continue the running number after the highest one.
 		reqItems := []models.PurchaseItem{}
+		seq := NextPurchaseItemSeq(r.Items)
 		for _, item := range r.Items {
-			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, purchase.PurchaseCode)
+			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, seq)
+			if item.PurchaseItem == nil || strings.TrimSpace(*item.PurchaseItem) == "" {
+				seq++
+			}
 			purchaseItem.PurchaseID = purchase.ID
 
 			reqItems = append(reqItems, purchaseItem)

@@ -3,7 +3,6 @@ package prePurchaseService
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	approvalService "prime-erp-core/internal/services/approval-service"
@@ -51,8 +50,8 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		prePurchase.UpdateDtm = time.Now().UTC()
 
 		items := []models.PrePurchaseItem{}
-		for _, itemReq := range r.Items {
-			preItem := fmt.Sprintf("%s-%s", prePurchaseCodes[idx], time.Now().Format("150405"))
+		for itemIdx, itemReq := range r.Items {
+			preItem := BuildPreItemCode(prePurchaseCodes[idx], itemIdx+1)
 			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, id, prePurchase.CreateBy, time.Now().UTC(), preItem)
 			items = append(items, item)
 		}

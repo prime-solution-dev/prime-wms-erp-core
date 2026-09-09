@@ -21,6 +21,20 @@ func CreatePurchase(gormx *gorm.DB, purchases []models.Purchase) error {
 	})
 }
 
+func applyItemsProductGroupOneNameLike(query, gormx *gorm.DB, value string) *gorm.DB {
+	if value == "" {
+		return query
+	}
+
+	likePattern := "%" + value + "%"
+	sub := gormx.Model(&models.PurchaseItem{}).
+		Select("1").
+		Where("purchase.id = purchase_item.purchase_id").
+		Where("(product_group_code ILIKE ? OR product_group_name ILIKE ?)", likePattern, likePattern)
+
+	return query.Where("EXISTS (?)", sub)
+}
+
 // Get
 // Get
 func GetPurchaseList(
@@ -47,6 +61,7 @@ func GetPurchaseList(
 	itemsProductGroupOneNameLike string,
 	startCreateDate *time.Time,
 	endCreateDate *time.Time,
+	usedStatus []string,
 ) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -90,6 +105,12 @@ func GetPurchaseList(
 		query = query.Where("status IN ?", status)
 	}
 
+	// Partial ถูกตัดสินจาก used_status ไม่ใช่ status_approve (ดู
+	// convertStatusToStatusWording ฝั่ง web) จึงต้องกรองแยกออกมา
+	if len(usedStatus) > 0 {
+		query = query.Where("used_status IN ?", usedStatus)
+	}
+
 	if purchaseCodeLike != "" {
 		query = query.Where("purchase_code ILIKE ?", "%"+purchaseCodeLike+"%")
 	}
@@ -122,19 +143,15 @@ func GetPurchaseList(
 		query = query.Where("EXISTS (?)", sub)
 	}
 
-	if itemsProductGroupOneNameLike != "" {
-		sub := gormx.Model(&models.PurchaseItem{}).
-			Select("1").
-			Where("purchase.id = purchase_item.purchase_id").
-			Where("product_group_code ILIKE ?", "%"+itemsProductGroupOneNameLike+"%")
-		query = query.Where("EXISTS (?)", sub)
-	}
+	query = applyItemsProductGroupOneNameLike(query, gormx, itemsProductGroupOneNameLike)
 
+	// ส่ง time.Time เข้า GORM ตรงๆ การ Format เป็น "2006-01-02" จะตัดเวลาทิ้ง
+	// ทำให้ปลายช่วงกลายเป็นเที่ยงคืนและ PO ของวันสุดท้ายหลุดทั้งวัน
 	if startCreateDate != nil {
-		query = query.Where("create_dtm >= ?", startCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm >= ?", *startCreateDate)
 	}
 	if endCreateDate != nil {
-		query = query.Where("create_dtm <= ?", endCreateDate.Format("2006-01-02"))
+		query = query.Where("create_dtm <= ?", *endCreateDate)
 	}
 
 	if len(productCodes) > 0 {
@@ -362,13 +379,22 @@ func UpdatePurchaseStatusApprove(purchases []models.UpdateStatusApprovePurchaseR
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
 		for _, purchase := range purchases {
+			updates := map[string]interface{}{
+				"status_approve": purchase.StatusApprove,
+				"is_approved":    purchase.IsApproved,
+				"update_dtm":     time.Now().UTC(),
+			}
+			// Approved: คง status=PENDING ไว้ (approved = PENDING + status_approve=COMPLETED)
+			// เพื่อให้ Plan GR/รับของ (getPurchaseItemRemain default WHERE status='PENDING')
+			// ยังเห็น PO อยู่ status จะเป็น COMPLETED ก็ต่อเมื่อรับของครบ (used_status).
+			// Reject→status CANCELLED (reject ไม่ควรรับของ). PROCESS/REVIEW/COMPLETED ไม่แตะ status
+			switch purchase.StatusApprove {
+			case "REJECT":
+				updates["status"] = "CANCELLED"
+			}
 			if result := tx.Model(&models.Purchase{}).
 				Where("id = ?", purchase.ID).
-				Updates(map[string]interface{}{
-					"status_approve": purchase.StatusApprove,
-					"is_approved":    purchase.IsApproved,
-					"update_dtm":     time.Now().UTC(),
-				}); result.Error != nil {
+				Updates(updates); result.Error != nil {
 				err = result.Error
 			}
 		}
@@ -384,29 +410,23 @@ func CompletePOPayment(purchaseCodes []string, purchaseItems []string) (err erro
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
+		// purchase_item is a per-purchase running number (1, 2, 3, ...), so it is
+		// only unique within a purchase. Always scope the update by purchase_id.
 		if len(purchaseCodes) > 0 {
-			var purchaseItemCodes []string
-			subQuery := tx.Model(&models.Purchase{}).
-				Select("id").
-				Where("purchase_code IN ?", purchaseCodes)
+			q := tx.Model(&models.PurchaseItem{}).
+				Where("purchase_id IN (?)", tx.Model(&models.Purchase{}).
+					Select("id").
+					Where("purchase_code IN ?", purchaseCodes))
 
-			if err := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_id IN (?)", subQuery).
-				Pluck("purchase_item", &purchaseItemCodes).Error; err != nil {
-				return err
+			if len(purchaseItems) > 0 {
+				q = q.Where("purchase_item IN ?", purchaseItems)
 			}
 
-			purchaseItems = append(purchaseItems, purchaseItemCodes...)
-		}
-
-		if len(purchaseItems) > 0 {
-			if result := tx.Model(&models.PurchaseItem{}).
-				Where("purchase_item IN ?", purchaseItems).
-				Updates(map[string]interface{}{
-					"status_payment": "COMPLETED",
-					"update_dtm":     time.Now().UTC(),
-				}); result.Error != nil {
-				err = result.Error
+			if result := q.Updates(map[string]interface{}{
+				"status_payment": "COMPLETED",
+				"update_dtm":     time.Now().UTC(),
+			}); result.Error != nil {
+				return result.Error
 			}
 		}
 

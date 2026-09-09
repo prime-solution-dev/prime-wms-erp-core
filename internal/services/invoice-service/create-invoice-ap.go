@@ -12,16 +12,19 @@ import (
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	xService "prime-erp-core/internal/services/x-service"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type POData struct {
-	QTY    float64
-	Weight float64
-	POITEM string
+	QTY          float64
+	Weight       float64
+	POITEM       string
+	PurchaseUnit string
 }
 
 type ToleranceErrorItem struct {
@@ -79,6 +82,64 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 
+	validateRequest := xService.ValidateAPOverPurchaseRequest{}
+	for _, invoice := range req {
+		for _, invoiceItem := range invoice.InvoiceItem {
+			key := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
+			validateUnit := ""
+			if poItem, ok := poMap[key]; ok {
+				switch strings.ToUpper(strings.TrimSpace(poItem.PurchaseUnit)) {
+				case "KG":
+					validateUnit = "WEIGHT"
+				default:
+					validateUnit = "UNIT"
+				}
+
+				validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
+					PurchaseCode: invoiceItem.DocumentRef,
+					PurchaseItem: invoiceItem.DocumentRefItem,
+					Qty:          invoiceItem.Qty,
+					TotalWeight:  invoiceItem.Weight,
+					ValidateUnit: validateUnit,
+				})
+			}
+
+		}
+	}
+	toleranceErrorResponse := ToleranceErrorResponse{}
+	if len(validateRequest.Datas) > 0 {
+
+		validatePayload, err := json.Marshal(validateRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
+		}
+		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
+		if err != nil {
+			return nil, err
+		}
+		validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
+		if !ok {
+			return nil, errors.New("invalid AP over-purchase validation response")
+		}
+
+		for _, validation := range validateResponse.Datas {
+			if validation.Status == "ERROR" {
+				errorType := strings.ToLower(validation.ValidateUnit)
+				if validation.ValidateUnit == "UNIT" {
+					errorType = "qty"
+				}
+				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					Index:   validation.Index,
+					Message: validation.Message,
+					Status:  "error",
+					Type:    errorType,
+				})
+			}
+		}
+		if len(toleranceErrorResponse.ToleranceError) > 0 {
+			return toleranceErrorResponse, nil
+		}
+	}
 	topicCodes := []string{"INVOICE"}
 	configCodes := []string{"AP"}
 
@@ -96,7 +157,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		tolerance = floatVal
 	}
-	toleranceErrorResponse := ToleranceErrorResponse{}
 
 	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
 	if errGetSupplierByCode != nil {
@@ -221,22 +281,22 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				poQTY := poQTYMapResult.Qty + (poQTYMapResult.Qty * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
 
-					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 						Index:   it,
 						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
 						Status:  "error",
 						Type:    "qty",
-					})
+					}) */
 
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.TotalWeight {
-						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+						/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 							Index:   it,
 							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.TotalWeight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
-						})
+						}) */
 					}
 				}
 			} /*  else {

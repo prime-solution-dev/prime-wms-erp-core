@@ -7,9 +7,9 @@ pipeline {
         CONTAINER_NAME = 'wms-erp-core-container'
         TARGET_BRANCH = 'Crossmax-uat'
         REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '52.76.29.55'                   
-        SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-uat.pem' 
-        VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxUATWMS' 
+        REMOTE_HOST = '52.76.29.55'
+        SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-uat.pem'
+        VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxUATWMS'
         ENV_FILE_KEY = 'CrossmaxUAT.env.erp'
     }
     stages {

@@ -204,14 +204,23 @@ type CreatePOBigLotRequest struct {
 }
 
 type GetPOBigLotListRequest struct {
-	PrePurchaseCodes  []string `json:"pre_purchase_codes"`
-	SupplierCodes     []string `json:"supplier_codes"`
-	ProductGroupCodes []string `json:"product_group_codes"`
-	StatusApprove     []string `json:"status_approve"`
-	CompanyCode       string   `json:"company_code"`
-	SiteCode          string   `json:"site_code"`
-	Page              int      `json:"page"`
-	PageSize          int      `json:"page_size"`
+	PrePurchaseCodes     []string `json:"pre_purchase_codes"`
+	SupplierCodes        []string `json:"supplier_codes"`
+	ProductGroupCodes    []string `json:"product_group_codes"`
+	StatusApprove        []string `json:"status_approve"`
+	Status               []string `json:"status"`
+	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
+	SupplierCodeLike     string   `json:"supplier_code_like"`
+	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	ProductGroupNameLike string   `json:"product_group_name_like"`
+	SupplierNameLike     string   `json:"supplier_name_like"`
+	CompanyCode          string   `json:"company_code"`
+	SiteCode             string   `json:"site_code"`
+	Page                 int      `json:"page"`
+	PageSize             int      `json:"page_size"`
+
+	StartCreateDate *time.Time `json:"start_create_date"`
+	EndCreateDate   *time.Time `json:"end_create_date"`
 }
 
 type GetPOBigLotItemResponse struct {
@@ -332,6 +341,7 @@ type UpdateStatusApprovePOBigLotRequest struct {
 	PrePurchaseCode string    `json:"pre_purchase_code"`
 	IsApproved      bool      `json:"is_approved"`
 	StatusApprove   string    `json:"status_approve"`
+	Remark          string    `json:"remark"`
 }
 
 // Supplier DTOs
@@ -441,6 +451,7 @@ type GetPurchaseRequest struct {
 	StatusPayment                []string   `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
+	UsedStatus                   []string   `json:"used_status"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`
@@ -545,6 +556,7 @@ type UpdateStatusApprovePurchaseRequest struct {
 	PurchaseCode  string    `json:"purchase_code"`
 	IsApproved    bool      `json:"is_approved"`
 	StatusApprove string    `json:"status_approve"`
+	Remark        string    `json:"remark"`
 }
 
 type CompleteStatusPaymentPurchaseRequest struct {

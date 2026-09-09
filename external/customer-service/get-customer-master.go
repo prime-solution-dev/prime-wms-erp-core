@@ -30,7 +30,14 @@ type GetCustomerResponse struct {
 	CreateDate   time.Time                    `gorm:"type:timestamp" json:"create_date"`
 	UpdateBy     string                       `gorm:"type:varchar(50)" json:"update_by"`
 	UpdateDate   time.Time                    `gorm:"type:timestamp" json:"update_date"`
-	Address      []GetCustomerAddressResponse `gorm:"foreignKey:CustomerCode;references:CustomerCode" json:"address"`
+	// customer service เคยส่ง address เป็น array ของที่อยู่ แต่ตอนนี้ส่งเป็นสตริง
+	// การประกาศเป็น []GetCustomerAddressResponse ทำให้ unmarshal ทั้งก้อนล้ม แล้วทุก
+	// endpoint ที่แปลงชื่อลูกค้าเป็นรหัส (เช่นตัวกรอง Customer Name ของ delivery list)
+	// ตอบ 500 ทั้งที่ต้องการแค่ customer_code
+	//
+	// เก็บเป็น RawMessage เพราะไม่มีใครในนี้อ่านค่าออกไปใช้ และรับได้ทั้งสองรูปแบบ
+	// ถ้าวันหน้า service เปลี่ยนกลับ ก็ไม่ต้องตามแก้อีก
+	Address json.RawMessage `gorm:"-" json:"address"`
 }
 type GetCustomerAddressResponse struct {
 	ID           uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`

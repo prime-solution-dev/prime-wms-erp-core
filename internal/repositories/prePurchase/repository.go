@@ -26,16 +26,17 @@ func CreatePOBigLot(prePurchases []models.PrePurchase) error {
 }
 
 // Get
-func GetPOBigLotList(
-	prePurchaseCodes []string,
-	supplierCodes []string,
-	productGroupCodes []string,
-	statusApprove []string,
-	companyCode,
-	siteCode string,
-	page int,
-	pageSize int,
-) ([]models.PrePurchase, int, int, int, int, error) {
+func GetPOBigLotList(req models.GetPOBigLotListRequest) ([]models.PrePurchase, int, int, int, int, error) {
+	prePurchaseCodes := req.PrePurchaseCodes
+	supplierCodes := req.SupplierCodes
+	productGroupCodes := req.ProductGroupCodes
+	statusApprove := req.StatusApprove
+	status := req.Status
+	companyCode := req.CompanyCode
+	siteCode := req.SiteCode
+	page := req.Page
+	pageSize := req.PageSize
+
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -61,11 +62,58 @@ func GetPOBigLotList(
 		query = query.Where("status_approve IN ?", statusApprove)
 	}
 
+	if len(status) > 0 {
+		query = query.Where("status IN ?", status)
+	}
+
 	if len(productGroupCodes) > 0 {
 		sub := gormx.Model(&models.PrePurchaseItem{}).
 			Select("1").
 			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
 			Where("hierarchy_code IN ?", productGroupCodes)
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
+	// partial search จากช่องค้นหาบนหัวตาราง (modal Big lot PO selection)
+	if req.PrePurchaseCodeLike != "" {
+		query = query.Where("pre_purchase_code ILIKE ?", "%"+req.PrePurchaseCodeLike+"%")
+	}
+
+	if req.SupplierCodeLike != "" {
+		query = query.Where("supplier_code ILIKE ?", "%"+req.SupplierCodeLike+"%")
+	}
+
+	if req.SupplierNameLike != "" {
+		query = query.Where("supplier_name ILIKE ?", "%"+req.SupplierNameLike+"%")
+	}
+
+	if req.StartCreateDate != nil {
+		query = query.Where("create_dtm >= ?", *req.StartCreateDate)
+	}
+
+	if req.EndCreateDate != nil {
+		query = query.Where("create_dtm <= ?", *req.EndCreateDate)
+	}
+
+	if req.ProductGroupCodeLike != "" {
+		sub := gormx.Model(&models.PrePurchaseItem{}).
+			Select("1").
+			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
+			Where("hierarchy_code ILIKE ?", "%"+req.ProductGroupCodeLike+"%")
+
+		query = query.Where("EXISTS (?)", sub)
+	}
+
+	// ชื่อกลุ่มสินค้าอยู่ในคอลัมน์ hierarchy_type ไม่ใช่คอลัมน์ชื่อของตัวเอง —
+	// หน้าจอ Big lot ส่ง itemName ลง product_group_type ตอนสร้าง (ดู
+	// PrePurchaseItemTable.vue handleSelectProductGroup) และคอลัมน์ Product group
+	// ในตารางก็แสดงค่านี้ ผู้ใช้จึงค้นด้วยชื่อที่เห็น ไม่ใช่ code
+	if req.ProductGroupNameLike != "" {
+		sub := gormx.Model(&models.PrePurchaseItem{}).
+			Select("1").
+			Where("pre_purchase.id = pre_purchase_item.pre_purchase_id").
+			Where("hierarchy_type ILIKE ?", "%"+req.ProductGroupNameLike+"%")
 
 		query = query.Where("EXISTS (?)", sub)
 	}
@@ -179,13 +227,21 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 	}()
 
 	for _, prePurchase := range prePurchases {
-		// update pre_purchase
-		if result := tx.Model(&models.PrePurchase{}).
-			Where("id = ?", prePurchase.ID).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"status_approve": prePurchase.StatusApprove,
 			"is_approved":    prePurchase.IsApproved,
 			"update_dtm":     time.Now().UTC(),
-		}); result.Error != nil {
+		}
+		// Approved: คง status=PENDING (approved = PENDING + status_approve=COMPLETED)
+		// ให้ Plan GR/รับของยังเห็น PO (เหมือน Normal). Reject→CANCELLED. status เป็น
+		// COMPLETED ต่อเมื่อรับของครบ (used_status)
+		switch prePurchase.StatusApprove {
+		case "REJECT":
+			updates["status"] = "CANCELLED"
+		}
+		// update pre_purchase
+		if result := tx.Model(&models.PrePurchase{}).
+			Where("id = ?", prePurchase.ID).Updates(updates); result.Error != nil {
 			err = result.Error
 			return
 		}

@@ -68,6 +68,7 @@ type VerifyApproveResponse struct {
 	IsPassExpiryPrice     bool                         `json:"is_pass_expiry_price"`
 	IsPassInventory       bool                         `json:"is_pass_inventory"`
 	CreditDetails         []VerifyCreditCustomer       `json:"credit_details"`
+	ProductAtps           []VerifyInventoryProductAtp  `json:"product_atps"`
 	InventoryCalculations []VerifyInventoryCalculation `json:"inventory_calculations"`
 	Documents             []VerifyApproveDocument      `json:"documents"`
 }
@@ -97,6 +98,7 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
 		CreditDetails:         []VerifyCreditCustomer{},
+		ProductAtps:           []VerifyInventoryProductAtp{},
 		InventoryCalculations: []VerifyInventoryCalculation{},
 		Documents:             []VerifyApproveDocument{},
 	}
@@ -131,6 +133,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 
 	inventoryReq.CompanyCode = req.CompanyCode
 	inventoryReq.SiteCode = req.SiteCode
+	inventoryReq.WarehouseCodes = req.InventoryWarehouseCode
 	inventoryReq.StorageTypes = req.StorageType
 	inventoryReq.ToDate = &req.SaleDate
 
@@ -208,12 +211,14 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				newProductInv := VerifyInventoryProduct{
 					ProductCode: docItem.ProductCode,
 					Qty:         0,
+					TotalWeight: 0,
 				}
 
 				productInv = newProductInv
 			}
 
 			productInv.Qty += docItem.Qty
+			productInv.TotalWeight += docItem.TotalWeight
 			productInvMap[productInvKey] = productInv
 		}
 
@@ -324,6 +329,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 			res.IsPassInventory = false
 		}
 
+		res.ProductAtps = append(res.ProductAtps, invenRes.ProductAtps...)
 		res.InventoryCalculations = append(res.InventoryCalculations, invenRes.InventoryCalculations...)
 	} else {
 		res.IsPassInventory = true

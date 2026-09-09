@@ -10,9 +10,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// closedOutboundStatuses คือสถานะที่ถือว่าคลังปิดงานบรรทัดนั้นแล้ว ไม่มีของค้างจองอยู่อีก
-// ต้องตรงกับ CLOSED_OUTBOUND_STATUSES ใน wms-web/src/utils/helper/deliveryRemaining.ts
-var closedOutboundStatuses = map[string]bool{
+// closedOrderItemStatuses คือสถานะของบรรทัดใน CO ที่ถือว่างานบรรทัดนั้นจบแล้ว
+// นอกลิสต์นี้ (PENDING, TEMP) แปลว่า CO ยังทำงานอยู่ ใบจองยังกันของไว้เต็มจำนวน
+//
+// ดูที่บรรทัดของ CO ไม่ใช่สถานะ outbound (SA เคาะ 2026-08-31) เพราะ outbound ถูกปิด
+// เป็น COMPLETED ได้ทั้งที่บรรทัดนั้นไม่เคยถูก pack/GI เลย ทำให้ของที่ CO ยังรออยู่
+// ถูกปล่อยกลับไปให้จองซ้ำ (เคส CO2608-00005-002)
+//
+// ต้องตรงกับ CLOSED_ORDER_ITEM_STATUSES ใน wms-web/src/utils/helper/deliveryRemaining.ts
+var closedOrderItemStatuses = map[string]bool{
 	"COMPLETED": true,
 	"CANCELED":  true,
 	"CANCELLED": true,
@@ -33,8 +39,8 @@ type bookingLine struct {
 // ในข้อมูล UAT มี sale item ที่ SO 200 แต่จองไปแล้ว 800 ใน 4 ใบ
 //
 // นับยอดที่ถูกใช้ไปแล้วด้วยกติกาเดียวกับหน้าจอ (ต่อ 1 บรรทัดของใบจองอื่น):
-//   - คลังปิดงานครบทุก outbound แล้ว -> นับเฉพาะที่ตัดจริง ส่วนที่ส่งขาดคืนมาให้จองใหม่ได้
-//   - ยังมี outbound ค้าง หรือยังไม่เริ่ม -> นับจำนวนที่จองไว้เต็ม เพราะของยังถูกกันอยู่
+//   - บรรทัดใน CO จบแล้ว -> นับเฉพาะที่ตัดจริง ส่วนที่ส่งขาดคืนมาให้จองใหม่ได้
+//   - บรรทัดใน CO ยังทำงานอยู่ หรือยังไม่มี CO -> นับจำนวนที่จองไว้เต็ม เพราะของยังถูกกันอยู่
 //
 // excludeDeliveryCodes ใช้ตอนแก้ใบเดิม จะได้ไม่นับจำนวนของตัวเองซ้ำ
 func ValidateBookingQty(gormx *gorm.DB, lines []bookingLine, excludeDeliveryCodes []string) error {
@@ -246,27 +252,15 @@ func foldWmsProgress(orders []orderExternalService.GetOrderDeliveryResponse) (ma
 
 	for _, order := range orders {
 		for _, orderItem := range order.OrderItem {
-			outbounds := orderItem.OutboundItem
-			if len(outbounds) == 0 {
+			if !closedOrderItemStatuses[orderItem.Status] {
 				continue
 			}
 
 			key := fmt.Sprintf("%s|%s", order.DocumentRef, orderItem.DocumentRefItem)
-
-			isClosed := true
-			for _, outbound := range outbounds {
-				if !closedOutboundStatuses[outbound.Status] {
-					isClosed = false
-					break
-				}
-			}
-
-			if !isClosed {
-				continue
-			}
-
 			closed[key] = true
-			for _, outbound := range outbounds {
+
+			// ยอดที่ตัดจ่ายจริงยังอ่านจาก goods issue ของ outbound เหมือนเดิม
+			for _, outbound := range orderItem.OutboundItem {
 				if outbound.Status != "COMPLETED" {
 					continue
 				}
