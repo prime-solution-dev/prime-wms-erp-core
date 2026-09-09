@@ -25,7 +25,14 @@ type GetPriceListGroupRequest struct {
 	EffectiveDateFrom *time.Time `json:"effective_date_from"`
 	EffectiveDateTo   *time.Time `json:"effective_date_to"`
 	SubGroupCodes     []string   `json:"sub_group_codes"` // TODO: อาจจะต้อง filter ละเอียดขึ้น หรือ แยกเส้น
+	// ReportType เลือกรูปแบบ tab ที่ GetPriceExportTable คืน
+	// ค่าว่าง = พฤติกรรมเดิม (Detail + Based price), "PRICELIST_DETAIL" = tab Template ตัวเดียว
+	ReportType string `json:"report_type"`
 }
+
+// ReportTypePricelistDetail คือค่า report_type ที่ทำให้ GetPriceExportTable
+// คืน tab "Template" ตัวเดียวตามรูปแบบ Pricelist Detail Report
+const ReportTypePricelistDetail = "PRICELIST_DETAIL"
 
 type GetPriceListGroupResponse struct {
 	PriceListGroup
