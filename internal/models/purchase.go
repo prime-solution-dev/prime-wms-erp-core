@@ -452,6 +452,7 @@ type GetPurchaseRequest struct {
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
 	UsedStatus                   []string   `json:"used_status"`
+	UsedStatusNot                []string   `json:"used_status_not"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`

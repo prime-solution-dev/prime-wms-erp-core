@@ -87,6 +87,8 @@ var seedRows = []struct {
 	{"PO-REJECT-01", "PENDING", "REJECT", ""},
 	{"PO-APPROVED-01", "PENDING", "COMPLETED", ""},
 	{"PO-PARTIAL-01", "PENDING", "COMPLETED", "PARTIAL"},
+	// PO เก่าที่ used_status เป็น NULL ไม่ใช่ค่าว่าง — ตัวกรอง Approved ต้องยังเห็น
+	{"PO-APPROVED-NULL-01", "PENDING", "COMPLETED", ""},
 }
 
 func seed() error {
@@ -133,6 +135,13 @@ func seed() error {
 		if err := gormx.Create(&purchase).Error; err != nil {
 			return err
 		}
+	}
+
+	// used_status ของแถวนี้ต้องเป็น NULL จริง ๆ GORM เขียนสตริงว่างให้เสมอ
+	if err := gormx.Model(&models.Purchase{}).
+		Where("purchase_code = ?", "PO-APPROVED-NULL-01").
+		Update("used_status", nil).Error; err != nil {
+		return err
 	}
 
 	return seedCreateDateRows(gormx)
@@ -184,6 +193,7 @@ type statusFilter struct {
 	status        []string
 	statusApprove []string
 	usedStatus    []string
+	usedStatusNot []string
 }
 
 func query(t *testing.T, filter statusFilter) []models.Purchase {
@@ -200,6 +210,7 @@ func query(t *testing.T, filter statusFilter) []models.Purchase {
 		"", "", "", "", "", "", "",
 		nil, nil,
 		filter.usedStatus,
+		filter.usedStatusNot,
 	)
 
 	assert.NoError(t, err)
@@ -248,7 +259,7 @@ func TestGetPurchaseList_StatusWithApproveFilters(t *testing.T) {
 		{"Review", "REVIEW", []string{"PO-REVIEW-01"}},
 		{"Reject", "REJECT", []string{"PO-REJECT-01"}},
 		// Approved กับ Partial ใช้ status_approve เดียวกัน แยกกันด้วย used_status
-		{"Approved", "COMPLETED", []string{"PO-APPROVED-01", "PO-PARTIAL-01"}},
+		{"Approved", "COMPLETED", []string{"PO-APPROVED-01", "PO-PARTIAL-01", "PO-APPROVED-NULL-01"}},
 	}
 
 	for _, c := range cases {
@@ -271,10 +282,22 @@ func TestGetPurchaseList_UsedStatusFilter(t *testing.T) {
 	assert.Equal(t, []string{"PO-PARTIAL-01"}, codesOf(list))
 }
 
+// ตัวกรอง Approved ต้องไม่กิน PO ที่รับของบางส่วนแล้ว เพราะหน้าจอตัดสิน Partial
+// จาก used_status ก่อน status_approve — สองสถานะนี้ใช้ status_approve เดียวกัน
+func TestGetPurchaseList_UsedStatusNotExcludesPartial(t *testing.T) {
+	list := query(t, statusFilter{
+		status:        []string{"PENDING"},
+		statusApprove: []string{"COMPLETED"},
+		usedStatusNot: []string{"PARTIAL"},
+	})
+
+	assert.ElementsMatch(t, []string{"PO-APPROVED-01", "PO-APPROVED-NULL-01"}, codesOf(list))
+}
+
 func TestGetPurchaseList_EmptyUsedStatusIsNotAFilter(t *testing.T) {
 	list := query(t, statusFilter{status: []string{"PENDING"}})
 
-	assert.Len(t, list, 6)
+	assert.Len(t, list, 7)
 }
 
 func TestGetPurchaseList_NoStatusFilterReturnsEverything(t *testing.T) {
@@ -294,7 +317,7 @@ func TestGetPurchaseList_CreateDateRangeIncludesLastDay(t *testing.T) {
 		1, 50,
 		"", "", "", "", "", "", "",
 		&start, &end,
-		nil,
+		nil, nil,
 	)
 
 	assert.NoError(t, err)

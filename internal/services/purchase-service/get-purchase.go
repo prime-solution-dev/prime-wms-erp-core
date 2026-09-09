@@ -44,6 +44,7 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.StartCreateDate,
 		req.EndCreateDate,
 		req.UsedStatus,
+		req.UsedStatusNot,
 	)
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())
