@@ -209,3 +209,25 @@ func isInactiveSubGroup(udfJson json.RawMessage) bool {
 	val, _ := udfData["inactive"].(bool)
 	return val
 }
+
+// selectExportTabs เลือกชุด tab ตาม report type
+// แยกออกมาเป็นฟังก์ชันเดี่ยวเพื่อให้ทดสอบได้โดยไม่ต้องต่อ DB
+func selectExportTabs(
+	reportType string,
+	groups []GetPriceListGroupResponse,
+	groupNameByCode func(code string) string,
+	itemNameByCode func(code string) string,
+	formulas map[string][]priceListRepository.SubgroupFormula,
+	paymentTermMap map[string]GetPaymentTermResponse,
+	lastUpdated *time.Time,
+) []ExportTab {
+	if reportType == ReportTypePricelistDetail {
+		return []ExportTab{
+			buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, formulas, lastUpdated),
+		}
+	}
+	return []ExportTab{
+		buildDetailTab(groups, groupNameByCode, itemNameByCode, lastUpdated),
+		buildBasedPriceTab(groups, paymentTermMap, lastUpdated),
+	}
+}

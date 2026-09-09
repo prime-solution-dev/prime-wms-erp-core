@@ -11,6 +11,7 @@ import (
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
+	priceListRepository "prime-erp-core/internal/repositories/priceList"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -86,23 +87,18 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		return nil, fmt.Errorf("failed to get group mappings: %w", err)
 	}
 
-	// Build "Detail" tab (existing functionality).
-	detailTab := buildDetailTab(
-		res,
-		func(code string) string {
-			if g, ok := groupMap[code]; ok {
-				return g.GroupName
-			}
-			return ""
-		},
-		func(code string) string {
-			if it, ok := groupItemMap[code]; ok {
-				return it.ItemName
-			}
-			return ""
-		},
-		lastUpdated,
-	)
+	groupNameByCode := func(code string) string {
+		if g, ok := groupMap[code]; ok {
+			return g.GroupName
+		}
+		return ""
+	}
+	itemNameByCode := func(code string) string {
+		if it, ok := groupItemMap[code]; ok {
+			return it.ItemName
+		}
+		return ""
+	}
 
 	// Collect all unique company codes and site codes from the response
 	companyCodeSet := make(map[string]bool)
@@ -180,11 +176,35 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 	}
 
-	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, lastUpdated)
+	// สูตรราคาต้องใช้เฉพาะ Pricelist Detail Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
+	var formulas map[string][]priceListRepository.SubgroupFormula
+	if req.ReportType == ReportTypePricelistDetail {
+		subgroupCodes := []string{}
+		for _, resp := range res {
+			for _, sg := range resp.SubGroups {
+				if sg.SubgroupCode != "" {
+					subgroupCodes = append(subgroupCodes, sg.SubgroupCode)
+				}
+			}
+		}
+		formulas, err = priceListRepository.GetFormulasBySubgroupCodes(subgroupCodes)
+		if err != nil {
+			// สูตรที่หายไปทำให้เซลล์ว่าง ไม่ควรทำให้ export ทั้งไฟล์ล้ม
+			fmt.Printf("Warning: failed to get subgroup formulas: %v\n", err)
+			formulas = nil
+		}
+	}
 
 	response := GetPriceExportTableResponse{
-		Tabs: []ExportTab{detailTab, basedPriceTab},
+		Tabs: selectExportTabs(
+			req.ReportType,
+			res,
+			groupNameByCode,
+			itemNameByCode,
+			formulas,
+			paymentTermMap,
+			lastUpdated,
+		),
 	}
 	return response, nil
 }
