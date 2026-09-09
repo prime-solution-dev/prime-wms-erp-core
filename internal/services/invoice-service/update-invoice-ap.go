@@ -92,6 +92,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
 		}
+		fmt.Println(string(validatePayload))
 		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
 		if err != nil {
 			return nil, err
