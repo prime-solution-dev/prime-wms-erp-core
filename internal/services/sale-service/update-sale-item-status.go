@@ -27,13 +27,21 @@ type UpdateSaleItemStatusResponse struct {
 	CompletedSales []string `json:"completed_sales,omitempty"`
 }
 
-// closedSaleItemStatuses คือสถานะของบรรทัดขายที่ถือว่างานบรรทัดนั้นจบแล้ว
+// closedSaleItemStatusList คือสถานะของบรรทัดขายที่ถือว่างานบรรทัดนั้นจบแล้ว
 // ยกเลิกก็นับว่าจบ ไม่งั้นใบที่มีบรรทัดถูกยกเลิกจะไม่มีวันปิดหัวใบ
-var closedSaleItemStatuses = map[string]bool{
-	"COMPLETED": true,
-	"CANCELED":  true,
-	"CANCELLED": true,
-}
+//
+// ประกาศเป็น slice ที่เดียวแล้วแปลงเป็น map ให้ predicate ใช้ เพื่อให้เงื่อนไข SQL
+// (NOT IN) กับ IsSaleItemClosed อ้างลิสต์เดียวกันจริงๆ เพิ่มวิธีสะกดใหม่แล้วไม่หลุดที่ใดที่หนึ่ง
+var closedSaleItemStatusList = []string{"COMPLETED", "CANCELED", "CANCELLED"}
+
+var closedSaleItemStatuses = func() map[string]bool {
+	statuses := map[string]bool{}
+	for _, status := range closedSaleItemStatusList {
+		statuses[status] = true
+	}
+
+	return statuses
+}()
 
 // IsSaleItemClosed บอกว่าบรรทัดขายบรรทัดเดียวจบงานแล้วหรือยัง
 // export เพราะ delivery-service ต้องใช้กติกาเดียวกันตอนเลือกบรรทัดที่จะปิด
@@ -56,12 +64,32 @@ func allSaleItemsClosed(statuses []string) bool {
 	return true
 }
 
-// MarkSaleItemsCompleted ตั้งสถานะบรรทัดขายที่ระบุ แล้วปิดหัวใบที่บรรทัดจบครบทุกบรรทัด
+// MarkSaleItemsCompleted ตั้งสถานะบรรทัดขายที่ระบุเป็นค่าอะไรก็ได้ แล้วปิดหัวใบที่บรรทัดจบครบทุกบรรทัด
 //
-// ทำงานบน tx ที่ผู้เรียกเปิดมา เพื่อให้เส้นอัตโนมัติ (ปิดตอนใบจองส่งของครบ ดูที่
-// delivery-service/close-sale-on-delivered.go) กับเส้นมือ (POST /sale/UpdateSaleItemStatus)
-// ใช้กติกาเดียวกันจริงๆ ไม่ใช่เขียนซ้ำสองที่
+// ตัวนี้ไว้ให้ "เส้นมือ" (POST /sale/UpdateSaleItemStatus) ซึ่งหน้าที่ของมันคือตั้งสถานะ
+// ตามที่ผู้ใช้สั่ง จึงต้องเขียนทับบรรทัดที่ปิดไปแล้วได้ด้วย (แก้ที่ตั้งผิดกลับ)
+// เส้นอัตโนมัติต้องใช้ MarkOpenSaleItemsCompleted ที่มีการ์ดสถานะแทน
 func MarkSaleItemsCompleted(tx *gorm.DB, saleItemCodes []string, status string, user string, now time.Time) ([]string, []string, error) {
+	return markSaleItems(tx, saleItemCodes, status, user, now, false)
+}
+
+// MarkOpenSaleItemsCompleted ปิดเฉพาะบรรทัดที่ "ยังเปิดอยู่" เป็น COMPLETED
+//
+// ใช้กับเส้นอัตโนมัติ (ปิดตอนใบจองส่งของครบ ดูที่ delivery-service/close-sale-on-delivered.go)
+// ซึ่งอ่านสถานะบรรทัดมาก่อนแล้วค่อยเขียน ระหว่างนั้นอาจมีคนยกเลิกบรรทัดนั้นไปแล้ว
+// หรือใบจองอีกใบของ SO เดียวกันปิดไปก่อน ถ้าไม่มีการ์ดจะเขียนทับ CANCELED เป็น COMPLETED
+// การ์ดนี้ทำให้เรียกซ้ำกี่รอบก็ได้ผลเท่าเดิม (idempotent) ตามที่เส้น hook ต้องการ
+func MarkOpenSaleItemsCompleted(tx *gorm.DB, saleItemCodes []string, user string, now time.Time) ([]string, []string, error) {
+	return markSaleItems(tx, saleItemCodes, "COMPLETED", user, now, true)
+}
+
+// markSaleItems ตั้งสถานะบรรทัดขายที่ระบุ แล้วปิดหัวใบที่บรรทัดจบครบทุกบรรทัด
+//
+// ทำงานบน tx ที่ผู้เรียกเปิดมา เพื่อให้เส้นอัตโนมัติกับเส้นมือใช้กติกาเดียวกันจริงๆ
+// ไม่ใช่เขียนซ้ำสองที่
+//
+// openOnly = true จะแตะแค่บรรทัดที่ยังไม่จบงาน (ดู closedSaleItemStatusList)
+func markSaleItems(tx *gorm.DB, saleItemCodes []string, status string, user string, now time.Time, openOnly bool) ([]string, []string, error) {
 	updatedSaleCodes := []string{}
 	completedSaleCodes := []string{}
 
@@ -75,9 +103,13 @@ func MarkSaleItemsCompleted(tx *gorm.DB, saleItemCodes []string, status string, 
 		"update_by":   user,
 	}
 
-	if err := tx.Model(&models.SaleItem{}).
-		Where("sale_item IN ?", saleItemCodes).
-		Updates(updateFields).Error; err != nil {
+	updateQuery := tx.Model(&models.SaleItem{}).Where("sale_item IN ?", saleItemCodes)
+	if openOnly {
+		// status IS NULL ต้องนับเป็น "ยังเปิด" ด้วย ไม่งั้น NOT IN จะตัดแถวนั้นออกเงียบๆ
+		updateQuery = updateQuery.Where("(status IS NULL OR status NOT IN ?)", closedSaleItemStatusList)
+	}
+
+	if err := updateQuery.Updates(updateFields).Error; err != nil {
 		return nil, nil, fmt.Errorf("failed to update sale items status: %v", err)
 	}
 
@@ -111,7 +143,8 @@ func MarkSaleItemsCompleted(tx *gorm.DB, saleItemCodes []string, status string, 
 		}
 
 		// ใบที่ยกเลิกหรือปิดไปแล้ว ห้ามถูกเขียนทับ
-		if sale.Status == "CANCELED" || sale.Status == "COMPLETED" {
+		// ใช้ predicate ตัวเดียวกับบรรทัด จะได้รู้จัก CANCELLED สองแอลด้วย
+		if IsSaleItemClosed(sale.Status) {
 			continue
 		}
 
