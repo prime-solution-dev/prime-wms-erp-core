@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UpdateSaleItemStatusRequest struct {
@@ -24,6 +25,110 @@ type UpdateSaleItemStatusResponse struct {
 	UpdatedItems   []string `json:"updated_items"`
 	UpdatedSales   []string `json:"updated_sales,omitempty"`
 	CompletedSales []string `json:"completed_sales,omitempty"`
+}
+
+// closedSaleItemStatuses คือสถานะของบรรทัดขายที่ถือว่างานบรรทัดนั้นจบแล้ว
+// ยกเลิกก็นับว่าจบ ไม่งั้นใบที่มีบรรทัดถูกยกเลิกจะไม่มีวันปิดหัวใบ
+var closedSaleItemStatuses = map[string]bool{
+	"COMPLETED": true,
+	"CANCELED":  true,
+	"CANCELLED": true,
+}
+
+// IsSaleItemClosed บอกว่าบรรทัดขายบรรทัดเดียวจบงานแล้วหรือยัง
+// export เพราะ delivery-service ต้องใช้กติกาเดียวกันตอนเลือกบรรทัดที่จะปิด
+func IsSaleItemClosed(status string) bool {
+	return closedSaleItemStatuses[status]
+}
+
+// allSaleItemsClosed บอกว่าทุกบรรทัดของใบนั้นจบงานแล้วหรือยัง
+func allSaleItemsClosed(statuses []string) bool {
+	if len(statuses) == 0 {
+		return false
+	}
+
+	for _, status := range statuses {
+		if !IsSaleItemClosed(status) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// MarkSaleItemsCompleted ตั้งสถานะบรรทัดขายที่ระบุ แล้วปิดหัวใบที่บรรทัดจบครบทุกบรรทัด
+//
+// ทำงานบน tx ที่ผู้เรียกเปิดมา เพื่อให้เส้นอัตโนมัติ (ปิดตอนใบจองส่งของครบ ดูที่
+// delivery-service/close-sale-on-delivered.go) กับเส้นมือ (POST /sale/UpdateSaleItemStatus)
+// ใช้กติกาเดียวกันจริงๆ ไม่ใช่เขียนซ้ำสองที่
+func MarkSaleItemsCompleted(tx *gorm.DB, saleItemCodes []string, status string, user string, now time.Time) ([]string, []string, error) {
+	updatedSaleCodes := []string{}
+	completedSaleCodes := []string{}
+
+	if len(saleItemCodes) == 0 {
+		return updatedSaleCodes, completedSaleCodes, nil
+	}
+
+	updateFields := map[string]interface{}{
+		"status":      status,
+		"update_date": now,
+		"update_by":   user,
+	}
+
+	if err := tx.Model(&models.SaleItem{}).
+		Where("sale_item IN ?", saleItemCodes).
+		Updates(updateFields).Error; err != nil {
+		return nil, nil, fmt.Errorf("failed to update sale items status: %v", err)
+	}
+
+	var affectedSaleIDs []uuid.UUID
+	if err := tx.Model(&models.SaleItem{}).
+		Where("sale_item IN ?", saleItemCodes).
+		Distinct("sale_id").
+		Pluck("sale_id", &affectedSaleIDs).Error; err != nil {
+		return nil, nil, fmt.Errorf("failed to get affected sale IDs: %v", err)
+	}
+
+	for _, saleID := range affectedSaleIDs {
+		var sale models.Sale
+		if err := tx.Where("id = ?", saleID).First(&sale).Error; err != nil {
+			return nil, nil, fmt.Errorf("failed to get sale for ID %v: %v", saleID, err)
+		}
+		updatedSaleCodes = append(updatedSaleCodes, sale.SaleCode)
+
+		var saleItems []models.SaleItem
+		if err := tx.Where("sale_id = ?", saleID).Find(&saleItems).Error; err != nil {
+			return nil, nil, fmt.Errorf("failed to get sale items for sale ID %v: %v", saleID, err)
+		}
+
+		statuses := make([]string, 0, len(saleItems))
+		for _, item := range saleItems {
+			statuses = append(statuses, item.Status)
+		}
+
+		if !allSaleItemsClosed(statuses) {
+			continue
+		}
+
+		// ใบที่ยกเลิกหรือปิดไปแล้ว ห้ามถูกเขียนทับ
+		if sale.Status == "CANCELED" || sale.Status == "COMPLETED" {
+			continue
+		}
+
+		if err := tx.Model(&models.Sale{}).
+			Where("id = ?", saleID).
+			Updates(map[string]interface{}{
+				"status":      "COMPLETED",
+				"update_date": now,
+				"update_by":   user,
+			}).Error; err != nil {
+			return nil, nil, fmt.Errorf("failed to update sale status to completed for sale ID %v: %v", saleID, err)
+		}
+
+		completedSaleCodes = append(completedSaleCodes, sale.SaleCode)
+	}
+
+	return updatedSaleCodes, completedSaleCodes, nil
 }
 
 func UpdateSaleItemStatus(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -62,81 +167,10 @@ func UpdateSaleItemStatus(ctx *gin.Context, jsonPayload string) (interface{}, er
 		}
 	}()
 
-	// Update sale items status
-	updateFields := map[string]interface{}{
-		"status":      req.Status,
-		"update_date": nowDateOnly,
-		"update_by":   user,
-	}
-
-	if err := tx.Model(&models.SaleItem{}).
-		Where("sale_item IN ?", req.SaleItem).
-		Updates(updateFields).Error; err != nil {
+	updatedSaleCodes, completedSaleCodes, err := MarkSaleItemsCompleted(tx, req.SaleItem, req.Status, user, nowDateOnly)
+	if err != nil {
 		tx.Rollback()
-		return nil, fmt.Errorf("failed to update sale items status: %v", err)
-	}
-
-	// Get all affected sale IDs
-	var affectedSaleIDs []uuid.UUID
-	if err := tx.Model(&models.SaleItem{}).
-		Where("sale_item IN ?", req.SaleItem).
-		Distinct("sale_id").
-		Pluck("sale_id", &affectedSaleIDs).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to get affected sale IDs: %v", err)
-	}
-
-	var completedSaleCodes []string
-	var updatedSaleCodes []string
-
-	// Check each affected sale
-	for _, saleID := range affectedSaleIDs {
-		// Get all sale items for this sale
-		var saleItems []models.SaleItem
-		if err := tx.Where("sale_id = ?", saleID).Find(&saleItems).Error; err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to get sale items for sale ID %v: %v", saleID, err)
-		}
-
-		// Check if all sale items are completed
-		allCompleted := true
-		for _, item := range saleItems {
-			if item.Status != "COMPLETED" {
-				allCompleted = false
-				break
-			}
-		}
-
-		// If all items are completed, update the parent sale to completed
-		if allCompleted {
-			var sale models.Sale
-			if err := tx.Where("id = ?", saleID).First(&sale).Error; err != nil {
-				tx.Rollback()
-				return nil, fmt.Errorf("failed to get sale for ID %v: %v", saleID, err)
-			}
-
-			// Update sale status to completed
-			if err := tx.Model(&models.Sale{}).
-				Where("id = ?", saleID).
-				Updates(map[string]interface{}{
-					"status":      "COMPLETED",
-					"update_date": nowDateOnly,
-					"update_by":   user,
-				}).Error; err != nil {
-				tx.Rollback()
-				return nil, fmt.Errorf("failed to update sale status to completed for sale ID %v: %v", saleID, err)
-			}
-
-			completedSaleCodes = append(completedSaleCodes, sale.SaleCode)
-		}
-
-		// Get sale code for response
-		var sale models.Sale
-		if err := tx.Where("id = ?", saleID).First(&sale).Error; err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to get sale code for ID %v: %v", saleID, err)
-		}
-		updatedSaleCodes = append(updatedSaleCodes, sale.SaleCode)
+		return nil, err
 	}
 
 	// Commit transaction
