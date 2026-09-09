@@ -18,20 +18,31 @@ import (
 )
 
 type GetPurchaseItemRemainRequest struct {
-	CompanyCode      string            `json:"company_code"`
-	SiteCode         string            `json:"site_code"`
-	PurchaseCodes    []string          `json:"purchase_codes"`
-	SupplierCodes    []string          `json:"supplier_codes"`
-	Status           []string          `json:"status"`
-	StatusApprove    []string          `json:"status_approve"`
-	StattusPayment   []string          `json:"stattus_payment"`
-	ProductCodes     []string          `json:"product_codes"`
-	NotPurchaseItems []NotPurchaseItem `json:"not_purchase_items,omitempty"`
-	Page             *int              `json:"page"`
-	PageSize         *int              `json:"limit"`
-	PurchaseCodeLike string            `json:"purchase_code_like,omitempty"`
-	ProductCodeLike  string            `json:"product_code_like,omitempty"`
-	ProductNameLike  string            `json:"product_name_like,omitempty"`
+	UsageType             string                 `json:"usage_type,omitempty"`
+	ExcludeDocumentCode   string                 `json:"exclude_document_code,omitempty"`
+	SelectedPurchaseItems []SelectedPurchaseItem `json:"selected_purchase_items,omitempty"`
+	CompanyCode           string                 `json:"company_code"`
+	SiteCode              string                 `json:"site_code"`
+	PurchaseCodes         []string               `json:"purchase_codes"`
+	SupplierCodes         []string               `json:"supplier_codes"`
+	Status                []string               `json:"status"`
+	StatusApprove         []string               `json:"status_approve"`
+	StattusPayment        []string               `json:"stattus_payment"`
+	ProductCodes          []string               `json:"product_codes"`
+	NotPurchaseItems      []NotPurchaseItem      `json:"not_purchase_items,omitempty"`
+	Page                  *int                   `json:"page"`
+	PageSize              *int                   `json:"limit"`
+	PurchaseCodeLike      string                 `json:"purchase_code_like,omitempty"`
+	ProductCodeLike       string                 `json:"product_code_like,omitempty"`
+	ProductNameLike       string                 `json:"product_name_like,omitempty"`
+}
+
+// SelectedPurchaseItem is a quantity in PO units from another row in the form.
+// The row currently being edited must not be included.
+type SelectedPurchaseItem struct {
+	PurchaseCode string  `json:"purchase_code"`
+	PurchaseItem string  `json:"purchase_item"`
+	Qty          float64 `json:"qty"`
 }
 
 type NotPurchaseItem struct {
@@ -50,48 +61,50 @@ type GetPurchaseItemRemainResponse struct {
 }
 
 type GetPurchaseItemRemainResponseResult struct {
-	PurchaseID           string  `json:"purchase_id"`
-	PurchaseCode         string  `json:"purchase_code"`
-	PurchaseType         string  `json:"purchase_type"`
-	SupplierCode         string  `json:"supplier_code"`
-	SupplierName         string  `json:"supplier_name"`
-	Status               string  `json:"status"`
-	StatusApprove        string  `json:"status_approve"`
-	StatusPayment        string  `json:"status_payment"`
-	DeliveryDate         string  `json:"delivery_date"`
-	ID                   string  `json:"id"`
-	PurchaseItem         string  `json:"purchase_item"`
-	DocRefItem           string  `json:"doc_ref_item"`
-	ProductCode          string  `json:"product_code"`
-	ProductDesc          string  `json:"product_desc"`
-	ProductName          string  `json:"product_name"`
-	ProductGroupOneCode  string  `json:"product_group_one_code"`
-	ProductGroupOneName  string  `json:"product_group_one_name"`
-	Qty                  float64 `json:"qty"`
-	RemainQty            float64 `json:"remain_qty"`
-	PurchaseQty          float64 `json:"purchase_qty"`
-	Unit                 string  `json:"unit"`
-	PurchaseUnit         string  `json:"purchase_unit"`
-	PurchaseUnitType     string  `json:"purchase_unit_type"`
-	PriceUnit            float64 `json:"price_unit"`
-	TotalDiscount        float64 `json:"total_discount"`
-	TotalAmount          float64 `json:"total_amount"`
-	UnitUom              string  `json:"unit_uom"`
-	TotalCost            float64 `json:"total_cost"`
-	TotalDiscountPercent float64 `json:"total_discount_percent"`
-	DiscountType         string  `json:"discount_type"`
-	TotalVat             float64 `json:"total_vat"`
-	SubtotalExclVat      float64 `json:"subtotal_excl_vat"`
-	WeightUnit           float64 `json:"weight_unit"`
-	ActualWeightUnit     float64 `json:"actual_weight_unit"`
-	TotalWeight          float64 `json:"total_weight"`
-	StatusItem           string  `json:"status_item"`
-	StatusPaymentItem    string  `json:"status_payment_item"`
-	Remark               string  `json:"remark"`
-	CreateDtm            string  `json:"create_dtm"`
-	CreateBy             string  `json:"create_by"`
-	UpdateDtm            string  `json:"update_dtm"`
-	UpdateBy             string  `json:"update_by"`
+	AvailableQtyBeforeSelection *float64 `json:"available_qty_before_selection,omitempty"`
+	SelectedQty                 *float64 `json:"selected_qty,omitempty"`
+	PurchaseID                  string   `json:"purchase_id"`
+	PurchaseCode                string   `json:"purchase_code"`
+	PurchaseType                string   `json:"purchase_type"`
+	SupplierCode                string   `json:"supplier_code"`
+	SupplierName                string   `json:"supplier_name"`
+	Status                      string   `json:"status"`
+	StatusApprove               string   `json:"status_approve"`
+	StatusPayment               string   `json:"status_payment"`
+	DeliveryDate                string   `json:"delivery_date"`
+	ID                          string   `json:"id"`
+	PurchaseItem                string   `json:"purchase_item"`
+	DocRefItem                  string   `json:"doc_ref_item"`
+	ProductCode                 string   `json:"product_code"`
+	ProductDesc                 string   `json:"product_desc"`
+	ProductName                 string   `json:"product_name"`
+	ProductGroupOneCode         string   `json:"product_group_one_code"`
+	ProductGroupOneName         string   `json:"product_group_one_name"`
+	Qty                         float64  `json:"qty"`
+	RemainQty                   float64  `json:"remain_qty"`
+	PurchaseQty                 float64  `json:"purchase_qty"`
+	Unit                        string   `json:"unit"`
+	PurchaseUnit                string   `json:"purchase_unit"`
+	PurchaseUnitType            string   `json:"purchase_unit_type"`
+	PriceUnit                   float64  `json:"price_unit"`
+	TotalDiscount               float64  `json:"total_discount"`
+	TotalAmount                 float64  `json:"total_amount"`
+	UnitUom                     string   `json:"unit_uom"`
+	TotalCost                   float64  `json:"total_cost"`
+	TotalDiscountPercent        float64  `json:"total_discount_percent"`
+	DiscountType                string   `json:"discount_type"`
+	TotalVat                    float64  `json:"total_vat"`
+	SubtotalExclVat             float64  `json:"subtotal_excl_vat"`
+	WeightUnit                  float64  `json:"weight_unit"`
+	ActualWeightUnit            float64  `json:"actual_weight_unit"`
+	TotalWeight                 float64  `json:"total_weight"`
+	StatusItem                  string   `json:"status_item"`
+	StatusPaymentItem           string   `json:"status_payment_item"`
+	Remark                      string   `json:"remark"`
+	CreateDtm                   string   `json:"create_dtm"`
+	CreateBy                    string   `json:"create_by"`
+	UpdateDtm                   string   `json:"update_dtm"`
+	UpdateBy                    string   `json:"update_by"`
 }
 
 type documentData struct {
@@ -123,6 +136,10 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 }
 
 func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
+	selectedQty, err := preparePurchaseRemainRequest(&req)
+	if err != nil {
+		return nil, err
+	}
 	res := GetPurchaseItemRemainResponse{
 		ResponseCode: 200,
 		Message:      "success",
@@ -191,7 +208,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
-	ibDocMap, err := getInbound(poCodes, poItems)
+	ibDocMap, err := getInbound(req, poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +265,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	if err != nil {
 		return nil, err
 	}
+	excludePurchaseUsageDocument(apDocMap, req, "IV")
 
 	if len(grDocMap) > 0 {
 		grRemainMapPo, ignoreSourceAp, err = ComputeReceiveRemain(grDocMap, apDocMap, ibToPO)
@@ -267,6 +285,8 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	if err != nil {
 		return nil, err
 	}
+
+	results = applyPurchaseSelections(req, results, selectedQty)
 
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].PurchaseCode == results[j].PurchaseCode {
@@ -289,6 +309,67 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	res.TotalPage = &totalPages
 
 	return &res, nil
+}
+
+func purchaseSelectionKey(code, item string) string {
+	return strings.ToUpper(strings.TrimSpace(code)) + "|" + strings.ToUpper(strings.TrimSpace(item))
+}
+
+func preparePurchaseRemainRequest(req *GetPurchaseItemRemainRequest) (map[string]float64, error) {
+	req.UsageType = strings.ToUpper(strings.TrimSpace(req.UsageType))
+	req.ExcludeDocumentCode = strings.TrimSpace(req.ExcludeDocumentCode)
+	if req.UsageType != "" && req.UsageType != "IV" && req.UsageType != "IB" {
+		return nil, fmt.Errorf("usage_type must be IV or IB")
+	}
+	if req.ExcludeDocumentCode != "" && req.UsageType == "" {
+		return nil, fmt.Errorf("usage_type is required when exclude_document_code is provided")
+	}
+	selected := map[string]float64{}
+	for i, item := range req.SelectedPurchaseItems {
+		if strings.TrimSpace(item.PurchaseCode) == "" || strings.TrimSpace(item.PurchaseItem) == "" {
+			return nil, fmt.Errorf("selected_purchase_items[%d]: purchase_code and purchase_item are required", i)
+		}
+		if item.Qty < 0 || math.IsNaN(item.Qty) || math.IsInf(item.Qty, 0) {
+			return nil, fmt.Errorf("selected_purchase_items[%d]: qty must be finite and non-negative", i)
+		}
+		key := purchaseSelectionKey(item.PurchaseCode, item.PurchaseItem)
+		selected[key] += item.Qty
+		if math.IsInf(selected[key], 0) {
+			return nil, fmt.Errorf("selected_purchase_items: total qty is too large")
+		}
+	}
+	return selected, nil
+}
+
+// Exclude before any IB/GR/AP aggregation so downstream quantities are recomputed
+// consistently, rather than simply adding the saved document quantity back.
+func excludePurchaseUsageDocument(docs map[string]documentData, req GetPurchaseItemRemainRequest, usageType string) {
+	if req.UsageType != usageType || req.ExcludeDocumentCode == "" {
+		return
+	}
+	for key, doc := range docs {
+		if strings.EqualFold(strings.TrimSpace(doc.DocumentCode), req.ExcludeDocumentCode) {
+			delete(docs, key)
+		}
+	}
+}
+
+func applyPurchaseSelections(req GetPurchaseItemRemainRequest, results []GetPurchaseItemRemainResponseResult, selected map[string]float64) []GetPurchaseItemRemainResponseResult {
+	if req.UsageType == "" && req.ExcludeDocumentCode == "" && len(req.SelectedPurchaseItems) == 0 {
+		return results
+	}
+	filtered := make([]GetPurchaseItemRemainResponseResult, 0, len(results))
+	for _, result := range results {
+		available := result.RemainQty
+		selectedQty := selected[purchaseSelectionKey(result.PurchaseCode, result.PurchaseItem)]
+		result.AvailableQtyBeforeSelection = &available
+		result.SelectedQty = &selectedQty
+		result.RemainQty = math.Max(0, available-selectedQty)
+		if result.RemainQty > 0 {
+			filtered = append(filtered, result)
+		}
+	}
+	return filtered
 }
 
 func ComputeSumInbound(ibDocMap map[string]documentData) (map[string]documentData, error) {
@@ -773,7 +854,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	return rs, nil
 }
 
-func getInbound(poCodes []string, poItems []string) (map[string]documentData, error) {
+func getInbound(req GetPurchaseItemRemainRequest, poCodes []string, poItems []string) (map[string]documentData, error) {
 	rs := map[string]documentData{}
 
 	reqIb := goodsReceiveService.InboundFilter{
@@ -788,6 +869,14 @@ func getInbound(poCodes []string, poItems []string) (map[string]documentData, er
 	}
 
 	for _, ib := range resIb.InboundRes {
+		// Only exclude the requested IB in its company/site. Other records keep
+		// the legacy accounting behavior, even when usage_type is supplied.
+		if req.UsageType == "IB" && req.ExcludeDocumentCode != "" &&
+			strings.EqualFold(strings.TrimSpace(ib.InboundCode), req.ExcludeDocumentCode) &&
+			strings.EqualFold(strings.TrimSpace(ib.CompanyCode), strings.TrimSpace(req.CompanyCode)) &&
+			strings.EqualFold(strings.TrimSpace(ib.SiteCode), strings.TrimSpace(req.SiteCode)) {
+			continue
+		}
 		for _, ibi := range ib.InboundItemRes {
 			ibCode := strings.TrimSpace(ib.InboundCode)
 			ibItem := strings.TrimSpace(ibi.InboundItem)
