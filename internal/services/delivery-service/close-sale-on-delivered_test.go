@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"prime-erp-core/internal/models"
+	orderExternalService "prime-erp-core/external/order-service"
 )
 
 func TestSaleItemCompletionModeFollowsSaleUnitAndType(t *testing.T) {
@@ -80,5 +81,62 @@ func TestIsFullyDeliveredUsesLowerBoundOnly(t *testing.T) {
 func TestIsFullyDeliveredTreatsNegativeToleranceAsZero(t *testing.T) {
 	if isFullyDelivered(100, 97, -3) {
 		t.Error("tolerance ติดลบต้องถือเป็น 0 -> ส่ง 97 จาก 100 ยังไม่ครบ")
+	}
+}
+
+// buildOutboundGI สร้าง outbound 1 ตัวพร้อมบรรทัด GI (qty, weight) — ตั้งชื่อไม่ให้ชนกับ
+// buildOutbound ใน validate-booking-qty_test.go ที่รับแต่ qty
+func buildOutboundGI(status string, lines ...[2]float64) orderExternalService.OutboundItemWithGoodsIssue {
+	outbound := orderExternalService.OutboundItemWithGoodsIssue{}
+	outbound.Status = status
+
+	for _, line := range lines {
+		outbound.GoodsIssueItem = append(outbound.GoodsIssueItem, orderExternalService.GetIssueItemResponse{
+			Qty:    line[0],
+			Weight: line[1],
+		})
+	}
+
+	return outbound
+}
+
+// เคสจริง GI20260909051617-0 ของ CO2609-00032: 2 บรรทัด 7+3 ชิ้น = 36.05+15.50 kg
+func TestFoldWmsIssuedSumsQtyAndWeight(t *testing.T) {
+	issuedQty, issuedWeight, closed := foldWmsIssued([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS202609-0012", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGI("COMPLETED", [2]float64{7, 36.05}, [2]float64{3, 15.5}),
+		}),
+	})
+
+	key := "DBS202609-0012|ITEM-1"
+	if !closed[key] {
+		t.Fatalf("closed[%s] = false, want true", key)
+	}
+	if issuedQty[key] != 10 {
+		t.Errorf("issuedQty[%s] = %v, want 10", key, issuedQty[key])
+	}
+	if issuedWeight[key] != 51.55 {
+		t.Errorf("issuedWeight[%s] = %v, want 51.55", key, issuedWeight[key])
+	}
+}
+
+func TestFoldWmsIssuedIgnoresOpenOrderItemAndUncompletedOutbound(t *testing.T) {
+	issuedQty, issuedWeight, closed := foldWmsIssued([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "PENDING", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGI("COMPLETED", [2]float64{8, 80}),
+		}),
+		buildOrder("DBS-2", "ITEM-2", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGI("PENDING", [2]float64{5, 50}),
+		}),
+	})
+
+	if closed["DBS-1|ITEM-1"] {
+		t.Error("CO ยัง PENDING ต้องไม่ถือว่าปิด")
+	}
+	if issuedQty["DBS-1|ITEM-1"] != 0 || issuedWeight["DBS-1|ITEM-1"] != 0 {
+		t.Error("บรรทัดที่ CO ยังไม่ปิด ต้องไม่นับยอด GI")
+	}
+	if issuedQty["DBS-2|ITEM-2"] != 0 || issuedWeight["DBS-2|ITEM-2"] != 0 {
+		t.Error("outbound ที่ยังไม่ COMPLETED ต้องไม่ถูกนับ")
 	}
 }
