@@ -368,6 +368,7 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 		mapUpdateList[req.PrePurchaseCode] = models.Approval{
 			DocumentCode: req.PrePurchaseCode,
 			Status:       req.StatusApprove,
+			Remark:       req.Remark,
 		}
 	}
 
