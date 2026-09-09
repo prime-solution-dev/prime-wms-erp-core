@@ -474,6 +474,95 @@ func TestUpdateLatestPriceListSubGroup_WithFormulas(t *testing.T) {
 	assert.Equal(t, 55.0, *updateRequest.Changes[0].TotalNetPriceWeight)
 }
 
+func TestUpdateLatestPriceListSubGroup_WithPcsFormula(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	groupID := uuid.New()
+	subGroupID := uuid.New()
+	now := time.Now()
+
+	subGroup := models.PriceListSubGroup{
+		ID:                  subGroupID,
+		PriceListGroupID:    groupID,
+		SubGroupCode:        "SUB001",
+		SubgroupKey:         "SUB",
+		IsTrading:           true,
+		PriceUnit:           100.0,
+		PriceWeight:         50.0,
+		ExtraPriceUnit:      10.0,
+		ExtraPriceWeight:    5.0,
+		TotalNetPriceUnit:   90.0,
+		TotalNetPriceWeight: 45.0,
+		CreateBy:            "tester",
+		CreateDtm:           &now,
+		UpdateBy:            "tester",
+		UpdateDtm:           &now,
+		PriceListGroup: models.PriceListGroup{
+			ID:          groupID,
+			PriceUnit:   100.0,
+			PriceWeight: 50.0,
+		},
+	}
+
+	originalGetByIDs := getPriceListSubGroupsByIDsFunc
+	getPriceListSubGroupsByIDsFunc = func([]uuid.UUID) ([]models.PriceListSubGroup, error) {
+		return []models.PriceListSubGroup{subGroup}, nil
+	}
+	defer func() { getPriceListSubGroupsByIDsFunc = originalGetByIDs }()
+
+	originalGetFormulas := getPriceListSubGroupFormulasMapBySubGroupCodesFunc
+	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func([]string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+		return map[string][]models.PriceListSubGroupFormulasMap{
+			"SUB001": {
+				{
+					ID:                    uuid.New(),
+					PriceListSubGroupCode: "SUB001",
+					PriceListFormulasCode: "FORMULA002",
+					IsDefault:             true,
+					PriceListFormulas: models.PriceListFormulas{
+						ID:          uuid.New(),
+						FormulaCode: "FORMULA002",
+						Name:        "Test Pcs Formula",
+						Uom:         "pcs",
+						FormulaType: "calculation",
+						Expression:  "base_price + extra",
+						Params:      json.RawMessage(`{}`),
+						Rounding:    2,
+					},
+				},
+			},
+		}, nil
+	}
+	defer func() { getPriceListSubGroupFormulasMapBySubGroupCodesFunc = originalGetFormulas }()
+
+	var updateRequest models.UpdatePriceListSubGroupRequest
+	originalUpdate := updateLatestSubGroupFunc
+	updateLatestSubGroupFunc = func(req models.UpdatePriceListSubGroupRequest) error {
+		updateRequest = req
+		return nil
+	}
+	defer func() { updateLatestSubGroupFunc = originalUpdate }()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"subgroup_ids": []string{subGroupID.String()},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/price/SubGroup/UpdateLatest", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	_, err := UpdateLatestPriceListSubGroup(c)
+	assert.NoError(t, err)
+
+	assert.Len(t, updateRequest.Changes, 1)
+	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceUnit)
+
+	// pcs formula must pair PriceUnit with ExtraPriceUnit: 100.0 + 10.0 = 110.0
+	assert.Equal(t, 110.0, *updateRequest.Changes[0].TotalNetPriceUnit)
+}
+
 func TestUpdateLatestPriceListSubGroup_GroupCodesNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -713,7 +802,8 @@ func TestUpdateLatestPriceListSubGroup_WithInventoryData(t *testing.T) {
 	assert.Equal(t, subGroupID, updateRequest.Changes[0].SubGroupID)
 	assert.NotNil(t, updateRequest.Changes[0].TotalNetPriceWeight)
 
-	// Note: In this test, the inventory service call will fail (no mock), so avg_kg_stock=0
-	// Formula: base_price + extra + avg_kg_stock = 50.0 + 5.0 + 0.0 = 55.0
-	assert.Equal(t, 55.0, *updateRequest.Changes[0].TotalNetPriceWeight)
+	// Note: In this test, the inventory service call will fail (no mock), so avg_kg_stock
+	// falls back to its default of 1.0
+	// Formula: base_price + extra + avg_kg_stock = 50.0 + 5.0 + 1.0 = 56.0
+	assert.Equal(t, 56.0, *updateRequest.Changes[0].TotalNetPriceWeight)
 }
