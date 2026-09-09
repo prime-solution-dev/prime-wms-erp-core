@@ -52,7 +52,7 @@ func TestCompletionTargetPicksQtyOrWeight(t *testing.T) {
 	}
 }
 
-func TestIsFullyDeliveredUsesLowerBoundOnly(t *testing.T) {
+func TestIsFullyDeliveredStaysInsideTheToleranceBand(t *testing.T) {
 	const tolerance = 3.0 // ค่าจริงของ TMI ใน system_config
 
 	cases := []struct {
@@ -64,7 +64,10 @@ func TestIsFullyDeliveredUsesLowerBoundOnly(t *testing.T) {
 		{"ส่งครบพอดี", 10, 10, true},
 		{"ขาดแต่ยังอยู่ในระยะผ่อนผัน", 100, 97, true},
 		{"ขาดเกินระยะผ่อนผัน", 100, 96.9, false},
-		{"ส่งเกินถือว่าครบ", 10, 11, true},
+		{"เกินแต่ยังอยู่ในระยะผ่อนผัน", 100, 102.9, true},
+		{"เกินพอดีที่ขอบบน", 100, 103, true},
+		{"เกินเพดานบนไม่ปิด", 100, 103.1, false},
+		{"เป้า 10 ส่ง 11 เกินเพดาน 3% จึงไม่ปิด", 10, 11, false},
 		{"ยังไม่ได้ส่งเลย", 10, 0, false},
 		{"เป้าเป็นศูนย์ไม่ปิด", 0, 0, false},
 		{"เป้าติดลบไม่ปิด", -5, 10, false},

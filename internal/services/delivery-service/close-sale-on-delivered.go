@@ -48,10 +48,12 @@ func completionTarget(item models.SaleItem) float64 {
 	return item.Qty
 }
 
-// isFullyDelivered ถือว่าครบเมื่อยอดที่ตัดจ่ายจริงถึงขอบล่างของระยะผ่อนผัน
+// isFullyDelivered ถือว่าครบเมื่อยอดที่ตัดจ่ายจริงอยู่ในกรอบระยะผ่อนผัน ทั้งขอบล่างและขอบบน
 //
-// ไม่มีเพดานบน — ส่งเกินก็ถือว่าจบงานแล้ว (โค้ดเดิมฝั่ง wms-outbound ใช้กรอบ min..max
-// ทำให้ใบที่ส่งเกินไม่ถูกปิดตลอดกาล)
+// เจ้าของสั่งให้คงเพดานบนไว้ (2026-09-09) เหมือนโค้ดเดิมฝั่ง wms-outbound
+// ผลที่ต้องรู้: บรรทัดที่ส่งเกินเพดาน (เช่นเป้า 10 ส่ง 11 ที่ระยะผ่อนผัน 3%) จะไม่ถูกปิดอัตโนมัติ
+// ต้องไปปิดด้วยมือที่หน้าจอ (POST /sale/UpdateStatusSale) ตั้งใจให้เป็นแบบนั้น
+// เพราะการส่งเกินถือเป็นเรื่องที่คนต้องมาดู ไม่ใช่ให้ระบบปิดเงียบๆ
 func isFullyDelivered(target float64, issued float64, tolerancePercent float64) bool {
 	if target <= 0 {
 		return false
@@ -61,7 +63,9 @@ func isFullyDelivered(target float64, issued float64, tolerancePercent float64) 
 		tolerancePercent = 0
 	}
 
-	return issued >= target*(1-tolerancePercent/100)
+	toleranceFactor := tolerancePercent / 100
+
+	return issued >= target*(1-toleranceFactor) && issued <= target*(1+toleranceFactor)
 }
 
 // isCanceledStatus บอกว่าสถานะนั้นคือ "ยกเลิก" หรือไม่ รับทุกวิธีสะกดที่เจอในระบบ
