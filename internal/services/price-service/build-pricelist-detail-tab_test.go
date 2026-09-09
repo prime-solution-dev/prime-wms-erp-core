@@ -19,6 +19,7 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 			PriceListGroup: PriceListGroup{
 				ID:        uuid.New(),
 				GroupCode: "GROUP_1_ITEM_1",
+				GroupName: "หมวดเหล็กแผ่น",
 				SubGroups: []SubGroup{
 					{
 						ID:                  uuid.New(),
@@ -69,8 +70,6 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 
 	itemNameByCode := func(code string) string {
 		switch code {
-		case "GROUP_1_ITEM_1":
-			return "หมวดเหล็กแผ่น"
 		case "PG01_3":
 			return "หมวดเหล็กแผ่น"
 		case "PG02_6":
@@ -100,7 +99,7 @@ func TestBuildPricelistDetailTab_TabShape(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 	updated := time.Date(2026, 9, 7, 10, 13, 0, 0, time.UTC)
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, &updated)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, &updated)
 
 	if tab.Name != "Template" {
 		t.Fatalf("expected tab name Template, got %q", tab.Name)
@@ -119,7 +118,7 @@ func TestBuildPricelistDetailTab_TabShape(t *testing.T) {
 func TestBuildPricelistDetailTab_DynamicGroupColumns(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
 
 	// PG04 ปรากฏเฉพาะใน subgroup ที่สอง ต้องยังมีคอลัมน์ให้
 	for _, code := range []string{"PG01", "PG02", "PG04", "PG06"} {
@@ -150,7 +149,7 @@ func TestBuildPricelistDetailTab_DynamicGroupColumns(t *testing.T) {
 func TestBuildPricelistDetailTab_ColumnOrder(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
 
 	if columnIndex(tab.Columns, "pricelist_group_name") != 0 {
 		t.Fatal("expected pricelist_group_name to be the first column")
@@ -191,7 +190,7 @@ func TestBuildPricelistDetailTab_ColumnOrder(t *testing.T) {
 func TestBuildPricelistDetailTab_RowValues(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
 
 	if len(tab.Rows) != 2 {
 		t.Fatalf("expected 2 rows, got %d", len(tab.Rows))
@@ -246,7 +245,7 @@ func TestBuildPricelistDetailTab_FormulaMapping(t *testing.T) {
 		},
 	}
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, formulas, nil)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, formulas, nil)
 
 	row := tab.Rows[0]
 	if row["formula_kg_name"] != "kg = Base price + Extra" {
@@ -274,10 +273,11 @@ func TestBuildPricelistDetailTab_FormulaMapping(t *testing.T) {
 
 func TestBuildPricelistDetailTab_FallbackToRawCode(t *testing.T) {
 	groups, _, _ := detailTestFixtures()
+	// group_name ว่างและ resolve อะไรไม่ได้เลย — ต้อง fallback เป็น code ดิบ ไม่ใช่เซลล์ว่าง
+	groups[0].GroupName = ""
 
-	// resolve ชื่อไม่ได้เลย — ต้อง fallback เป็น code ดิบ ไม่ใช่เซลล์ว่าง
 	none := func(string) string { return "" }
-	tab := buildPricelistDetailTab(groups, none, none, nil, nil)
+	tab := buildPricelistDetailTab(groups, none, none, nil, nil, nil)
 
 	nameCol := tab.Columns[columnIndex(tab.Columns, "PG01")]
 	if nameCol.HeaderName != "PG01" {
@@ -296,7 +296,7 @@ func TestBuildPricelistDetailTab_SkipsInactive(t *testing.T) {
 	inactive, _ := json.Marshal(map[string]interface{}{"inactive": true})
 	groups[0].SubGroups[1].UdfJson = inactive
 
-	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil)
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
 
 	if len(tab.Rows) != 1 {
 		t.Fatalf("expected inactive subgroups to be skipped, got %d rows", len(tab.Rows))
@@ -306,7 +306,7 @@ func TestBuildPricelistDetailTab_SkipsInactive(t *testing.T) {
 func TestSelectExportTabs_DefaultKeepsTwoTabs(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 
-	tabs := selectExportTabs("", groups, groupNameByCode, itemNameByCode, nil, map[string]GetPaymentTermResponse{}, nil)
+	tabs := selectExportTabs("", groups, groupNameByCode, itemNameByCode, nil, nil, map[string]GetPaymentTermResponse{}, nil)
 
 	if len(tabs) != 2 {
 		t.Fatalf("expected 2 tabs for the default report type, got %d", len(tabs))
@@ -322,7 +322,7 @@ func TestSelectExportTabs_DefaultKeepsTwoTabs(t *testing.T) {
 func TestSelectExportTabs_PricelistDetailReturnsSingleTab(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 
-	tabs := selectExportTabs(ReportTypePricelistDetail, groups, groupNameByCode, itemNameByCode, nil, map[string]GetPaymentTermResponse{}, nil)
+	tabs := selectExportTabs(ReportTypePricelistDetail, groups, groupNameByCode, itemNameByCode, nil, nil, map[string]GetPaymentTermResponse{}, nil)
 
 	if len(tabs) != 1 {
 		t.Fatalf("expected exactly 1 tab, got %d", len(tabs))
@@ -355,7 +355,7 @@ func TestCollectGroupColumns_MergesNameAndKeepsLowestSeq(t *testing.T) {
 		return ""
 	}
 
-	cols := collectGroupColumns(groups, nameByCode)
+	cols := collectGroupColumns(groups, nameByCode, nil)
 
 	if len(cols) != 1 {
 		t.Fatalf("expected 1 column, got %d", len(cols))
@@ -389,7 +389,7 @@ func TestCollectGroupColumns_OrdersMissingSeqLast(t *testing.T) {
 		},
 	}
 
-	cols := collectGroupColumns(groups, func(string) string { return "" })
+	cols := collectGroupColumns(groups, func(string) string { return "" }, nil)
 
 	if len(cols) != 3 {
 		t.Fatalf("expected 3 columns, got %d", len(cols))
@@ -424,5 +424,66 @@ func TestIsInactiveSubGroup(t *testing.T) {
 				t.Fatalf("expected %v, got %v", c.want, got)
 			}
 		})
+	}
+}
+
+func TestBuildPricelistDetailTab_ColumnSetStaysFixedWhenFiltered(t *testing.T) {
+	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
+
+	// จำลองการกรองเหลือ subgroup เดียวที่ใช้แค่ PG01 กับ PG02
+	groups[0].SubGroups = groups[0].SubGroups[:1]
+	groups[0].SubGroups[0].GroupKeys = []GroupKey{
+		{Code: "PG01", Value: "PG01_3", Seq: 1},
+		{Code: "PG02", Value: "PG02_6", Seq: 2},
+	}
+
+	// ชุดคอลัมน์ของทั้ง price list มี PG04 กับ PG06 ด้วย ต้องยังมีคอลัมน์ให้ครบ
+	allColumns := []priceListRepository.SubGroupKeyColumn{
+		{Code: "PG01", Seq: 1},
+		{Code: "PG02", Seq: 2},
+		{Code: "PG04", Seq: 4},
+		{Code: "PG06", Seq: 6},
+	}
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, allColumns, nil, nil)
+
+	for _, code := range []string{"PG01", "PG02", "PG04", "PG06"} {
+		if columnIndex(tab.Columns, code) == -1 {
+			t.Fatalf("expected the %s column to survive filtering", code)
+		}
+		if columnIndex(tab.Columns, code+groupCodeColumnSuffix) == -1 {
+			t.Fatalf("expected the %s code column to survive filtering", code)
+		}
+	}
+
+	// header ยังมาจาก DB และคอลัมน์ที่กลุ่มนี้ไม่ใช้ต้องเป็นเซลล์ว่าง
+	if tab.Columns[columnIndex(tab.Columns, "PG04")].HeaderName != "ขนาด" {
+		t.Fatalf("expected the PG04 header from the group table, got %q",
+			tab.Columns[columnIndex(tab.Columns, "PG04")].HeaderName)
+	}
+	if tab.Rows[0]["PG04"] != "" {
+		t.Fatalf("expected an empty PG04 cell, got %v", tab.Rows[0]["PG04"])
+	}
+}
+
+func TestBuildPricelistDetailTab_IgnoresUnusedColumnCodes(t *testing.T) {
+	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
+
+	// PG10 มีในตาราง group แต่ไม่มี subgroup ไหนใช้ — ต้องไม่ถูกส่งมาเป็นคอลัมน์
+	allColumns := []priceListRepository.SubGroupKeyColumn{
+		{Code: "PG01", Seq: 1},
+		{Code: "PG02", Seq: 2},
+		{Code: "PG04", Seq: 4},
+		{Code: "PG06", Seq: 6},
+	}
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, allColumns, nil, nil)
+
+	if columnIndex(tab.Columns, "PG10") != -1 {
+		t.Fatal("did not expect a PG10 column")
+	}
+	// 1 ชื่อกลุ่ม + 4 PG ชื่อ + 8 คงที่ + 4 PG รหัส + 3 ท้าย = 20
+	if len(tab.Columns) != 20 {
+		t.Fatalf("expected 20 columns, got %d", len(tab.Columns))
 	}
 }

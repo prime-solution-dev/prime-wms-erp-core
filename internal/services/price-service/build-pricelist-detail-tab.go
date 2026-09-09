@@ -25,7 +25,25 @@ type groupColumn struct {
 func collectGroupColumns(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
+	fixedColumns []priceListRepository.SubGroupKeyColumn,
 ) []groupColumn {
+	// ชุดคอลัมน์คงที่มาจากทั้ง price list จึงไม่หดตามการกรอง Product Group 1
+	if len(fixedColumns) > 0 {
+		cols := make([]groupColumn, 0, len(fixedColumns))
+		for _, c := range fixedColumns {
+			if c.Code == "" {
+				continue
+			}
+			cols = append(cols, groupColumn{
+				code:   c.Code,
+				name:   strings.TrimSpace(groupNameByCode(c.Code)),
+				minSeq: c.Seq,
+			})
+		}
+		sortGroupColumns(cols)
+		return cols
+	}
+
 	colMap := map[string]*groupColumn{}
 	for _, g := range groups {
 		for _, sg := range g.SubGroups {
@@ -52,6 +70,12 @@ func collectGroupColumns(
 	for _, m := range colMap {
 		cols = append(cols, *m)
 	}
+	sortGroupColumns(cols)
+	return cols
+}
+
+// sortGroupColumns เรียงคอลัมน์ให้คงที่ — seq มาก่อน ถ้าไม่มี seq ให้เรียงตาม code
+func sortGroupColumns(cols []groupColumn) {
 	sort.Slice(cols, func(i, j int) bool {
 		ai, aj := cols[i], cols[j]
 		if ai.minSeq != 0 && aj.minSeq != 0 && ai.minSeq != aj.minSeq {
@@ -65,7 +89,6 @@ func collectGroupColumns(
 		}
 		return ai.code < aj.code
 	})
-	return cols
 }
 
 // buildPricelistDetailTab ประกอบ tab "Template" ของ Pricelist Detail Report
@@ -74,16 +97,20 @@ func collectGroupColumns(
 // หัวคอลัมน์มาจากตาราง group ผ่าน groupNameByCode และค่าในเซลล์มาจากตาราง group_item
 // ผ่าน itemNameByCode ทั้งคู่ fallback เป็นรหัสดิบเมื่อ resolve ไม่ได้
 //
+// fixedColumns กำหนดชุดคอลัมน์กลุ่มสินค้าให้คงที่ไม่ว่าจะกรอง Product Group 1 ตัวไหน
+// ส่ง nil ได้เมื่อต้องการให้เก็บคอลัมน์จากแถวที่ส่งเข้ามาแทน
+//
 // formulas เป็น map จาก subgroup_code ไปยังสูตรของ subgroup นั้น ส่งค่า nil ได้
 // เมื่อไม่ต้องการเติมคอลัมน์สูตร
 func buildPricelistDetailTab(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
 	itemNameByCode func(code string) string,
+	fixedColumns []priceListRepository.SubGroupKeyColumn,
 	formulas map[string][]priceListRepository.SubgroupFormula,
 	lastUpdated *time.Time,
 ) ExportTab {
-	cols := collectGroupColumns(groups, groupNameByCode)
+	cols := collectGroupColumns(groups, groupNameByCode, fixedColumns)
 
 	// ลำดับคอลัมน์ตามชีท Template ของไฟล์ตัวอย่าง
 	columns := []ExportColumn{
@@ -120,7 +147,9 @@ func buildPricelistDetailTab(
 
 	rows := make([]map[string]interface{}, 0)
 	for _, g := range groups {
-		groupName := itemNameByCode(g.GroupCode)
+		// ชื่อกลุ่มมาจาก price_list_group.group_name ตรง ๆ — group_code ของ price list
+		// (เช่น GROUP_1_ITEM_1) ไม่มีอยู่ในตาราง group_item จึง resolve ทางนั้นไม่ได้
+		groupName := strings.TrimSpace(g.GroupName)
 		if groupName == "" {
 			groupName = g.GroupCode
 		}
@@ -217,13 +246,14 @@ func selectExportTabs(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
 	itemNameByCode func(code string) string,
+	fixedColumns []priceListRepository.SubGroupKeyColumn,
 	formulas map[string][]priceListRepository.SubgroupFormula,
 	paymentTermMap map[string]GetPaymentTermResponse,
 	lastUpdated *time.Time,
 ) []ExportTab {
 	if reportType == ReportTypePricelistDetail {
 		return []ExportTab{
-			buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, formulas, lastUpdated),
+			buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, fixedColumns, formulas, lastUpdated),
 		}
 	}
 	return []ExportTab{

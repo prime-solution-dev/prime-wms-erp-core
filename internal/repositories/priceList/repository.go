@@ -734,3 +734,43 @@ func GetFormulasBySubgroupCodes(codes []string) (map[string][]SubgroupFormula, e
 	}
 	return result, nil
 }
+
+// SubGroupKeyColumn คือกลุ่มสินค้าหนึ่งตัวที่ price list ใช้อยู่ พร้อมลำดับที่ควรแสดง
+type SubGroupKeyColumn struct {
+	Code string `gorm:"column:code"`
+	Seq  int    `gorm:"column:seq"`
+}
+
+// GetSubGroupKeyColumns คืนกลุ่มสินค้าทุกตัวที่ subgroup ใน price list ของบริษัท/ไซต์นี้ใช้อยู่
+//
+// จงใจไม่รับ groupCodes เป็นพารามิเตอร์ — รายงานต้องมีคอลัมน์ชุดเดิมเสมอไม่ว่าผู้ใช้
+// จะกรอง Product Group 1 ตัวไหน ไม่งั้นไฟล์ที่กรองแล้วจะมีคอลัมน์น้อยกว่าไฟล์เต็ม
+func GetSubGroupKeyColumns(companyCode string, siteCodes []string) ([]SubGroupKeyColumn, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	query := gormx.
+		Table("price_list_sub_group_key AS k").
+		Select("k.code, MIN(k.seq) AS seq").
+		Joins("JOIN price_list_sub_group AS sg ON sg.id = k.sub_group_id").
+		Joins("JOIN price_list_group AS g ON g.id = sg.price_list_group_id").
+		Where("k.code <> ''").
+		Group("k.code").
+		Order("MIN(k.seq), k.code")
+
+	if companyCode != "" {
+		query = query.Where("g.company_code = ?", companyCode)
+	}
+	if len(siteCodes) > 0 {
+		query = query.Where("g.site_code IN ?", siteCodes)
+	}
+
+	cols := []SubGroupKeyColumn{}
+	if err := query.Scan(&cols).Error; err != nil {
+		return nil, err
+	}
+	return cols, nil
+}

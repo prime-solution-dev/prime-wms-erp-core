@@ -94,3 +94,84 @@ func TestGetFormulasBySubgroupCodes_EmptyInput(t *testing.T) {
 		t.Fatalf("expected empty map, got %d entries", len(got))
 	}
 }
+
+// setupSubGroupKeyFixtures สร้าง price list สองกลุ่มที่ใช้ PG ไม่เท่ากัน
+// เพื่อยืนยันว่าการดึงชุดคอลัมน์ไม่ผูกกับกลุ่มใดกลุ่มหนึ่ง
+func setupSubGroupKeyFixtures(t *testing.T) {
+	t.Helper()
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatalf("failed to connect: %v", err)
+	}
+	defer db.CloseGORM(gormx)
+
+	stmts := []string{
+		`DELETE FROM price_list_sub_group_key;`,
+		`DELETE FROM price_list_sub_group;`,
+		`DELETE FROM price_list_group;`,
+		`INSERT INTO price_list_group (id, company_code, site_code, group_code, group_name)
+         VALUES
+           ('11111111-1111-1111-1111-111111111111', 'ACME', 'MAIN', 'GROUP_1_ITEM_1', 'กลุ่มหนึ่ง'),
+           ('22222222-2222-2222-2222-222222222222', 'ACME', 'MAIN', 'GROUP_1_ITEM_2', 'กลุ่มสอง'),
+           ('33333333-3333-3333-3333-333333333333', 'OTHER', 'MAIN', 'GROUP_1_ITEM_9', 'คนละบริษัท');`,
+		`INSERT INTO price_list_sub_group (id, price_list_group_id, subgroup_code, subgroup_key)
+         VALUES
+           ('aaaaaaaa-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111111', 'SGA', 'k1'),
+           ('bbbbbbbb-2222-2222-2222-222222222222', '22222222-2222-2222-2222-222222222222', 'SGB', 'k2'),
+           ('cccccccc-3333-3333-3333-333333333333', '33333333-3333-3333-3333-333333333333', 'SGC', 'k3');`,
+		`INSERT INTO price_list_sub_group_key (id, sub_group_id, code, value, seq)
+         VALUES
+           (gen_random_uuid(), 'aaaaaaaa-1111-1111-1111-111111111111', 'PG01', 'PG01_1', 1),
+           (gen_random_uuid(), 'aaaaaaaa-1111-1111-1111-111111111111', 'PG02', 'PG02_1', 2),
+           (gen_random_uuid(), 'bbbbbbbb-2222-2222-2222-222222222222', 'PG01', 'PG01_2', 1),
+           (gen_random_uuid(), 'bbbbbbbb-2222-2222-2222-222222222222', 'PG06', 'PG06_1', 6),
+           (gen_random_uuid(), 'cccccccc-3333-3333-3333-333333333333', 'PG09', 'PG09_1', 9);`,
+	}
+
+	for _, s := range stmts {
+		if err := gormx.Exec(s).Error; err != nil {
+			t.Fatalf("failed to seed subgroup key fixtures: %v", err)
+		}
+	}
+}
+
+func TestGetSubGroupKeyColumns(t *testing.T) {
+	setupSubGroupKeyFixtures(t)
+
+	got, err := GetSubGroupKeyColumns("ACME", []string{"MAIN"})
+	if err != nil {
+		t.Fatalf("GetSubGroupKeyColumns error: %v", err)
+	}
+
+	// ครอบทุกกลุ่มของบริษัทนี้ ไม่ใช่แค่กลุ่มเดียว และไม่ปนบริษัทอื่น
+	codes := []string{}
+	for _, c := range got {
+		codes = append(codes, c.Code)
+	}
+	want := []string{"PG01", "PG02", "PG06"}
+	if len(codes) != len(want) {
+		t.Fatalf("expected %v, got %v", want, codes)
+	}
+	for i := range want {
+		if codes[i] != want[i] {
+			t.Fatalf("expected %v ordered by seq, got %v", want, codes)
+		}
+	}
+
+	if got[0].Seq != 1 || got[2].Seq != 6 {
+		t.Fatalf("unexpected seq values: %+v", got)
+	}
+}
+
+func TestGetSubGroupKeyColumns_UnknownCompany(t *testing.T) {
+	setupSubGroupKeyFixtures(t)
+
+	got, err := GetSubGroupKeyColumns("NOPE", []string{"MAIN"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected no columns, got %+v", got)
+	}
+}

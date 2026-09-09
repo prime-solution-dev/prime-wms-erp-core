@@ -176,9 +176,19 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 	}
 
-	// สูตรราคาต้องใช้เฉพาะ Pricelist Detail Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
+	// สูตรราคาและชุดคอลัมน์คงที่ใช้เฉพาะ Pricelist Detail Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
 	var formulas map[string][]priceListRepository.SubgroupFormula
+	var fixedColumns []priceListRepository.SubGroupKeyColumn
 	if req.ReportType == ReportTypePricelistDetail {
+		// ดึงชุดคอลัมน์จากทั้ง price list โดยไม่ใส่ groupCodes เพื่อให้ไฟล์ที่กรองแล้ว
+		// มีคอลัมน์เท่ากับไฟล์เต็มเสมอ
+		fixedColumns, err = priceListRepository.GetSubGroupKeyColumns(req.CompanyCode, req.SiteCodes)
+		if err != nil {
+			// ถอยไปเก็บคอลัมน์จากแถวที่ได้แทน ดีกว่าทำให้ export ทั้งไฟล์ล้ม
+			fmt.Printf("Warning: failed to get sub group key columns: %v\n", err)
+			fixedColumns = nil
+		}
+
 		subgroupCodes := []string{}
 		for _, resp := range res {
 			for _, sg := range resp.SubGroups {
@@ -201,6 +211,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 			res,
 			groupNameByCode,
 			itemNameByCode,
+			fixedColumns,
 			formulas,
 			paymentTermMap,
 			lastUpdated,
