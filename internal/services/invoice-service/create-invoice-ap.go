@@ -45,6 +45,74 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
+
+	// ── Idempotency guard for AP-FAB (GRA) ──────────────────────────────
+	// FABRICATION Complete re-sends every already-COMPLETED output, so the
+	// production-core AP-FAB block builds a second GRA merging output lines
+	// that were already invoiced per-line at Confirm. Drop output lines that
+	// already have a live AP-FAB invoice (matched on document_ref|document_ref_item),
+	// and skip creation entirely if nothing new remains. Scoped to AP-FAB only —
+	// regular AP invoices keep their current behavior.
+	{
+		filtered := req[:0]
+		for _, invoice := range req {
+			if invoice.InvoiceType != "AP-FAB" {
+				filtered = append(filtered, invoice)
+				continue
+			}
+
+			docRefs := []string{}
+			docRefItems := []string{}
+			seenRef := map[string]bool{}
+			seenItem := map[string]bool{}
+			for _, item := range invoice.InvoiceItem {
+				if item.DocumentRef != "" && !seenRef[item.DocumentRef] {
+					seenRef[item.DocumentRef] = true
+					docRefs = append(docRefs, item.DocumentRef)
+				}
+				if item.DocumentRefItem != "" && !seenItem[item.DocumentRefItem] {
+					seenItem[item.DocumentRefItem] = true
+					docRefItems = append(docRefItems, item.DocumentRefItem)
+				}
+			}
+
+			existing := map[string]bool{}
+			if len(docRefs) > 0 && len(docRefItems) > 0 {
+				existingInvoices, errExisting := repositoryInvoice.GetInvoiceRelatedByPO(
+					invoice.CompanyCode, invoice.SiteCode, docRefs, docRefItems,
+					[]string{"AP-FAB"}, []string{"PENDING", "COMPLETED"})
+				if errExisting != nil {
+					return nil, errors.New("failed to check existing AP-FAB invoices: " + errExisting.Error())
+				}
+				for _, ex := range existingInvoices {
+					for _, exItem := range ex.InvoiceItem {
+						existing[exItem.DocumentRef+"|"+exItem.DocumentRefItem] = true
+					}
+				}
+			}
+
+			newItems := invoice.InvoiceItem[:0]
+			for _, item := range invoice.InvoiceItem {
+				if existing[item.DocumentRef+"|"+item.DocumentRefItem] {
+					continue
+				}
+				newItems = append(newItems, item)
+			}
+			invoice.InvoiceItem = newItems
+			if len(invoice.InvoiceItem) > 0 {
+				filtered = append(filtered, invoice)
+			}
+		}
+		req = filtered
+		if len(req) == 0 {
+			return map[string]interface{}{
+				"status":  "success",
+				"message": "AP-FAB invoice already exists for all output lines; skipped duplicate creation",
+				"skipped": true,
+			}, nil
+		}
+	}
+
 	poNumber := []string{}
 	companyCode := ""
 	siteCode := ""
