@@ -301,7 +301,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
 				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
 				xxx := 0.0
-				if poQTYMapResult.UnitUom == "KG" {
+				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.PurchaseUnit), "KG") {
 					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
 					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
@@ -319,11 +319,14 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					totalBeforeDiscount = req[i].InvoiceItem[it].SubtotalExclVat / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent)) // TotalAmount
 				}
 
-				if req[i].InvoiceItem[it].UnitUom == "KG" {
-					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
-				} else {
-					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Qty
+				priceUnit, err := calculateAPPriceUnit(
+					poQTYMapResult.PurchaseUnit, req[i].InvoiceItem[it].UnitUom,
+					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("PO %s item %s: %w", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem, err)
 				}
+				req[i].InvoiceItem[it].PriceUnit = priceUnit
 
 				totalDiscount := 0.0
 				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
