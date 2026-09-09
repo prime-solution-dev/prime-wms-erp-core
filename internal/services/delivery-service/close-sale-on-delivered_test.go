@@ -140,3 +140,72 @@ func TestFoldWmsIssuedIgnoresOpenOrderItemAndUncompletedOutbound(t *testing.T) {
 		t.Error("outbound ที่ยังไม่ COMPLETED ต้องไม่ถูกนับ")
 	}
 }
+
+// SO202609-0009 บรรทัด 94e41ee0… = 50 PCS ถูกแบ่งจอง 3 ใบ 30 + 3 + 17
+// ปิดครบทั้ง 3 ใบ -> รวมได้ 50 ชิ้น
+func TestIssuedBySaleItemSumsAcrossEveryBooking(t *testing.T) {
+	lines := []deliveryLine{
+		{DeliveryCode: "DBS202609-0009", DeliveryItem: "ITEM-A", SaleItemCode: "SALE-1"},
+		{DeliveryCode: "DBS202609-0010", DeliveryItem: "ITEM-B", SaleItemCode: "SALE-1"},
+		{DeliveryCode: "DBS202609-0011", DeliveryItem: "ITEM-C", SaleItemCode: "SALE-1"},
+	}
+
+	issuedQty := map[string]float64{
+		"DBS202609-0009|ITEM-A": 30,
+		"DBS202609-0010|ITEM-B": 3,
+		"DBS202609-0011|ITEM-C": 17,
+	}
+	issuedWeight := map[string]float64{
+		"DBS202609-0009|ITEM-A": 87,
+		"DBS202609-0010|ITEM-B": 8.7,
+		"DBS202609-0011|ITEM-C": 49.3,
+	}
+	closed := map[string]bool{
+		"DBS202609-0009|ITEM-A": true,
+		"DBS202609-0010|ITEM-B": true,
+		"DBS202609-0011|ITEM-C": true,
+	}
+
+	qty, weight := issuedBySaleItem(lines, issuedQty, issuedWeight, closed)
+
+	if qty["SALE-1"] != 50 {
+		t.Errorf("qty[SALE-1] = %v, want 50", qty["SALE-1"])
+	}
+	if weight["SALE-1"] != 145 {
+		t.Errorf("weight[SALE-1] = %v, want 145", weight["SALE-1"])
+	}
+}
+
+// ใบแรกจบแล้วแต่อีก 2 ใบยังไม่เดิน -> ต้องได้แค่ 30 (ห้ามปิด SO ที่เหลือของค้าง)
+func TestIssuedBySaleItemSkipsBookingsThatAreNotClosedYet(t *testing.T) {
+	lines := []deliveryLine{
+		{DeliveryCode: "DBS202609-0009", DeliveryItem: "ITEM-A", SaleItemCode: "SALE-1"},
+		{DeliveryCode: "DBS202609-0010", DeliveryItem: "ITEM-B", SaleItemCode: "SALE-1"},
+		{DeliveryCode: "DBS202609-0011", DeliveryItem: "ITEM-C", SaleItemCode: "SALE-1"},
+	}
+
+	issuedQty := map[string]float64{"DBS202609-0009|ITEM-A": 30}
+	issuedWeight := map[string]float64{"DBS202609-0009|ITEM-A": 87}
+	closed := map[string]bool{"DBS202609-0009|ITEM-A": true}
+
+	qty, _ := issuedBySaleItem(lines, issuedQty, issuedWeight, closed)
+
+	if qty["SALE-1"] != 30 {
+		t.Errorf("qty[SALE-1] = %v, want 30", qty["SALE-1"])
+	}
+}
+
+func TestIssuedBySaleItemIgnoresLinesWithoutSaleItem(t *testing.T) {
+	lines := []deliveryLine{
+		{DeliveryCode: "DBS-1", DeliveryItem: "ITEM-A", SaleItemCode: ""},
+	}
+
+	qty, weight := issuedBySaleItem(lines,
+		map[string]float64{"DBS-1|ITEM-A": 9},
+		map[string]float64{"DBS-1|ITEM-A": 9},
+		map[string]bool{"DBS-1|ITEM-A": true})
+
+	if len(qty) != 0 || len(weight) != 0 {
+		t.Errorf("บรรทัดที่ไม่มี sale_item ต้องถูกข้าม ได้ qty=%v weight=%v", qty, weight)
+	}
+}
