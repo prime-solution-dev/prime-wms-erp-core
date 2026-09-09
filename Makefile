@@ -1,6 +1,6 @@
 SHELL := /usr/bin/fish
 
-.PHONY: test test-integration test-integration-group test-integration-prepurchase test-integration-purchase test-integration-pricelist tidy seed-price-list-test seed-price-list-formulas
+.PHONY: test test-integration test-integration-group test-integration-prepurchase test-integration-purchase test-integration-unit test-integration-pricelist tidy seed-price-list-test seed-price-list-formulas
 
 test:
 	go test ./...
@@ -16,6 +16,9 @@ test-integration-prepurchase:
 
 test-integration-purchase:
 	go test -v -tags=integration ./internal/repositories/purchase
+
+test-integration-unit:
+	go test -v -tags=integration ./internal/repositories/unit
 
 test-integration-pricelist:
 	go test -v -tags=integration ./internal/services/price-service
