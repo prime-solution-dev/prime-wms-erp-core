@@ -62,7 +62,19 @@
 
 1. รวม GI จาก **ทุก DBS ของ sale_code นั้น** (`delivery_booking.document_ref = sale_code`, ข้ามใบ `CANCELED`)
 2. นับเฉพาะบรรทัดที่ CO ปิดแล้ว (`order_item.status ∈ {COMPLETED, CANCELED, CANCELLED}`)
-   และ outbound `COMPLETED` — กติกาเดียวกับ `foldWmsProgress`
+   **ไม่ดู `outbound_item.status` เลย** และนับบรรทัด GI ทุกบรรทัดที่ตัวมันเองไม่ถูกยกเลิก
+   (ข้าม `CANCELED`/`CANCELLED` ไม่สนตัวพิมพ์เล็กใหญ่/ขีดกลาง — สถานะว่างต้องนับ เพราะข้อมูลเก่าเว้นช่องนี้ไว้)
+
+   เหตุผลที่ห้ามดู outbound: hook ที่พามาถึงเส้นนี้ถูกยิงจาก
+   `wms-outbound-service update-flow-tracking-packing.go:394` ขณะที่ transaction ซึ่งเขียน
+   `outbound_item.status = COMPLETED` (`:279`, tx เปิด `:127` commit ใน defer `:135-147`)
+   **ยังไม่ commit** erp-core อ่านสถานะกลับมาทาง HTTP บน session ใหม่จึงเห็นเป็น `PENDING`
+   ตลอด ถ้า gate ด้วย outbound ยอดที่ตัดจ่ายจะเป็น 0 ทุกบรรทัดและไม่มี SO ไหนถูกปิดเลย
+   ส่วน `order_item.status` เชื่อได้ เพราะถูก commit ใน tx แรกของ `ConfirmOrderOutbound` ก่อน hook ยิง
+
+   ⚠️ กติกานี้อยู่ใน `foldWmsDelivered` (`close-sale-on-delivered.go`) ตัวเดียว
+   `foldWmsProgress`/`foldWmsIssued` ที่ `ValidateBookingQty` ใช้ **ต้องคงการ์ด outbound เดิมไว้**
+   ตามที่ SA เคาะ 2026-08-31 (ดูคอมเมนต์ `validate-booking-qty.go:13-19`) ห้ามรวมสองตัวเข้าด้วยกัน
 3. โหมดเทียบหน่วย:
 
    | `sale_unit` | `sale_unit_type` | โหมด | เป้า (target) | เทียบกับ |

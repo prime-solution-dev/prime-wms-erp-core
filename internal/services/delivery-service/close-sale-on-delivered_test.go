@@ -1,10 +1,11 @@
 package deliveryService
 
 import (
+	"strings"
 	"testing"
 
-	"prime-erp-core/internal/models"
 	orderExternalService "prime-erp-core/external/order-service"
+	"prime-erp-core/internal/models"
 )
 
 func TestSaleItemCompletionModeFollowsSaleUnitAndType(t *testing.T) {
@@ -120,6 +121,9 @@ func TestFoldWmsIssuedSumsQtyAndWeight(t *testing.T) {
 	}
 }
 
+// foldWmsIssued ต้องคงการ์ด outbound เดิมไว้ เพราะ ValidateBookingQty พึ่งมันอยู่
+// (SA เคาะ 2026-08-31 ดู validate-booking-qty.go:13-19) เทสนี้จึงยืนยัน "พฤติกรรมเดิม"
+// เส้นปิด SO ใช้ foldWmsDelivered ที่มีกติกาต่างออกไป ดูเทสด้านล่าง
 func TestFoldWmsIssuedIgnoresOpenOrderItemAndUncompletedOutbound(t *testing.T) {
 	issuedQty, issuedWeight, closed := foldWmsIssued([]orderExternalService.GetOrderDeliveryResponse{
 		buildOrder("DBS-1", "ITEM-1", "PENDING", []orderExternalService.OutboundItemWithGoodsIssue{
@@ -138,6 +142,194 @@ func TestFoldWmsIssuedIgnoresOpenOrderItemAndUncompletedOutbound(t *testing.T) {
 	}
 	if issuedQty["DBS-2|ITEM-2"] != 0 || issuedWeight["DBS-2|ITEM-2"] != 0 {
 		t.Error("outbound ที่ยังไม่ COMPLETED ต้องไม่ถูกนับ")
+	}
+}
+
+// giLine คือ 1 บรรทัด goods issue พร้อมสถานะของตัวเอง ใช้เทส foldWmsDelivered
+type giLine struct {
+	Qty    float64
+	Weight float64
+	Status string
+}
+
+// buildOutboundGIStatus สร้าง outbound พร้อมบรรทัด GI ที่กำหนดสถานะรายบรรทัดได้
+// (buildOutboundGI เดิมตั้งสถานะบรรทัด GI ไม่ได้ จึงไม่แก้ของเดิมเพื่อไม่ให้เทสอื่นสะเทือน)
+func buildOutboundGIStatus(outboundStatus string, lines ...giLine) orderExternalService.OutboundItemWithGoodsIssue {
+	outbound := orderExternalService.OutboundItemWithGoodsIssue{}
+	outbound.Status = outboundStatus
+
+	for _, line := range lines {
+		outbound.GoodsIssueItem = append(outbound.GoodsIssueItem, orderExternalService.GetIssueItemResponse{
+			Qty:    line.Qty,
+			Weight: line.Weight,
+			Status: line.Status,
+		})
+	}
+
+	return outbound
+}
+
+func TestIsCanceledStatusAcceptsEverySpelling(t *testing.T) {
+	cases := []struct {
+		status string
+		want   bool
+	}{
+		{"CANCELED", true},
+		{"CANCELLED", true},
+		{"cancelled", true},
+		{" Canceled ", true},
+		{"CANCEL-LED", false},
+		{"COMPLETED", false},
+		{"PENDING", false},
+		{"", false},
+	}
+
+	for _, tc := range cases {
+		if got := isCanceledStatus(tc.status); got != tc.want {
+			t.Errorf("isCanceledStatus(%q) = %v, want %v", tc.status, got, tc.want)
+		}
+	}
+}
+
+// เคสจริงที่ทำให้ feature นี้ไม่เคยทำงานเลย (TMI UAT 2026-09-09):
+//
+// hook ORDER/DELIVERY/UPDATE ถูกยิงจาก update-flow-tracking-packing.go:394 ขณะที่ tx
+// ที่เขียน outbound_item.status = COMPLETED (:279) ยังไม่ commit erp-core อ่านกลับมา
+// ทาง HTTP บน session ใหม่ จึงเห็น outbound เป็น PENDING
+//
+// GI20260909051617-0 ของ CO2609-00032: 2 บรรทัด 7+3 ชิ้น = 36.05+15.50 kg
+// ต้องนับได้ครบ 10 ชิ้น / 51.55 kg แม้ outbound ยังอ่านเป็น PENDING
+func TestFoldWmsDeliveredCountsGoodsIssueUnderPendingOutbound(t *testing.T) {
+	issuedQty, issuedWeight, closed := foldWmsDelivered([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS202609-0012", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGIStatus("PENDING",
+				giLine{Qty: 7, Weight: 36.05, Status: "COMPLETED"},
+				giLine{Qty: 3, Weight: 15.5, Status: "COMPLETED"}),
+		}),
+	})
+
+	key := "DBS202609-0012|ITEM-1"
+	if !closed[key] {
+		t.Fatalf("closed[%s] = false, want true (บรรทัด CO ปิดแล้ว)", key)
+	}
+	if issuedQty[key] != 10 {
+		t.Errorf("issuedQty[%s] = %v, want 10 — outbound ที่ยังอ่านเป็น PENDING ต้องไม่ทำให้ยอดหาย", key, issuedQty[key])
+	}
+	if issuedWeight[key] != 51.55 {
+		t.Errorf("issuedWeight[%s] = %v, want 51.55", key, issuedWeight[key])
+	}
+}
+
+// เทียบกับ foldWmsIssued บนข้อมูลชุดเดียวกัน: ตัวเดิมได้ 0 ตัวใหม่ได้ 10
+// นี่คือเหตุผลที่ต้องแยกสองตัวออกจากกัน ไม่ใช่แก้ตัวเดิม
+func TestFoldWmsDeliveredDiffersFromFoldWmsIssuedOnPendingOutbound(t *testing.T) {
+	orders := []orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGIStatus("PENDING", giLine{Qty: 10, Weight: 51.55, Status: "COMPLETED"}),
+		}),
+	}
+
+	oldQty, _, _ := foldWmsIssued(orders)
+	if oldQty["DBS-1|ITEM-1"] != 0 {
+		t.Fatalf("foldWmsIssued ต้องยังนับ 0 ตามกติกา ValidateBookingQty ได้ %v", oldQty["DBS-1|ITEM-1"])
+	}
+
+	newQty, _, _ := foldWmsDelivered(orders)
+	if newQty["DBS-1|ITEM-1"] != 10 {
+		t.Errorf("foldWmsDelivered = %v, want 10", newQty["DBS-1|ITEM-1"])
+	}
+}
+
+// บรรทัด CO ที่ยัง PENDING ยังต้องถูกข้ามเหมือนเดิม — เป็นการ์ดตัวเดียวที่เหลืออยู่
+// และเชื่อได้ เพราะ order_item.status ถูก commit ใน tx แรกของ ConfirmOrderOutbound
+func TestFoldWmsDeliveredStillSkipsOpenOrderItem(t *testing.T) {
+	issuedQty, issuedWeight, closed := foldWmsDelivered([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "PENDING", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGIStatus("COMPLETED", giLine{Qty: 8, Weight: 80, Status: "COMPLETED"}),
+		}),
+		buildOrder("DBS-2", "ITEM-2", "TEMP", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGIStatus("COMPLETED", giLine{Qty: 4, Weight: 40, Status: "COMPLETED"}),
+		}),
+	})
+
+	for _, key := range []string{"DBS-1|ITEM-1", "DBS-2|ITEM-2"} {
+		if closed[key] {
+			t.Errorf("closed[%s] = true, want false (CO ยังทำงานอยู่)", key)
+		}
+		if issuedQty[key] != 0 || issuedWeight[key] != 0 {
+			t.Errorf("บรรทัดที่ CO ยังไม่ปิด ต้องไม่นับยอด GI ได้ qty=%v weight=%v", issuedQty[key], issuedWeight[key])
+		}
+	}
+}
+
+// บรรทัด GI ที่ถูกยกเลิกต้องไม่นับ แต่บรรทัดที่สถานะว่าง (ข้อมูลเก่า) ต้องนับ
+func TestFoldWmsDeliveredSkipsCanceledGoodsIssueLines(t *testing.T) {
+	issuedQty, issuedWeight, _ := foldWmsDelivered([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutboundGIStatus("PENDING",
+				giLine{Qty: 5, Weight: 50, Status: "CANCELED"},
+				giLine{Qty: 7, Weight: 70, Status: "cancelled"},
+				giLine{Qty: 3, Weight: 30, Status: ""},
+				giLine{Qty: 2, Weight: 20, Status: "COMPLETED"}),
+		}),
+	})
+
+	key := "DBS-1|ITEM-1"
+	if issuedQty[key] != 5 {
+		t.Errorf("issuedQty[%s] = %v, want 5 (นับแค่บรรทัดว่าง 3 + COMPLETED 2)", key, issuedQty[key])
+	}
+	if issuedWeight[key] != 50 {
+		t.Errorf("issuedWeight[%s] = %v, want 50", key, issuedWeight[key])
+	}
+}
+
+// อ่าน system_config ไม่ได้ ต้องไม่ทำให้ระยะผ่อนผันกว้างกว่าค่าจริง (fail closed)
+// ค่าจริงของ TMI คือ 3 ค่า default เดิม 5 หลวมกว่านั้น
+func TestDefaultToleranceSOPercentFailsClosed(t *testing.T) {
+	if defaultToleranceSOPercent != 0 {
+		t.Fatalf("defaultToleranceSOPercent = %v, want 0", defaultToleranceSOPercent)
+	}
+
+	if isFullyDelivered(100, 97, defaultToleranceSOPercent) {
+		t.Error("อ่าน config ไม่ได้แล้วยังปิดใบที่ส่ง 97 จาก 100 ได้ = fail open")
+	}
+}
+
+// เส้นนี้เงียบเกินไปคือเหตุผลที่บั๊ก outbound.Status หลุดไปได้
+// log ต้องบอกเป้ากับยอดที่ตัดจริงของทุกบรรทัดที่ยังเปิดอยู่ และไม่รายงานบรรทัดที่ปิดแล้ว
+func TestDescribeCandidatesReportsTargetAndIssuedOfOpenLinesOnly(t *testing.T) {
+	items := []models.SaleItem{
+		{SaleItem: "SALE-PC", Qty: 10, TotalWeight: 51.5, SaleUnit: "PC", SaleUnitType: "PC", Status: "PENDING"},
+		{SaleItem: "SALE-KG", Qty: 53, TotalWeight: 500, SaleUnit: "KG", SaleUnitType: "KG", Status: "PENDING"},
+		{SaleItem: "SALE-DONE", Qty: 5, TotalWeight: 5, SaleUnit: "PC", SaleUnitType: "PC", Status: "COMPLETED"},
+	}
+
+	got := describeCandidates(items,
+		map[string]float64{"SALE-PC": 4, "SALE-KG": 53},
+		map[string]float64{"SALE-PC": 20, "SALE-KG": 300})
+
+	for _, want := range []string{
+		"SALE-PC[QTY status=PENDING target=10 issued_qty=4 issued_weight=20]",
+		"SALE-KG[WEIGHT status=PENDING target=500 issued_qty=53 issued_weight=300]",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("describeCandidates = %q, want ให้มี %q", got, want)
+		}
+	}
+
+	if strings.Contains(got, "SALE-DONE") {
+		t.Errorf("describeCandidates = %q, บรรทัดที่ปิดแล้วต้องไม่ถูกรายงาน", got)
+	}
+}
+
+func TestDescribeCandidatesSaysSoWhenEveryLineIsClosed(t *testing.T) {
+	items := []models.SaleItem{
+		{SaleItem: "SALE-DONE", Qty: 5, SaleUnit: "PC", Status: "COMPLETED"},
+		{SaleItem: "SALE-CANCELLED", Qty: 5, SaleUnit: "PC", Status: "CANCELLED"},
+	}
+
+	if got := describeCandidates(items, map[string]float64{}, map[string]float64{}); got != "no open sale item" {
+		t.Errorf("describeCandidates = %q, want %q", got, "no open sale item")
 	}
 }
 

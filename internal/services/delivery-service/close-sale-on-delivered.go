@@ -64,6 +64,65 @@ func isFullyDelivered(target float64, issued float64, tolerancePercent float64) 
 	return issued >= target*(1-tolerancePercent/100)
 }
 
+// isCanceledStatus บอกว่าสถานะนั้นคือ "ยกเลิก" หรือไม่ รับทุกวิธีสะกดที่เจอในระบบ
+// (CANCELED / CANCELLED / ตัวพิมพ์เล็ก / มีช่องว่าง / เขียนด้วยขีดกลาง)
+// normalise แบบเดียวกับ saleItemCompletionMode เพื่อไม่ให้สองที่เพี้ยนออกจากกัน
+func isCanceledStatus(status string) bool {
+	normalized := strings.ToUpper(strings.TrimSpace(status))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+
+	return normalized == "CANCELED" || normalized == "CANCELLED"
+}
+
+// foldWmsDelivered พับความคืบหน้าฝั่งคลังสำหรับ "เส้นปิด SO" โดยเฉพาะ
+// คืนรูปเดียวกับ foldWmsIssued: issuedQty, issuedWeight, closed คีย์ "<delivery_code>|<delivery_item>"
+//
+// ต่างจาก foldWmsIssued ที่จุดเดียว: ตัวนี้ "ไม่ดู outbound.Status" เลย
+//
+// เหตุผล — hook ORDER/DELIVERY/UPDATE ที่พาเรามาถึง UpdateStatusDelivery ถูกยิงจาก
+// wms-outbound-service externalConfirmOrderOutbound (update-flow-tracking-packing.go:394)
+// ขณะที่ tx ซึ่งเขียน `update outbound_item set status = ?` (:279) ยังไม่ commit
+// (tx เปิดที่ :127 commit ใน defer :135-147) erp-core อ่านสถานะกลับมาทาง HTTP
+// บน session ใหม่ จึงเห็น outbound_item.status = 'PENDING' เสมอ
+// ถ้า gate ด้วย outbound.Status ยอดที่ตัดจ่ายจะเป็น 0 ทุกบรรทัด และไม่มี SO ไหนถูกปิดเลย
+//
+// สิ่งที่เชื่อได้ตอน hook ยิงคือ order_item.status ซึ่งถูก commit ใน tx แรกของ
+// wms-order-service ConfirmOrderOutbound ก่อน hook จะทำงาน จึงยังใช้ closedOrderItemStatuses ได้
+//
+// ระดับบรรทัด GI นับทุกบรรทัดที่ไม่ถูกยกเลิก — สถานะว่างก็ต้องนับ เพราะข้อมูลเก่าเว้นช่องนี้ไว้
+//
+// ห้ามย้ายกติกานี้ไปใส่ foldWmsIssued/foldWmsProgress เพราะ ValidateBookingQty ต้องคง
+// การ์ด outbound เดิมไว้ตามที่ SA เคาะ (ดูคอมเมนต์ validate-booking-qty.go:13-19)
+func foldWmsDelivered(orders []orderExternalService.GetOrderDeliveryResponse) (map[string]float64, map[string]float64, map[string]bool) {
+	issuedQty := map[string]float64{}
+	issuedWeight := map[string]float64{}
+	closed := map[string]bool{}
+
+	for _, order := range orders {
+		for _, orderItem := range order.OrderItem {
+			if !closedOrderItemStatuses[orderItem.Status] {
+				continue
+			}
+
+			key := fmt.Sprintf("%s|%s", order.DocumentRef, orderItem.DocumentRefItem)
+			closed[key] = true
+
+			for _, outbound := range orderItem.OutboundItem {
+				for _, issued := range outbound.GoodsIssueItem {
+					if isCanceledStatus(issued.Status) {
+						continue
+					}
+
+					issuedQty[key] += issued.Qty
+					issuedWeight[key] += issued.Weight
+				}
+			}
+		}
+	}
+
+	return issuedQty, issuedWeight, closed
+}
+
 // deliveryLine คือ 1 บรรทัดของใบจอง ที่ผูกกับบรรทัดขายผ่าน document_ref_item
 type deliveryLine struct {
 	DeliveryCode string
@@ -96,8 +155,13 @@ func issuedBySaleItem(lines []deliveryLine, issuedQty map[string]float64, issued
 	return qtyOf, weightOf
 }
 
-// defaultToleranceSOPercent ใช้เมื่ออ่าน config ไม่ได้ (ค่าจริงของ TMI ตอนนี้คือ 3)
-const defaultToleranceSOPercent = 5.0
+// defaultToleranceSOPercent ใช้เมื่ออ่าน config ไม่ได้ — ต้องเป็น 0 (fail closed)
+//
+// ค่าจริงของ TMI ตอนนี้คือ 3 ค่า default ที่ "หลวมกว่าค่าจริง" (เดิม 5) แปลว่าเวลา
+// system_config อ่านไม่ได้หรือ parse ไม่ผ่าน ระยะผ่อนผันจะกว้างขึ้นเอง แล้วเส้นนี้
+// ไปเขียน sale/sale_item จริง ปิดใบที่ยังส่งไม่ครบได้ ย้อนคืนไม่ได้
+// 0 = ต้องส่งครบเป๊ะจึงปิด อ่าน config ไม่ได้ก็แค่ปิดช้ากว่าที่ควร ไม่ปิดผิด
+const defaultToleranceSOPercent = 0.0
 
 // selectDeliveredSaleItems คืนรหัสบรรทัดขายที่ส่งของถึงเป้าแล้วและยังไม่ถูกปิด
 //
@@ -124,6 +188,32 @@ func selectDeliveredSaleItems(items []models.SaleItem, issuedQty map[string]floa
 	}
 
 	return delivered
+}
+
+// describeCandidates ทำสรุป "บรรทัดที่พิจารณาแล้วยังไม่ปิด" ให้ log อ่านออก
+//
+// เส้นนี้เงียบมาก คืน nil ตอนไม่มีอะไรเข้าเกณฑ์ ทำให้บั๊กที่ยอดถูกนับเป็น 0 ทุกบรรทัด
+// (เคส gate ด้วย outbound.Status) หลุดขึ้น production ไปโดยไม่มีร่องรอยอะไรเลย
+// บรรทัดที่ปิดไปแล้วไม่ต้องรายงาน เพราะไม่ใช่ผู้ต้องสงสัย
+func describeCandidates(items []models.SaleItem, issuedQty map[string]float64, issuedWeight map[string]float64) string {
+	parts := []string{}
+
+	for _, item := range items {
+		if saleService.IsSaleItemClosed(item.Status) {
+			continue
+		}
+
+		mode := saleItemCompletionMode(item.SaleUnit, item.SaleUnitType)
+		parts = append(parts, fmt.Sprintf("%s[%s status=%s target=%v issued_qty=%v issued_weight=%v]",
+			item.SaleItem, mode, item.Status, completionTarget(item),
+			issuedQty[item.SaleItem], issuedWeight[item.SaleItem]))
+	}
+
+	if len(parts) == 0 {
+		return "no open sale item"
+	}
+
+	return strings.Join(parts, " ")
 }
 
 // toleranceSOPercent อ่านระยะผ่อนผันจาก system_config ของ ERP เอง (topic SO / TOLERANCE_SO)
@@ -162,21 +252,27 @@ func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) e
 		return nil
 	}
 
+	// อ่านทุกใบแล้วคัดด้วย saleService.IsSaleItemClosed ไม่คัดใน SQL
+	// เพราะ SQL literal เดิม ("COMPLETED","CANCELED") ไม่รู้จัก CANCELLED สองแอล
+	// กติกา "จบงานแล้ว" ต้องมีที่เดียวคือ predicate ของ sale-service
 	var sales []models.Sale
-	if err := gormx.Where("sale_code IN ? AND status NOT IN ?", codes, []string{"COMPLETED", "CANCELED"}).
-		Find(&sales).Error; err != nil {
+	if err := gormx.Where("sale_code IN ?", codes).Find(&sales).Error; err != nil {
 		return fmt.Errorf("failed to load sales %v: %v", codes, err)
-	}
-
-	if len(sales) == 0 {
-		return nil
 	}
 
 	saleIDs := make([]uuid.UUID, 0, len(sales))
 	openSaleCodes := make([]string, 0, len(sales))
 	for _, sale := range sales {
+		if saleService.IsSaleItemClosed(sale.Status) {
+			continue
+		}
+
 		saleIDs = append(saleIDs, sale.ID)
 		openSaleCodes = append(openSaleCodes, sale.SaleCode)
+	}
+
+	if len(openSaleCodes) == 0 {
+		return nil
 	}
 
 	var saleItems []models.SaleItem
@@ -189,8 +285,9 @@ func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) e
 	}
 
 	// ใบจองทุกใบของ SO เหล่านี้ ใบที่ยกเลิกไม่นับเพราะของถูกคืนไปแล้ว
+	// ต้องกันทั้งสองวิธีสะกด CANCELED/CANCELLED เหมือนที่ predicate ฝั่ง Go ทำ
 	var deliveries []models.Delivery
-	if err := gormx.Where("document_ref IN ? AND status <> ?", openSaleCodes, "CANCELED").
+	if err := gormx.Where("document_ref IN ? AND status NOT IN ?", openSaleCodes, []string{"CANCELED", "CANCELLED"}).
 		Find(&deliveries).Error; err != nil {
 		return fmt.Errorf("failed to load delivery bookings of %v: %v", openSaleCodes, err)
 	}
@@ -229,11 +326,17 @@ func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) e
 		return fmt.Errorf("failed to read WMS progress of %v: %v", deliveryCodes, err)
 	}
 
-	issuedQtyByLine, issuedWeightByLine, closed := foldWmsIssued(orderRes.Orders)
+	// foldWmsDelivered ไม่ใช่ foldWmsIssued — เส้นปิด SO ห้าม gate ด้วย outbound.Status
+	// เพราะแถว outbound_item ยังไม่ commit ตอน hook ยิง (ดูคอมเมนต์ที่ foldWmsDelivered)
+	issuedQtyByLine, issuedWeightByLine, closed := foldWmsDelivered(orderRes.Orders)
 	issuedQty, issuedWeight := issuedBySaleItem(lines, issuedQtyByLine, issuedWeightByLine, closed)
 
-	toClose := selectDeliveredSaleItems(saleItems, issuedQty, issuedWeight, toleranceSOPercent())
+	tolerance := toleranceSOPercent()
+
+	toClose := selectDeliveredSaleItems(saleItems, issuedQty, issuedWeight, tolerance)
 	if len(toClose) == 0 {
+		fmt.Printf("CloseSalesFullyDelivered: nothing to close for sales %v (tolerance %v%%), candidates: %s\n",
+			openSaleCodes, tolerance, describeCandidates(saleItems, issuedQty, issuedWeight))
 		return nil
 	}
 
@@ -245,7 +348,9 @@ func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) e
 		return tx.Error
 	}
 
-	_, completedSaleCodes, err := saleService.MarkSaleItemsCompleted(tx, toClose, "COMPLETED", user, nowDateOnly)
+	// เส้นอัตโนมัติต้องใช้ตัวที่มีการ์ดสถานะ (แตะแค่บรรทัดที่ยังเปิดอยู่)
+	// ระหว่างอ่านกับเขียนอาจมีคนยกเลิกบรรทัดนั้น หรือใบจองอีกใบของ SO เดียวกันปิดไปแล้ว
+	_, completedSaleCodes, err := saleService.MarkOpenSaleItemsCompleted(tx, toClose, user, nowDateOnly)
 	if err != nil {
 		tx.Rollback()
 		return err
