@@ -159,6 +159,24 @@ func createSchema() error {
             value text,
             seq integer
         );`,
+		`CREATE TABLE IF NOT EXISTS price_list_formulas (
+            id uuid PRIMARY KEY,
+            formula_code text UNIQUE NOT NULL,
+            name text NOT NULL,
+            uom text NOT NULL,
+            formula_type text,
+            expression text,
+            params jsonb,
+            rounding integer,
+            create_dtm timestamp
+        );`,
+		`CREATE TABLE IF NOT EXISTS price_list_subgroup_formulas_map (
+            id uuid PRIMARY KEY,
+            price_list_subgroup_code text NOT NULL,
+            price_list_formulas_code text NOT NULL,
+            is_default boolean DEFAULT false,
+            create_dtm timestamp
+        );`,
 	}
 
 	for _, s := range stmts {

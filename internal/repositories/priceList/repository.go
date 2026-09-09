@@ -691,3 +691,46 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 
 	return result, nil
 }
+
+// SubgroupFormula คือสูตรราคา 1 ตัวที่ผูกกับ price_list_sub_group หนึ่งแถว
+type SubgroupFormula struct {
+	SubgroupCode string `gorm:"column:subgroup_code"`
+	FormulaCode  string `gorm:"column:formula_code"`
+	Name         string `gorm:"column:name"`
+	Uom          string `gorm:"column:uom"`
+}
+
+// GetFormulasBySubgroupCodes คืนสูตรราคาของทุก subgroup ที่ขอมาในคิวรีเดียว
+// key ของ map คือ subgroup_code — subgroup ที่ไม่มีสูตรจะไม่มี key อยู่ใน map
+//
+// เขียน join เองแทนการใช้ Preload ของ models.PriceListSubGroupFormulasMap เพราะ
+// gorm tag ของ struct นั้นอ้าง references:SubgroupKey ซึ่งไม่ตรงกับ FK จริงในฐานข้อมูล
+// ที่ผูกด้วย subgroup_code
+func GetFormulasBySubgroupCodes(codes []string) (map[string][]SubgroupFormula, error) {
+	result := map[string][]SubgroupFormula{}
+	if len(codes) == 0 {
+		return result, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	rows := []SubgroupFormula{}
+	if err := gormx.
+		Table("price_list_subgroup_formulas_map AS m").
+		Select("m.price_list_subgroup_code AS subgroup_code, f.formula_code, f.name, f.uom").
+		Joins("JOIN price_list_formulas AS f ON f.formula_code = m.price_list_formulas_code").
+		Where("m.price_list_subgroup_code IN ?", codes).
+		Order("m.price_list_subgroup_code, f.uom, f.formula_code").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		result[r.SubgroupCode] = append(result[r.SubgroupCode], r)
+	}
+	return result, nil
+}
