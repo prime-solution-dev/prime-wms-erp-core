@@ -176,7 +176,7 @@ func TestIssuedBySaleItemSumsAcrossEveryBooking(t *testing.T) {
 	}
 }
 
-// ใบแรกจบแล้วแต่อีก 2 ใบยังไม่เดิน -> ต้องได้แค่ 30 (ห้ามปิด SO ที่เหลือของค้าง)
+// ใบแรกจบแล้วแต่อีก 2 ใบยังไม่เดิน -> ต้องได้แค่ 30 ชิ้นและ 87 kg (ห้ามเพิ่มยอด pending)
 func TestIssuedBySaleItemSkipsBookingsThatAreNotClosedYet(t *testing.T) {
 	lines := []deliveryLine{
 		{DeliveryCode: "DBS202609-0009", DeliveryItem: "ITEM-A", SaleItemCode: "SALE-1"},
@@ -184,14 +184,25 @@ func TestIssuedBySaleItemSkipsBookingsThatAreNotClosedYet(t *testing.T) {
 		{DeliveryCode: "DBS202609-0011", DeliveryItem: "ITEM-C", SaleItemCode: "SALE-1"},
 	}
 
-	issuedQty := map[string]float64{"DBS202609-0009|ITEM-A": 30}
-	issuedWeight := map[string]float64{"DBS202609-0009|ITEM-A": 87}
+	issuedQty := map[string]float64{
+		"DBS202609-0009|ITEM-A": 30,
+		"DBS202609-0010|ITEM-B": 3,
+		"DBS202609-0011|ITEM-C": 17,
+	}
+	issuedWeight := map[string]float64{
+		"DBS202609-0009|ITEM-A": 87,
+		"DBS202609-0010|ITEM-B": 8.7,
+		"DBS202609-0011|ITEM-C": 49.3,
+	}
 	closed := map[string]bool{"DBS202609-0009|ITEM-A": true}
 
-	qty, _ := issuedBySaleItem(lines, issuedQty, issuedWeight, closed)
+	qty, weight := issuedBySaleItem(lines, issuedQty, issuedWeight, closed)
 
 	if qty["SALE-1"] != 30 {
 		t.Errorf("qty[SALE-1] = %v, want 30", qty["SALE-1"])
+	}
+	if weight["SALE-1"] != 87 {
+		t.Errorf("weight[SALE-1] = %v, want 87", weight["SALE-1"])
 	}
 }
 
