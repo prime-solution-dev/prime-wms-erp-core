@@ -245,9 +245,18 @@ func loadWmsProgress(deliveryCodes []string) (map[string]float64, map[string]boo
 	return foldWmsProgress(orderRes.Orders)
 }
 
-// foldWmsProgress แยกออกมาเพื่อให้เทสกติกา closed/issued ได้โดยไม่ต้องมี WMS จริง
+// foldWmsProgress คงรูปเดิมไว้ให้ ValidateBookingQty ใช้ (สนใจแค่จำนวน)
+// แยกออกมาเพื่อให้เทสกติกา closed/issued ได้โดยไม่ต้องมี WMS จริง
 func foldWmsProgress(orders []orderExternalService.GetOrderDeliveryResponse) (map[string]float64, map[string]bool) {
+	issuedQty, _, closed := foldWmsIssued(orders)
+	return issuedQty, closed
+}
+
+// foldWmsIssued พับความคืบหน้าฝั่งคลังเป็น 3 map คีย์ "<delivery_code>|<delivery_item>"
+// ยอดน้ำหนักต้องแยกจากจำนวน เพราะบรรทัดที่ขายเป็นกิโลตัดสินความครบด้วยน้ำหนัก
+func foldWmsIssued(orders []orderExternalService.GetOrderDeliveryResponse) (map[string]float64, map[string]float64, map[string]bool) {
 	issuedQty := map[string]float64{}
+	issuedWeight := map[string]float64{}
 	closed := map[string]bool{}
 
 	for _, order := range orders {
@@ -266,10 +275,11 @@ func foldWmsProgress(orders []orderExternalService.GetOrderDeliveryResponse) (ma
 				}
 				for _, issued := range outbound.GoodsIssueItem {
 					issuedQty[key] += issued.Qty
+					issuedWeight[key] += issued.Weight
 				}
 			}
 		}
 	}
 
-	return issuedQty, closed
+	return issuedQty, issuedWeight, closed
 }
