@@ -18,7 +18,7 @@ import (
 )
 
 type GetPurchaseItemRemainRequest struct {
-	UsageType             string                 `json:"usage_type,omitempty"`
+	UsageType             string                 `json:"usage_type,omitempty"` //IB = inbound, IV = Invoice
 	ExcludeDocumentCode   string                 `json:"exclude_document_code,omitempty"`
 	SelectedPurchaseItems []SelectedPurchaseItem `json:"selected_purchase_items,omitempty"`
 	CompanyCode           string                 `json:"company_code"`
