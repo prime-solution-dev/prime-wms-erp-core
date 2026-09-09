@@ -341,6 +341,7 @@ type UpdateStatusApprovePOBigLotRequest struct {
 	PrePurchaseCode string    `json:"pre_purchase_code"`
 	IsApproved      bool      `json:"is_approved"`
 	StatusApprove   string    `json:"status_approve"`
+	Remark          string    `json:"remark"`
 }
 
 // Supplier DTOs
