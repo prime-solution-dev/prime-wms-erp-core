@@ -119,7 +119,8 @@ Formula มาจาก `price_list_subgroup_formulas_map` JOIN `price_list_form
 
 - ไม่พบ formula สำหรับ subgroup → เซลล์ formula ว่าง ไม่ error
 - resolve ชื่อ item ไม่ได้ → fallback แสดง code ดิบ (ดีกว่าเซลล์ว่างเงียบ ๆ)
-- `groupCodes` ที่ส่งมาไม่มีในระบบ → คืน tab ที่มี header ครบแต่ไม่มีแถว ไม่ใช่ error
+- `groupCodes` ที่ส่งมาไม่มีในระบบ → คืน tab ที่ไม่มีแถว ไม่ใช่ error โดยเหลือเฉพาะคอลัมน์คงที่
+  (คอลัมน์กลุ่มสินค้าเก็บจากข้อมูลจริง เมื่อไม่มีแถวจึงไม่มีคอลัมน์กลุ่ม)
 - frontend ใช้ try/catch + loading pattern เดิมของ `onPrintDocument()`
 
 ## 8. Test
