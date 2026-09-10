@@ -81,6 +81,10 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errCreateInvoice
 	}
 
+	if req[0].Status == "TEMP" {
+		return createInvoiceReturn, nil
+	}
+
 	invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
