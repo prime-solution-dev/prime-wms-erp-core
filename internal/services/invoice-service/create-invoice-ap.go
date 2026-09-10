@@ -306,7 +306,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
 				)
 				req[i].InvoiceItem[it].PriceUnit = priceUnit
-				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.PurchaseUnit), "KG") {
+				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.UnitUom), "KG") {
 					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
 					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
