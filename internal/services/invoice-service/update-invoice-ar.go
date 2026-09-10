@@ -71,11 +71,11 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				}
 				drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
 				if err != nil {
-					totalFloat = 0
+					drFloat = 0
 				}
 				crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
 				if err != nil {
-					totalFloat = 0
+					crFloat = 0
 				}
 
 				deposit = append(deposit, models.Deposit{
