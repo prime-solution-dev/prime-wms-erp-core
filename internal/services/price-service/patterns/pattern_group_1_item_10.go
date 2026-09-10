@@ -49,8 +49,10 @@ func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, grou
 			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
 			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
 			if lengthI == lengthJ {
-				weightI := fmt.Sprintf("%v", mergedRows[i]["total_weight"])
-				weightJ := fmt.Sprintf("%v", mergedRows[j]["total_weight"])
+				// total_weight (คอลัมน์ Weight-spec) เป็นตัวเลข ต้องเทียบเป็น float
+				// ไม่ใช่ string ไม่งั้น "12.5" จะมาก่อน "9"
+				weightI, _ := toFloat64(mergedRows[i]["total_weight"])
+				weightJ, _ := toFloat64(mergedRows[j]["total_weight"])
 				return weightI < weightJ
 			}
 			return lengthI < lengthJ
