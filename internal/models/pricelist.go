@@ -281,24 +281,24 @@ type PriceListSubGroupKeyResponse struct {
 }
 
 type InventoryWeightResponse struct {
-	Key               string  `json:"key"`
-	InventoryKeyCode  string  `json:"inventory_weightkey_code,omitempty"`
-	ProductCode       string  `json:"product_code"`
-	CompanyCode       string  `json:"company_code,omitempty"`
-	SiteCode          string  `json:"site_code,omitempty"`
-	BatchNo           string  `json:"batch_no"`
-	SerialCode        string  `json:"serial_code,omitempty"`
-	SupplierCode      string  `json:"supplier_code"`
-	SupplierName      string  `json:"supplier_name"`
-	AvgProduct        float64 `json:"avg_product"`
-	AvgBatch          float64 `json:"avg_batch"`
-	AvgSerial         float64 `json:"avg_serial"`
-	AvgWeight         float64 `json:"avg_weight"`
-	WeightSpec        float64 `json:"weight_spec"`
-	SumQty            float64 `json:"sum_qty"`
-	SumWeight         float64 `json:"sum_weight"`
-	TotalQty          float64 `json:"total_qty"`
-	TotalWeight       float64 `json:"total_weight"`
+	Key              string  `json:"key"`
+	InventoryKeyCode string  `json:"inventory_weightkey_code,omitempty"`
+	ProductCode      string  `json:"product_code"`
+	CompanyCode      string  `json:"company_code,omitempty"`
+	SiteCode         string  `json:"site_code,omitempty"`
+	BatchNo          string  `json:"batch_no"`
+	SerialCode       string  `json:"serial_code,omitempty"`
+	SupplierCode     string  `json:"supplier_code"`
+	SupplierName     string  `json:"supplier_name"`
+	AvgProduct       float64 `json:"avg_product"`
+	AvgBatch         float64 `json:"avg_batch"`
+	AvgSerial        float64 `json:"avg_serial"`
+	AvgWeight        float64 `json:"avg_weight"`
+	WeightSpec       float64 `json:"weight_spec"`
+	SumQty           float64 `json:"sum_qty"`
+	SumWeight        float64 `json:"sum_weight"`
+	TotalQty         float64 `json:"total_qty"`
+	TotalWeight      float64 `json:"total_weight"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -334,8 +334,11 @@ type PriceListSubGroupResponse struct {
 	SupplierCode              string                         `json:"supplier_code,omitempty"`
 	SupplierName              string                         `json:"supplier_name,omitempty"`
 	ProductCode               string                         `json:"product_code,omitempty"`
-	BatchNo                   string                         `json:"batch_no,omitempty"`
-	DefaultUom                string                         `json:"default_uom,omitempty"`
+	// WeightSpec คือน้ำหนักของ base unit จาก product master — เก็บระดับ subgroup
+	// ไม่ใช่ใน InventoryWeight เพราะต้องมีค่าแม้ subgroup นั้นไม่มีสต็อก
+	WeightSpec float64 `json:"weight_spec"`
+	BatchNo    string  `json:"batch_no,omitempty"`
+	DefaultUom string  `json:"default_uom,omitempty"`
 }
 
 type GetPriceListResponse struct {
@@ -499,6 +502,7 @@ type GetCalculatedPriceListSubGroupItem struct {
 	TotalNetPriceWeight       float64 `json:"total_net_price_weight"`
 	ExtraPriceUnit            float64 `json:"extra_price_unit"`
 	ExtraPriceWeight          float64 `json:"extra_price_weight"`
+	WeightSpec                float64 `json:"weight_spec"`
 	BeforeTotalNetPriceUnit   float64 `json:"before_total_net_price_unit"`
 	BeforeTotalNetPriceWeight float64 `json:"before_total_net_price_weight"`
 	DefaultUom                string  `json:"default_uom,omitempty"`

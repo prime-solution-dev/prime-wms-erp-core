@@ -18,7 +18,6 @@ type GetPriceDetailRequest struct {
 	EffectiveDateTo   *time.Time `json:"effective_date_to"`
 }
 
-
 type PriceFormula struct {
 	Expression string          `json:"expression"`
 	Params     json.RawMessage `json:"params"`
@@ -40,6 +39,7 @@ type Price struct {
 	TotalNetPriceWeight float64 `json:"total_net_price_weight"`
 	ExtraPriceUnit      float64 `json:"extra_price_unit"`
 	ExtraPriceWeight    float64 `json:"extra_price_weight"`
+	WeightSpec          float64 `json:"weight_spec"`
 	DefaultUom          string  `json:"default_uom"`
 }
 
