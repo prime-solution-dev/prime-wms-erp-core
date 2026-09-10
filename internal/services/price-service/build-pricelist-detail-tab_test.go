@@ -28,6 +28,7 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 						TotalNetPriceWeight: 18.34,
 						TotalNetPriceUnit:   1230,
 						ExtraPriceWeight:    1,
+						WeightSpec:          120.45,
 						UdfJson:             udf,
 						GroupKeys: []GroupKey{
 							{Code: "PG01", Value: "PG01_3", Seq: 1},
@@ -35,7 +36,9 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 							{Code: "PG06", Value: "PG06_4", Seq: 6},
 						},
 						InventoryWeight: []models.InventoryWeightResponse{
-							{TotalWeight: 120.45, AvgWeight: 0},
+							// TotalWeight ต้องต่างจาก WeightSpec เพื่อให้ assertion ของ
+							// total_weight แยกแยะได้ว่าอ่านจาก product master ไม่ใช่จากสต็อก
+							{TotalWeight: 999.9, AvgWeight: 0},
 						},
 					},
 					{
@@ -463,6 +466,38 @@ func TestBuildPricelistDetailTab_ColumnSetStaysFixedWhenFiltered(t *testing.T) {
 	}
 	if tab.Rows[0]["PG04"] != "" {
 		t.Fatalf("expected an empty PG04 cell, got %v", tab.Rows[0]["PG04"])
+	}
+}
+
+func TestBuildPricelistDetailTab_WeightSpecUsesProductMaster(t *testing.T) {
+	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
+	groups[0].SubGroups[0].WeightSpec = 12.5
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
+
+	row := tab.Rows[0]
+	if row["total_weight"] != 12.5 {
+		t.Fatalf("expected total_weight to use WeightSpec from product master, got %v", row["total_weight"])
+	}
+	if row["avg_weight"] != float64(0) {
+		t.Fatalf("expected avg_weight to still come from inventory, got %v", row["avg_weight"])
+	}
+}
+
+func TestBuildPricelistDetailTab_WeightSpecWithoutStock(t *testing.T) {
+	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
+	groups[0].SubGroups[0].WeightSpec = 12.5
+	groups[0].SubGroups[0].InventoryWeight = nil
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
+
+	row := tab.Rows[0]
+	if row["total_weight"] != 12.5 {
+		t.Fatalf("expected total_weight to be 12.5 even without stock, got %v", row["total_weight"])
+	}
+	// avg_weight ผูกกับสต็อกจริง ๆ จึงต้องยังเป็นเซลล์ว่างเมื่อไม่มีสต็อก
+	if row["avg_weight"] != "" {
+		t.Fatalf("expected avg_weight to stay blank without stock, got %v", row["avg_weight"])
 	}
 }
 

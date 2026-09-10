@@ -156,6 +156,8 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 	// Create inventory maps for quick lookup
 	inventoryMap := make(map[string][]models.InventoryWeightResponse)
 	supplierCodeMap := make(map[string]string)
+	// weight_spec มาจาก product master ระดับ result ใช้ได้แม้ subgroup ไม่มีสต็อก
+	weightSpecMap := make(map[string]float64)
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
@@ -185,6 +187,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
 				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 		}
 	}
@@ -213,7 +216,6 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 
 		// Get inventory data for this subgroup
 		avgKgStock := 1.0
-		weightSpec := 1.0
 		pcs := 0.0
 		kg := 0.0
 		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
@@ -223,14 +225,15 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			} else {
 				avgKgStock = inventoryWeight[0].AvgWeight
 			}
-			if inventoryWeight[0].TotalWeight == 0 {
-				weightSpec = 1.0
-			} else {
-				weightSpec = inventoryWeight[0].TotalWeight
-			}
 			pcs = inventoryWeight[0].TotalQty
 			kg = inventoryWeight[0].TotalWeight
 		}
+
+		// weight_spec คือน้ำหนักของ base unit จาก product master ไม่ได้ผูกกับสต็อก
+		// จึงอ่านนอกบล็อก inventory ข้างบน (เดิมอ่าน TotalWeight ซึ่งเป็นตัวเดียวกับ kg)
+		// rawWeightSpec เก็บค่าดิบไว้ส่งกลับใน response ส่วนสูตรใช้ค่าที่ fallback แล้ว
+		rawWeightSpec := weightSpecMap[subGroupID.String()]
+		weightSpec := weightSpecForFormula(rawWeightSpec)
 
 		if len(priceListFormulas) > 0 {
 			// Check for default input formula
@@ -314,6 +317,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			ExtraPriceWeight:          extraPriceWeight,
 			BeforeTotalNetPriceUnit:   beforeTotalNetPriceUnit,
 			BeforeTotalNetPriceWeight: beforeTotalNetPriceWeight,
+			WeightSpec:                rawWeightSpec,
 			DefaultUom:                defaultUom,
 		})
 	}
