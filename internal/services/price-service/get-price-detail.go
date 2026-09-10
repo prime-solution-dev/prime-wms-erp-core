@@ -314,8 +314,12 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
 							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0
-							// เงื่อนไขเดิมทำให้ field คงค่าที่ค้างจาก subgroup ต้นแบบ
-							// (expandedSG := sg เป็นการ copy) เมื่อ batch นี้มีค่าเป็น 0 จริง ๆ
+							//
+							// InventoryWeightResponse มีทั้ง field เก่า (sum_qty, sum_weight, avg_batch)
+							// และใหม่ (total_qty, total_weight, avg_weight) อยู่ใน struct เดียวกัน
+							// บรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา ซึ่งรวม field เก่าที่มาจาก JSON
+							// เงื่อนไข > 0 เดิมจึงเขียนทับแค่บาง field ทำให้ field เก่าที่ backend
+							// ส่งมาค้างอยู่เมื่อค่าใหม่เป็น 0 จริง ๆ เช่น batch ที่น้ำหนักเป็น 0
 							//
 							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
 							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct
