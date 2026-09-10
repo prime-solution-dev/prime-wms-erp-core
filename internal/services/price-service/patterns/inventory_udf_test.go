@@ -12,20 +12,36 @@ func sgWithInventory(inv models.InventoryWeightResponse) models.PriceListSubGrou
 	}
 }
 
-// The "Weight-spec" column must read WeightSpec, not TotalWeight (the total
-// on-hand stock weight). Reading TotalWeight showed values like 1,500,000 kg
-// in a column that is meant to hold a per-unit spec weight.
+// คอลัมน์ "Weight-spec" ต้องอ่านจาก sg.WeightSpec ซึ่งเป็นน้ำหนักของ base unit
+// จาก product master ไม่ใช่จาก InventoryWeight ที่ผูกกับสต็อก
+//
+// เดิมอ่านจาก InventoryWeight[0].WeightSpec ซึ่ง warehouse-core ไม่เคย set ค่าเลย
+// จึงได้ 0 เสมอ และค่าต้องมีแม้ subgroup นั้นไม่มีสต็อก (InventoryWeight ว่าง)
 func TestGetWeightSpecFromInventory(t *testing.T) {
-	sg := sgWithInventory(models.InventoryWeightResponse{
-		WeightSpec:  12.5,
-		TotalWeight: 1500000,
-	})
+	sg := models.PriceListSubGroupResponse{WeightSpec: 12.5}
 	if got := getWeightSpecFromInventory(sg); got != 12.5 {
 		t.Fatalf("want WeightSpec 12.5, got %v", got)
 	}
 
+	// ไม่มีสต็อกเลยแต่ยังต้องได้ค่า weight spec
+	noStock := models.PriceListSubGroupResponse{
+		WeightSpec:      12.5,
+		InventoryWeight: []models.InventoryWeightResponse{},
+	}
+	if got := getWeightSpecFromInventory(noStock); got != 12.5 {
+		t.Fatalf("want 12.5 with no stock, got %v", got)
+	}
+
+	// มีสต็อกน้ำหนักรวมมหาศาล แต่ต้องไม่หลุดมาเป็น weight spec
+	withStock := sgWithInventory(models.InventoryWeightResponse{TotalWeight: 1500000})
+	withStock.WeightSpec = 12.5
+	if got := getWeightSpecFromInventory(withStock); got != 12.5 {
+		t.Fatalf("want 12.5, must not read TotalWeight, got %v", got)
+	}
+
+	// ไม่มีข้อมูลอะไรเลย → 0 (ฝั่งสูตรจะ fallback เป็น 1.0 เอง)
 	if got := getWeightSpecFromInventory(models.PriceListSubGroupResponse{}); got != 0 {
-		t.Fatalf("want 0 with no inventory, got %v", got)
+		t.Fatalf("want 0 with no data, got %v", got)
 	}
 }
 
