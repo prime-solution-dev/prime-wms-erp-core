@@ -47,7 +47,7 @@ func TestSortFormulasByDependencyPutsProducerFirst(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sortFormulasByDependency(tt.input)
+			got := sortFormulasByDependency("SUB_PRODUCER_FIRST", tt.input)
 			gotNames := formulaNames(got)
 			if len(gotNames) != 2 {
 				t.Fatalf("ต้องได้ 2 สูตร แต่ได้ %d", len(gotNames))
@@ -71,7 +71,7 @@ func TestSortFormulasByDependencyInputFormulaFirst(t *testing.T) {
 	}
 	kgFormula := formulaEntry("kg = [Pcs] / [Avg. kg stock]", "kg", "pcs/avg_kg_stock", []string{"pcs", "avg_kg_stock"})
 
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{kgFormula, inputFormula})
+	got := sortFormulasByDependency("SUB_INPUT_FIRST", []models.PriceListSubGroupFormulasMap{kgFormula, inputFormula})
 	gotNames := formulaNames(got)
 
 	if gotNames[0] != "pcs = input" {
@@ -85,7 +85,7 @@ func TestSortFormulasByDependencyKeepsOrderWhenIndependent(t *testing.T) {
 		"(base_price+2.1)*avg_kg_stock*1.02", []string{"base_price", "avg_kg_stock"})
 	b := formulaEntry("kg = Base price + Extra", "kg", "base_price+extra", []string{"base_price", "extra"})
 
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{a, b})
+	got := sortFormulasByDependency("SUB_INDEPENDENT", []models.PriceListSubGroupFormulasMap{a, b})
 	gotNames := formulaNames(got)
 
 	if gotNames[0] != a.PriceListFormulas.Name || gotNames[1] != b.PriceListFormulas.Name {
@@ -98,7 +98,7 @@ func TestSortFormulasByDependencyCircularKeepsOrder(t *testing.T) {
 	pcsFormula := formulaEntry("Pcs from kg", "pcs", "kg*avg_kg_stock", []string{"kg"})
 	kgFormula := formulaEntry("kg from Pcs", "kg", "pcs/avg_kg_stock", []string{"pcs"})
 
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{pcsFormula, kgFormula})
+	got := sortFormulasByDependency("SUB_CIRCULAR", []models.PriceListSubGroupFormulasMap{pcsFormula, kgFormula})
 	gotNames := formulaNames(got)
 
 	if len(gotNames) != 2 {
@@ -111,15 +111,15 @@ func TestSortFormulasByDependencyCircularKeepsOrder(t *testing.T) {
 
 // input ว่าง nil และสูตรเดียวต้องไม่ panic
 func TestSortFormulasByDependencyEdgeCases(t *testing.T) {
-	if got := sortFormulasByDependency(nil); len(got) != 0 {
+	if got := sortFormulasByDependency("SUB_EDGE_NIL", nil); len(got) != 0 {
 		t.Errorf("input nil ต้องได้ slice ว่าง แต่ได้ %d", len(got))
 	}
-	if got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{}); len(got) != 0 {
+	if got := sortFormulasByDependency("SUB_EDGE_EMPTY", []models.PriceListSubGroupFormulasMap{}); len(got) != 0 {
 		t.Errorf("input ว่างต้องได้ slice ว่าง แต่ได้ %d", len(got))
 	}
 
 	single := formulaEntry("kg = Base price + Extra", "kg", "base_price+extra", []string{"base_price"})
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{single})
+	got := sortFormulasByDependency("SUB_EDGE_SINGLE", []models.PriceListSubGroupFormulasMap{single})
 	if len(got) != 1 || got[0].PriceListFormulas.Name != single.PriceListFormulas.Name {
 		t.Errorf("สูตรเดียวต้องคืนตัวเดิม")
 	}
@@ -138,20 +138,45 @@ func TestSortFormulasByDependencyInvalidParams(t *testing.T) {
 	}
 	kgFormula := formulaEntry("kg = Base price + Extra", "kg", "base_price+extra", []string{"base_price"})
 
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{broken, kgFormula})
+	got := sortFormulasByDependency("SUB_INVALID_PARAMS", []models.PriceListSubGroupFormulasMap{broken, kgFormula})
 	if len(got) != 2 {
 		t.Fatalf("ต้องได้ 2 สูตร แต่ได้ %d", len(got))
+	}
+	if got[0].PriceListFormulas.Name != "broken params" {
+		t.Errorf("params พัง ต้องคงลำดับเดิม แต่ได้ %v", formulaNames(got))
 	}
 }
 
 // สูตรเดียวกันถูกผูกซ้ำ 2 ครั้ง (พบจริง 131 subgroup) ต้องไม่หายและไม่วนไม่จบ
-func TestSortFormulasByDependencyDuplicateFormula(t *testing.T) {
+func TestSortFormulasByDependencyDuplicateFormulaNotLost(t *testing.T) {
 	f := formulaEntry("Pcs = ( [Base price] + 2.1 ) x [Avg kg. stock] x (1+2%)", "pcs",
 		"(base_price+2.1)*avg_kg_stock*1.02", []string{"base_price", "avg_kg_stock"})
 
-	got := sortFormulasByDependency([]models.PriceListSubGroupFormulasMap{f, f})
+	got := sortFormulasByDependency("SUB_DUPLICATE", []models.PriceListSubGroupFormulasMap{f, f})
 
 	if len(got) != 2 {
 		t.Fatalf("ต้องได้ 2 สูตร (ผูกซ้ำ) แต่ได้ %d", len(got))
+	}
+}
+
+// chain 3 ชั้นคือเหตุผลที่ต้องใช้ topological sort ไม่ใช่การเรียงด้วยกฎคงที่
+// ton ผลิตค่าให้ kg และ kg ผลิตค่าให้ pcs จึงต้องได้ลำดับ ton -> kg -> pcs
+func TestSortFormulasByDependencyThreeLevelChain(t *testing.T) {
+	pcsFormula := formulaEntry("pcs from kg", "pcs", "kg*avg_kg_stock", []string{"kg"})
+	kgFormula := formulaEntry("kg from ton", "kg", "ton*1000", []string{"ton"})
+	tonFormula := formulaEntry("ton = input", "ton", "base_price", []string{"base_price"})
+
+	// ส่งมาสลับลำดับที่สุด
+	got := sortFormulasByDependency("SUB_CHAIN", []models.PriceListSubGroupFormulasMap{pcsFormula, kgFormula, tonFormula})
+	gotNames := formulaNames(got)
+
+	want := []string{"ton = input", "kg from ton", "pcs from kg"}
+	if len(gotNames) != 3 {
+		t.Fatalf("ต้องได้ 3 สูตร แต่ได้ %d", len(gotNames))
+	}
+	for i := range want {
+		if gotNames[i] != want[i] {
+			t.Fatalf("ลำดับ = %v ต้องเป็น %v", gotNames, want)
+		}
 	}
 }
