@@ -315,7 +315,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				totalAmount += req[i].InvoiceItem[it].TotalAmount //total cost
 
 				priceUnit, err := calculateAPPriceUnit(
-					poQTYMapResult.PurchaseUnit, req[i].InvoiceItem[it].UnitUom,
+					poQTYMapResult.UnitUom, req[i].InvoiceItem[it].UnitUom,
 					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
 				)
 				if err != nil {
