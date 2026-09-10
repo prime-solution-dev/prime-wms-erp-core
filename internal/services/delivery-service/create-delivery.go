@@ -75,8 +75,13 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	defer db.CloseGORM(gormx)
 
 	// กันจองเกินจำนวนใน sale order ก่อนแตะอะไรทั้งนั้น (ทั้ง DB และ hook ภายนอก)
+	// Save Draft (is_draft) ยังไม่ผูกของจริง จึงไม่ต้องกันจองเกิน SO — ข้ามใบร่างไป
+	// ใบที่ไม่ใช่ร่างในเพย์โหลดเดียวกันยังถูกตรวจตามปกติ
 	bookingLines := []bookingLine{}
 	for _, deliveryReq := range req {
+		if deliveryReq.IsDraft {
+			continue
+		}
 		for _, item := range deliveryReq.DeliveryItems {
 			bookingLines = append(bookingLines, bookingLine{
 				SaleCode:        deliveryReq.DocumentRef,

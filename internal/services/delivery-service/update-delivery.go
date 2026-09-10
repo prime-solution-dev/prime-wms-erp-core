@@ -187,10 +187,15 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// กันจองเกินจำนวนใน sale order โดยไม่นับจำนวนของใบที่กำลังแก้ซ้ำเข้าไปเอง
+	// Save Draft (is_draft) ยังไม่ผูกของจริง จึงไม่ต้องกันจองเกิน SO — ข้ามใบร่างไป
+	// ใบที่ไม่ใช่ร่างในเพย์โหลดเดียวกันยังถูกตรวจตามปกติ
 	bookingLines := []bookingLine{}
 	editingDeliveryCodes := []string{}
 	for _, deliveryReq := range req.Deliveries {
 		editingDeliveryCodes = append(editingDeliveryCodes, deliveryReq.DeliveryCode)
+		if deliveryReq.IsDraft {
+			continue
+		}
 		for _, item := range deliveryReq.Items {
 			bookingLines = append(bookingLines, bookingLine{
 				SaleCode:        deliveryReq.DocumentRef,
