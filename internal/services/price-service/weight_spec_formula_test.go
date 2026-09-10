@@ -9,8 +9,9 @@ import (
 // สูตรคู่ Pcs = [kg] x [Weight Spec] และ kg = [Pcs] / [Weight Spec] ต้องเป็นผกผันกัน
 //
 // weight_spec มีหน่วย kg ต่อชิ้น ดังนั้น
-//   ราคาต่อชิ้น = ราคาต่อกิโล x kg ต่อชิ้น
-//   ราคาต่อกิโล = ราคาต่อชิ้น / kg ต่อชิ้น
+//
+//	ราคาต่อชิ้น = ราคาต่อกิโล x kg ต่อชิ้น
+//	ราคาต่อกิโล = ราคาต่อชิ้น / kg ต่อชิ้น
 //
 // expression ของสูตรที่สองเคยเป็น pcs*weight_spec ซึ่งเป็นการคูณ ไม่ตรงกับชื่อสูตร
 // แก้เป็น pcs/weight_spec ที่ migration 2026-09-11-fix-pcs-weight-spec-expression.sql

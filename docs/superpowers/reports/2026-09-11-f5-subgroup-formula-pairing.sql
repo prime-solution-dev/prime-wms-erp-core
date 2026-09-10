@@ -32,7 +32,7 @@ ORDER BY subgroups DESC;
 \echo '=== 2) subgroup ที่ไม่มีสูตร uom kg เลย (total_net_price_weight ไม่ถูกคำนวณใหม่) ==='
 SELECT
     m.price_list_subgroup_code,
-    string_agg(DISTINCT f.name, '  ||  ') AS formulas_bound,
+    string_agg(DISTINCT f.name, '  ||  ' ORDER BY f.name) AS formulas_bound,
     s.total_net_price_weight,
     s.total_net_price_unit
 FROM price_list_subgroup_formulas_map m
