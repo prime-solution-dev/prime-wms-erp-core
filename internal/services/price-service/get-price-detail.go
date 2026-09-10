@@ -317,9 +317,13 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							//
 							// InventoryWeightResponse มีทั้ง field เก่า (sum_qty, sum_weight, avg_batch)
 							// และใหม่ (total_qty, total_weight, avg_weight) อยู่ใน struct เดียวกัน
-							// บรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา ซึ่งรวม field เก่าที่มาจาก JSON
-							// เงื่อนไข > 0 เดิมจึงเขียนทับแค่บาง field ทำให้ field เก่าที่ backend
-							// ส่งมาค้างอยู่เมื่อค่าใหม่เป็น 0 จริง ๆ เช่น batch ที่น้ำหนักเป็น 0
+							// และบรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา
+							//
+							// ปัจจุบัน endpoint get-inventory-weight-by-key ไม่ส่ง field เก่ามาเลย
+							// จึงเป็น 0 เสมอ และเงื่อนไข > 0 เดิมยังให้ผลเหมือนการเขียนตรง ๆ
+							// แต่เงื่อนไขนั้นเป็นความเสี่ยงเชิงโครงสร้าง ถ้าวันหนึ่ง endpoint ส่ง field เก่ามา
+							// หรือ struct นี้ถูกใช้ซ้ำกับ endpoint อื่น ค่าเก่าจะค้างเมื่อค่าใหม่เป็น 0 จริง
+							// เขียนตรง ๆ จึงปลอดภัยกว่าและอ่านง่ายกว่า
 							//
 							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
 							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct

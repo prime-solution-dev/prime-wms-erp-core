@@ -8,10 +8,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// เทสนี้พิสูจน์บั๊ก: `if inv.TotalQty > 0` / `if inv.TotalWeight > 0` ใน
-// transformToGetPriceListResponse (จุด map "new API fields to existing model fields")
-// ปล่อยให้ SumQty/SumWeight ค้างค่าจาก field เก่า (sum_qty/sum_weight) ที่ JSON
-// ของ inventory_weight ส่งมาตรง ๆ เมื่อ batch นั้นมี total_qty/total_weight = 0 จริง
+// เทสนี้พิสูจน์การกันความเสี่ยงเชิงโครงสร้าง ไม่ใช่บั๊กที่ active อยู่ในปัจจุบัน:
+// `if inv.TotalQty > 0` / `if inv.TotalWeight > 0` เดิมใน transformToGetPriceListResponse
+// (จุด map "new API fields to existing model fields") เขียนทับ SumQty/SumWeight แบบมีเงื่อนไข
+// ซึ่งถ้า JSON ของ inventory_weight มี field เก่า (sum_qty/sum_weight) ปนมาด้วย ค่าเก่านั้นจะ
+// ค้างอยู่เมื่อ batch นั้นมี total_qty/total_weight = 0 จริง — ปัจจุบัน endpoint
+// get-inventory-weight-by-key ที่ price-service เรียกจริง (warehouse-core
+// internal/services/inventory-service/get-inventory-weight-by-key.go) ไม่ส่ง field เก่าพวกนี้
+// มาเลย field เหล่านั้นจึงเป็น 0 เสมอในปัจจุบัน และโค้ดเดิมกับโค้ดใหม่ให้ผลเหมือนกัน
+// ใน production ตอนนี้ — เทสนี้จึงพิสูจน์ความปลอดภัยเชิงโครงสร้าง (ถ้า endpoint เปลี่ยนหรือ
+// struct ถูกใช้ซ้ำกับ endpoint อื่นในอนาคต) ไม่ใช่การพิสูจน์บั๊กที่เกิดขึ้นจริงตอนนี้
 //
 // หมายเหตุสำคัญ (ต่างจากสมมติฐานเดิมของแผน): "subgroup ต้นแบบ" (sg ใน
 // transformToGetPriceListResponse บรรทัดที่ทำ `expandedSG := sg`) ไม่มีทางมี
@@ -20,11 +26,12 @@ import (
 // เลยสักครั้ง — ต่อให้ buildSingleSubGroupResponse ตั้ง SubGroup.InventoryWeight ไว้ ค่านั้น
 // ก็จะถูกทิ้งไปตั้งแต่ก่อนถึง loop expand ไม่มีทางไหลเข้ามาถึงจุดบั๊กได้
 //
-// ค่าที่ "ค้าง" จริง ๆ ที่พิสูจน์ได้คือค่าจาก field เก่า (sum_qty/sum_weight) ที่ inv เอง
-// ได้รับมาจาก JSON โดยตรง (models.InventoryWeightResponse มีทั้ง field เก่าและใหม่) —
-// เทสด้านล่างจำลองสถานการณ์นี้ด้วยการส่ง sum_qty/sum_weight ที่ไม่ตรงกับ total_qty/
-// total_weight มาใน JSON ของ batch ที่สอง เพื่อพิสูจน์ว่าโค้ดใหม่ต้อง overwrite ทับเสมอ
-// ไม่ว่า total_qty/total_weight จะเป็น 0 หรือไม่ก็ตาม
+// กลไกที่พิสูจน์ได้จริงคือ field เก่า (sum_qty/sum_weight) ที่ inv จะได้รับถ้า JSON
+// ส่งมา (models.InventoryWeightResponse มีทั้ง field เก่าและใหม่ใน struct เดียวกัน) —
+// เทสด้านล่าง "จำลอง" สถานการณ์นี้ด้วยการส่ง sum_qty/sum_weight เองในมือ (ไม่ใช่รูปแบบ
+// ที่ warehouse-core ส่งจริงในปัจจุบัน — get-inventory-weight-by-key ไม่มี field เหล่านี้
+// ใน response เลย) เพื่อพิสูจน์ว่าโค้ดใหม่ overwrite ทับเสมอไม่ว่า total_qty/total_weight
+// จะเป็น 0 หรือไม่ก็ตาม เผื่อวันหน้า endpoint เปลี่ยนหรือ struct ถูกใช้ซ้ำที่อื่น
 
 func TestGetPriceDetailZeroValuesAreNotStale(t *testing.T) {
 	ensureGroupPaymentTablesForTest(t)
