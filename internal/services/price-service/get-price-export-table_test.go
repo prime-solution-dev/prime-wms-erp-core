@@ -570,3 +570,37 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 		t.Fatalf("expected group key value to be mapped through itemNameByCode, got %#v", inv["DYN_B"])
 	}
 }
+
+// คอลัมน์ Weight-spec ใน export ผูกกับ field "total_weight" (ดู ExportColumn
+// ที่ get-price-export-table.go:303) ค่าต้องมาจาก weight_spec ของ base unit
+// ใน product master ไม่ใช่ TotalWeight ซึ่งเป็นน้ำหนักรวมของสต็อก
+func TestExportRowWeightSpecUsesProductMaster(t *testing.T) {
+	sg := SubGroup{
+		WeightSpec: 12.5,
+		InventoryWeight: []models.InventoryWeightResponse{
+			{TotalWeight: 1500000, AvgWeight: 30},
+		},
+	}
+
+	row := map[string]interface{}{}
+	applyInventoryFieldsToRow(row, sg)
+
+	if got := row["total_weight"]; got != 12.5 {
+		t.Fatalf("total_weight (คอลัมน์ Weight-spec) = %v, want 12.5", got)
+	}
+}
+
+// สินค้าที่ไม่มีสต็อกต้องยังแสดง Weight-spec ได้
+func TestExportRowWeightSpecWithoutStock(t *testing.T) {
+	sg := SubGroup{
+		WeightSpec:      12.5,
+		InventoryWeight: []models.InventoryWeightResponse{},
+	}
+
+	row := map[string]interface{}{}
+	applyInventoryFieldsToRow(row, sg)
+
+	if got := row["total_weight"]; got != 12.5 {
+		t.Fatalf("total_weight ตอนไม่มีสต็อก = %v, want 12.5", got)
+	}
+}

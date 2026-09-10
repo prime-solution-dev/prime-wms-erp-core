@@ -527,13 +527,14 @@ func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
 	return 0
 }
 
-// getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry
-// Returns 0.0 if inventory data is not available
+// getWeightSpecFromInventory คืนน้ำหนักของ base unit (flag_base = true) จาก product master
+// ซึ่งคือค่าที่คอลัมน์ "Weight-spec" ต้องแสดง
+//
+// ค่านี้อยู่ระดับ subgroup ไม่ใช่ใน InventoryWeight เพราะต้องมีค่าแม้สินค้าไม่มีสต็อก
+// คืน 0 เมื่อหาไม่เจอ เพื่อให้ผู้ใช้เห็นว่า master data ยังไม่ครบ
+// (ฝั่งสูตรคำนวณ fallback เป็น 1.0 เองผ่าน weightSpecForFormula)
 func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
-	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].WeightSpec
-	}
-	return 0.0
+	return sg.WeightSpec
 }
 
 // getQtyFromInventory extracts the on-hand quantity (จำนวน / ลูก) from the first

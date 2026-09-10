@@ -154,14 +154,18 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		} else {
 			// Create a map of inventory data by ID for quick lookup
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			// weight_spec มาระดับ result และต้องใช้ได้แม้ subgroup ไม่มีสต็อก
+			weightSpecMap := make(map[string]float64)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 
 			// Enrich subgroups with inventory data
 			for i := range res {
 				for j := range res[i].SubGroups {
 					sg := &res[i].SubGroups[j]
+					sg.WeightSpec = weightSpecMap[sg.ID.String()]
 					if inventoryWeights, ok := inventoryMap[sg.ID.String()]; ok && len(inventoryWeights) > 0 {
 						// For export, use first inventory record per subgroup
 						inv := inventoryWeights[0]
@@ -443,20 +447,7 @@ func buildExportTableTyped(
 			}
 
 			// Add inventory weight fields
-			if len(sg.InventoryWeight) > 0 {
-				inv := sg.InventoryWeight[0]
-				row["total_weight"] = inv.TotalWeight
-				row["avg_weight"] = inv.AvgWeight
-				row["market_weight"] = inv.WeightSpec
-				row["stock"] = inv.SumQty
-				row["stock_quantity"] = inv.TotalQty
-				row["quantity"] = inv.SumQty
-				row["batch_no"] = inv.BatchNo
-				row["brand"] = inv.SupplierName
-				row["code"] = inv.ProductCode
-				row["warehouse"] = inv.SiteCode
-				row["supplier_name"] = inv.SupplierName
-			}
+			applyInventoryFieldsToRow(row, sg)
 
 			// Fill dynamic group_code fields with value_name.
 			for _, k := range sg.GroupKeys {
@@ -629,3 +620,29 @@ func getGroupNameByCode(groupCode string, groupMap map[string]models.GetGroupRes
 // Compile-time guard: ensure we actually depend on models package (imported for the types below).
 var _ = models.GetGroupResponse{}
 var _ *sqlx.DB
+
+// applyInventoryFieldsToRow เติมค่าที่มาจาก inventory และ product master ลงใน row ของ export
+//
+// row["total_weight"] คือคอลัมน์ที่ผู้ใช้เห็นชื่อ "Weight-spec" ค่าที่ถูกต้องคือน้ำหนัก
+// ของ base unit จาก product master (sg.WeightSpec) ไม่ใช่ inv.TotalWeight ซึ่งเป็น
+// น้ำหนักรวมของสต็อก และต้องเติมนอกเงื่อนไข len(InventoryWeight) > 0 เพราะสินค้าที่
+// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
+func applyInventoryFieldsToRow(row map[string]interface{}, sg SubGroup) {
+	row["total_weight"] = sg.WeightSpec
+
+	if len(sg.InventoryWeight) == 0 {
+		return
+	}
+
+	inv := sg.InventoryWeight[0]
+	row["avg_weight"] = inv.AvgWeight
+	row["market_weight"] = inv.WeightSpec
+	row["stock"] = inv.SumQty
+	row["stock_quantity"] = inv.TotalQty
+	row["quantity"] = inv.SumQty
+	row["batch_no"] = inv.BatchNo
+	row["brand"] = inv.SupplierName
+	row["code"] = inv.ProductCode
+	row["warehouse"] = inv.SiteCode
+	row["supplier_name"] = inv.SupplierName
+}
