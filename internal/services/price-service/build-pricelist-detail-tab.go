@@ -166,7 +166,6 @@ func buildPricelistDetailTab(
 				"price_per_kg":         sg.TotalNetPriceWeight,
 				"price_per_unit":       sg.TotalNetPriceUnit,
 				"extra_price":          sg.ExtraPriceWeight,
-				"total_weight":         "",
 				"avg_weight":           "",
 				"formula_kg_name":      "",
 				"formula_kg_code":      "",
@@ -192,10 +191,14 @@ func buildPricelistDetailTab(
 				row[k.Code+groupCodeColumnSuffix] = k.Value
 			}
 
+			// total_weight คือคอลัมน์ที่ผู้ใช้เห็นชื่อ "Weight-spec" ค่าที่ถูกต้องคือน้ำหนัก
+			// ของ base unit จาก product master ไม่ใช่ inv.TotalWeight ซึ่งเป็นน้ำหนักรวม
+			// ของสต็อก และต้อง set นอกเงื่อนไข len(InventoryWeight) > 0 เพราะสินค้าที่
+			// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
+			row["total_weight"] = sg.WeightSpec
+
 			if len(sg.InventoryWeight) > 0 {
-				inv := sg.InventoryWeight[0]
-				row["total_weight"] = inv.TotalWeight
-				row["avg_weight"] = inv.AvgWeight
+				row["avg_weight"] = sg.InventoryWeight[0].AvgWeight
 			}
 
 			for _, f := range formulas[sg.SubgroupCode] {

@@ -283,8 +283,12 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		} else {
 			// Create a map of inventory data by ID for quick lookup
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			// weight_spec มาระดับ result ไม่ได้อยู่ใน InventoryWeight จึงต้องเก็บ map แยก
+			// และต้องใช้ได้แม้ subgroup นั้นไม่มีสต็อก
+			weightSpecMap := make(map[string]float64)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 
 			// Create new result with expanded subgroups for multiple inventory records
@@ -307,6 +311,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.SupplierCode = inv.SupplierCode
 							expandedSG.SupplierName = inv.SupplierName
 							expandedSG.BatchNo = inv.BatchNo
+							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
 							// Map new API fields to existing model fields
 							if inv.TotalQty > 0 {
@@ -322,7 +327,9 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSubGroups = append(expandedSubGroups, expandedSG)
 						}
 					} else {
-						// No inventory data, keep original subgroup
+						// No inventory data, keep original subgroup.
+						// weight_spec ยังต้องมีค่าเพราะมาจาก product master ไม่ได้มาจากสต็อก
+						sg.WeightSpec = weightSpecMap[sg.ID]
 						expandedSubGroups = append(expandedSubGroups, sg)
 					}
 				}
