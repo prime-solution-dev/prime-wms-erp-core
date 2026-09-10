@@ -100,6 +100,15 @@ func TestPatternHasBatchColumn(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "มี batch_no ใน ColumnGroups.Children",
+			pattern: PatternConfig{
+				ColumnGroups: []ColumnGroupConfig{
+					{Children: []ColumnConfigItem{{Field: "batch_no", HeaderName: "โรงงาน"}}},
+				},
+			},
+			want: true,
+		},
+		{
 			name: "ไม่มี batch_no เลย",
 			pattern: PatternConfig{
 				Columns: []ColumnConfigItem{
@@ -121,6 +130,41 @@ func TestPatternHasBatchColumn(t *testing.T) {
 			got := patternHasBatchColumn(&tt.pattern)
 			if got != tt.want {
 				t.Errorf("ได้ %v ต้องเป็น %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// ยึดกับ config จริงในไฟล์ ไม่ใช่ PatternConfig ที่ประกอบขึ้นในเทสต์
+// เพื่อให้จับได้ถ้ามีใครแก้ field batch_no ใน configs/*.json
+// หรือมี pattern ใหม่ที่ประกาศ batch_no ผ่านช่องทางที่ patternHasBatchColumn มองไม่เห็น
+func TestPatternHasBatchColumnAgainstRealConfigs(t *testing.T) {
+	tests := []struct {
+		groupCode string
+		want      bool
+	}{
+		{"GROUP_1_ITEM_7", true},
+		{"GROUP_1_ITEM_8", true},
+		{"GROUP_1_ITEM_22", true},
+		{"GROUP_1_ITEM_2", false},
+		{"GROUP_1_ITEM_9", false},
+		{"GROUP_1_ITEM_13", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.groupCode, func(t *testing.T) {
+			cfg, err := LoadConfiguration(tt.groupCode)
+			if err != nil {
+				t.Fatalf("โหลด config ไม่ได้: %v", err)
+			}
+			if len(cfg.Patterns) == 0 {
+				t.Fatalf("config ไม่มี pattern เลย")
+			}
+			for i := range cfg.Patterns {
+				got := patternHasBatchColumn(&cfg.Patterns[i])
+				if got != tt.want {
+					t.Errorf("pattern %q: ได้ %v ต้องเป็น %v", cfg.Patterns[i].ID, got, tt.want)
+				}
 			}
 		})
 	}

@@ -544,12 +544,21 @@ func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bo
 //
 // บาง pattern เปลี่ยนชื่อคอลัมน์ไปเป็น "โรงงาน" หรือ "Ship No." และบางตัวอ้าง
 // batch_no ผ่าน dataMapping จึงต้องตรวจทั้ง Field และ DataMapping
+//
+// ต้องตรวจ**ทุกช่องทาง**ที่ PatternConfig ประกาศคอลัมน์ได้ คือ Columns,
+// FixedColumns และ ColumnGroups[].Children ถ้าตกช่องใดไป pattern ที่ประกาศ
+// batch_no ที่นั่นจะถูกจัดเป็น non-batch เงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
+// (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
 func patternHasBatchColumn(pattern *PatternConfig) bool {
 	if pattern == nil {
 		return false
 	}
-	for _, cols := range [][]ColumnConfigItem{pattern.Columns, pattern.FixedColumns} {
-		for _, c := range cols {
+	cols := [][]ColumnConfigItem{pattern.Columns, pattern.FixedColumns}
+	for _, g := range pattern.ColumnGroups {
+		cols = append(cols, g.Children)
+	}
+	for _, group := range cols {
+		for _, c := range group {
 			if c.Field == "batch_no" || c.DataMapping == "batch_no" {
 				return true
 			}
