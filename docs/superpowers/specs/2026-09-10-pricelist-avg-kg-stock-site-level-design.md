@@ -94,25 +94,116 @@ kg  = inventoryWeight[0].TotalWeight   // น้ำหนักรวมใน�
 และผลลัพธ์ของสูตรเหล่านี้ถูก assign ลง `total_net_price_unit` / `total_net_price_weight`
 จึงไม่มีทางตีความ `pcs` และ `kg` เป็นจำนวนสต็อกได้
 
+#### `[kg]` และ `[Pcs]` หมายถึงอะไรกันแน่
+
+ทุก subgroup ผูกสูตรไว้ 2 ตัวเสมอ และคู่ที่ผูกกันจริงคือ:
+
+| คู่สูตร | subgroups |
+|---|---|
+| `kg = Base price + Extra` + `Pcs = [kg] x [Avg. kg stock]` | 712 |
+| `kg = Base price + Extra` + `Pcs = [kg] x [Weight Spec]` | 475 |
+| `Pcs = (...) x [Avg kg. stock] x (1+2%)` ผูกซ้ำ 2 ครั้ง | 131 |
+| `kg = [Pcs] / [Avg. kg stock]` + `pcs = input` | 16 |
+| `pcs = input` ผูกซ้ำ 2 ครั้ง | 16 |
+
+คู่หลัก 1,187 ตัวเป็น pipeline 2 ขั้น: คำนวณราคาต่อกิโลก่อน (`base_price+extra`) แล้วแปลงเป็นราคาต่อชิ้น
+`[kg]` ในสูตร pcs จึงหมายถึง **ผลลัพธ์ของสูตร `kg` ในคู่เดียวกัน** คือ `total_net_price_weight`
+ไม่ใช่ราคาตั้งของกลุ่ม ยืนยันอีกทางจากคู่ `kg = [Pcs] / [Avg. kg stock]` + `pcs = input`
+ซึ่ง `[Pcs]` คือราคาที่ผู้ใช้กรอกแล้ว kg คำนวณจากมัน
+
+หลักฐานสนับสนุนในโค้ด: `update-latest-pricelist-subgroup.go:222-223` init ตัวแปรจากค่าปัจจุบันใน DB
+ซึ่งจะไม่มีเหตุผลเลยถ้าสูตรไม่ได้อ่านค่าเหล่านี้
+
+```go
+totalNetPriceUnit := subGroup.TotalNetPriceUnit
+totalNetPriceWeight := subGroup.TotalNetPriceWeight
+```
+
+และถ้าเจตนาคือราคาตั้งของกลุ่ม สูตรย่อมเขียน `base_price` ตรง ๆ อย่างที่
+`(base_price+2.1)*avg_kg_stock*1.02` ทำอยู่แล้ว
+
+#### ผลกระทบที่เกิดขึ้นจริงใน DB
+
+จาก 712 subgroup ที่ผูกสูตร `Pcs = [kg] x [Avg. kg stock]`:
+
+| สถานะ `total_net_price_unit` | subgroups |
+|---|---|
+| เท่ากับ `0` | **694** |
+| มากกว่า `0` | 18 (สูงสุด **632,016.00**) |
+
+ราคาต่อกิโลของกลุ่มเหล่านี้อยู่ราว `18.30` ถึง `19.60` ราคาต่อชิ้นที่ควรได้จึงอยู่ระดับหลักสิบ
+ค่า `0` เกิดจาก `kg` ถูกป้อน `TotalWeight` ซึ่งเป็น 0 เมื่อไม่มีสต็อก ส่วนค่า 632,016
+เกิดจากน้ำหนักสต็อกรวมถูกนำไปคูณ avg โดยตรง
+
+ตัวอย่างรูปธรรม `SG711` @ `TMI_WH` — `price_weight = 19.40` `extra_price_weight = 0.20`
+`total_net_price_weight = 19.60` `total_net_price_unit = 0.000000`
+สมมติ `avg_kg_stock = 3.0000`:
+
+| การตีความของ `[kg]` | ค่าที่ป้อน | ผลลัพธ์ |
+|---|---|---|
+| โค้ดปัจจุบัน = `TotalWeight` (ไม่มีสต็อก) | 0 | `0.00` |
+| โค้ดปัจจุบัน = `TotalWeight` (มีสต็อก 211,000 kg) | 211,000 | `633,000.00` |
+| ราคาตั้งของกลุ่ม `PriceListGroup.PriceWeight` | 19.40 | `58.20` ตก `extra` ไป |
+| **ค่า running `total_net_price_weight`** | 19.60 | **`58.80`** |
+
+เลือกค่า running เพราะรวม `extra` ที่สูตร `kg` คำนวณไว้แล้ว
+
 ### F3 — expression ใน DB ไม่ตรงกับชื่อสูตร
 
 `kg = [Pcs] / [Weight Spec]` มี expression เป็น `pcs*weight_spec` ทั้งที่ชื่อระบุว่าเป็นการหาร
 ผิดทั้งใน `prime_erp.price_list_formulas` และใน seed `internal/scripts/price_list_formulas/price-list-formulas.json`
 
+### F4 — ลำดับการประเมินสูตรไม่ตรงกับลำดับ dependency (Critical)
+
+เมื่อ `[kg]` คือผลลัพธ์ของสูตร `kg` สูตร `kg` ต้องถูกประเมินก่อนสูตร `pcs` เสมอ
+แต่ `internal/repositories/priceList/repository.go:641` ดึงสูตรมาด้วย
+
+```sql
+ORDER BY psfm.create_dtm DESC
+```
+
+คือเรียงตามเวลาที่ผูกสูตรเข้า subgroup ไม่ใช่เรียงตาม dependency
+`update-latest-pricelist-subgroup.go:263` วน `priceListFormulas` ตามลำดับที่ได้มาตรง ๆ
+
+สูตรที่ถูกประเมินก่อนในข้อมูลจริง:
+
+| สูตรที่รันก่อน | subgroups | ลำดับถูกต้องหรือไม่ |
+|---|---|---|
+| `kg = Base price + Extra` | 665 | ถูก (โดยบังเอิญ) |
+| `Pcs = [kg] x [Avg. kg stock]` | 307 | **ผิด** |
+| `Pcs = [kg] x [Weight Spec]` | 215 | **ผิด** |
+| `Pcs = (...) x [Avg kg. stock] x (1+2%)` | 131 | ไม่เกี่ยว (ไม่อ้าง `kg`) |
+| `pcs = input` | 20 | ไม่เกี่ยว |
+| `kg = [Pcs] / [Avg. kg stock]` | 12 | ไม่เกี่ยว (คู่เป็น input) |
+
+**522 subgroup ประเมินสูตร `pcs` ก่อนที่ `kg` จะถูกคำนวณใหม่** ทำให้อ่าน `total_net_price_weight`
+ของรอบคำนวณก่อนหน้า ราคาต่อชิ้นจึงตามหลังราคาต่อกิโลหนึ่งรอบเสมอ ต้องกดคำนวณสองครั้งจึงจะตรง
+
+### F5 — ข้อมูลการผูกสูตรไม่ครบคู่ (รายงานเท่านั้น ไม่แก้ในงานนี้)
+
+147 subgroup ผูกสูตร uom `pcs` ทั้งสองตัว ไม่มีสูตร uom `kg` เลย
+
+- 131 ตัวผูกสูตร `(base_price+2.1)*avg_kg_stock*1.02` **ซ้ำสองครั้ง** คำนวณสิ่งเดียวกันซ้ำลง
+  `total_net_price_unit` และ `total_net_price_weight` ไม่ถูกคำนวณใหม่เลย
+- 16 ตัวผูก `pcs = input` ซ้ำสองครั้ง
+
+เป็นปัญหาข้อมูลไม่ใช่โค้ด ต้องให้ธุรกิจตัดสินว่าแต่ละกลุ่มควรผูกสูตร `kg` ตัวไหน
+งานนี้ส่งมอบเพียง query รายงานรายการ subgroup ที่ผูกไม่ครบคู่
+
 ### ขนาดผลกระทบ
 
 จาก `prime_erp.price_list_subgroup_formulas_map`:
 
-| expression | subgroups | F1 | F2 |
-|---|---|---|---|
-| `base_price+extra` | 1,187 | | |
-| `kg*avg_kg_stock` | 712 | ✓ | ✓ |
-| `kg*weight_spec` | 475 | | ✓ |
-| `(base_price+2.1)*avg_kg_stock*1.02` | 262 | ✓ | |
-| `pcs = input` | 48 | | |
-| `pcs/avg_kg_stock` | 16 | ✓ | ✓ |
+| expression | subgroups | F1 | F2 | F4 |
+|---|---|---|---|---|
+| `base_price+extra` | 1,187 | | | |
+| `kg*avg_kg_stock` | 712 | ✓ | ✓ | ✓ (307 ตัวลำดับผิด) |
+| `kg*weight_spec` | 475 | | ✓ | ✓ (215 ตัวลำดับผิด) |
+| `(base_price+2.1)*avg_kg_stock*1.02` | 262 | ✓ | | |
+| `pcs = input` | 48 | | | |
+| `pcs/avg_kg_stock` | 16 | ✓ | ✓ | |
 
-**F1 กระทบ 990 subgroup · F2 กระทบ 1,203 subgroup**
+**F1 กระทบ 990 subgroup · F2 กระทบ 1,203 subgroup · F4 กระทบ 522 subgroup · F5 กระทบ 147 subgroup**
 (`(base_price+1.4)*avg_kg_stock*1.02` ไม่ถูกผูกกับ subgroup ใดในขณะนี้)
 
 ---
@@ -241,16 +332,39 @@ const avgWeight = avgSerial || avgBatch || avgProduct || 0;
 
 ### D. `prime-wms-erp-core` — แก้ประเภทของ `pcs` / `kg` ในสูตร
 
-`update-latest-pricelist-subgroup.go:242-243` และ `get-calculated-pricelist-subgroup.go:228-229`
-เปลี่ยนจากจำนวนสต็อกเป็นราคาของกลุ่ม:
+ลบตัวแปร `pcs` และ `kg` ที่อ่านจากสต็อกออก (`update-latest-pricelist-subgroup.go:242-243`
+และ `get-calculated-pricelist-subgroup.go:228-229`) แล้วป้อน env จากค่า running ที่โค้ดมีอยู่แล้ว:
 
 ```go
-pcs = subGroup.PriceListGroup.PriceUnit      // ราคาต่อชิ้น
-kg  = subGroup.PriceListGroup.PriceWeight    // ราคาต่อกิโล
+priceData := priceDomain.PriceData{
+    BasePrice:  subGroup.PriceListGroup.PriceUnit,   // หรือ PriceWeight ตาม uom เดิม
+    Extra:      extraPriceUnit,                      // หรือ extraPriceWeight ตาม uom เดิม
+    AvgKgStock: avgKgStock,
+    WeightSpec: weightSpec,
+    Pcs:        totalNetPriceUnit,                   // ราคาต่อชิ้นล่าสุด
+    Kg:         totalNetPriceWeight,                 // ราคาต่อกิโลล่าสุด
+}
 ```
 
-ค่าทั้งสองอ่านได้นอกบล็อก `if ... len(inventoryWeight) > 0` เพราะเป็นข้อมูลราคาของกลุ่ม ไม่ผูกกับสต็อก
-(เหตุผลเดียวกับที่ `weight_spec` ถูกย้ายออกมานอกบล็อกในงาน Weight-spec รอบก่อน)
+ตัวแปรทั้งสองถูก init จากค่าใน DB ที่บรรทัด 222-223 และถูกเขียนทับเมื่อสูตรของ uom นั้นคำนวณเสร็จ
+จึงต้องสร้าง `priceData` **ใหม่ในแต่ละรอบของลูปสูตร** ไม่ใช่สร้างครั้งเดียวก่อนเข้าลูป
+เพื่อให้สูตรที่รันทีหลังเห็นค่าที่สูตรก่อนหน้าเพิ่งคำนวณ (โค้ดปัจจุบันสร้างใน `case` อยู่แล้ว
+จึงได้พฤติกรรมนี้ฟรีเมื่อแก้ร่วมกับข้อ D2)
+
+### D2. `prime-wms-erp-core` — บังคับลำดับการประเมินสูตรตาม dependency (F4)
+
+ก่อนเข้าลูปประเมินสูตร เรียง `priceListFormulas` ใหม่ตาม dependency โดยอ่านจาก
+`params.required` ที่เก็บไว้ใน `price_list_formulas` อยู่แล้ว
+
+กฎ: ถ้าสูตร A มี `required` ที่อ้างตัวแปรชื่อเดียวกับ `uom` ของสูตร B แล้ว B ต้องรันก่อน A
+เช่น `Pcs = [kg] x [Avg. kg stock]` มี `required: ["kg", "avg_kg_stock"]` และคู่ของมันมี `uom = "kg"`
+จึงต้องรันสูตร kg ก่อน
+
+กรณีอ้างอิงวนกัน (ทั้งสองอ้างกันเอง) ให้คงลำดับเดิมจาก query และ log warning ไว้
+ไม่ทำให้ request ล้ม เพราะปัจจุบันไม่มีข้อมูลเช่นนั้น แต่ป้องกันการผูกสูตรผิดในอนาคต
+
+ทำที่ชั้น service ไม่แก้ `ORDER BY` ใน repository เพราะ `create_dtm DESC` ยังเป็นลำดับที่ flow อื่นใช้
+และการเรียงตาม dependency เป็นตรรกะของการคำนวณ ไม่ใช่ของการดึงข้อมูล
 
 ### E. `prime-wms-erp-core` — แก้ expression ที่ผิด
 
@@ -286,6 +400,10 @@ grid คืน `0` · `applyInventoryFieldsToRow` ไม่ set key เลยเ
   แม้ endpoint นั้นจะมี `AVGProduct` ที่ตรงนิยามอยู่แล้ว เพราะ contract ต่างกันมาก
   (`key_value` / `group_code_keys`) จะกลายเป็นการ rewrite ทั้ง 4 flow
 - ไม่แก้ข้อมูลราคาที่คำนวณผิดไปแล้วใน DB — ต้องยืนยันกับธุรกิจก่อนว่าจะ recalculate ย้อนหลังหรือไม่
+  (694 subgroup มี `total_net_price_unit = 0` อยู่ตอนนี้ และจะถูกคำนวณใหม่ให้ถูกเมื่อผู้ใช้กดคำนวณ
+  แต่ยังไม่มีการ backfill อัตโนมัติ)
+- ไม่แก้ F5 — ส่งมอบเพียง query รายงาน subgroup ที่ผูกสูตรไม่ครบคู่ ให้ธุรกิจตัดสินว่าควรผูกสูตร `kg` ตัวไหน
+- ไม่แก้คอลัมน์ `avg_weight_ton` — รอคำตอบจากธุรกิจ
 
 ---
 
@@ -314,8 +432,22 @@ unit test:
 - `CalculatePrice` กับทั้ง 4 สูตรที่ใช้ `avg_kg_stock` โดยเทียบกับค่าที่คำนวณมือ
 - `CalculatePrice` กับสูตร `pcs/weight_spec` ที่แก้แล้ว ต้องเป็นผกผันของ `kg*weight_spec`
 - `avgKgStock` fallback เป็น `1.0` เมื่อ `AvgProduct` เป็น 0
-- env ที่ส่งเข้า expression engine มี `pcs` และ `kg` เป็น `PriceUnit` / `PriceWeight`
+- env ที่ส่งเข้า expression engine มี `pcs` และ `kg` เป็น `totalNetPriceUnit` / `totalNetPriceWeight`
   ไม่ใช่ `TotalQty` / `TotalWeight`
+- เคสตามตัวอย่างใน spec: `price_weight = 19.40` `extra = 0.20` `avg_kg_stock = 3.0` กับคู่สูตร
+  `base_price+extra` + `kg*avg_kg_stock` → `total_net_price_weight = 19.60` และ
+  `total_net_price_unit = 58.80` (test นี้จะ fail บนโค้ดปัจจุบันซึ่งให้ `0`)
+
+unit test ของการเรียงลำดับสูตร (F4):
+
+- สูตร `pcs` ที่ `required` มี `kg` คู่กับสูตร uom `kg` → สูตร kg ต้องอยู่ก่อนในลำดับที่เรียงแล้ว
+  ไม่ว่า input จะเรียงมาแบบใด (ทดสอบทั้งสองลำดับ input)
+- สูตรที่ไม่อ้างถึงกัน เช่น `(base_price+2.1)*avg_kg_stock*1.02` คู่กับ `pcs = input` → คงลำดับเดิม
+- สูตรที่อ้างอิงวนกัน → คงลำดับเดิมและไม่ panic
+- คู่ `kg = [Pcs] / [Avg. kg stock]` + `pcs = input` → ลำดับต้องให้ค่า `pcs` พร้อมก่อนสูตร kg
+- integration: คู่สูตร `base_price+extra` + `kg*avg_kg_stock` ที่ผูกโดยให้สูตร pcs มี `create_dtm`
+  ใหม่กว่า (เลียนแบบ 522 subgroup ที่ลำดับผิด) → กดคำนวณครั้งเดียวต้องได้ราคาต่อชิ้นที่ถูกต้อง
+  ไม่ต้องกดสองครั้ง (test นี้จะ fail บนโค้ดปัจจุบัน)
 
 integration test (testcontainers ตามรูปแบบ `make test-integration` ที่มีอยู่):
 
@@ -340,6 +472,10 @@ coverage เป้าหมาย ≥ 80% ของไฟล์ที่แก�
 1. `prime-wms-warehouse-core` — ข้อ A พร้อม unit test แล้วเปิด PR เข้า `Develop`
 2. `prime-wms-erp-core` — ข้อ B, C, D, F พร้อม test แล้วเปิด PR เข้า `Develop`
 3. `prime-wms-erp-core` — ข้อ E migration แยก commit ให้ revert ได้เดี่ยว ๆ
+4. ส่ง query รายงาน F5 ให้ทีม/ธุรกิจ (ไม่มีการแก้โค้ดหรือข้อมูล)
+
+ข้อ D และ D2 ต้องอยู่ใน PR เดียวกัน แก้ D อย่างเดียวโดยไม่แก้ D2 จะทำให้ 522 subgroup
+อ่านค่า running ของรอบก่อนหน้า ซึ่งผิดในรูปแบบใหม่แทนที่จะหายไป
 
 ข้อ 2 ต้องรอข้อ 1 ขึ้น environment ก่อนเพราะพึ่งพา field `avg_product` จาก response
 ระหว่างนั้น `AvgProduct` จะเป็น 0 แล้วตกไป fallback `1.0` ซึ่งเป็นพฤติกรรมเดียวกับกรณีไม่มีสต็อก
