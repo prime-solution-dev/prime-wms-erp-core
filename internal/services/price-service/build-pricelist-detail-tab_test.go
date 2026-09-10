@@ -495,9 +495,13 @@ func TestBuildPricelistDetailTab_WeightSpecWithoutStock(t *testing.T) {
 	if row["total_weight"] != 12.5 {
 		t.Fatalf("expected total_weight to be 12.5 even without stock, got %v", row["total_weight"])
 	}
-	// avg_weight ผูกกับสต็อกจริง ๆ จึงต้องยังเป็นเซลล์ว่างเมื่อไม่มีสต็อก
-	if row["avg_weight"] != "" {
-		t.Fatalf("expected avg_weight to stay blank without stock, got %v", row["avg_weight"])
+	// ไม่มีสต็อกต้องแสดงเลข 0 ไม่ใช่เซลล์ว่าง
+	//
+	// เปลี่ยนจากพฤติกรรมเดิมโดยเจตนา เพื่อให้ row builder ทั้ง 3 ตัวตรงกัน
+	// เดิมกริดคืน 0 · export table ไม่ set key เลย · รายงานนี้ใส่ string ว่าง
+	// ผู้ใช้จึงเห็นคอลัมน์เดียวกันไม่เหมือนกันใน 3 ที่
+	if row["avg_weight"] != float64(0) {
+		t.Fatalf("expected avg_weight to be 0 without stock, got %v (%T)", row["avg_weight"], row["avg_weight"])
 	}
 }
 

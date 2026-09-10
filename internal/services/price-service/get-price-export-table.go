@@ -631,11 +631,15 @@ func applyInventoryFieldsToRow(row map[string]interface{}, sg SubGroup) {
 	row["total_weight"] = sg.WeightSpec
 
 	if len(sg.InventoryWeight) == 0 {
+		// ต้องเติม 0 ไม่ใช่ปล่อยให้ key หาย เพื่อให้ตรงกับกริดและ Pricelist Detail Report
+		row["avg_weight"] = float64(0)
 		return
 	}
 
 	inv := sg.InventoryWeight[0]
-	row["avg_weight"] = inv.AvgWeight
+	// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
+	// AvgWeight เป็นค่าระดับ batch ซึ่งไม่ใช่สิ่งที่คอลัมน์นี้ต้องแสดง
+	row["avg_weight"] = inv.AvgProduct
 	row["market_weight"] = inv.WeightSpec
 	row["stock"] = inv.SumQty
 	row["stock_quantity"] = inv.TotalQty
