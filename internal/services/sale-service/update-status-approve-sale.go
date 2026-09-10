@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UpdateStatusApproveSaleRequest struct {
@@ -110,6 +111,25 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		return nil, fmt.Errorf("failed to update sale status: %v", err)
 	}
 
+	// อนุมัติผ่านแล้วให้ราคาที่ใช้จริงกลับไปเป็นราคาจาก quotation
+	// บรรทัดที่ไม่มีราคาจาก quotation (0) ไม่แตะ เพราะไม่มีอะไรให้ยึด
+	if shouldAdoptQuotationPrice(req.Status) {
+		user := ctx.GetString("user")
+		if user == "" {
+			user = `system`
+		}
+
+		if err := gormx.Model(&models.SaleItem{}).
+			Where("sale_id = ? AND old_price_list_unit > 0", req.ID).
+			Updates(map[string]interface{}{
+				"price_list_unit": gorm.Expr("old_price_list_unit"),
+				"update_date":     nowDateOnly,
+				"update_by":       user,
+			}).Error; err != nil {
+			return nil, fmt.Errorf("failed to adopt quotation price for sale %v: %v", req.ID, err)
+		}
+	}
+
 	// If status is REJECT, also update sale_item status to CANCELED
 	if req.Status == "REJECT" {
 		if err := gormx.Model(&models.SaleItem{}).
@@ -127,4 +147,10 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		"status":            "success",
 		"message":           "Approval updated successfully",
 	}, nil
+}
+
+// shouldAdoptQuotationPrice บอกว่าผลอนุมัตินี้ทำให้ใบยึดราคาจาก quotation หรือยัง
+// อนุมัติผ่าน = ผู้อนุมัติยอมรับราคาที่ห่างจาก price list master แล้ว (SA เคาะ 2026-09-10)
+func shouldAdoptQuotationPrice(status string) bool {
+	return status == "COMPLETED"
 }
