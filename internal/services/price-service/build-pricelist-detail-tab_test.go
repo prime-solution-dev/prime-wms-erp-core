@@ -36,7 +36,9 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 							{Code: "PG06", Value: "PG06_4", Seq: 6},
 						},
 						InventoryWeight: []models.InventoryWeightResponse{
-							{TotalWeight: 120.45, AvgWeight: 0},
+							// TotalWeight ต้องต่างจาก WeightSpec เพื่อให้ assertion ของ
+							// total_weight แยกแยะได้ว่าอ่านจาก product master ไม่ใช่จากสต็อก
+							{TotalWeight: 999.9, AvgWeight: 0},
 						},
 					},
 					{
@@ -467,7 +469,7 @@ func TestBuildPricelistDetailTab_ColumnSetStaysFixedWhenFiltered(t *testing.T) {
 	}
 }
 
-func TestBuildPricelistDetailTabWeightSpecUsesProductMaster(t *testing.T) {
+func TestBuildPricelistDetailTab_WeightSpecUsesProductMaster(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 	groups[0].SubGroups[0].WeightSpec = 12.5
 
@@ -482,7 +484,7 @@ func TestBuildPricelistDetailTabWeightSpecUsesProductMaster(t *testing.T) {
 	}
 }
 
-func TestBuildPricelistDetailTabWeightSpecWithoutStock(t *testing.T) {
+func TestBuildPricelistDetailTab_WeightSpecWithoutStock(t *testing.T) {
 	groups, groupNameByCode, itemNameByCode := detailTestFixtures()
 	groups[0].SubGroups[0].WeightSpec = 12.5
 	groups[0].SubGroups[0].InventoryWeight = nil
@@ -492,6 +494,10 @@ func TestBuildPricelistDetailTabWeightSpecWithoutStock(t *testing.T) {
 	row := tab.Rows[0]
 	if row["total_weight"] != 12.5 {
 		t.Fatalf("expected total_weight to be 12.5 even without stock, got %v", row["total_weight"])
+	}
+	// avg_weight ผูกกับสต็อกจริง ๆ จึงต้องยังเป็นเซลล์ว่างเมื่อไม่มีสต็อก
+	if row["avg_weight"] != "" {
+		t.Fatalf("expected avg_weight to stay blank without stock, got %v", row["avg_weight"])
 	}
 }
 
