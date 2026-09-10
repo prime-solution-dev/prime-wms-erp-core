@@ -204,9 +204,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				})
 			}
 		}
-		if len(toleranceErrorResponse.ToleranceError) > 0 {
+		/* if len(toleranceErrorResponse.ToleranceError) > 0 {
 			return toleranceErrorResponse, nil
-		}
+		} */
 	}
 	topicCodes := []string{"INVOICE"}
 	configCodes := []string{"AP"}
@@ -305,7 +305,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					poQTYMapResult.UnitUom, req[i].InvoiceItem[it].UnitUom,
 					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
 				)
-				req[i].InvoiceItem[it].PriceUnit = priceUnit
+				req[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
 				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.UnitUom), "KG") {
 					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
