@@ -19,9 +19,14 @@
 กติกา SA ข้อ 3 (approve แล้ว `price_list_unit` = ราคาจาก quotation) ชนกับข้อ 4 (คงคอลัมน์คู่ไว้ตลอดชีวิตใบ):
 พอ approve ทับแล้ว `price_list_unit` กับ `old_price_list_unit` เท่ากัน คอลัมน์คู่เลยโชว์เลขซ้ำ และราคาที่ master ให้ตอน convert หายถาวร
 
-เจ้าของเลือกทาง "เพิ่มฟิลด์ที่ 3" แทนทาง "เลิกทับตอน approve" เพราะ `price_list_unit` มีปลายทางอ่านไปใช้ต่อหลายจุด
-(`get-sale-pack.go:349` ส่งเข้าใบส่งของ, `get-compare-price.go` คิดส่วนต่างราคา, delivery-service อีก 4 ไฟล์)
-ซึ่งต้องได้ราคาที่ผู้อนุมัติยอมรับ ไม่ใช่ราคาที่ master เคยให้
+เจ้าของเลือกทาง "เพิ่มฟิลด์ที่ 3" แทนทาง "เลิกทับตอน approve" เพราะ `price_list_unit` ไหลต่อไปเป็นราคาบนใบจองคิวส่ง:
+หน้าจอ DBS คัดลอกราคาจากบรรทัดขายไปเก็บที่ `delivery_booking_item.price_list_unit`
+(`wms-web deliverySlotCreate/index.vue:615` -> `delivery-slot-create.store.ts:197`) แล้วฝั่ง Go อ่านต่อจาก
+*delivery item* ไม่ใช่ sale item (`get-sale-pack.go:349`, `get-delivery-so.go:57`, `get-delivery-co.go:58`)
+ดังนั้น `price_list_unit` ของ sale ต้องเป็นราคาที่ผู้อนุมัติยอมรับ ณ ตอนสร้างใบจอง ไม่ใช่ราคาที่ master เคยให้
+
+(ข้อความเดิมเขียนว่า `get-sale-pack.go:349` อ่าน `sale_item.price_list_unit` โดยตรง — ไม่ถูก final review
+ตรวจแล้วพบว่าเป็น `delivery_item` ข้อสรุปยังเหมือนเดิมแต่เส้นทางคนละทาง แก้ไว้กันคนตามรอยผิด)
 
 ## Global Constraints
 
