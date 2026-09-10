@@ -377,8 +377,19 @@ migration ต้องเป็น idempotent และระบุสูตร�
 ### F. ของแถมที่อยู่บนเส้นทางเดียวกัน
 
 `get-price-detail.go:317-326` ตัดเงื่อนไข `if inv.X > 0` ออก เขียนค่าตรง ๆ
-ปัจจุบันเมื่อ batch ใหม่มีค่า 0 field จะคงค่าที่ค้างจาก subgroup ต้นแบบไว้
-(เป็นรูปแบบเดียวกับบั๊ก Weight-spec รอบก่อน)
+
+**แก้ความเข้าใจผิดของ spec ฉบับแรก:** ตอนเขียน spec ผมระบุว่าค่าค้างมาจาก subgroup ต้นแบบ
+(`expandedSG := sg`) ซึ่ง**ไม่จริง** — การ construct `models.PriceListSubGroupResponse`
+ที่ `get-price-detail.go:211-237` ไม่เคยคัดลอก `InventoryWeight` มาจาก input `SubGroup` เลย
+ค่าจึงไม่มีทางไหลมาจากทางนั้น
+
+กลไกจริงคือ `models.InventoryWeightResponse` มีทั้ง field เก่า (`sum_qty`, `sum_weight`,
+`avg_batch`) และใหม่ (`total_qty`, `total_weight`, `avg_weight`) อยู่ใน struct เดียวกัน
+บรรทัด `expandedSG.InventoryWeight = []models.InventoryWeightResponse{inv}` copy ทั้ง struct
+จาก `inv` ซึ่งรวม field เก่าที่ backend ส่งมาใน JSON แล้วเงื่อนไข `> 0` เขียนทับแค่บาง field
+ทำให้ค่าเก่าค้างอยู่เมื่อค่าใหม่เป็น 0 จริง ๆ
+
+(ยังเป็นรูปแบบเดียวกับบั๊ก Weight-spec รอบก่อนในแง่ที่การเขียนแบบมีเงื่อนไขปล่อยค่าเก่าให้ค้าง)
 
 ลบการเขียน `expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight` ที่บรรทัด 324 ออก
 เป็น dead write — ไม่มีผู้อ่าน `AvgBatch` ในโปรเจกต์เลย ผู้อ่านที่เหลือคือฝั่ง web ซึ่งรับค่าจาก
