@@ -133,10 +133,21 @@ kg  = inventoryWeight[0].TotalWeight   // น้ำหนักรวมใน�
 ปลายทาง ไม่ใช่ค่าคนละตัว) จึงต้องคงค่า avg ของ batch ตัวเองไว้
 `GROUP_1_ITEM_1-6` และ `9-20` ไม่มี `batch_no` จึงต้องเป็นค่าระดับ site
 
-**ข้อสังเกตที่พบระหว่างทาง (ไม่แก้ในงานนี้):** คอลัมน์ `avg_weight_ton` ของ `GROUP_1_ITEM_7` และ
-`GROUP_1_ITEM_22` มี headerName ว่า "Avg.kg stock (Tons)" แต่ `dataMapping` ชี้ไป `avg_weight`
-ซึ่งมีหน่วย kg และไม่มีการหารด้วย 1000 ที่จุดใดใน Go เลย (`grep avg_weight_ton` ในโค้ด Go ไม่พบผลลัพธ์)
-ตัวเลขที่ผู้ใช้เห็นใต้หัวข้อ Tons จึงน่าจะเป็น kg ต้องยืนยันกับธุรกิจแยกต่างหาก
+**ข้อสังเกตที่พบระหว่างทาง — ค้างรอคำตอบจากธุรกิจ ไม่แก้ในงานนี้:**
+คอลัมน์ `avg_weight_ton` ของ `GROUP_1_ITEM_7` และ `GROUP_1_ITEM_22` มี headerName ว่า
+"Avg.kg stock (Tons)" แต่ `dataMapping` ชี้ไป `avg_weight` ซึ่งมีหน่วย kg
+
+สิ่งที่ตรวจแล้ว:
+- ฝั่ง Go ไม่มีการอ้างถึง `avg_weight_ton` เลย (`grep` ใน `internal/services/price-service/` ไม่พบผลลัพธ์)
+  คอลัมน์นี้ได้ค่ามาทาง `dataMapping` เท่านั้น
+- ฝั่ง web `avg_weight_ton` ปรากฏแห่งเดียวคือ `utils/helper/priceListNumberFormat.ts:19`
+  ซึ่งเป็นลิสต์ field ที่ต้อง format ด้วยตัวคั่นหลักพัน ไม่ใช่การแปลงหน่วย
+- ค่าจำนวนตันที่ผู้ใช้เห็นบนหน้าจอมาจาก UDF field ชื่อ `ton` ซึ่งผู้ใช้กรอกเอง
+  (อยู่ใน `UDF_FIELDS` และ editable suffixes เช่น `PriceListGROUP1ITEM7Detail.vue:1525`)
+  เป็นค่าคนละตัวกับ `avg_weight` ไม่ได้คำนวณจากกัน
+
+สรุปสถานะ: ไม่พบการแปลง kg เป็น ton ที่ใดในระบบ ค่าใต้หัวข้อ "(Tons)" จึงน่าจะเป็น kg
+แต่เนื่องจากมี field `ton` ที่ผู้ใช้กรอกอยู่แยกอีกตัว ยังสรุปเจตนาไม่ได้ รอคำตอบจากธุรกิจ
 
 ### ขอบเขตของ endpoint ปลอดภัย
 
