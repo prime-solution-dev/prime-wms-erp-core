@@ -313,16 +313,14 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.BatchNo = inv.BatchNo
 							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
-							// Map new API fields to existing model fields
-							if inv.TotalQty > 0 {
-								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
-							}
-							if inv.TotalWeight > 0 {
-								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
-							}
-							if inv.AvgWeight > 0 {
-								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
-							}
+							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0
+							// เงื่อนไขเดิมทำให้ field คงค่าที่ค้างจาก subgroup ต้นแบบ
+							// (expandedSG := sg เป็นการ copy) เมื่อ batch นี้มีค่าเป็น 0 จริง ๆ
+							//
+							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
+							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct
+							expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
 
 							expandedSubGroups = append(expandedSubGroups, expandedSG)
 						}
