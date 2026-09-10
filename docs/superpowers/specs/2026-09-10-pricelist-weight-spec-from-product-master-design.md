@@ -116,7 +116,11 @@ func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
 **f. API response**
 - `internal/models/pricelist.go:496-505` — `GetCalculatedPriceListSubGroupItem` เพิ่ม `WeightSpec float64 \`json:"weight_spec"\`` (ตอนนี้ยังไม่มี field นี้)
 - `internal/services/price-service/domain/domain.go` — `Price` struct เพิ่ม `WeightSpec float64 \`json:"weight_spec"\``
-- `update-latest-pricelist-subgroup.go:430` มี `"weight_spec": priceData.WeightSpec` อยู่แล้ว → จะได้ค่าถูกอัตโนมัติ
+- `update-latest-pricelist-subgroup.go:430` ที่มี `"weight_spec": priceData.WeightSpec` **ไม่ใช่ response**
+  แต่เป็น env ของ expression engine ข้างใน `CalculatePrice` (ตัวแปรที่สูตรเรียกใช้) ต้องได้ค่าที่ fallback
+  เป็น 1.0 แล้วตามเจตนา → ไม่ต้องแก้
+- `RunUpdateLatestPriceListSubGroup` return แค่ `{success, message}` (บรรทัด 329-332) ไม่มีข้อมูลราย
+  subgroup จึงไม่มี response field ให้เพิ่มในไฟล์นี้
 
 ### 3. web — ไม่ต้องแก้
 
