@@ -204,9 +204,9 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				})
 			}
 		}
-		if len(toleranceErrorResponse.ToleranceError) > 0 {
+		/* if len(toleranceErrorResponse.ToleranceError) > 0 {
 			return toleranceErrorResponse, nil
-		}
+		} */
 	}
 	topicCodes := []string{"INVOICE"}
 	configCodes := []string{"AP"}
@@ -301,7 +301,12 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
 				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
 				totalBeforeDiscount := 0.0
-				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.PurchaseUnit), "KG") {
+				priceUnit, err := calculateAPPriceUnit(
+					poQTYMapResult.UnitUom, req[i].InvoiceItem[it].UnitUom,
+					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
+				)
+				req[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.UnitUom), "KG") {
 					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
 					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
@@ -309,19 +314,15 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].TotalDiscount = calculateAPDiscount(totalBeforeDiscount,
 					req[i].InvoiceItem[it].TotalDiscount_percent, poQTYMapResult.TotalDiscount)
 				req[i].InvoiceItem[it].SubtotalExclVat = totalBeforeDiscount - req[i].InvoiceItem[it].TotalDiscount
+
 				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
 				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
 
 				totalAmount += req[i].InvoiceItem[it].TotalAmount //total cost
 
-				priceUnit, err := calculateAPPriceUnit(
-					poQTYMapResult.PurchaseUnit, req[i].InvoiceItem[it].UnitUom,
-					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
-				)
 				if err != nil {
 					return nil, fmt.Errorf("PO %s item %s: %w", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem, err)
 				}
-				req[i].InvoiceItem[it].PriceUnit = priceUnit
 
 				//movingAvgCost ใช้ เฉพาะ fab
 				if req[i].InvoiceType == "AP-FAB" {
