@@ -258,9 +258,12 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					}
 					switch formula.PriceListFormulas.Uom {
 					case "pcs":
+						// สูตร uom pcs ต้องใช้ extra ของหน่วยชิ้น ไม่ใช่ของกิโล
+						// เดิมจับคู่สลับกับ update-latest ทำให้ราคาที่ preview ไม่ตรงกับที่บันทึก
+						// เมื่อใดที่ extra_price_unit กับ extra_price_weight ต่างกัน
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceUnit,
-							Extra:      extraPriceWeight,
+							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
 							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
@@ -280,9 +283,10 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 						}
 						totalNetPriceUnit = calculatedTotalNetPriceUnit
 					case "kg":
+						// สูตร uom kg ต้องใช้ extra ของหน่วยกิโล
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceUnit,
+							Extra:      extraPriceWeight,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
 							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
