@@ -54,13 +54,11 @@ func BuildGroup1Item11Response(priceListData []models.GetPriceListResponse, grou
 	productGroup5Code := getGroupCodeFromConfig(config, pattern, "productGroup5", "PRODUCT_GROUP5")
 	productGroup3Code := getGroupCodeFromConfig(config, pattern, "productGroup3", "PRODUCT_GROUP3")
 	sort.SliceStable(allSubGroups, func(i, j int) bool {
-		pg6I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup6Code)
-		pg7I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup7Code)
-		pg6J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup6Code)
-		pg7J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup7Code)
-
-		compositeI := fmt.Sprintf("%s x %s", pg6I, pg7I)
-		compositeJ := fmt.Sprintf("%s x %s", pg6J, pg7J)
+		// ต้องใช้ compositeMappingValue เหมือนตอนสร้างแถว ไม่งั้นเรียงตามค่าที่
+		// ไม่ตรงกับที่แสดง
+		thicknessLength := []string{productGroup6Code, productGroup7Code}
+		compositeI := compositeMappingValue(allSubGroups[i].SubGroupKeys, thicknessLength, "_x_")
+		compositeJ := compositeMappingValue(allSubGroups[j].SubGroupKeys, thicknessLength, "_x_")
 
 		if compositeI == compositeJ {
 			// If same "หนา x ยาว", sort by "ขนาด" (PRODUCT_GROUP5 + PRODUCT_GROUP3)
