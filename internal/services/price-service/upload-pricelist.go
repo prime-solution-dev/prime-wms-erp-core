@@ -1201,12 +1201,9 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 	//
 	// ponytail: precision follows the sheet's own display format (0.0% here);
 	// read the raw cell value if a template ever needs more decimals than it shows.
+	// parseFloat trim ให้อยู่แล้ว และ TrimSuffix ไม่ทำอะไรถ้าไม่มี % จึงไม่ต้องแยก branch
 	parsePercent := func(s string) float64 {
-		s = strings.TrimSpace(s)
-		if strings.HasSuffix(s, "%") {
-			return parseFloat(strings.TrimSuffix(s, "%"))
-		}
-		return parseFloat(s)
+		return parseFloat(strings.TrimSuffix(strings.TrimSpace(s), "%"))
 	}
 	parseInt := func(s string) int {
 		s = strings.TrimSpace(s)
