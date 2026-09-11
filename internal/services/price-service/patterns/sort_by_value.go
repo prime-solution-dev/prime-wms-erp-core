@@ -230,3 +230,17 @@ func sortLabelsByValue(labels []string, sgs []models.PriceListSubGroupResponse, 
 		return idx.Less(labels[i], labels[i], labels[j], labels[j])
 	})
 }
+
+// productGroup2CodeFromConfig อ่าน group code ของแกน tab จาก config
+// คืน "PG02" เป็นค่าเริ่มต้นเมื่อ config ไม่ได้ระบุ
+func productGroup2CodeFromConfig(config *PriceTableConfiguration) string {
+	if config == nil {
+		return "PG02"
+	}
+	for _, p := range config.Patterns {
+		if codes := splitGroupCodes(p.Grouping.Tabs); len(codes) > 0 {
+			return codes[0]
+		}
+	}
+	return "PG02"
+}
