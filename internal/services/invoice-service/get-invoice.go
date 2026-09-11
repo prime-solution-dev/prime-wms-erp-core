@@ -3,6 +3,8 @@ package invoiceService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	externalService "prime-erp-core/external/customer-service"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	paymentService "prime-erp-core/internal/services/payment-service"
@@ -59,6 +61,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errDeposit
 	}
 	supplierReq := models.GetSupplierListRequest{}
+	customerCode := []string{}
 	productCodes := []string{}
 	siteCode := []string{}
 	companyCode := []string{}
@@ -67,6 +70,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		siteCode = append(siteCode, invoiceValue.SiteCode)
 		companyCode = append(companyCode, invoiceValue.CompanyCode)
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
+		customerCode = append(customerCode, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
 		}
@@ -76,6 +80,21 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		Customers: customerCode,
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+	mapCustomer := map[string]externalService.GetCustomerResponse{}
+	for _, customer := range customerByNameData.Customers {
+		mapCustomer[customer.CustomerCode] = customer
+	}
+
 	mapProduct := map[string]models.GetProductsDetailComponent{}
 	if len(productCodes) > 0 {
 		productReq := models.GetProductRequest{
@@ -131,6 +150,10 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
 		}
+		if customerValue, ok := mapCustomer[invoice[i].PartyCode]; ok {
+			invoice[i].PartyName = customerValue.CustomerName
+		}
+
 		sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
 			return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
 		})

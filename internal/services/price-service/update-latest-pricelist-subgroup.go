@@ -146,6 +146,12 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 	}
+	// สูตร pcs อ้างผลลัพธ์ของสูตร kg ในคู่เดียวกัน จึงต้องประเมินตามลำดับ dependency
+	// ไม่ใช่ตามลำดับ create_dtm ที่ repository คืนมา
+	// เรียงที่นี่ครั้งเดียวต่อ subgroup code เพื่อไม่ให้ parse JSON และ log warning ซ้ำ
+	for code, formulas := range formulasMap {
+		formulasMap[code] = sortFormulasByDependency(code, formulas)
+	}
 	// Collect all key values from all subgroups for inventory service request
 	keyValues := []externalService.InventoryByProductCodeKeyValue{}
 	companyCodeSet := make(map[string]bool)
@@ -174,6 +180,8 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	// Create inventory maps for quick lookup
 	inventoryMap := make(map[string][]models.InventoryWeightResponse)
 	supplierCodeMap := make(map[string]string)
+	// weight_spec มาจาก product master ระดับ result ใช้ได้แม้ subgroup ไม่มีสต็อก
+	weightSpecMap := make(map[string]float64)
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
@@ -203,6 +211,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
 				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 		}
 	}
@@ -225,26 +234,22 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
 		}
 
-		// Get inventory data for this subgroup
+		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
+		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch
+		// AvgProduct เป็นค่าเดียวกันทุก entry ของ product/site เดียวกัน จึงหยิบ entry แรกได้
+		//
+		// fallback เป็น 1.0 เมื่อไม่มีสต็อก เป็นพฤติกรรมที่ตกลงกันไว้
+		// ทำให้สูตรที่คูณด้วย avg_kg_stock ให้ผลเหมือนไม่มีตัวคูณ
 		avgKgStock := 1.0
-		weightSpec := 1.0
-		pcs := 0.0
-		kg := 0.0
 		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
-			// Use AvgProduct from first inventory weight response
-			if inventoryWeight[0].AvgWeight == 0 {
-				avgKgStock = 1.0
-			} else {
-				avgKgStock = inventoryWeight[0].AvgWeight
+			if inventoryWeight[0].AvgProduct != 0 {
+				avgKgStock = inventoryWeight[0].AvgProduct
 			}
-			if inventoryWeight[0].TotalWeight == 0 {
-				weightSpec = 1.0
-			} else {
-				weightSpec = inventoryWeight[0].TotalWeight
-			}
-			pcs = inventoryWeight[0].TotalQty
-			kg = inventoryWeight[0].TotalWeight
 		}
+
+		// weight_spec คือน้ำหนักของ base unit จาก product master ไม่ได้ผูกกับสต็อก
+		// จึงอ่านนอกบล็อก inventory (เดิมอ่าน TotalWeight ซึ่งเป็นตัวเดียวกับ kg)
+		weightSpec := weightSpecForFormula(weightSpecMap[subGroupID.String()])
 
 		if len(priceListFormulas) > 0 {
 			// Check for default input formula
@@ -270,8 +275,10 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
 						}
 
 						priceFormula := priceDomain.PriceFormula{
@@ -290,8 +297,10 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 							Extra:      extraPriceWeight,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
