@@ -31,17 +31,41 @@ func TestGroup1Item9_SubGroupsDifferingOnlyByPG06_StayInSeparateRows(t *testing.
 		t.Fatalf("ต้องได้ 2 แถว (คนละ PG06) แต่ได้ %d แถว — ข้อมูลถูกยุบทับกัน", len(merged))
 	}
 
-	// ยืนยันว่าราคาของทั้งสอง subgroup ยังอยู่ ไม่ถูกทับ
-	seen := map[float64]bool{}
+	// ราคาต้องอยู่กับแถวที่ถูกต้อง ไม่ใช่แค่ยังปรากฏอยู่ที่ไหนก็ได้
+	// ผูก PG06 กับราคาที่คาดไว้เป็นคู่ เพื่อจับกรณีราคาสลับแถว
+	wantByPG06 := map[string]float64{
+		"ความยาว 6 เมตร": 101,
+		"ความยาว 9 เมตร": 202,
+	}
+
 	for _, row := range merged {
+		// shared.go เขียนลงแถวเฉพาะ field ที่อยู่ใน rowFields
+		// คอลัมน์ PG06 ที่ pinned ไว้จะมีข้อมูลก็เมื่อ PG06 อยู่ใน grouping.rows
+		pg06, ok := row["pg_06"].(string)
+		if !ok || pg06 == "" {
+			t.Fatalf("คอลัมน์ PG06 ไม่มีข้อมูลป้อน: row = %v", row)
+		}
+
+		want, known := wantByPG06[pg06]
+		if !known {
+			t.Fatalf("เจอแถวที่ PG06 = %q ซึ่งไม่ได้สร้างไว้ใน fixture", pg06)
+		}
+
+		found := false
 		for _, value := range row {
-			if v, ok := value.(float64); ok && (v == 101 || v == 202) {
-				seen[v] = true
+			if v, isFloat := value.(float64); isFloat && v == want {
+				found = true
+				break
 			}
 		}
+		if !found {
+			t.Errorf("แถว PG06 = %q ต้องมีราคา %v แต่หาไม่เจอ: row = %v", pg06, want, row)
+		}
+		delete(wantByPG06, pg06)
 	}
-	if !seen[101] || !seen[202] {
-		t.Fatalf("ราคาของ subgroup ถูกทับหาย: เห็น %v ต้องเห็นทั้ง 101 และ 202", seen)
+
+	if len(wantByPG06) != 0 {
+		t.Fatalf("ยังมี subgroup ที่ไม่ปรากฏเป็นแถวของตัวเอง: %v", wantByPG06)
 	}
 }
 
