@@ -9,6 +9,7 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -127,6 +128,11 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					)
 					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
 				}
+				reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
+					reqHook[i].InvoiceItem[it].ProductDesc,
+					"\\",
+					"",
+				)
 			}
 		}
 
