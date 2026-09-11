@@ -9,6 +9,7 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -117,8 +118,9 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
-		reqHook := req
+		reqHook := slices.Clone(req)
 		for i := range reqHook {
+			reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
 			for it := range reqHook[i].InvoiceItem {
 				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
 				if exists {
