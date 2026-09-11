@@ -3,9 +3,11 @@ package invoiceService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
+	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +45,35 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
+		}
+		reqHook := req
+		productCodes := []string{}
+		for i := range reqHook {
+			for it := range reqHook[i].InvoiceItem {
+				productCodes = append(productCodes, reqHook[i].InvoiceItem[it].ProductCode)
+			}
+		}
+
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    []string{req[0].SiteCode},
+			CompanyCode: []string{req[0].CompanyCode},
+		}
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		if errGetProductInterface != nil {
+			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+		}
+		for i := range reqHook {
+			for it := range reqHook[i].InvoiceItem {
+				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+				if exists {
+					priceUnit, _ := calculateAPPriceUnit(
+						reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+					)
+					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+				}
+			}
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
