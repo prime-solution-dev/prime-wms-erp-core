@@ -127,6 +127,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
 					)
 					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
 				}
 				reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
 					reqHook[i].InvoiceItem[it].ProductDesc,
