@@ -37,14 +37,10 @@ func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, grou
 		}, nil
 	}
 
-	// คอลัมน์เรียงคนละแกนกับแถว จึงต้องใช้ subGroups คนละชุด
-	colSorted := append([]models.PriceListSubGroupResponse(nil), allSubGroups...)
-	SortSubGroupsByValue(colSorted, splitGroupCodes(pattern.Grouping.ColumnGroups)...)
-	columns := buildDynamicColumns(pattern, colSorted)
-
 	// เรียงที่ต้นทางด้วย group_item.value — row_group_value เป็น composite ที่
 	// ข้ามค่าว่างตอน join จึงแยกกลับไปเทียบเป็นตัวเลขไม่ได้
 	SortSubGroupsByValue(allSubGroups, splitGroupCodes(pattern.Grouping.Rows)...)
+	columns := buildDynamicColumns(pattern, allSubGroups)
 	rowData := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rowData)
 

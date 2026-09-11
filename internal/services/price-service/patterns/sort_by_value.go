@@ -108,23 +108,6 @@ func orderedUnique(rows []AGGridRowData, field string) []string {
 	return out
 }
 
-// orderedUniqueBy เวอร์ชันที่ดึง key ด้วยฟังก์ชัน ใช้กับ subGroups โดยตรง
-func orderedUniqueBy[T any](items []T, keyOf func(T) string) []string {
-	seen := map[string]bool{}
-	out := make([]string, 0, len(items))
-
-	for _, item := range items {
-		key := strings.TrimSpace(keyOf(item))
-		if key == "" || seen[key] {
-			continue
-		}
-		seen[key] = true
-		out = append(out, key)
-	}
-
-	return out
-}
-
 // splitGroupCodes แยกสตริงแกนของ pattern เช่น "PG03|PG08|PG05" เป็น slice
 // ตัดช่องว่างและข้ามค่าว่าง คืน nil เมื่อไม่เหลืออะไร
 func splitGroupCodes(s string) []string {
@@ -197,7 +180,13 @@ func (idx valueByCode) Less(codeA, labelA, codeB, labelB string) bool {
 		return false
 	}
 
-	return labelA < labelB
+	if labelA != labelB {
+		return labelA < labelB
+	}
+	// ปิดท้ายด้วย code — slice ที่เรียกใช้ถูกสร้างจาก map iteration แล้วเรียงด้วย
+	// sort.Slice ที่ไม่ stable ถ้าไม่มี tie-break ตรงนี้ item คนละตัวที่ item_name
+	// ซ้ำกันจะสลับตำแหน่งกันทุก request
+	return codeA < codeB
 }
 
 // newValueByName สร้าง index จาก ValueName ไปหาค่าตัวเลข เฉพาะ groupCode เดียว
@@ -229,18 +218,4 @@ func sortLabelsByValue(labels []string, sgs []models.PriceListSubGroupResponse, 
 	sort.SliceStable(labels, func(i, j int) bool {
 		return idx.Less(labels[i], labels[i], labels[j], labels[j])
 	})
-}
-
-// productGroup2CodeFromConfig อ่าน group code ของแกน tab จาก config
-// คืน "PG02" เป็นค่าเริ่มต้นเมื่อ config ไม่ได้ระบุ
-func productGroup2CodeFromConfig(config *PriceTableConfiguration) string {
-	if config == nil {
-		return "PG02"
-	}
-	for _, p := range config.Patterns {
-		if codes := splitGroupCodes(p.Grouping.Tabs); len(codes) > 0 {
-			return codes[0]
-		}
-	}
-	return "PG02"
 }

@@ -46,7 +46,12 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		}
 		sort.Strings(productGroup2Keys)
-		sortLabelsByValue(productGroup2Keys, allSubGroupsForTabs, productGroup2CodeFromConfig(config))
+		// ต้องใช้ call เดียวกับที่ groupDataByGroupKeyAndProductGroup2 ใช้ group
+		// (shared.go) ไม่งั้นจะ lookup คนละแกนแล้ว miss ทุกตัวเงียบ ๆ
+		// pattern.Grouping.Tabs ใช้แทนไม่ได้ — PG01_3_PATTERN.json ตั้ง tabs เป็น
+		// PG01 แต่ group จริงด้วย root mapping productGroup2 = PG02
+		sortLabelsByValue(productGroup2Keys, allSubGroupsForTabs,
+			getGroupCodeFromConfig(config, nil, "productGroup2", "PRODUCT_GROUP2"))
 		tabDisplayOrder = append(tabDisplayOrder, productGroup2Keys...)
 
 		for _, productGroup2 := range productGroup2Keys {
@@ -60,13 +65,10 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			rowCodes := splitGroupCodes(pattern.Grouping.Rows)
 			colCodes := splitGroupCodes(pattern.Grouping.ColumnGroups)
 
-			// คอลัมน์กับแถวเรียงคนละแกน จึงต้องใช้ subGroups คนละชุด
-			// ถ้าใช้ชุดเดียวกัน ลำดับคอลัมน์จะกลายเป็นลำดับที่เจอตอนไล่แถว
-			colSorted := append([]models.PriceListSubGroupResponse(nil), subGroups...)
-			SortSubGroupsByValue(colSorted, colCodes...)
-			columns := buildDynamicColumns(pattern, colSorted)
-
+			// ลำดับคอลัมน์ไม่ได้มาจากลำดับ subGroups — buildDynamicColumns เก็บ
+			// unique key ลง map แล้วเรียงเองภายในด้วย group_item.value
 			SortSubGroupsByValue(subGroups, append(append([]string{}, rowCodes...), colCodes...)...)
+			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(config, pattern, subGroups)
 
 			// Regroup rows to prevent data loss when the same column_group_key appears

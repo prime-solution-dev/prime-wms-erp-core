@@ -168,23 +168,6 @@ func TestOrderedUnique(t *testing.T) {
 	}
 }
 
-func TestOrderedUniqueBy(t *testing.T) {
-	subs := []models.PriceListSubGroupResponse{
-		sub(sgk("PG02", "เหล็กแผ่น", 6, true)),
-		sub(sgk("PG02", "เหล็กแผ่น", 6, true)),
-		sub(sgk("PG02", "แผ่นลาย", 9, true)),
-	}
-
-	got := orderedUniqueBy(subs, func(s models.PriceListSubGroupResponse) string {
-		return s.SubGroupKeys[0].ValueName
-	})
-	want := []string{"เหล็กแผ่น", "แผ่นลาย"}
-
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("ได้ %v ต้องเป็น %v", got, want)
-	}
-}
-
 func TestSplitGroupCodes(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -378,28 +361,23 @@ func TestNewValueByName_OnlyMatchingGroupAndSkipsEmptyName(t *testing.T) {
 	}
 }
 
-func TestProductGroup2CodeFromConfig(t *testing.T) {
-	if got := productGroup2CodeFromConfig(nil); got != "PG02" {
-		t.Fatalf("config เป็น nil ต้องได้ PG02 แต่ได้ %q", got)
+// item คนละตัวที่ item_name ซ้ำกันต้องได้ลำดับเดิมทุกครั้ง — slice ที่เรียกใช้
+// สร้างจาก map iteration แล้วเรียงด้วย sort.Slice ที่ไม่ stable
+func TestValueByCodeLess_SameLabelTieBreaksByCode(t *testing.T) {
+	idx := valueByCode{
+		"PG05_9":  {value: 100, has: true},
+		"PG05_12": {value: 100, has: true},
 	}
 
-	empty := &PriceTableConfiguration{}
-	if got := productGroup2CodeFromConfig(empty); got != "PG02" {
-		t.Fatalf("config ไม่มี pattern ต้องได้ PG02 แต่ได้ %q", got)
+	if !idx.Less("PG05_12", "100", "PG05_9", "100") {
+		t.Fatal("label ซ้ำและค่าเท่ากัน ต้อง tie-break ด้วย code")
 	}
-
-	noTabs := &PriceTableConfiguration{Patterns: []PatternConfig{
-		{Grouping: GroupingConfig{Tabs: ""}},
-	}}
-	if got := productGroup2CodeFromConfig(noTabs); got != "PG02" {
-		t.Fatalf("pattern ไม่ระบุ tabs ต้องได้ PG02 แต่ได้ %q", got)
+	if idx.Less("PG05_9", "100", "PG05_12", "100") {
+		t.Fatal("tie-break ด้วย code ต้องไม่สลับทิศ")
 	}
-
-	withTabs := &PriceTableConfiguration{Patterns: []PatternConfig{
-		{Grouping: GroupingConfig{Tabs: ""}},
-		{Grouping: GroupingConfig{Tabs: "PG01"}},
-	}}
-	if got := productGroup2CodeFromConfig(withTabs); got != "PG01" {
-		t.Fatalf("ต้องได้ PG01 จาก pattern ตัวที่สอง แต่ได้ %q", got)
+	// resolve ไม่ได้ทั้งคู่และ label ซ้ำ ก็ต้อง tie-break ด้วย code เช่นกัน
+	empty := valueByCode{}
+	if !empty.Less("a", "ซ้ำ", "b", "ซ้ำ") {
+		t.Fatal("resolve ไม่ได้ทั้งคู่ label ซ้ำ ต้อง tie-break ด้วย code")
 	}
 }

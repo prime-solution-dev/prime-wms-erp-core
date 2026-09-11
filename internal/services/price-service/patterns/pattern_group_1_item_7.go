@@ -3,6 +3,7 @@ package patterns
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"prime-erp-core/internal/models"
 
@@ -80,19 +81,18 @@ func BuildGroup1Item7Response(priceListData []models.GetPriceListResponse, group
 		rowCodes := splitGroupCodes(pattern.Grouping.Rows)
 		colCodes := splitGroupCodes(pattern.Grouping.ColumnGroups)
 
-		// คอลัมน์กับแถวเรียงคนละแกน จึงต้องใช้ subGroups คนละชุด
-		colSorted := append([]models.PriceListSubGroupResponse(nil), subGroups...)
-		SortSubGroupsByValue(colSorted, colCodes...)
-		columns := buildDynamicColumns(pattern, colSorted)
-
+		// ลำดับคอลัมน์ไม่ได้มาจากลำดับ subGroups — buildDynamicColumns เรียงเองภายใน
 		SortSubGroupsByValue(subGroups, append(append([]string{}, rowCodes...), colCodes...)...)
+		columns := buildDynamicColumns(pattern, subGroups)
 		rowData := buildDynamicRows(config, pattern, subGroups)
 
 		// Merge rows with the same row_group_value into a single row
 		// This groups all PRODUCT_GROUP5 columns into one row per PRODUCT_GROUP6
 		mergedRowMap := make(map[string]AGGridRowData)
 		for _, row := range rowData {
-			rowGroupValue := fmt.Sprintf("%v", row["row_group_value"])
+			// ต้อง TrimSpace ให้ตรงกับ orderedUnique ที่ใช้ไล่ออกด้านล่าง ไม่งั้น
+			// item_name ที่มีช่องว่างหัว/ท้ายจะทำให้ key ไม่ตรงแล้วแถวหายเงียบ ๆ
+			rowGroupValue := strings.TrimSpace(fmt.Sprintf("%v", row["row_group_value"]))
 			if rowGroupValue == "" {
 				continue
 			}

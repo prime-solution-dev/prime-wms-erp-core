@@ -41,12 +41,8 @@ func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, grou
 	productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
 	productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
 
-	// คอลัมน์เรียงคนละแกนกับแถว จึงต้องใช้ subGroups คนละชุด
-	colSorted := append([]models.PriceListSubGroupResponse(nil), allSubGroups...)
-	SortSubGroupsByValue(colSorted, splitGroupCodes(pattern.Grouping.ColumnGroups)...)
-	columns := buildDynamicColumns(pattern, colSorted)
-
 	SortSubGroupsByValue(allSubGroups, productGroup4Code, productGroup7Code)
+	columns := buildDynamicColumns(pattern, allSubGroups)
 	rows := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rows)
 

@@ -55,6 +55,8 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 
 	for _, tabLabel := range tabOrder {
 		subGroups := groupedByProductGroup2[tabLabel]
+		// แกนแถวของ pattern นี้คือ PG06 ความหนา ซึ่งเป็นแกนที่เป็นต้นเหตุของบั๊ก
+		SortSubGroupsByValue(subGroups, splitGroupCodes(pattern.Grouping.Rows)...)
 		columns := buildGroup1Item5Columns(pattern, subGroups)
 		rowData := buildDynamicRows(config, pattern, subGroups)
 
