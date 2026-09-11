@@ -485,7 +485,8 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["is_trading"] = *req.IsTrading
 			}
 
-			// Handle price unit and price weight fields - update before fields with old values
+			// Handle price unit and price weight fields
+			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
 			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
 				updateMap[k] = v
 			}
