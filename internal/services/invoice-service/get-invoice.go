@@ -3,6 +3,8 @@ package invoiceService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	externalService "prime-erp-core/external/customer-service"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	paymentService "prime-erp-core/internal/services/payment-service"
@@ -60,6 +62,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errDeposit
 	}
 	supplierReq := models.GetSupplierListRequest{}
+	customerCode := []string{}
 	productCodes := []string{}
 	siteCode := []string{}
 	companyCode := []string{}
@@ -68,6 +71,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		siteCode = append(siteCode, invoiceValue.SiteCode)
 		companyCode = append(companyCode, invoiceValue.CompanyCode)
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
+		customerCode = append(customerCode, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
 		}
@@ -77,6 +81,21 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		Customers: customerCode,
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+	mapCustomer := map[string]externalService.GetCustomerResponse{}
+	for _, customer := range customerByNameData.Customers {
+		mapCustomer[customer.CustomerCode] = customer
+	}
+
 	mapProduct := map[string]models.GetProductsDetailComponent{}
 	if len(productCodes) > 0 {
 		productReq := models.GetProductRequest{
@@ -122,29 +141,61 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	}
-	// order := map[string]int{
-	// 	"PRODUCT": 1,
-	// 	"ADJUST":  2,
-	// 	"TRANS":   3,
-	// 	"Deposit": 4,
-	// }
+	order := map[string]int{
+		"PRODUCT": 1,
+		"ADJUST":  2,
+		"TRANS":   3,
+		"Deposit": 4,
+	}
+
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
 		}
-		// sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
-		// 	return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
-		// })
-		sort.SliceStable(invoice[i].InvoiceItem, func(o, j int) bool {
-			itemO, errO := strconv.Atoi(invoice[i].InvoiceItem[o].InvoiceItem)
-			itemJ, errJ := strconv.Atoi(invoice[i].InvoiceItem[j].InvoiceItem)
+		if customerValue, ok := mapCustomer[invoice[i].PartyCode]; ok {
+			invoice[i].PartyName = customerValue.CustomerName
+		}
 
-			if errO != nil || errJ != nil {
+		sort.SliceStable(invoice[i].InvoiceItem, func(o, j int) bool {
+			left := invoice[i].InvoiceItem[o]
+			right := invoice[i].InvoiceItem[j]
+
+			// 1. เรียงตาม InvoiceType ก่อน
+			typeOrderO, okO := order[left.InvoiceType]
+			typeOrderJ, okJ := order[right.InvoiceType]
+
+			// ถ้าเป็น Type ที่ไม่มีใน map ให้ไปอยู่ท้าย
+			if !okO {
+				typeOrderO = 999
+			}
+			if !okJ {
+				typeOrderJ = 999
+			}
+
+			if typeOrderO != typeOrderJ {
+				return typeOrderO < typeOrderJ
+			}
+
+			// 2. ถ้า InvoiceType เดียวกัน
+			// ให้เรียงตาม invoice_item
+			itemO, errO := strconv.Atoi(left.InvoiceItem)
+			itemJ, errJ := strconv.Atoi(right.InvoiceItem)
+
+			if errO != nil && errJ != nil {
 				return false
+			}
+
+			if errO != nil {
+				return false
+			}
+
+			if errJ != nil {
+				return true
 			}
 
 			return itemO < itemJ
 		})
+
 		for j := range invoice[i].InvoiceItem {
 			if productDetail, ok := mapProduct[invoice[i].InvoiceItem[j].ProductCode]; ok {
 				invoice[i].InvoiceItem[j].ProductName = productDetail.ProductName
