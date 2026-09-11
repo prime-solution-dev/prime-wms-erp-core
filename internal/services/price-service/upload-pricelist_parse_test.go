@@ -92,7 +92,9 @@ func TestParse_PercentAndDecimalNotTruncated(t *testing.T) {
 	if len(req.Terms) != 3 {
 		t.Fatalf("terms = %d, want 3", len(req.Terms))
 	}
-	for i, want := range []struct{ pdc, due float64 }{{0.01, 0.015}, {0.02, 0.03}, {0, 0}} {
+	// มาตรฐานที่ธุรกิจยืนยัน 2026-09-11: 1 = 1% และ 0.1 = 0.1%
+	// cell "1.0%" ต้องเก็บเป็น 1 ไม่ใช่ 0.01 · cell ที่ไม่มี % ต่อท้ายเก็บตามที่พิมพ์
+	for i, want := range []struct{ pdc, due float64 }{{1, 1.5}, {0.02, 3}, {0, 0}} {
 		if got := req.Terms[i].PdcPercent; got != want.pdc {
 			t.Errorf("term[%d].PdcPercent = %v, want %v", i, got, want.pdc)
 		}
@@ -226,5 +228,52 @@ func TestParse_WithoutFormulasSheetIsAccepted(t *testing.T) {
 	}
 	if len(req.SubGroupFormulas) != 2 {
 		t.Errorf("subgroup formulas = %d, want 2", len(req.SubGroupFormulas))
+	}
+}
+
+// มาตรฐานที่ธุรกิจยืนยัน 2026-09-11: pdc_percent / due_percent เก็บเป็นจำนวนเปอร์เซ็นต์
+// (1 = 1%, 0.1 = 0.1%) และ baht = price * percent / 100
+//
+// เดิม parsePercent หารด้วย 100 เมื่อ cell มี % ต่อท้าย ทำให้ cell "3.0%" ถูกเก็บเป็น 0.03
+// ซึ่งอ่านเป็น 0.03% ข้อมูลใน DB จึงเล็กไป 100 เท่า 46 แถวสำหรับ pdc และ 48 แถวสำหรับ due
+func TestParse_PercentKeepsWholeNumberConvention(t *testing.T) {
+	tests := []struct {
+		name       string
+		pdcPercent string
+		duePercent string
+		wantPdc    float64
+		wantDue    float64
+	}{
+		{"หนึ่งเปอร์เซ็นต์", "1.0%", "1.5%", 1, 1.5},
+		{"สามเปอร์เซ็นต์", "3.0%", "4.0%", 3, 4},
+		{"ต่ำกว่าหนึ่งเปอร์เซ็นต์", "0.1%", "0.5%", 0.1, 0.5},
+		{"ไม่มีเครื่องหมายเปอร์เซ็นต์", "2.5", "3.5", 2.5, 3.5},
+		{"ศูนย์", "0%", "0", 0, 0},
+		{"ว่าง", "", "", 0, 0},
+		{"มีช่องว่างรอบ", " 2.0% ", " 2.5% ", 2, 2.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sh := baseSheets()
+			sh["price_list_group_term"] = [][]string{
+				{"company_code", "site_code", "group_code", "term_code", "pdc", "pdc_percent", "due", "due_percent"},
+				{testCompany, testSite, "G1", "T1", "0.19", tt.pdcPercent, "0.28", tt.duePercent},
+			}
+
+			req, err := buildCreatePricelistRequestFromExcel(buildXlsx(t, sh))
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if len(req.Terms) != 1 {
+				t.Fatalf("terms = %d, want 1", len(req.Terms))
+			}
+			if got := req.Terms[0].PdcPercent; got != tt.wantPdc {
+				t.Errorf("PdcPercent = %v, want %v", got, tt.wantPdc)
+			}
+			if got := req.Terms[0].DuePercent; got != tt.wantDue {
+				t.Errorf("DuePercent = %v, want %v", got, tt.wantDue)
+			}
+		})
 	}
 }

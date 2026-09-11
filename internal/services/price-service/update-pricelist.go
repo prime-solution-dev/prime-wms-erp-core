@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"prime-erp-core/internal/models"
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
+	"prime-erp-core/internal/utils"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -126,6 +128,12 @@ func checkForOverlappingConditions(extras []models.UpdatePriceListExtraRequest) 
 		case "<>":
 			// Range between min and max
 			return e.CondRangeMin, e.CondRangeMax
+		case ">":
+			// Range from min to infinity, same as >= (only min is meaningful)
+			return e.CondRangeMin, 1e18
+		case "<":
+			// Range from min to max, same as <= (only max is meaningful)
+			return e.CondRangeMin, e.CondRangeMax
 		default:
 			// Default: use the full range
 			return e.CondRangeMin, e.CondRangeMax
@@ -161,10 +169,88 @@ func checkForOverlappingConditions(extras []models.UpdatePriceListExtraRequest) 
 	return nil
 }
 
+// validExtraOperators คือ operator ที่ extraConditionMatched รองรับ
+// (update-latest-pricelist-subgroup.go) ซึ่งเป็นตัวตัดสินราคาจริง
+// ห้ามใช้ getEffectiveRange เป็นแหล่งความจริง มันเป็นแค่ helper ของการตรวจ overlap
+// และ default ของมันกลืน operator ที่ไม่รู้จักไป
+var validExtraOperators = map[string]bool{
+	"=":  true,
+	">=": true,
+	"<=": true,
+	"<":  true,
+	">":  true,
+	"<>": true,
+}
+
+// validateExtras ตรวจว่าข้อมูล extra ที่ส่งมาไม่มี field ว่างที่จำเป็น
+//
+// route /UpdatePriceListExtra ใช้ utils.ProcessRequest ซึ่งไม่ผ่าน ShouldBindJSON
+// ฉะนั้น binding:"required" tag ใช้ไม่ได้ ต้องตรวจด้วยโค้ดตรง ๆ
+// คืน *utils.BindingError เพื่อให้ ProcessRequest แปลงเป็น HTTP 400
+func validateExtras(extras []models.UpdatePriceListExtraRequest) error {
+	if len(extras) == 0 {
+		return &utils.BindingError{Message: "ต้องส่งข้อมูล extra มาอย่างน้อย 1 รายการ"}
+	}
+
+	for i, e := range extras {
+		if e.PriceListGroupID == uuid.Nil {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: price_list_group_id ห้ามว่าง", i+1),
+			}
+		}
+		if strings.TrimSpace(e.ExtraKey) == "" {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: extra_key ห้ามว่าง", i+1),
+			}
+		}
+		if strings.TrimSpace(e.ConditionCode) == "" {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: condition_code ห้ามว่าง", i+1),
+			}
+		}
+		if !validExtraOperators[strings.TrimSpace(e.Operator)] {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: operator %q ไม่ถูกต้อง ต้องเป็น =, >=, <=, <, > หรือ <>", i+1, e.Operator),
+			}
+		}
+		// เฉพาะ "<>" เท่านั้นที่ใช้ทั้ง min และ max พร้อมกัน (extraConditionMatched:
+		// val >= min && val <= max) operator อื่นใช้ขอบเดียว (เช่น ">=" ใช้แค่ min)
+		// ค่าอีกขอบไม่มีความหมายและอาจเป็นข้อมูลเก่าที่ถูกต้องอยู่แล้ว (เช่น min=100, max=0)
+		if strings.TrimSpace(e.Operator) == "<>" && e.CondRangeMin > e.CondRangeMax {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: cond_range_min (%v) ต้องไม่มากกว่า cond_range_max (%v)", i+1, e.CondRangeMin, e.CondRangeMax),
+			}
+		}
+		if len(e.PriceListGroupExtraKeys) == 0 {
+			return &utils.BindingError{
+				Message: fmt.Sprintf("รายการที่ %d: price_list_group_extra_keys ห้ามว่าง", i+1),
+			}
+		}
+		for j, k := range e.PriceListGroupExtraKeys {
+			if strings.TrimSpace(k.Code) == "" {
+				return &utils.BindingError{
+					Message: fmt.Sprintf("รายการที่ %d key ที่ %d: code ห้ามว่าง", i+1, j+1),
+				}
+			}
+			if strings.TrimSpace(k.Value) == "" {
+				return &utils.BindingError{
+					Message: fmt.Sprintf("รายการที่ %d key ที่ %d: value ห้ามว่าง", i+1, j+1),
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func UpdateExtras(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdatePriceListExtraRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, &utils.BindingError{Message: "payload ไม่ใช่ JSON ที่ถูกต้อง: " + err.Error()}
+	}
+
+	if err := validateExtras(req); err != nil {
 		return nil, err
 	}
 

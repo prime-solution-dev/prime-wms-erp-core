@@ -263,8 +263,10 @@ func TestCreatePricelist_LoadsEveryRow(t *testing.T) {
 		Select("pdc_percent, due_percent").Where("term_code = ?", "T1").Scan(&term).Error; err != nil {
 		t.Fatalf("scan term: %v", err)
 	}
-	if term.PdcPercent != 0.01 || term.DuePercent != 0.015 {
-		t.Errorf("T1 percents = %+v, want 0.01 / 0.015", term)
+	// มาตรฐานที่ธุรกิจยืนยัน 2026-09-11: pdc_percent / due_percent เก็บเป็นจำนวนเปอร์เซ็นต์
+	// (1 = 1%, 0.1 = 0.1%) cell "1.0%"/"1.5%" ของ T1 จึงต้องเก็บเป็น 1 / 1.5 ไม่ใช่ 0.01 / 0.015
+	if term.PdcPercent != 1 || term.DuePercent != 1.5 {
+		t.Errorf("T1 percents = %+v, want 1 / 1.5", term)
 	}
 
 	var values []float64

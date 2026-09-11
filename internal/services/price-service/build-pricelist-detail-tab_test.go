@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, func(string) string) {
+func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, func(string) (string, bool)) {
 	udf, _ := json.Marshal(map[string]interface{}{"inactive": false})
 
 	groups := []GetPriceListGroupResponse{
@@ -71,18 +71,18 @@ func detailTestFixtures() ([]GetPriceListGroupResponse, func(string) string, fun
 		}
 	}
 
-	itemNameByCode := func(code string) string {
+	itemNameByCode := func(code string) (string, bool) {
 		switch code {
 		case "PG01_3":
-			return "หมวดเหล็กแผ่น"
+			return "หมวดเหล็กแผ่น", true
 		case "PG02_6":
-			return "เหล็กแผ่น"
+			return "เหล็กแผ่น", true
 		case "PG04_9":
-			return "4' x 8'"
+			return "4' x 8'", true
 		case "PG06_4":
-			return "1.2"
+			return "1.2", true
 		default:
-			return ""
+			return "", false
 		}
 	}
 
@@ -279,8 +279,9 @@ func TestBuildPricelistDetailTab_FallbackToRawCode(t *testing.T) {
 	// group_name ว่างและ resolve อะไรไม่ได้เลย — ต้อง fallback เป็น code ดิบ ไม่ใช่เซลล์ว่าง
 	groups[0].GroupName = ""
 
-	none := func(string) string { return "" }
-	tab := buildPricelistDetailTab(groups, none, none, nil, nil, nil)
+	noneName := func(string) string { return "" }
+	noneItem := func(string) (string, bool) { return "", false }
+	tab := buildPricelistDetailTab(groups, noneName, noneItem, nil, nil, nil)
 
 	nameCol := tab.Columns[columnIndex(tab.Columns, "PG01")]
 	if nameCol.HeaderName != "PG01" {
@@ -291,6 +292,39 @@ func TestBuildPricelistDetailTab_FallbackToRawCode(t *testing.T) {
 	}
 	if tab.Rows[0]["pricelist_group_name"] != "GROUP_1_ITEM_1" {
 		t.Fatalf("expected group name to fall back to the code, got %v", tab.Rows[0]["pricelist_group_name"])
+	}
+}
+
+// กฎที่ธุรกิจยืนยัน: ถ้ามี record ใน DB แต่ชื่อว่าง = ว่างจริง ห้าม fallback ไป code
+// ตอนนี้ itemNameByCode คืน string เดี่ยว จึงแยกไม่ออกจากกรณี "ไม่มี record"
+func TestBuildPricelistDetailTab_EmptyNameOnExistingRecordStaysEmpty(t *testing.T) {
+	groups, groupNameByCode, _ := detailTestFixtures()
+
+	// มี record ของ PG01_3 อยู่จริงแต่ชื่อว่างโดยตั้งใจ
+	itemNameByCode := func(code string) (string, bool) {
+		if code == "PG01_3" {
+			return "", true
+		}
+		return "", false
+	}
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
+
+	if got := tab.Rows[0]["PG01"]; got != "" {
+		t.Fatalf("มี record แต่ชื่อว่าง ต้องได้เซลล์ว่าง แต่ได้ %v", got)
+	}
+}
+
+// กรณีหา record ไม่เจอ ต้อง fallback ไป code ดิบเหมือนเดิม
+func TestBuildPricelistDetailTab_MissingRecordStillFallsBackToCode(t *testing.T) {
+	groups, groupNameByCode, _ := detailTestFixtures()
+
+	itemNameByCode := func(string) (string, bool) { return "", false }
+
+	tab := buildPricelistDetailTab(groups, groupNameByCode, itemNameByCode, nil, nil, nil)
+
+	if got := tab.Rows[0]["PG01"]; got != "PG01_3" {
+		t.Fatalf("ไม่มี record ต้อง fallback เป็น code ดิบ แต่ได้ %v", got)
 	}
 }
 

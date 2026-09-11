@@ -93,11 +93,14 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 		return ""
 	}
-	itemNameByCode := func(code string) string {
-		if it, ok := groupItemMap[code]; ok {
-			return it.ItemName
+	// คืน ok ออกมาด้วย เพื่อให้ผู้เรียกแยก "ไม่มี record" จาก "มี record แต่ชื่อว่าง" ได้
+	// ธุรกิจยืนยันว่าชื่อว่างโดยตั้งใจต้องแสดงว่าง ไม่ fallback ไป code
+	itemNameByCode := func(code string) (string, bool) {
+		it, ok := groupItemMap[code]
+		if !ok {
+			return "", false
 		}
-		return ""
+		return it.ItemName, true
 	}
 
 	// Collect all unique company codes and site codes from the response
@@ -235,7 +238,7 @@ type detailTabData struct {
 func buildExportTableTyped(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
-	itemNameByCode func(code string) string,
+	itemNameByCode func(code string) (string, bool),
 ) detailTabData {
 	// Collect columns: group_code -> group_name, track min seq for stable ordering.
 	type colMeta struct {
@@ -454,7 +457,10 @@ func buildExportTableTyped(
 				if k.Code == "" {
 					continue
 				}
-				row[k.Code] = itemNameByCode(k.Value)
+				// tab นี้ (Detail แบบเดิม) ไม่เคย fallback ไป code ดิบอยู่แล้ว
+				// ไม่ใช้ ok เพื่อคงพฤติกรรมเดิมไว้ตามที่เป็น
+				name, _ := itemNameByCode(k.Value)
+				row[k.Code] = name
 			}
 
 			rows = append(rows, row)
@@ -468,7 +474,7 @@ func buildExportTableTyped(
 func buildDetailTab(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
-	itemNameByCode func(code string) string,
+	itemNameByCode func(code string) (string, bool),
 	lastUpdated *time.Time,
 ) ExportTab {
 	// Reuse existing logic but get the old response structure.
