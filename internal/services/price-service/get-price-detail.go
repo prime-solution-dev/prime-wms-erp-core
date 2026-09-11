@@ -8,6 +8,7 @@ import (
 	groupService "prime-erp-core/internal/services/group-service"
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
+	"sort"
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -259,15 +260,9 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
-		// Convert sets to slices
-		companyCodes := []string{}
-		for code := range companyCodeSet {
-			companyCodes = append(companyCodes, code)
-		}
-		siteCodes := []string{}
-		for code := range siteCodeSet {
-			siteCodes = append(siteCodes, code)
-		}
+		// Convert sets to slices — sort เพื่อให้ companyCodes[0] และลำดับ siteCodes นิ่ง
+		companyCodes := sortedSetKeys(companyCodeSet)
+		siteCodes := sortedSetKeys(siteCodeSet)
 
 		// Use first company code for the request (as per example, it's a single value array)
 		companyCode := ""
@@ -313,16 +308,22 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.BatchNo = inv.BatchNo
 							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
-							// Map new API fields to existing model fields
-							if inv.TotalQty > 0 {
-								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
-							}
-							if inv.TotalWeight > 0 {
-								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
-							}
-							if inv.AvgWeight > 0 {
-								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
-							}
+							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0
+							//
+							// InventoryWeightResponse มีทั้ง field เก่า (sum_qty, sum_weight, avg_batch)
+							// และใหม่ (total_qty, total_weight, avg_weight) อยู่ใน struct เดียวกัน
+							// และบรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา
+							//
+							// ปัจจุบัน endpoint get-inventory-weight-by-key ไม่ส่ง field เก่ามาเลย
+							// จึงเป็น 0 เสมอ และเงื่อนไข > 0 เดิมยังให้ผลเหมือนการเขียนตรง ๆ
+							// แต่เงื่อนไขนั้นเป็นความเสี่ยงเชิงโครงสร้าง ถ้าวันหนึ่ง endpoint ส่ง field เก่ามา
+							// หรือ struct นี้ถูกใช้ซ้ำกับ endpoint อื่น ค่าเก่าจะค้างเมื่อค่าใหม่เป็น 0 จริง
+							// เขียนตรง ๆ จึงปลอดภัยกว่าและอ่านง่ายกว่า
+							//
+							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
+							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct
+							expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
 
 							expandedSubGroups = append(expandedSubGroups, expandedSG)
 						}
@@ -445,4 +446,17 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return response, nil
+}
+
+// sortedSetKeys คืน key ของ set ที่เรียงแล้ว
+//
+// การวน map ใน Go สุ่มลำดับ ผู้เรียกใช้ผลนี้เลือก element ตัวแรกไปส่งต่อ
+// ถ้าไม่ sort ค่าที่ถูกเลือกจะเปลี่ยนทุกครั้งที่เรียก
+func sortedSetKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

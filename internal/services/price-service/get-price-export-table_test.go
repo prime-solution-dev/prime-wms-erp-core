@@ -58,16 +58,16 @@ func TestBuildExportTableTyped_ColumnsAndRows(t *testing.T) {
 		}
 	}
 
-	itemNameByCode := func(code string) string {
+	itemNameByCode := func(code string) (string, bool) {
 		switch code {
 		case "GROUP_1_ITEM_1":
-			return "หมวดเหล็กแผ่น"
+			return "หมวดเหล็กแผ่น", true
 		case "GROUP_4_ITEM_1":
-			return "75x45x15"
+			return "75x45x15", true
 		case "GROUP_6_ITEM_1":
-			return "1.2"
+			return "1.2", true
 		default:
-			return ""
+			return "", false
 		}
 	}
 
@@ -239,7 +239,7 @@ func TestBuildExportTableTyped_NoDuplicateColumns(t *testing.T) {
 		},
 	}
 
-	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) (string, bool) { return "", false })
 
 	count := map[string]int{}
 	for _, c := range data.Columns {
@@ -271,7 +271,7 @@ func TestBuildExportTableTyped_DropsIsHighlightColumnButKeepsValue(t *testing.T)
 		},
 	}
 
-	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) (string, bool) { return "", false })
 
 	for _, c := range data.Columns {
 		if c.Field == "is_highlight" {
@@ -289,7 +289,7 @@ func TestBuildExportTableTyped_DropsIsHighlightColumnButKeepsValue(t *testing.T)
 
 // stock_quantity (TotalQty) กับ quantity (SumQty) เคยใช้หัวเดียวกันคือ "จำนวน"
 func TestBuildExportTableTyped_QuantityHeadersAreDistinct(t *testing.T) {
-	data := buildExportTableTyped(nil, func(string) string { return "" }, func(string) string { return "" })
+	data := buildExportTableTyped(nil, func(string) string { return "" }, func(string) (string, bool) { return "", false })
 
 	headers := map[string]string{}
 	for _, c := range data.Columns {
@@ -335,7 +335,7 @@ func TestBuildExportTableTyped_GroupNameOverridesStaticHeader(t *testing.T) {
 		}
 	}
 
-	data := buildExportTableTyped(groups, groupNameByCode, func(string) string { return "" })
+	data := buildExportTableTyped(groups, groupNameByCode, func(string) (string, bool) { return "", false })
 
 	headers := map[string]string{}
 	count := map[string]int{}
@@ -375,7 +375,7 @@ func TestBuildExportTableTyped_StaticHeaderIsFallback(t *testing.T) {
 		},
 	}
 
-	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) string { return "" })
+	data := buildExportTableTyped(groups, func(string) string { return "" }, func(string) (string, bool) { return "", false })
 
 	for _, c := range data.Columns {
 		if c.Field == "PG01" {
@@ -408,7 +408,7 @@ func TestBuildExportTableTyped_BlankGroupNameKeepsStaticHeader(t *testing.T) {
 		},
 	}
 
-	data := buildExportTableTyped(groups, func(string) string { return "   " }, func(string) string { return "" })
+	data := buildExportTableTyped(groups, func(string) string { return "   " }, func(string) (string, bool) { return "", false })
 
 	headers := map[string]string{}
 	for _, c := range data.Columns {
@@ -428,7 +428,7 @@ func TestBuildExportTableTyped_BlankGroupNameKeepsStaticHeader(t *testing.T) {
 func TestBuildDetailTab_UsesProvidedLastUpdated(t *testing.T) {
 	lastUpdated := time.Date(2026, 8, 20, 3, 15, 0, 0, time.UTC)
 
-	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, &lastUpdated)
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) (string, bool) { return "", false }, &lastUpdated)
 
 	if tab.Headers.LastUpdated != "20/8/2026 10:15" {
 		t.Fatalf("expected LastUpdated %q, got %q", "20/8/2026 10:15", tab.Headers.LastUpdated)
@@ -440,7 +440,7 @@ func TestBuildDetailTab_UsesProvidedLastUpdated(t *testing.T) {
 
 // ไม่มีข้อมูลราคาเลย -> ปล่อยหัวเรื่องว่าง (excel_generator ข้ามแถวที่ค่าว่าง)
 func TestBuildDetailTab_NilLastUpdatedLeavesHeaderEmpty(t *testing.T) {
-	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) string { return "" }, nil)
+	tab := buildDetailTab(nil, func(string) string { return "" }, func(string) (string, bool) { return "", false }, nil)
 
 	if tab.Headers.LastUpdated != "" {
 		t.Fatalf("expected empty LastUpdated, got %q", tab.Headers.LastUpdated)
@@ -526,7 +526,7 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 		}
 	}
 
-	data := buildExportTableTyped(groups, nameByCode, func(string) string { return "แปลงแล้ว" })
+	data := buildExportTableTyped(groups, nameByCode, func(string) (string, bool) { return "แปลงแล้ว", true })
 
 	// subgroup ที่ inactive ถูกข้าม เหลือ 2 แถว
 	if len(data.Rows) != 2 {
