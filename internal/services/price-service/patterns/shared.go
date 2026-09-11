@@ -579,6 +579,9 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 // และวน slice ตามลำดับเดิม (ห้ามวน map) เพื่อให้ผลลัพธ์ deterministic
 //
 // perBatch = true คืน slice เดิมทั้งก้อน เพราะ 1 row = 1 batch ตามที่ตั้งใจ
+//
+// caller ต้องรักษาลำดับ relative ของ record ที่มี sg.ID เดียวกันไว้ (ใช้ sort.SliceStable
+// เท่านั้น ห้าม sort.Slice) ไม่งั้น "record แรก" จะไม่ใช่ inventoryWeights[0] อีกต่อไป
 func collapseNonBatchSubGroups(subGroups []models.PriceListSubGroupResponse, perBatch bool) []models.PriceListSubGroupResponse {
 	if perBatch || len(subGroups) == 0 {
 		return subGroups
