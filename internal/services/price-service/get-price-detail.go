@@ -313,16 +313,22 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.BatchNo = inv.BatchNo
 							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
-							// Map new API fields to existing model fields
-							if inv.TotalQty > 0 {
-								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
-							}
-							if inv.TotalWeight > 0 {
-								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
-							}
-							if inv.AvgWeight > 0 {
-								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
-							}
+							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0
+							//
+							// InventoryWeightResponse มีทั้ง field เก่า (sum_qty, sum_weight, avg_batch)
+							// และใหม่ (total_qty, total_weight, avg_weight) อยู่ใน struct เดียวกัน
+							// และบรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา
+							//
+							// ปัจจุบัน endpoint get-inventory-weight-by-key ไม่ส่ง field เก่ามาเลย
+							// จึงเป็น 0 เสมอ และเงื่อนไข > 0 เดิมยังให้ผลเหมือนการเขียนตรง ๆ
+							// แต่เงื่อนไขนั้นเป็นความเสี่ยงเชิงโครงสร้าง ถ้าวันหนึ่ง endpoint ส่ง field เก่ามา
+							// หรือ struct นี้ถูกใช้ซ้ำกับ endpoint อื่น ค่าเก่าจะค้างเมื่อค่าใหม่เป็น 0 จริง
+							// เขียนตรง ๆ จึงปลอดภัยกว่าและอ่านง่ายกว่า
+							//
+							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
+							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct
+							expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
 
 							expandedSubGroups = append(expandedSubGroups, expandedSG)
 						}
