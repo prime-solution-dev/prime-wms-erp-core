@@ -1192,13 +1192,19 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 		return v
 	}
 	// Excel percent cells come back already formatted ("1.0%"), not as "0.01".
+	//
+	// pdc_percent / due_percent เก็บเป็นจำนวนเปอร์เซ็นต์ ไม่ใช่เศษส่วน
+	// ธุรกิจยืนยันเมื่อ 2026-09-11 ว่า 1 = 1% และ 0.1 = 0.1% และสูตรคือ
+	// baht = price * percent / 100 ซึ่งตรงกับที่ฝั่ง web คำนวณอยู่
+	// (BasePriceTable.vue calculateUpdateTerm) ฉะนั้นตัดแค่เครื่องหมาย % ทิ้ง
+	// ห้ามหารด้วย 100 ซ้ำ
+	//
 	// ponytail: precision follows the sheet's own display format (0.0% here);
 	// read the raw cell value if a template ever needs more decimals than it shows.
 	parsePercent := func(s string) float64 {
 		s = strings.TrimSpace(s)
 		if strings.HasSuffix(s, "%") {
-			v, _ := strconv.ParseFloat(strings.TrimSpace(strings.TrimSuffix(s, "%")), 64)
-			return v / 100
+			return parseFloat(strings.TrimSuffix(s, "%"))
 		}
 		return parseFloat(s)
 	}
