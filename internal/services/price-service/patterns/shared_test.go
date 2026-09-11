@@ -217,6 +217,19 @@ func TestGetEffectiveValueMappings(t *testing.T) {
 			pattern:  nil,
 			expected: rootMappings,
 		},
+		{
+			// เดิมบรรทัด return root.ValueMappings จะ panic ตรงนี้
+			name:     "nil root และ nil pattern",
+			root:     nil,
+			pattern:  nil,
+			expected: nil,
+		},
+		{
+			name:     "nil root และ pattern ไม่มี mappings",
+			root:     nil,
+			pattern:  &PatternConfig{ValueMappings: nil},
+			expected: nil,
+		},
 	}
 
 	for _, tt := range tests {

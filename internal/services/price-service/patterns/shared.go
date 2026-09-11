@@ -335,6 +335,13 @@ func getEffectiveValueMappings(root *PriceTableConfiguration, pattern *PatternCo
 	if pattern != nil && pattern.ValueMappings != nil {
 		return pattern.ValueMappings
 	}
+	// ผู้เรียกทั้งสามจุดเช็ค nil ก่อนใช้ผลลัพธ์อยู่แล้ว (ส่งต่อให้
+	// getGroupCodeByMapping / getSpecialMapping ซึ่งคืน fallback เมื่อรับ nil
+	// หรือเช็ค vm != nil เอง) จึงคืน nil ตาม contract ที่ doc comment ด้านบน
+	// ประกาศไว้ แทนที่จะ deref root จน panic
+	if root == nil {
+		return nil
+	}
 	return root.ValueMappings
 }
 
