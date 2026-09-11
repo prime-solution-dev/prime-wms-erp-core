@@ -46,7 +46,8 @@ func TestUpdateExtras_RejectsEmptyFields(t *testing.T) {
 		{"condition_code ว่าง", func(m map[string]interface{}) { m["condition_code"] = "" }},
 		{"operator ว่าง", func(m map[string]interface{}) { m["operator"] = "" }},
 		{"operator ไม่รู้จัก", func(m map[string]interface{}) { m["operator"] = "~~" }},
-		{"cond_range_min มากกว่า max", func(m map[string]interface{}) {
+		{"cond_range_min มากกว่า max ตอน operator เป็น <>", func(m map[string]interface{}) {
+			m["operator"] = "<>"
 			m["cond_range_min"] = 50.0
 			m["cond_range_max"] = 10.0
 		}},
@@ -110,6 +111,33 @@ func TestValidateExtras_AcceptsEveryOperatorTheCalculatorSupports(t *testing.T) 
 				t.Fatalf("operator %q ต้องผ่าน validation แต่ถูกปฏิเสธ: %v", op, err)
 			}
 		})
+	}
+}
+
+// operator ที่ใช้ขอบเดียว (>=, <=, <, >, =) ไม่ควรถูกตรวจ min > max เพราะอีกขอบไม่มี
+// ความหมาย ข้อมูลเก่าใน DB ที่มี operator=">=" กับ min=100,max=0 เป็นรูปแบบที่ถูกต้อง
+// ตาม extraConditionMatched (">=" ใช้แค่ min) ต้องไม่ถูกปฏิเสธ
+func TestValidateExtras_MinGreaterThanMaxOnlyRejectedForBetween(t *testing.T) {
+	baseExtra := func(operator string, min, max float64) []models.UpdatePriceListExtraRequest {
+		return []models.UpdatePriceListExtraRequest{{
+			PriceListGroupID: uuid.New(),
+			ExtraKey:         "PG06_1",
+			ConditionCode:    "PG06",
+			Operator:         operator,
+			CondRangeMin:     min,
+			CondRangeMax:     max,
+			PriceListGroupExtraKeys: []models.UpdatePriceListGroupExtraKeyRequest{
+				{Code: "PG06", Value: "PG06_1", Seq: 1},
+			},
+		}}
+	}
+
+	if err := validateExtras(baseExtra(">=", 100, 0)); err != nil {
+		t.Fatalf(">= ที่ min=100, max=0 ต้องผ่าน (ใช้แค่ min) แต่ถูกปฏิเสธ: %v", err)
+	}
+
+	if err := validateExtras(baseExtra("<>", 50, 10)); err == nil {
+		t.Fatal("<> ที่ min=50, max=10 ต้องไม่ผ่าน (ใช้ทั้ง min และ max)")
 	}
 }
 

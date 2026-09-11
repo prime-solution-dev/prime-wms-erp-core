@@ -213,7 +213,10 @@ func validateExtras(extras []models.UpdatePriceListExtraRequest) error {
 				Message: fmt.Sprintf("รายการที่ %d: operator %q ไม่ถูกต้อง ต้องเป็น =, >=, <=, <, > หรือ <>", i+1, e.Operator),
 			}
 		}
-		if e.CondRangeMin > e.CondRangeMax {
+		// เฉพาะ "<>" เท่านั้นที่ใช้ทั้ง min และ max พร้อมกัน (extraConditionMatched:
+		// val >= min && val <= max) operator อื่นใช้ขอบเดียว (เช่น ">=" ใช้แค่ min)
+		// ค่าอีกขอบไม่มีความหมายและอาจเป็นข้อมูลเก่าที่ถูกต้องอยู่แล้ว (เช่น min=100, max=0)
+		if strings.TrimSpace(e.Operator) == "<>" && e.CondRangeMin > e.CondRangeMax {
 			return &utils.BindingError{
 				Message: fmt.Sprintf("รายการที่ %d: cond_range_min (%v) ต้องไม่มากกว่า cond_range_max (%v)", i+1, e.CondRangeMin, e.CondRangeMax),
 			}
