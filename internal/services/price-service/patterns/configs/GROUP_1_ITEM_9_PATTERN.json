@@ -7,7 +7,7 @@
       "enabled": true,
       "grouping": {
         "tabs": "",
-        "rows": "PG02|PG07",
+        "rows": "PG02|PG07|PG06",
         "columnGroups": "PG03"
       },
       "fixedColumns": [
