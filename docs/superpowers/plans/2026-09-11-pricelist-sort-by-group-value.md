@@ -2653,10 +2653,12 @@ Claude-Session: https://claude.ai/code/session_017tAQ8sPrGH4Wq7MksZPrLk"
 
 ```bash
 cd /home/chonlatee/Desktop/Work/prime-wms/prime-wms-erp-core
-go build ./... && go vet ./... && gofmt -l .
+go build ./... && gofmt -l . && go vet ./internal/services/price-service/... ./internal/models/...
 ```
 
 Expected: ไม่มี output ทั้งสามคำสั่ง
+
+> `go vet ./...` ทั้ง repo มี error ค้างอยู่ก่อนแล้ว 12 จุด (`errors.New` ที่ไม่ใช้ผลลัพธ์ ใน customer/authentication/interface/invoice/credit/cronjob service) ซึ่งไม่เกี่ยวกับงานนี้ จึง vet เฉพาะ package ที่แก้
 
 - [ ] **Step 2: รัน test ทั้งหมด**
 
