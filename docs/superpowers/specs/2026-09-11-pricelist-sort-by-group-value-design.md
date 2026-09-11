@@ -60,7 +60,7 @@ Frontend ไม่ sort อะไรเลย — แสดงตามลำด
 
 ## การเปลี่ยนแปลง
 
-### 1. `internal/models/pricelist.go` — `PriceListSubGroupKeyResponse` (บรรทัด 236-244)
+### 1. `internal/models/pricelist.go` — `PriceListSubGroupKeyResponse` (บรรทัด 274-282)
 
 ```go
 ValueNumber float64 `json:"value_number"`
@@ -72,8 +72,7 @@ HasValue    bool    `json:"-"`   // แยก "value = 0 จริง" (เช�
 ### 2. `internal/services/price-service/get-price-detail.go`
 
 `getGroupAndItemMappings()` (บรรทัด 22) โหลด `groupItemMap[item_code] → GetGroupItemResponse`
-ซึ่งมี `Value` อยู่แล้ว จึงเติมค่าได้ที่จุดประกอบ key ทั้ง 2 จุด (บรรทัด ~201-210 และ ~255-262)
-โดยไม่ต้องยิง query เพิ่ม
+ซึ่งมี `Value` อยู่แล้ว จึงเติมค่าได้ที่จุดประกอบ key (บรรทัด 203-211) โดยไม่ต้องยิง query เพิ่ม
 
 ```go
 valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
@@ -90,8 +89,11 @@ valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
 func parseGroupItemValue(m map[string]models.GetGroupItemResponse, code string) (float64, bool)
 ```
 
-`get-price-export-table.go:128` ประกอบ `PriceListSubGroupKeyResponse` เหมือนกัน ต้องเติมด้วย
-เพื่อให้ export เรียงตรงกับหน้าจอ
+`get-pricelist.go:828-836` ประกอบ `PriceListSubGroupKeyResponse` อีกจุดหนึ่ง (ทาง `GetPriceList`)
+และมี `groupItemMap` ในมือเช่นกัน ต้องเติมด้วย เพื่อให้ทั้งสองทางป้อนข้อมูลให้ pattern เหมือนกัน
+
+`get-price-export-table.go` **ไม่ต้องแก้** — ประกอบคอลัมน์เองที่ `:247-290` ด้วย `Seq`
+ของ product group ซึ่งเป็นคนละแกน ไม่ได้เรียกใช้ pattern
 
 ### 3. `internal/services/price-service/patterns/value_index.go` (ไฟล์ใหม่)
 
