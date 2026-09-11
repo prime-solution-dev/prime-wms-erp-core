@@ -95,7 +95,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	if len(hookConfig) > 0 {
+	if len(hookConfig) > 0 && req[0].Status != "TEMP" {
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
