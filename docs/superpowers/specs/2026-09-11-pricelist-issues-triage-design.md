@@ -250,13 +250,23 @@ sort ที่ backend ให้เป็นแหล่งความจริ
 `total_net_price_*` เดิม ณ จุดที่ `repositories/priceList/repository.go` เขียน history
 (ซึ่งอ่าน `oldSubGroup` อยู่แล้ว จึงไม่ต้อง query เพิ่ม)
 
-ต้องครอบ `before_price_*`, `before_extra_price_*`, `before_term_price_*` ด้วยหรือไม่ —
-ตรวจใน PR นี้ว่าคอลัมน์กลุ่ม `before_*` ทั้งหมดมีผู้เขียนหรือไม่ ถ้าไม่มีเลยให้ snapshot
-พร้อมกันทั้งกลุ่ม เพราะเป็นบั๊กเดียวกันและ caller เดียวกัน
+**ขอบเขตที่ผู้ใช้อนุมัติแล้ว (2026-09-11): snapshot คอลัมน์กลุ่ม `before_*` ทั้งกลุ่ม**
+ไม่ใช่แค่ 2 คอลัมน์ที่แจ้งมา คือครอบ `before_price_unit`, `before_price_weight`,
+`before_extra_price_unit`, `before_extra_price_weight`, `before_term_price_unit`,
+`before_term_price_weight`, `before_total_net_price_unit`, `before_total_net_price_weight`
 
-- verify: integration test — save 2 รอบ แล้ว `before_*` ของรอบที่ 2 ต้องเท่ากับ
-  `total_net_price_*` ของรอบที่ 1
+เหตุผล: เป็นบั๊กเดียวกันและ caller เดียวกัน การแก้จุดเดียวครอบทั้งกลุ่มได้ในทีเดียว
+ส่วนการแก้แค่ 2 คอลัมน์จะทำให้คอลัมน์ `before_*` ที่เหลือค้างค่าเก่าอยู่แบบเงียบ ๆ ต่อไป
+
+ใน PR นี้ต้องยืนยันก่อนว่าคอลัมน์ทั้งกลุ่มไม่มีผู้เขียนจริง (grep ให้ครบเหมือนที่ทำกับ
+`before_total_net_price_*`) ถ้าพบว่าบางคอลัมน์มีผู้เขียนอยู่แล้ว ให้เว้นคอลัมน์นั้นไว้
+และบันทึกไว้ในคำอธิบาย PR
+
+- verify: integration test — save 2 รอบ แล้ว `before_*` ของรอบที่ 2 ต้องเท่ากับค่า
+  ปัจจุบันของรอบที่ 1 (ทดสอบให้ครบทั้ง 8 คอลัมน์ ไม่ใช่แค่ `before_total_net_price_*`)
 - verify: `before_*` ที่คืนจาก `getPriceListTable()` ต้องเท่ากับที่ calculate response ส่งมา
+- verify: กด Reset บนหน้า Price List Detail แล้วค่าช่อง before ต้องไม่เปลี่ยน — นี่คือ
+  repro ของอาการที่ผู้ใช้แจ้ง
 
 ### PR D — Extra validation
 
@@ -289,6 +299,19 @@ sort ที่ backend ให้เป็นแหล่งความจริ
   และคอลัมน์ percent อื่นในไฟล์ upload ใช้ `parseFloat` อยู่ — ต้องไม่ทำให้สองเส้นทางขัดกัน
 
 **การแก้นี้ไม่ย้อนไปซ่อมข้อมูลเก่า** ต้อง backfill แยก ดูหัวข้อสิ่งที่ไม่ทำ
+
+## ลำดับการ deploy และ backfill
+
+ข้อเสนอ: **backfill ข้อมูล percent ก่อน แล้วค่อย deploy PR F**
+
+ถ้า deploy PR F ก่อน การ upload ครั้งถัดไปจะเขียนค่าถูกต้อง แต่ข้อมูลเก่าที่เพี้ยนยังอยู่
+จึงมีสองมาตรฐานปนกันในช่วงคาบเกี่ยว และผู้ใช้ที่แตะช่อง adjust บนแถวเก่าจะทำ baht
+เสียหายเพิ่มอีก
+
+ข้อนี้ยังไม่ได้รับคำยืนยันจากผู้ใช้ ถือเป็นข้อสมมติของแผนนี้ · ไม่บล็อกการเขียนโค้ด
+เพราะเป็นเรื่องลำดับการปล่อย ไม่ใช่เนื้อการแก้
+
+PR A–E ไม่ผูกกับ backfill ปล่อยได้ทันทีตามลำดับความเสียหาย
 
 ## Test
 
