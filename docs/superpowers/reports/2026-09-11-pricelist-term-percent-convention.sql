@@ -1,17 +1,22 @@
 -- รายงาน: มาตรฐานหน่วยของ pdc_percent / due_percent ไม่เป็นหนึ่งเดียว (issue 1)
 -- วันที่: 2026-09-11
--- ใช้สำหรับให้ธุรกิจตัดสินว่ามาตรฐานไหนเป็นตัวจริง ก่อนแก้โค้ด
+-- มาตรฐานที่ธุรกิจยืนยันแล้ว (2026-09-11): 1 = 1% และ 0.1 = 0.1%
+--   คือ pdc_percent / due_percent เก็บเป็นจำนวนเปอร์เซ็นต์ตรง ๆ และ baht = price * percent / 100
+-- ใช้ไฟล์นี้เพื่อระบุแถวที่ต้อง backfill และตรวจผลหลัง backfill
 --
 -- ทุก query ในไฟล์นี้เป็น SELECT เท่านั้น ไม่มีการเขียนลง DB
 -- รันกับ database prime_erp
 --
 -- บริบท
---   ฝั่งหน้าจอ (prime-wms-web/src/components/priceList/BasePriceTable.vue:419-438)
---     บาท = percent / 100 * price   และแสดงผลเป็น "{{ percent }}%"
---   ข้อมูลข้างมากใน DB
---     บาท = percent * price         (percent เก็บเป็นเศษส่วน เช่น 0.01 = 1%)
---   ต่างกัน 100 เท่า และหน้าจอเขียนทับ DB ทุกครั้งที่ผู้ใช้แตะช่อง adjust price
---   เพราะ calculateUpdatedPrice วนคำนวณใหม่ทุก term (บรรทัด 355-368)
+--   ฝั่งหน้าจอถูกต้อง (prime-wms-web/src/components/priceList/BasePriceTable.vue:419-438)
+--     baht = percent / 100 * price   และแสดงผลเป็น "{{ percent }}%"
+--   ฝั่ง export ถูกต้อง (get-price-export-table.go:490-578) เป็น passthrough ล้วน
+--   ฝั่ง import ผิด (upload-pricelist.go:1197-1204) parsePercent หารด้วย 100
+--     cell "3.0%" ใน Excel จึงถูกเก็บเป็น 0.03 ทั้งที่ควรเก็บ 3
+--
+--   คอลัมน์ baht (pdc / due) ถูกต้องอยู่แล้ว ผิดเฉพาะคอลัมน์ *_percent ที่เล็กไป 100 เท่า
+--   ยกเว้นแถวที่ผู้ใช้เคยแตะช่อง adjust บนหน้าจอ ซึ่งหน้าจอคำนวณ baht ใหม่จาก percent
+--   ที่เพี้ยน (calculateUpdatedPrice บรรทัด 355-368) แล้วเซฟทับ จึง baht เสียหายด้วย
 
 
 -- =========================================================================
@@ -41,6 +46,10 @@ ORDER BY 1, 3 DESC;
 -- ผลเมื่อ 2026-09-11
 --   pdc_percent : เศษส่วน 46 แถว (0.01–0.03) | ศูนย์ 12 | จำนวนเต็ม 5 แถว (1–5)
 --   due_percent : เศษส่วน 48 แถว (0.015–0.04) | ศูนย์ 12 | จำนวนเต็ม 3 แถว (2–6)
+--
+-- ตีความตามมาตรฐานที่ยืนยันแล้ว
+--   แถว "เศษส่วน" = เสียหายจาก parsePercent ต้อง backfill ด้วย percent * 100
+--   แถว "จำนวนเต็ม" = ผู้ใช้พิมพ์ผ่านหน้าจอ ถูกต้องแล้ว ห้ามแตะ
 
 
 -- =========================================================================
@@ -157,3 +166,60 @@ SELECT 'cell (row,PG03) ที่ subgroup ทับกัน — หลัง�
     HAVING COUNT(*) > 1) b;
 
 -- ผลเมื่อ 2026-09-11 : 80 | 4 | 21 | 12 | 0
+
+
+-- =========================================================================
+-- 6. แถวที่ต้อง backfill — percent เล็กไป 100 เท่า (ยังไม่ใช่คำสั่ง UPDATE)
+--    เงื่อนไข: percent อยู่ระหว่าง 0 กับ 1 (ไม่รวมศูนย์) = นำเข้าผ่าน Excel
+--    ตรวจคู่กับ baht: ถ้า baht ตรงกับ price * (percent*100)/100 แสดงว่า baht ยังดี
+--                    แก้แค่ percent พอ · ถ้าไม่ตรง baht เสียหายด้วย ต้องคำนวณใหม่
+-- =========================================================================
+SELECT
+    g.group_name,
+    t.term_code,
+    g.price_weight,
+    t.pdc_percent                                                AS pdc_percent_now,
+    t.pdc_percent * 100                                          AS pdc_percent_ควรเป็น,
+    t.pdc                                                        AS pdc_baht_now,
+    ROUND((g.price_weight * (t.pdc_percent * 100) / 100)::numeric, 2) AS pdc_baht_ควรเป็น,
+    CASE
+        WHEN ROUND(t.pdc::numeric, 2)
+             = ROUND((g.price_weight * (t.pdc_percent * 100) / 100)::numeric, 2)
+        THEN 'baht ยังดี — แก้แค่ percent'
+        ELSE 'baht เสียหายด้วย — ต้องคำนวณใหม่'
+    END AS action
+FROM price_list_group_term t
+JOIN price_list_group g ON g.id = t.price_list_group_id
+WHERE t.pdc_percent > 0
+  AND t.pdc_percent < 1
+ORDER BY action DESC, g.group_name, t.term_code;
+
+
+-- =========================================================================
+-- 7. เช่นเดียวกันฝั่ง due
+-- =========================================================================
+SELECT
+    g.group_name,
+    t.term_code,
+    g.price_weight,
+    t.due_percent                                                AS due_percent_now,
+    t.due_percent * 100                                          AS due_percent_ควรเป็น,
+    t.due                                                        AS due_baht_now,
+    ROUND((g.price_weight * (t.due_percent * 100) / 100)::numeric, 2) AS due_baht_ควรเป็น,
+    CASE
+        WHEN ROUND(t.due::numeric, 2)
+             = ROUND((g.price_weight * (t.due_percent * 100) / 100)::numeric, 2)
+        THEN 'baht ยังดี — แก้แค่ percent'
+        ELSE 'baht เสียหายด้วย — ต้องคำนวณใหม่'
+    END AS action
+FROM price_list_group_term t
+JOIN price_list_group g ON g.id = t.price_list_group_id
+WHERE t.due_percent > 0
+  AND t.due_percent < 1
+ORDER BY action DESC, g.group_name, t.term_code;
+
+-- ผลเมื่อ 2026-09-11
+--   pdc : baht ยังดี 33 แถว | baht เสียหาย 13 แถว
+--   due : baht ยังดี 33 แถว | baht เสียหาย 15 แถว
+--   percent ที่ backfill แล้วได้ค่าธุรกิจที่สะอาดทุกแถว (1.5% 2.5% 3% 4%)
+--   ซึ่งเป็นหลักฐานว่าการคูณ 100 เป็นการตีความที่ถูก
