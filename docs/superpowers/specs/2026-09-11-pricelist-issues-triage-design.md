@@ -76,21 +76,55 @@ audit config ทั้ง 23 pattern แล้ว มีแค่ ITEM_9 ที�
 
 ### 2a — กด Reset แล้วราคาช่อง before ผิด
 
-`before_total_net_price_unit` / `before_total_net_price_weight` มี **2 แหล่งที่ไม่ตรงกัน**:
+**แก้ไขการวินิจฉัยเดิม**: รอบแรกสรุปว่า "ไม่มี save path ไหนเขียน `before_*` เลย" ซึ่ง**ผิด**
+เพราะสรุปจาก `grep` ที่ถูก `head -20` ตัดผลทิ้ง ไล่ใหม่แบบไม่ตัดพบ 142 จุดที่อ้างถึง
+คอลัมน์กลุ่มนี้ และ `internal/repositories/priceList/repository.go:490-516` เขียนจริง
 
-- **แหล่งคำนวณสด**: `get-calculated-pricelist-subgroup.go:209-210` ตั้ง
-  `beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit` แล้วส่งกลับใน calculate response
-  (บรรทัด 330-331) — semantic ถูกต้อง คือ "ค่าก่อนการคำนวณรอบนี้"
-- **แหล่งที่ persist**: คอลัมน์ `before_total_net_price_*` ใน `price_list_sub_group` ซึ่ง
-  **ไม่มี save path ไหนเขียนเลย** grep ทั้ง `internal/` แล้วพบ writer เฉพาะ
-  `upload-pricelist.go` (นำเข้า Excel) · `repositories/priceList/repository.go:433,437`
-  แค่คัดลอกค่าเดิมเข้า history ไม่ได้อัปเดตค่าใหม่
+```go
+if req.TotalNetPriceWeight != nil {
+    updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
+    updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
+}
+```
 
+semantic ตรงตามที่ผู้ใช้ยืนยัน (`before` = ค่าก่อนแก้) แต่**ไม่มีเงื่อนไขว่าค่าต้องเปลี่ยนจริง**
+
+รากสาเหตุจริงอยู่ที่ผู้เรียก `update-latest-pricelist-subgroup.go:321-324`
+
+```go
+updateChanges = append(updateChanges, models.UpdatePriceListSubGroupItem{
+    SubGroupID:          subGroupID,
+    TotalNetPriceUnit:   &totalNetPriceUnit,
+    TotalNetPriceWeight: &totalNetPriceWeight,
+})
+```
+
+ส่ง pointer ของทั้งสอง field **ทุก subgroup ทุกครั้งไม่มีเงื่อนไข** แม้ราคาที่คำนวณได้จะ
+เท่ากับค่าเดิม ฉะนั้นทุกครั้งที่ `update-latest` รัน `before_*` จะถูกเลื่อนมาเท่ากับค่าปัจจุบัน
+
+ที่ทำให้อาการกระจายวงกว้างคือ `update-latest` รองรับ `update_type = "group"`
+(บรรทัด 105-125) ซึ่งดึง subgroup **ทั้งกลุ่ม** มาคำนวณใหม่ และฝั่ง web เรียกแบบ
+fire-and-forget หลังแก้ Extra (`Extra.vue` `onUpdate` →
+`updateLatestPriceListSubGroup([groupCode])`) → แก้ extra แถวเดียวทำให้ `before_*` ของ
+ทุก subgroup ในกลุ่มถูกทับ
+
+หลักฐานจาก DB เมื่อ 2026-09-11:
+
+| สถานะ | subgroup |
+|-------|----------|
+| `before_total_net_price_weight = total_net_price_weight` (snapshot ถูกทับจนค่า before หายไป) | **1,257** |
+| `before_total_net_price_weight <> total_net_price_weight` (ยังมีค่าจริง) | 93 |
+| ทั้งหมด | 1,350 |
+
+**93% ของ subgroup สูญค่า before ไปแล้ว**
+
+อาการที่ผู้ใช้เห็นจึงเป็น: ก่อนกด Reset กริดแสดง `before` จาก calculate response ซึ่งคำนวณสด
+และถูกต้อง (`get-calculated-pricelist-subgroup.go:209-210`) · กด Reset →
 `handleReset()` (`PriceListGROUP1ITEM6Detail.vue:328-342`) เรียก `loadDetailData()` →
-`getPriceListTable()` ซึ่งอ่านคอลัมน์ที่ persist → **ได้ค่าค้างจาก Excel upload ครั้งล่าสุด**
-ต่างจากตัวเลขที่เห็นก่อนกด Reset ซึ่งมาจาก calculate response
+อ่านคอลัมน์ที่ persist ซึ่งถูกทับจนเท่ากับ after แล้ว → ตัวเลขเปลี่ยน
 
-ความหมายที่ผู้ใช้ยืนยัน: `before_*` = **ราคาก่อนแก้ครั้งล่าสุด** ฉะนั้นแหล่งที่ persist ผิด
+หมายเหตุ: `before_term_price_unit` **ไม่มีผู้เขียนเลย** ใน `updateMap` (เขียนครบ 7 จาก 8
+คอลัมน์) พบตอนไล่ใหม่ จึงเป็นบั๊กย่อยที่ต้องแก้พร้อมกันใน PR C
 
 สมมติฐานที่ถูกหักล้าง: เดาว่า 2a เกิดจาก row collapse เหมือน 4a → ตกไป เพราะ
 `GROUP_1_ITEM_6_PATTERN.json` มี `rows=""` ไม่ยุบแถว
@@ -119,28 +153,52 @@ fallback ไป code ใช้ได้เฉพาะกรณีหา record 
 
 ขาด validation ทั้ง 2 ชั้น:
 
-- **backend** `models/pricelist.go:456-469` ไม่มี `binding:"required"` เลย —
+- **backend** `models/pricelist.go:448-469` ไม่มี `binding:"required"` เลย —
   `ExtraKey`, `ConditionCode`, `Operator`, `CondRangeMin`, `CondRangeMax`,
   `PriceListGroupExtraKeys` รับ zero value ได้ทั้งหมด ·
   `update-pricelist.go:164` `UpdateExtras` มีแค่ `checkForOverlappingConditions()` (บรรทัด 171-174)
+
+  **ข้อสำคัญที่พบตอนไล่โค้ด**: route `/UpdatePriceListExtra`
+  (`internal/routes/routes.go:81-82`) ใช้ `utils.ProcessRequest` ซึ่งอ่าน raw body แล้วให้
+  service ทำ `json.Unmarshal` เอง (`utils/request-handler.go:11-29`) →
+  **การใส่ `binding:"required"` tag จะไม่ทำงานเลย** เพราะไม่ได้ผ่าน `ShouldBindJSON`
+  และ error ที่ service คืนจะกลายเป็น HTTP **500** ไม่ใช่ 400
+  (route อื่นอย่าง `/SubGroup/UpdateLatest` ใช้ `ProcessRequestWithBinding` ซึ่งแปลง
+  `*utils.BindingError` เป็น 400 ให้)
 - **web** `Extra.vue:103-109` มี `<a-form :model="formState" :rules="rules">` แต่ `rules`
   ไม่ cover field ไหนของ `formState` เลย
 
 ### 2b — ไม่แสดง `,` คั่นหลักพัน
 
-`priceListNumberFormat.ts:9-26` มี 26 suffix และ match แบบ
-`field === suffix || field.endsWith('_' + suffix)` (บรรทัด 28-29) → ครอบคอลัมน์ที่มี prefix
-กลุ่มอย่าง `pg09_2_avg_weight` ได้อยู่แล้ว กลไกไม่พัง แค่ลิสต์ไม่ครบ
+`priceListNumberFormat.ts` มี `NUMERIC_SUFFIXES` **16 ตัว** (ไม่ใช่ 26 อย่างที่สรุปไว้รอบแรก)
+และ match แบบ `field === suffix || field.endsWith('_' + suffix)` → ครอบคอลัมน์ที่มี prefix
+กลุ่มอย่าง `pg09_2_avg_weight` ได้อยู่แล้ว และครอบ `before_total_net_price_weight` ได้ด้วย
+เพราะลงท้ายด้วย `total_net_price_weight` กลไกไม่พัง แค่ลิสต์ไม่ครบ
+
+ลิสต์ปัจจุบัน: `price_unit`, `price_weight`, `total_net_price_unit`,
+`total_net_price_weight`, `extra_price_unit`, `extra_price_weight`, `extra_thb`,
+`avg_weight`, `avg_kg_stock`, `avg_weight_ton`, `total_weight`, `market_weight`,
+`stock`, `stock_quantity`, `quantity`, `ton`
+
+ที่ขาดชัดเจนคือ `line_bundle` ซึ่งเป็นคอลัมน์ตัวเลขใน config ของหลาย pattern
 
 ผู้ใช้สั่ง: ให้ครอบ**ทุกคอลัมน์ที่เป็นตัวเลขเงินหรือน้ำหนัก**
 
 ### 4c — จัดหัวตาราง / ลำดับให้ center
 
-`DynamicTable.vue:372-373` ตั้ง default `headerClass: 'ag-header-cell-center'` +
-`cellClass: 'cell-center'` ให้ทุกคอลัมน์อยู่แล้ว แต่
-`PriceListGROUP1ITEM6Detail.vue:1426-1444` `applyHeaderAlignment()` อ่าน alignment จาก
-backend column config แล้ว merge ทับ → ต้องแก้ที่ต้นทางคือ column config ฝั่ง backend
-ไม่ใช่ที่ `DynamicTable`
+`DynamicTable.vue:365-374` ตั้ง default `headerClass: 'ag-header-cell-center'` +
+`cellClass: 'cell-center'` และ `applyHeaderAlignment()`
+(`PriceListGROUP1ITEM6Detail.vue:1426-1444`) ก็ fallback เป็น `'center'` อยู่แล้ว
+(`getColumnAlignment(updatedCol) || 'center'`) → **หัวตารางเป็น center อยู่แล้ว**
+
+ที่ไม่ center คือ**เซลล์ข้อมูล** เพราะ config ฝั่ง backend ตั้ง `"textAlign": "left"` ไว้
+นับได้ **81 จุดใน 9 ไฟล์** เทียบกับ `"textAlign": "center"` 78 จุด
+
+ไฟล์ที่มี `left`: `GROUP_1_ITEM_2` (10), `GROUP_1_ITEM_3` (14), `GROUP_1_ITEM_4` (9),
+`GROUP_1_ITEM_5` (12), `GROUP_1_ITEM_8` (6), `GROUP_1_ITEM_9` (6),
+`GROUP_1_ITEM_10` (6), `GROUP_1_ITEM_11` (5), `PG01_3` (13)
+
+→ แก้ที่ config JSON ฝั่ง backend ไม่ต้องแตะ web เลย
 
 ### 1 — ตัวเลขหน้าจอไม่ตรงกับเอกสาร
 
@@ -244,49 +302,125 @@ sort ที่ backend ให้เป็นแหล่งความจริ
 - `get-price-detail.go:264, 268` — `sort.Strings(companyCodes)` และ `sort.Strings(siteCodes)`
 - verify: unit test เรียกฟังก์ชันซ้ำ 20 รอบด้วย input เดียวกัน ต้องได้ลำดับเท่ากันทุกรอบ
 
-### PR C — snapshot `before_*` ตอน save
+### PR C — เลื่อน snapshot `before_*` เฉพาะเมื่อค่าเปลี่ยนจริง
 
-เพิ่มการเขียน `before_total_net_price_unit` / `before_total_net_price_weight` ด้วยค่า
-`total_net_price_*` เดิม ณ จุดที่ `repositories/priceList/repository.go` เขียน history
-(ซึ่งอ่าน `oldSubGroup` อยู่แล้ว จึงไม่ต้อง query เพิ่ม)
+รากสาเหตุไม่ใช่ "ไม่มีใครเขียน" แต่เป็น "เขียนทุกครั้งแม้ค่าไม่เปลี่ยน" ฉะนั้นการแก้คือ
+เพิ่มเงื่อนไข ไม่ใช่เพิ่มการเขียน
 
-**ขอบเขตที่ผู้ใช้อนุมัติแล้ว (2026-09-11): snapshot คอลัมน์กลุ่ม `before_*` ทั้งกลุ่ม**
-ไม่ใช่แค่ 2 คอลัมน์ที่แจ้งมา คือครอบ `before_price_unit`, `before_price_weight`,
-`before_extra_price_unit`, `before_extra_price_weight`, `before_term_price_unit`,
-`before_term_price_weight`, `before_total_net_price_unit`, `before_total_net_price_weight`
+**จุดที่แก้ (เลือกทางที่ diff เล็กที่สุดและครอบทุก caller)**:
+`internal/repositories/priceList/repository.go:490-516` — ใส่เงื่อนไขว่าค่าใหม่ต่างจากค่าเดิม
+ก่อนจะเลื่อน `before_*`
 
-เหตุผล: เป็นบั๊กเดียวกันและ caller เดียวกัน การแก้จุดเดียวครอบทั้งกลุ่มได้ในทีเดียว
-ส่วนการแก้แค่ 2 คอลัมน์จะทำให้คอลัมน์ `before_*` ที่เหลือค้างค่าเก่าอยู่แบบเงียบ ๆ ต่อไป
+```go
+if req.TotalNetPriceWeight != nil {
+    if *req.TotalNetPriceWeight != oldSubGroup.TotalNetPriceWeight {
+        updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
+    }
+    updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
+}
+```
 
-ใน PR นี้ต้องยืนยันก่อนว่าคอลัมน์ทั้งกลุ่มไม่มีผู้เขียนจริง (grep ให้ครบเหมือนที่ทำกับ
-`before_total_net_price_*`) ถ้าพบว่าบางคอลัมน์มีผู้เขียนอยู่แล้ว ให้เว้นคอลัมน์นั้นไว้
-และบันทึกไว้ในคำอธิบาย PR
+แก้ที่นี่ครอบทุก caller ในทีเดียว (ทั้ง `update-latest` และ
+`update-pricelist-subgroup`) ส่วนการแก้ที่ `update-latest-pricelist-subgroup.go:321-324`
+ให้ส่ง `nil` เมื่อค่าไม่เปลี่ยน จะแก้ได้แค่ caller เดียวและ caller อื่นยังพังอยู่
 
-- verify: integration test — save 2 รอบ แล้ว `before_*` ของรอบที่ 2 ต้องเท่ากับค่า
-  ปัจจุบันของรอบที่ 1 (ทดสอบให้ครบทั้ง 8 คอลัมน์ ไม่ใช่แค่ `before_total_net_price_*`)
-- verify: `before_*` ที่คืนจาก `getPriceListTable()` ต้องเท่ากับที่ calculate response ส่งมา
-- verify: กด Reset บนหน้า Price List Detail แล้วค่าช่อง before ต้องไม่เปลี่ยน — นี่คือ
-  repro ของอาการที่ผู้ใช้แจ้ง
+ทำให้ครบทั้ง 7 คอลัมน์ที่มีเงื่อนไขอยู่แล้ว และ**เพิ่ม `before_term_price_unit` ที่ยังไม่มี
+ผู้เขียนเลย** ให้เข้าชุดกับ `before_term_price_weight`
+
+- verify: unit test — เรียก update ด้วยค่าเท่าเดิม แล้ว `updateMap` ต้องไม่มี key `before_*`
+- verify: unit test — เรียก update ด้วยค่าใหม่ แล้ว `before_*` ต้องเท่ากับค่าเดิม
+- verify: integration test (testcontainers ที่ `repository_test.go` มีอยู่แล้ว) —
+  save ค่าใหม่ 1 ครั้งแล้ว save ค่าเดิมซ้ำอีก 2 ครั้ง `before_*` ต้องยังเท่ากับค่าก่อนแก้ครั้งแรก
+- verify: กด Reset บนหน้า Price List Detail แล้วค่าช่อง before ต้องไม่เปลี่ยน — repro ของอาการ
+
+**การแก้นี้ไม่ย้อนไปซ่อม 1,257 แถวที่ `before` หายไปแล้ว** ค่าเดิมสูญไปอย่างถาวรใน
+`price_list_sub_group` แต่ยังกู้ได้จาก `price_list_sub_group_history` ซึ่ง
+`repository.go:394-547` เขียนไว้ทุกครั้ง — ถ้าธุรกิจต้องการกู้ ให้แยกเป็นงานต่างหาก
+พร้อมรายงานก่อนเหมือน issue 1
 
 ### PR D — Extra validation
 
-ต้องมีทั้ง 2 ชั้น เพราะ backend เป็น trust boundary การพึ่งฟอร์มฝั่ง web อย่างเดียวไม่พอ
+`binding:"required"` tag ใช้ไม่ได้เพราะ route นี้ผ่าน `utils.ProcessRequest` ซึ่งไม่ใช้
+`ShouldBindJSON` ฉะนั้นต้อง validate ด้วยโค้ดตรง ๆ
 
-- backend: `binding:"required"` บน `models/pricelist.go:456-469` + เช็คใน `UpdateExtras`
-  สำหรับเงื่อนไขที่ tag ครอบไม่ได้ (เช่น `CondRangeMin <= CondRangeMax`, slice ว่าง)
-- web: `rules` ใน `Extra.vue` ให้ครอบทุก field ของ `formState`
-- verify: unit test ยิง payload ที่ field ว่างทีละตัว ต้องได้ 400 ไม่ใช่ 200
+2 ชั้น เพราะ backend เป็น trust boundary การพึ่งฟอร์มฝั่ง web อย่างเดียวไม่พอ
+
+**backend**
+
+1. `internal/utils/request-handler.go` — ให้ `ProcessRequest` แปลง `*BindingError`
+   เป็น HTTP 400 เหมือนที่ `ProcessRequestWithBinding` ทำอยู่แล้ว ตอนนี้ error ทุกชนิด
+   กลายเป็น 500 ซึ่งทำให้แยก "ผู้ใช้ส่งข้อมูลไม่ครบ" กับ "ระบบพัง" ไม่ออก
+   แก้จุดเดียวได้ประโยชน์กับทุก route ที่ใช้ `ProcessRequest`
+2. `internal/services/price-service/update-pricelist.go` `UpdateExtras` — เพิ่มการ validate
+   หลัง `json.Unmarshal` ก่อน `checkForOverlappingConditions` คืน `*utils.BindingError`
+   เมื่อพบข้อผิดพลาด ตรวจต่อรายการและระบุ index ในข้อความ:
+   - `PriceListGroupID` ต้องไม่เป็น `uuid.Nil`
+   - `ExtraKey` ต้องไม่ว่างหลัง `strings.TrimSpace`
+   - `ConditionCode` ต้องไม่ว่างหลัง `strings.TrimSpace`
+   - `Operator` ต้องไม่ว่างและต้องเป็นค่าที่ `getEffectiveRange` รู้จัก
+     (`<=`, `>=`, `=`, `<>`) เพราะตอนนี้ operator ที่ไม่รู้จักตกไป `default` เงียบ ๆ
+   - `CondRangeMin <= CondRangeMax`
+   - `PriceListGroupExtraKeys` ต้องไม่เป็น slice ว่าง และแต่ละตัว `Code` / `Value`
+     ต้องไม่ว่าง
+
+**web** `Extra.vue:103-109` — `rules` ปัจจุบันมีแค่ key `pass` ซึ่งไม่ตรงกับ field ไหนของ
+`formState` เลย จึงไม่ validate อะไร ต้องเปลี่ยนไปตรวจที่ `onUpdate` ก่อนเรียก API
+เพราะ `formState` เป็น `PriceListExtra[]` (array) ไม่ใช่ object เดียว `a-form :rules`
+จึงใช้กับมันตรง ๆ ไม่ได้ · ตรวจ field ชุดเดียวกับ backend และแสดง message ระบุแถว
+
+- verify: unit test backend — ยิง payload ที่ field ว่างทีละตัว ต้องได้ `*utils.BindingError`
+  และ repository ต้องไม่ถูกเรียก (ใช้ pattern การ swap function var เหมือน
+  `TestUpdatePriceListSubGroup_Validation_MissingID` ใน
+  `update-pricelist-subgroup_service_test.go`)
+- verify: unit test `ProcessRequest` — service คืน `*BindingError` ต้องได้ status 400
+  ส่วน error ชนิดอื่นต้องยังได้ 500
+- verify: vitest ฝั่ง web — `onUpdate` ที่ข้อมูลไม่ครบต้องไม่เรียก API
 
 ### PR E — แสดงผล
 
-- 2b: เพิ่ม suffix เงิน/น้ำหนักที่ขาดใน `priceListNumberFormat.ts` ให้ครอบทุกคอลัมน์ตัวเลข
-  เงินและน้ำหนัก · กลไก suffix match ใช้ได้อยู่แล้ว ไม่ต้องแก้
-- 4b: เปลี่ยน `itemNameByCode` ให้คืน `(string, bool)` แล้ว fallback เฉพาะเมื่อ `!ok`
-  ทำแบบเดียวกันที่ระดับ group (`build-pricelist-detail-tab.go:152-154`) เพราะเป็นบั๊กเดียวกัน
-  และแก้ `TestBuildPricelistDetailTab_FallbackToRawCode` ให้ตรึงพฤติกรรมใหม่ + เพิ่มเคส
-  "มี record แต่ชื่อว่าง → ต้องว่าง"
-- 4c: ตั้ง center ที่ backend column config ซึ่งเป็นต้นทางที่ merge ทับ default ของ
-  `DynamicTable`
+**2b comma** (`web`) — เพิ่ม `line_bundle` เข้า `NUMERIC_SUFFIXES` ใน
+`src/utils/helper/priceListNumberFormat.ts` และไล่ config JSON ฝั่ง backend ทุกไฟล์เพื่อหา
+field ตัวเลขอื่นที่ยังไม่อยู่ในลิสต์ กลไก suffix match ใช้ได้อยู่แล้วไม่ต้องแก้
+(ครอบ `pg09_2_avg_weight` และ `before_total_net_price_weight` ได้แล้ว)
+
+**4b fallback** (`erp-core`) — `itemNameByCode` ถูกสร้างเป็น closure ที่
+`get-price-export-table.go:90-101`
+
+```go
+itemNameByCode := func(code string) string {
+    if it, ok := groupItemMap[code]; ok {
+        return it.ItemName
+    }
+    return ""
+}
+```
+
+`ok` มีอยู่แล้วแต่ถูกทิ้ง เปลี่ยน signature เป็น `func(string) (string, bool)` แล้วให้
+`build-pricelist-detail-tab.go:186-188` fallback เฉพาะเมื่อ `!ok`
+
+```go
+name, found := itemNameByCode(k.Value)
+if !found {
+    name = k.Value
+}
+row[k.Code] = name
+```
+
+ทำแบบเดียวกันกับ `groupNameByCode` ที่ระดับ group (บรรทัด 152-154) เพราะเป็นบั๊กเดียวกัน
+· ต้องแก้ทุก caller ของทั้งสอง closure ให้ครบ (`buildPricelistDetailTab` และ
+`selectExportTabs`) · แก้ `TestBuildPricelistDetailTab_FallbackToRawCode`
+(`build-pricelist-detail-tab_test.go:277-295`) ซึ่งตอนนี้ส่ง
+`none := func(string) string { return "" }` ให้ตรงกับ signature ใหม่ และ**เพิ่มเคสใหม่**
+"มี record แต่ `ItemName` ว่าง → เซลล์ต้องว่าง ไม่ fallback"
+
+**4c center** (`erp-core`) — เปลี่ยน `"textAlign": "left"` เป็น `"center"` ใน config 9 ไฟล์
+(81 จุด) ไม่ต้องแตะ web เพราะหัวตารางเป็น center อยู่แล้ว
+
+- verify: vitest — `isNumericPriceListField('pg09_2_line_bundle')` ต้องเป็น `true`
+- verify: unit test Go — เคส "มี record ชื่อว่าง" ต้องได้เซลล์ว่าง และเคส "ไม่มี record"
+  ต้องได้ code ดิบ
+- verify: `grep -c '"textAlign": "left"' internal/services/price-service/patterns/configs/*.json`
+  ต้องไม่เหลือ
 
 ### PR F — มาตรฐาน percent ตอน import
 
