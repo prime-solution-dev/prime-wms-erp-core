@@ -38,26 +38,32 @@ func BuildGroup1Item10Response(priceListData []models.GetPriceListResponse, grou
 		}, nil
 	}
 
-	columns := buildDynamicColumns(pattern, allSubGroups)
+	productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
+	productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
+
+	// คอลัมน์เรียงคนละแกนกับแถว จึงต้องใช้ subGroups คนละชุด
+	colSorted := append([]models.PriceListSubGroupResponse(nil), allSubGroups...)
+	SortSubGroupsByValue(colSorted, splitGroupCodes(pattern.Grouping.ColumnGroups)...)
+	columns := buildDynamicColumns(pattern, colSorted)
+
+	SortSubGroupsByValue(allSubGroups, productGroup4Code, productGroup7Code)
 	rows := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rows)
 
+	// total_weight ไม่ได้มาจาก product group จึงยัง tie-break ด้วย float ตามเดิม
+	// ใช้ SliceStable และคืน false เมื่อแกน product group ต่างกัน เพื่อไม่ทำลาย
+	// ลำดับที่เรียงมาแล้วจากต้นทาง
 	sort.SliceStable(mergedRows, func(i, j int) bool {
 		itemI := fmt.Sprintf("%v", mergedRows[i]["product_group_4"])
 		itemJ := fmt.Sprintf("%v", mergedRows[j]["product_group_4"])
-		if itemI == itemJ {
-			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
-			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
-			if lengthI == lengthJ {
-				// total_weight (คอลัมน์ Weight-spec) เป็นตัวเลข ต้องเทียบเป็น float
-				// ไม่ใช่ string ไม่งั้น "12.5" จะมาก่อน "9"
-				weightI, _ := toFloat64(mergedRows[i]["total_weight"])
-				weightJ, _ := toFloat64(mergedRows[j]["total_weight"])
-				return weightI < weightJ
-			}
-			return lengthI < lengthJ
+		lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
+		lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
+		if itemI != itemJ || lengthI != lengthJ {
+			return false
 		}
-		return itemI < itemJ
+		weightI, _ := toFloat64(mergedRows[i]["total_weight"])
+		weightJ, _ := toFloat64(mergedRows[j]["total_weight"])
+		return weightI < weightJ
 	})
 
 	tableData := make([]map[string]interface{}, len(mergedRows))

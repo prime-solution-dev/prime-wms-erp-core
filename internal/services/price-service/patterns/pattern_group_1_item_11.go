@@ -2,7 +2,6 @@ package patterns
 
 import (
 	"fmt"
-	"sort"
 
 	"prime-erp-core/internal/models"
 
@@ -53,26 +52,13 @@ func BuildGroup1Item11Response(priceListData []models.GetPriceListResponse, grou
 	productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
 	productGroup5Code := getGroupCodeFromConfig(config, pattern, "productGroup5", "PRODUCT_GROUP5")
 	productGroup3Code := getGroupCodeFromConfig(config, pattern, "productGroup3", "PRODUCT_GROUP3")
-	sort.SliceStable(allSubGroups, func(i, j int) bool {
-		// ต้องใช้ compositeMappingValue เหมือนตอนสร้างแถว ไม่งั้นเรียงตามค่าที่
-		// ไม่ตรงกับที่แสดง
-		thicknessLength := []string{productGroup6Code, productGroup7Code}
-		compositeI := compositeMappingValue(allSubGroups[i].SubGroupKeys, thicknessLength, "_x_")
-		compositeJ := compositeMappingValue(allSubGroups[j].SubGroupKeys, thicknessLength, "_x_")
-
-		if compositeI == compositeJ {
-			// If same "หนา x ยาว", sort by "ขนาด" (PRODUCT_GROUP5 + PRODUCT_GROUP3)
-			pg5I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup5Code)
-			pg3I := getValueNameByGroupCode(allSubGroups[i].SubGroupKeys, productGroup3Code)
-			pg5J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup5Code)
-			pg3J := getValueNameByGroupCode(allSubGroups[j].SubGroupKeys, productGroup3Code)
-
-			sizeI := pg5I + pg3I
-			sizeJ := pg5J + pg3J
-			return sizeI < sizeJ
-		}
-		return compositeI < compositeJ
-	})
+	// เรียงทีละแกนด้วยค่าตัวเลขจาก group_item.value แทนการประกอบ composite
+	// แล้วเทียบเป็น string — compositeMappingValue ข้ามค่าว่างตอน join จึงเทียบ
+	// กลับเป็นตัวเลขไม่ได้ แต่การไล่ทีละแกนให้ผลลัพธ์เดียวกันและถูกต้องกว่า
+	//
+	// ลำดับแกนต้องตรงกับตอนประกอบ composite เป๊ะ ๆ (PG6 -> PG7 -> PG5 -> PG3)
+	// ไม่งั้น row spanning จะไม่ตรงกับค่าที่แสดง
+	SortSubGroupsByValue(allSubGroups, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code)
 
 	// Build rows with fixed columns and dynamic column group data
 	rowData := buildDirectRowsWithProductGroup2WithCode(config, pattern, allSubGroups, productGroup2Code, productGroup6Code, productGroup7Code, productGroup5Code, productGroup3Code)
