@@ -179,13 +179,14 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			Items:              []verifyService.VerifyApproveItem{},
 		}
 
-		for _, item := range quotationReq.Items {
+		for index, item := range quotationReq.Items {
 			item.ID = uuid.New()
 			item.QuotationID = tempQuotation.ID
 
-			if item.QuotationItem == "" {
-				item.QuotationItem = uuid.New().String()
-			}
+			// if item.QuotationItem == "" {
+			// 	item.QuotationItem = uuid.New().String()
+			// }
+			item.QuotationItem = strconv.Itoa(index)
 
 			item.CreateDate = &nowDateOnly
 			item.CreateBy = user
