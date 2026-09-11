@@ -286,3 +286,120 @@ func TestSortLabelsByValue_UnknownGoesLast(t *testing.T) {
 		t.Fatalf("ตัวที่ resolve ไม่ได้ต้องไปท้าย แต่ได้ %v", labels)
 	}
 }
+
+func TestNameOfGroup_NotFound(t *testing.T) {
+	keys := []models.PriceListSubGroupKeyResponse{sgk("PG06", "1.2", 1.2, true)}
+	if got := nameOfGroup(keys, "PG99"); got != "" {
+		t.Fatalf("กลุ่มที่ไม่มี ต้องคืนค่าว่าง แต่ได้ %q", got)
+	}
+}
+
+func TestCmpSubGroupKeys_SkipsEmptyGroupCode(t *testing.T) {
+	a := []models.PriceListSubGroupKeyResponse{sgk("PG06", "9", 9, true)}
+	b := []models.PriceListSubGroupKeyResponse{sgk("PG06", "10", 10, true)}
+
+	// groupCode ว่างต้องถูกข้าม ไม่ใช่ทำให้ผลเป็น 0 ทันที
+	if got := cmpSubGroupKeys(a, b, "", "PG06"); got != -1 {
+		t.Fatalf("groupCode ว่างต้องถูกข้าม ได้ %d ต้องเป็น -1", got)
+	}
+	if got := cmpSubGroupKeys(a, b); got != 0 {
+		t.Fatalf("ไม่ส่ง groupCode เลย ต้องได้ 0 ได้ %d", got)
+	}
+}
+
+func TestOrderedUnique_SkipsMissingField(t *testing.T) {
+	rows := []AGGridRowData{
+		{"other": "x"},
+		{"row_group_value": "10"},
+	}
+	got := orderedUnique(rows, "row_group_value")
+	if len(got) != 1 || got[0] != "10" {
+		t.Fatalf("แถวที่ไม่มี field ต้องถูกข้าม แต่ได้ %v", got)
+	}
+}
+
+func TestNewValueByCode_SkipsEmptyCodeAndKeepsResolved(t *testing.T) {
+	subs := []models.PriceListSubGroupResponse{
+		// ValueCode ว่าง ต้องไม่เข้า index
+		sub(models.PriceListSubGroupKeyResponse{GroupCode: "PG05", ValueName: "ไม่มี code"}),
+		// ตัวที่ resolve ไม่ได้มาก่อน ตัวที่ resolve ได้มาทีหลัง ต้องได้ตัวที่ resolve ได้
+		sub(models.PriceListSubGroupKeyResponse{GroupCode: "PG05", ValueCode: "PG05_3", ValueName: "4' x 8'"}),
+		sub(sgk("PG05", "dup", 32, true)),
+	}
+	subs[2].SubGroupKeys[0].ValueCode = "PG05_3"
+
+	idx := newValueByCode(subs)
+
+	if _, ok := idx[""]; ok {
+		t.Fatal("ValueCode ว่างต้องไม่เข้า index")
+	}
+	if v := idx["PG05_3"]; !v.has || v.value != 32 {
+		t.Fatalf("ต้องเก็บตัวที่ resolve ได้ แต่ได้ %+v", v)
+	}
+
+	// เจอตัวที่ resolve ได้ก่อนแล้ว ตัวถัดมาต้องไม่ทับ
+	more := append(subs, sub(models.PriceListSubGroupKeyResponse{
+		GroupCode: "PG05", ValueCode: "PG05_3", ValueName: "ทับไม่ได้",
+	}))
+	if v := newValueByCode(more)["PG05_3"]; !v.has || v.value != 32 {
+		t.Fatalf("ตัวที่ resolve ได้ต้องไม่ถูกทับ แต่ได้ %+v", v)
+	}
+}
+
+func TestValueByCodeLess_EqualValueFallsBackToLabel(t *testing.T) {
+	idx := valueByCode{
+		"a": {value: 30000, has: true},
+		"b": {value: 30000, has: true},
+	}
+	if !idx.Less("a", "100x300", "b", "150x200") {
+		t.Fatal("ค่าเท่ากันต้อง tie-break ด้วย label")
+	}
+	if idx.Less("b", "150x200", "a", "100x300") {
+		t.Fatal("tie-break ด้วย label ต้องไม่สลับทิศ")
+	}
+}
+
+func TestNewValueByName_OnlyMatchingGroupAndSkipsEmptyName(t *testing.T) {
+	subs := []models.PriceListSubGroupResponse{
+		sub(sgk("PG02", "เหล็กแผ่น", 6, true), sgk("PG06", "10", 10, true)),
+		sub(models.PriceListSubGroupKeyResponse{GroupCode: "PG02", ValueCode: "PG02_X"}),
+	}
+
+	idx := newValueByName(subs, "PG02")
+
+	if _, ok := idx["10"]; ok {
+		t.Fatal("ต้องเก็บเฉพาะ groupCode ที่ขอ ไม่เอา PG06")
+	}
+	if _, ok := idx[""]; ok {
+		t.Fatal("ValueName ว่างต้องไม่เข้า index")
+	}
+	if v := idx["เหล็กแผ่น"]; !v.has || v.value != 6 {
+		t.Fatalf("เหล็กแผ่น ต้องได้ (6, true) แต่ได้ %+v", v)
+	}
+}
+
+func TestProductGroup2CodeFromConfig(t *testing.T) {
+	if got := productGroup2CodeFromConfig(nil); got != "PG02" {
+		t.Fatalf("config เป็น nil ต้องได้ PG02 แต่ได้ %q", got)
+	}
+
+	empty := &PriceTableConfiguration{}
+	if got := productGroup2CodeFromConfig(empty); got != "PG02" {
+		t.Fatalf("config ไม่มี pattern ต้องได้ PG02 แต่ได้ %q", got)
+	}
+
+	noTabs := &PriceTableConfiguration{Patterns: []PatternConfig{
+		{Grouping: GroupingConfig{Tabs: ""}},
+	}}
+	if got := productGroup2CodeFromConfig(noTabs); got != "PG02" {
+		t.Fatalf("pattern ไม่ระบุ tabs ต้องได้ PG02 แต่ได้ %q", got)
+	}
+
+	withTabs := &PriceTableConfiguration{Patterns: []PatternConfig{
+		{Grouping: GroupingConfig{Tabs: ""}},
+		{Grouping: GroupingConfig{Tabs: "PG01"}},
+	}}
+	if got := productGroup2CodeFromConfig(withTabs); got != "PG01" {
+		t.Fatalf("ต้องได้ PG01 จาก pattern ตัวที่สอง แต่ได้ %q", got)
+	}
+}
