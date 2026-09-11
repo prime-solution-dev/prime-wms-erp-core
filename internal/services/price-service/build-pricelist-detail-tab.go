@@ -95,7 +95,9 @@ func sortGroupColumns(cols []groupColumn) {
 //
 // คอลัมน์กลุ่มสินค้าไม่ได้ hardcode ไว้ — เก็บจาก GroupKey.Code ที่พบจริงในข้อมูล
 // หัวคอลัมน์มาจากตาราง group ผ่าน groupNameByCode และค่าในเซลล์มาจากตาราง group_item
-// ผ่าน itemNameByCode ทั้งคู่ fallback เป็นรหัสดิบเมื่อ resolve ไม่ได้
+// ผ่าน itemNameByCode — groupNameByCode fallback เป็นรหัสดิบเมื่อ resolve ไม่ได้
+// ส่วน itemNameByCode fallback เฉพาะตอนไม่มี record (ok=false) เท่านั้น ถ้ามี record
+// แต่ชื่อว่าง (ok=true, name="") ต้องแสดงว่างจริง ไม่ fallback ไป code
 //
 // fixedColumns กำหนดชุดคอลัมน์กลุ่มสินค้าให้คงที่ไม่ว่าจะกรอง Product Group 1 ตัวไหน
 // ส่ง nil ได้เมื่อต้องการให้เก็บคอลัมน์จากแถวที่ส่งเข้ามาแทน
@@ -105,7 +107,7 @@ func sortGroupColumns(cols []groupColumn) {
 func buildPricelistDetailTab(
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
-	itemNameByCode func(code string) string,
+	itemNameByCode func(code string) (string, bool),
 	fixedColumns []priceListRepository.SubGroupKeyColumn,
 	formulas map[string][]priceListRepository.SubgroupFormula,
 	lastUpdated *time.Time,
@@ -166,7 +168,7 @@ func buildPricelistDetailTab(
 				"price_per_kg":         sg.TotalNetPriceWeight,
 				"price_per_unit":       sg.TotalNetPriceUnit,
 				"extra_price":          sg.ExtraPriceWeight,
-				"avg_weight":           "",
+				"avg_weight":           float64(0),
 				"formula_kg_name":      "",
 				"formula_kg_code":      "",
 				"formula_unit_name":    "",
@@ -183,8 +185,8 @@ func buildPricelistDetailTab(
 				if k.Code == "" {
 					continue
 				}
-				name := itemNameByCode(k.Value)
-				if name == "" {
+				name, found := itemNameByCode(k.Value)
+				if !found {
 					name = k.Value
 				}
 				row[k.Code] = name
@@ -197,8 +199,9 @@ func buildPricelistDetailTab(
 			// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
 			row["total_weight"] = sg.WeightSpec
 
+			// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
 			if len(sg.InventoryWeight) > 0 {
-				row["avg_weight"] = sg.InventoryWeight[0].AvgWeight
+				row["avg_weight"] = sg.InventoryWeight[0].AvgProduct
 			}
 
 			for _, f := range formulas[sg.SubgroupCode] {
@@ -248,7 +251,7 @@ func selectExportTabs(
 	reportType string,
 	groups []GetPriceListGroupResponse,
 	groupNameByCode func(code string) string,
-	itemNameByCode func(code string) string,
+	itemNameByCode func(code string) (string, bool),
 	fixedColumns []priceListRepository.SubGroupKeyColumn,
 	formulas map[string][]priceListRepository.SubgroupFormula,
 	paymentTermMap map[string]GetPaymentTermResponse,

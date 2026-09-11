@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
+	purchaseService "prime-erp-core/internal/services/purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 
 	"github.com/gin-gonic/gin"
@@ -54,7 +56,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 
 	//depositCut := []models.Deposit{}
-
+	productCodes := []string{}
 	for i := range req {
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
@@ -78,7 +80,9 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 		} */
-
+		for it := range req[i].InvoiceItem {
+			productCodes = append(productCodes, req[i].InvoiceItem[it].ProductCode)
+		}
 	}
 
 	requestData := map[string]interface{}{
@@ -97,8 +101,31 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			urlHook = hookConfigValue.HookUrl
 		}
 
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    []string{req[0].SiteCode},
+			CompanyCode: []string{req[0].CompanyCode},
+		}
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		if errGetProductInterface != nil {
+			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+		}
+		reqHook := req
+		for i := range reqHook {
+			for it := range reqHook[i].InvoiceItem {
+				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+				if exists {
+					priceUnit, _ := calculateAPPriceUnit(
+						reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+					)
+					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+				}
+			}
+		}
+
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)

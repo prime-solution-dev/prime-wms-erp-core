@@ -29,7 +29,7 @@
           "headerName": "ราคาขาย Before",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "before_total_net_price_weight"
         },
@@ -38,7 +38,7 @@
           "headerName": "ราคาขาย After",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -47,7 +47,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },
@@ -88,7 +88,7 @@
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           }
         },
         {
@@ -100,7 +100,7 @@
           "spanRows": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           }
         }
       ],
@@ -145,7 +145,7 @@
           "headerName": "ราคาขาย Before",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "before_total_net_price_weight"
         },
@@ -154,7 +154,7 @@
           "headerName": "ราคาขาย After",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -163,7 +163,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },
@@ -204,7 +204,7 @@
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           }
         },
         {
@@ -216,7 +216,7 @@
           "spanRows": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           }
         }
       ],
@@ -273,7 +273,7 @@
           "headerName": "ราคาขาย Before",
           "width": 130,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "before_total_net_price_weight"
         },
@@ -283,7 +283,7 @@
           "width": 130,
           "enableTooltip": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -292,7 +292,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },

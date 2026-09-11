@@ -20,7 +20,7 @@
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
           "cellStyle": {
-            "textAlign": "left",
+            "textAlign": "center",
             "fontWeight": "500"
           }
         },
@@ -53,7 +53,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_weight"
         },
@@ -65,7 +65,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "market_weight"
         },
@@ -77,7 +77,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "avg_weight"
         },
@@ -103,7 +103,7 @@
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_weight"
             },
@@ -112,7 +112,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_weight"
             }
@@ -128,7 +128,7 @@
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_unit"
             },
@@ -137,7 +137,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_unit"
             }
@@ -150,7 +150,7 @@
           "headerName": "Extra (THB)",
           "width": 120,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_unit"
         },
@@ -159,7 +159,7 @@
           "headerName": "เส้น/มัด",
           "width": 120,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "line_bundle"
         },

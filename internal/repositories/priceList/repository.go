@@ -485,36 +485,10 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["is_trading"] = *req.IsTrading
 			}
 
-			// Handle price unit fields - update before fields with old values
-			if req.PriceUnit != nil {
-				updateMap["before_price_unit"] = oldSubGroup.PriceUnit
-				updateMap["price_unit"] = *req.PriceUnit
-			}
-			if req.ExtraPriceUnit != nil {
-				updateMap["before_extra_price_unit"] = oldSubGroup.ExtraPriceUnit
-				updateMap["extra_price_unit"] = *req.ExtraPriceUnit
-			}
-			if req.TotalNetPriceUnit != nil {
-				updateMap["before_total_net_price_unit"] = oldSubGroup.TotalNetPriceUnit
-				updateMap["total_net_price_unit"] = *req.TotalNetPriceUnit
-			}
-
-			// Handle price weight fields - update before fields with old values
-			if req.PriceWeight != nil {
-				updateMap["before_price_weight"] = oldSubGroup.PriceWeight
-				updateMap["price_weight"] = *req.PriceWeight
-			}
-			if req.ExtraPriceWeight != nil {
-				updateMap["before_extra_price_weight"] = oldSubGroup.ExtraPriceWeight
-				updateMap["extra_price_weight"] = *req.ExtraPriceWeight
-			}
-			if req.TermPriceWeight != nil {
-				updateMap["before_term_price_weight"] = oldSubGroup.TermPriceWeight
-				updateMap["term_price_weight"] = *req.TermPriceWeight
-			}
-			if req.TotalNetPriceWeight != nil {
-				updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
-				updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
+			// Handle price unit and price weight fields
+			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
+			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
+				updateMap[k] = v
 			}
 
 			if req.EffectiveDate != nil {
@@ -549,6 +523,39 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 // subGroupHistoryBatchSize keeps each history INSERT well under PostgreSQL's
 // 65535 bind-parameter limit; the history row has ~28 columns.
 const subGroupHistoryBatchSize = 500
+
+// buildSubGroupUpdateMap ประกอบ map สำหรับ UPDATE จากค่าเดิมและค่าที่ request ส่งมา
+//
+// field ที่ request ไม่ได้ส่งมา (nil) จะไม่ถูกใส่ใน map เลย เพื่อไม่ให้ GORM
+// เขียนทับด้วย zero value
+//
+// before_* จะถูกเลื่อน **เฉพาะเมื่อค่าเปลี่ยนจริง** เพราะ update-latest ส่ง
+// TotalNetPrice* ทุก subgroup ทุกครั้งแม้ราคาที่คำนวณได้เท่าเดิม และรองรับ
+// update_type = "group" ที่ดึงทั้งกลุ่มมาคำนวณ ถ้าเลื่อนทุกครั้ง snapshot จะถูกทับ
+// จนเท่ากับค่าปัจจุบันและค่า "ก่อนแก้ครั้งล่าสุด" จะหายไป
+func buildSubGroupUpdateMap(oldSubGroup models.PriceListSubGroup, req models.UpdatePriceListSubGroupItem) map[string]interface{} {
+	updateMap := make(map[string]interface{})
+
+	apply := func(column string, newValue *float64, oldValue float64) {
+		if newValue == nil {
+			return
+		}
+		if *newValue != oldValue {
+			updateMap["before_"+column] = oldValue
+		}
+		updateMap[column] = *newValue
+	}
+
+	apply("price_unit", req.PriceUnit, oldSubGroup.PriceUnit)
+	apply("extra_price_unit", req.ExtraPriceUnit, oldSubGroup.ExtraPriceUnit)
+	apply("total_net_price_unit", req.TotalNetPriceUnit, oldSubGroup.TotalNetPriceUnit)
+	apply("price_weight", req.PriceWeight, oldSubGroup.PriceWeight)
+	apply("extra_price_weight", req.ExtraPriceWeight, oldSubGroup.ExtraPriceWeight)
+	apply("term_price_weight", req.TermPriceWeight, oldSubGroup.TermPriceWeight)
+	apply("total_net_price_weight", req.TotalNetPriceWeight, oldSubGroup.TotalNetPriceWeight)
+
+	return updateMap
+}
 
 // loadSubGroupsForUpdate reads every sub group the changes refer to in one query,
 // keyed by id. Ids that do not exist are simply absent from the map, which the
