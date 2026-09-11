@@ -69,6 +69,7 @@ type PriceListGroupCreateDTO struct {
 	Remark            string
 	CreateBy          string
 	UpdateBy          string
+	Seq               int
 }
 
 type PriceListGroupTermCreateDTO struct {
@@ -1248,6 +1249,7 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 			Remark:            r["remark"],
 			CreateBy:          r["create_by"],
 			UpdateBy:          r["update_by"],
+			Seq:               parseInt(r["Seq"]),
 		})
 
 		_, gKeys := genKeyFromCols(r, pgCols)
