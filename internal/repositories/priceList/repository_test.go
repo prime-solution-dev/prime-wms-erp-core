@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/gorm"
 )
 
 var postgresContainer tc.Container
@@ -91,7 +92,8 @@ func createSchema() error {
             create_by text,
             create_dtm timestamp,
             update_by text,
-            update_dtm timestamp
+            update_dtm timestamp,
+            seq integer
         );`,
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group (
             id uuid PRIMARY KEY,
@@ -384,4 +386,45 @@ func TestGetPriceListSubGroupByID(t *testing.T) {
 	result, err = GetPriceListSubGroupByID(unknownID)
 	assert.NoError(t, err, "not found should not error")
 	assert.Nil(t, result, "not found result expected nil")
+}
+
+// schema ที่เขียนมือใน createSchema ต้องมีครบทุกคอลัมน์ที่ GORM model ประกาศ
+//
+// เคยพังมาแล้วตอนเพิ่ม seq เข้า price_list_group: migration กับ model อัปเดต
+// แต่ DDL ในเทสต์ไม่ได้อัปเดตตาม เทสต์เลยล้มด้วย SQLSTATE 42703 ที่อ่านไม่รู้เรื่อง
+// และล้มต่อเป็นลูกโซ่ไปที่ FK ของตารางลูก
+//
+// เทสต์นี้เทียบ field ของ model กับคอลัมน์จริงในตาราง เพื่อให้ครั้งหน้าที่มีใคร
+// เพิ่มคอลัมน์ในโมเดล เทสต์บอกตรง ๆ ว่าขาดคอลัมน์ไหนในตารางไหน
+func TestCreateSchemaCoversModelColumns(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatalf("db connect failed: %v", err)
+	}
+	defer db.CloseGORM(gormx)
+
+	migrator := gormx.Migrator()
+	subjects := []interface{}{
+		&models.PriceListGroup{},
+		&models.PriceListSubGroup{},
+	}
+
+	for _, model := range subjects {
+		stmt := &gorm.Statement{DB: gormx}
+		if err := stmt.Parse(model); err != nil {
+			t.Fatalf("parse model ไม่ได้: %v", err)
+		}
+
+		table := stmt.Schema.Table
+		for _, field := range stmt.Schema.Fields {
+			// ข้าม association ที่ไม่ได้เป็นคอลัมน์ของตารางนี้
+			if field.DBName == "" {
+				continue
+			}
+			if !migrator.HasColumn(model, field.DBName) {
+				t.Errorf("ตาราง %s ขาดคอลัมน์ %q ที่ model ประกาศไว้ — เพิ่มใน createSchema ด้วย",
+					table, field.DBName)
+			}
+		}
+	}
 }
