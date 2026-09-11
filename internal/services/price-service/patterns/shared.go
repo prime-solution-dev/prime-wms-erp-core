@@ -567,6 +567,34 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 	return false
 }
 
+// collapseNonBatchSubGroups ยุบ subGroups ให้เหลือ record แรกของแต่ละ sg.ID
+// เมื่อ pattern ไม่มีคอลัมน์ batch_no
+//
+// warehouse-core รวม inventory ด้วยคีย์ company|site|product|batch จึงคืนหลาย
+// record ต่อ 1 subgroup ซึ่งฝั่ง build row จะ expand เป็นหลายแถว
+// pattern ที่ไม่แสดง batch_no ไม่มีคอลัมน์ไหนแยกแถวเหล่านั้นได้ (ค่า Avg. kg stock
+// ก็เป็นค่าระดับ site เท่ากันทุกแถวโดยการออกแบบ) ผู้ใช้จึงเห็นแถวซ้ำ
+//
+// เลือก record ตัวแรกให้ตรงกับฝั่ง export ที่ใช้ inventoryWeights[0]
+// และวน slice ตามลำดับเดิม (ห้ามวน map) เพื่อให้ผลลัพธ์ deterministic
+//
+// perBatch = true คืน slice เดิมทั้งก้อน เพราะ 1 row = 1 batch ตามที่ตั้งใจ
+func collapseNonBatchSubGroups(subGroups []models.PriceListSubGroupResponse, perBatch bool) []models.PriceListSubGroupResponse {
+	if perBatch || len(subGroups) == 0 {
+		return subGroups
+	}
+	seen := make(map[string]bool, len(subGroups))
+	collapsed := make([]models.PriceListSubGroupResponse, 0, len(subGroups))
+	for _, sg := range subGroups {
+		if seen[sg.ID] {
+			continue
+		}
+		seen[sg.ID] = true
+		collapsed = append(collapsed, sg)
+	}
+	return collapsed
+}
+
 // getWeightSpecFromInventory คืนน้ำหนักของ base unit (flag_base = true) จาก product master
 // ซึ่งคือค่าที่คอลัมน์ "Weight-spec" ต้องแสดง
 //
@@ -1039,6 +1067,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 
 func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -1516,6 +1545,7 @@ func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg mo
 
 func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -2253,6 +2283,7 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	}
 
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
 
 	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
 	type pg2Entry struct {
