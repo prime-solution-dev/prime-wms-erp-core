@@ -57,12 +57,17 @@ func BuildGroup1Item7Response(priceListData []models.GetPriceListResponse, group
 		}
 	}
 	remaining := make([]string, 0)
-	for key := range groupedByProductGroup2 {
+	allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+	for key, sgs := range groupedByProductGroup2 {
+		allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		if !seen[key] {
 			remaining = append(remaining, key)
 		}
 	}
+	// sort.Strings ก่อนเพื่อให้ลำดับตั้งต้นนิ่ง แล้วจึงเรียงด้วย group_item.value
 	sort.Strings(remaining)
+	sortLabelsByValue(remaining, allSubGroupsForTabs,
+		getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2"))
 	tabOrder = append(tabOrder, remaining...)
 
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
@@ -72,7 +77,15 @@ func BuildGroup1Item7Response(priceListData []models.GetPriceListResponse, group
 			continue
 		}
 
-		columns := buildDynamicColumns(pattern, subGroups)
+		rowCodes := splitGroupCodes(pattern.Grouping.Rows)
+		colCodes := splitGroupCodes(pattern.Grouping.ColumnGroups)
+
+		// คอลัมน์กับแถวเรียงคนละแกน จึงต้องใช้ subGroups คนละชุด
+		colSorted := append([]models.PriceListSubGroupResponse(nil), subGroups...)
+		SortSubGroupsByValue(colSorted, colCodes...)
+		columns := buildDynamicColumns(pattern, colSorted)
+
+		SortSubGroupsByValue(subGroups, append(append([]string{}, rowCodes...), colCodes...)...)
 		rowData := buildDynamicRows(config, pattern, subGroups)
 
 		// Merge rows with the same row_group_value into a single row
@@ -125,17 +138,15 @@ func BuildGroup1Item7Response(priceListData []models.GetPriceListResponse, group
 			mergedRowMap[rowGroupValue] = mergedRow
 		}
 
-		// Convert merged rows to slice and sort
+		// วน mergedRowMap ตรง ๆ ไม่ได้ — Go สุ่มลำดับ map จึงต้องไล่ตาม
+		// row_group_value ที่เจอใน rowData ซึ่งมาจาก subGroups ที่เรียงด้วย
+		// group_item.value แล้ว และไม่ต้อง sort ซ้ำด้วย product_group_6 แบบ string
 		mergedRows := make([]AGGridRowData, 0, len(mergedRowMap))
-		for _, row := range mergedRowMap {
-			mergedRows = append(mergedRows, row)
+		for _, key := range orderedUnique(rowData, "row_group_value") {
+			if row, ok := mergedRowMap[key]; ok {
+				mergedRows = append(mergedRows, row)
+			}
 		}
-
-		sort.SliceStable(mergedRows, func(i, j int) bool {
-			thicknessI := fmt.Sprintf("%v", mergedRows[i]["product_group_6"])
-			thicknessJ := fmt.Sprintf("%v", mergedRows[j]["product_group_6"])
-			return thicknessI < thicknessJ
-		})
 
 		tableData := make([]map[string]interface{}, len(mergedRows))
 		for i, row := range mergedRows {
