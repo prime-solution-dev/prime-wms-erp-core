@@ -11,6 +11,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -140,12 +141,12 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 	}
-	order := map[string]int{
-		"PRODUCT": 1,
-		"ADJUST":  2,
-		"TRANS":   3,
-		"Deposit": 4,
-	}
+	// order := map[string]int{
+	// 	"PRODUCT": 1,
+	// 	"ADJUST":  2,
+	// 	"TRANS":   3,
+	// 	"Deposit": 4,
+	// }
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
@@ -154,8 +155,20 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoice[i].PartyName = customerValue.CustomerName
 		}
 
-		sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
-			return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		// sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
+		// 	return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		// sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
+		// 	return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		// })
+		sort.SliceStable(invoice[i].InvoiceItem, func(o, j int) bool {
+			itemO, errO := strconv.Atoi(invoice[i].InvoiceItem[o].InvoiceItem)
+			itemJ, errJ := strconv.Atoi(invoice[i].InvoiceItem[j].InvoiceItem)
+
+			if errO != nil || errJ != nil {
+				return false
+			}
+
+			return itemO < itemJ
 		})
 		for j := range invoice[i].InvoiceItem {
 			if productDetail, ok := mapProduct[invoice[i].InvoiceItem[j].ProductCode]; ok {
