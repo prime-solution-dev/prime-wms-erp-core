@@ -1110,11 +1110,10 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			}
 
 			// Fallback: if all group codes are missing, use subgroup ID
+			// เฉพาะ columnKey เท่านั้น — columnLabel ปล่อยว่างไว้ เพราะ col_<uuid>
+			// เป็นตัวระบุตัวตน ไม่ใช่ค่าที่เอาไปโชว์เป็นหัวคอลัมน์ได้
 			if columnKey == "" {
 				columnKey = fmt.Sprintf("col_%s", sg.ID)
-				if columnLabel == "" {
-					columnLabel = columnKey
-				}
 			}
 		} else {
 			columnLabel = buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
@@ -2276,9 +2275,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	rowOrder := []string{}
 
 	for _, sg := range subGroups {
-		thickness := getValueNameByGroupCode(sg.SubGroupKeys, productGroup6Code)
-		length := getValueNameByGroupCode(sg.SubGroupKeys, productGroup7Code)
-		thicknessLength := strings.TrimSpace(fmt.Sprintf("%s x %s", thickness, length))
+		// ใช้กติกาเดียวกับคอลัมน์ composite อื่น ๆ คือข้ามค่าว่าง ไม่งั้นชื่อที่ว่าง
+		// โดยตั้งใจจะเหลือ "6 x" หรือ "x 6" ค้างไว้ (TrimSpace ตัดได้แค่ช่องว่าง)
+		thicknessLength := compositeMappingValue(sg.SubGroupKeys, []string{productGroup6Code, productGroup7Code}, "_x_")
 
 		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup5Code)
 		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup3Code)

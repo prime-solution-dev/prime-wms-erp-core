@@ -127,3 +127,32 @@ func TestBuildDynamicRows_ValueNamePresentIsUsedAsColumnLabel(t *testing.T) {
 		t.Fatalf("column_group_value = %#v, want %q", got, "เกรด SD40")
 	}
 }
+
+// เมื่อไม่มี code ของ columnLevels เลยสักตัว columnKey ตกไปใช้ col_<subgroup id>
+// ซึ่งเป็นตัวระบุตัวตน ไม่ควรหลุดไปโชว์เป็นหัวคอลัมน์
+func TestBuildDynamicRows_MissingAllColumnLevelCodesLeavesLabelEmpty(t *testing.T) {
+	cfg, err := LoadConfiguration("GROUP_1_ITEM_12")
+	if err != nil {
+		t.Fatalf("โหลด config ไม่ได้: %v", err)
+	}
+	if len(cfg.Patterns) == 0 || len(cfg.Patterns[0].ColumnLevels) == 0 {
+		t.Fatal("ต้องใช้ pattern ที่มี columnLevels")
+	}
+
+	// ไม่มี key ของ PG09/PG07 ที่ columnLevels อ้างถึงเลย
+	sg := models.PriceListSubGroupResponse{
+		ID:           "sg-1",
+		SubgroupCode: "sg-1",
+		SubGroupKeys: []models.PriceListSubGroupKeyResponse{
+			{GroupCode: "PG02", ValueCode: "PG02_1", ValueName: "หมวด A", Seq: 2},
+		},
+	}
+
+	rows := buildDynamicRows(cfg, &cfg.Patterns[0], []models.PriceListSubGroupResponse{sg})
+	if len(rows) == 0 {
+		t.Fatal("ไม่ได้แถวเลย")
+	}
+	if got := rows[0]["column_group_value"]; got != "" {
+		t.Fatalf("column_group_value = %#v, want \"\" (ห้ามเอา col_<uuid> ไปโชว์)", got)
+	}
+}
