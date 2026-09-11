@@ -11,6 +11,7 @@ import (
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
+	priceListRepository "prime-erp-core/internal/repositories/priceList"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -86,23 +87,18 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		return nil, fmt.Errorf("failed to get group mappings: %w", err)
 	}
 
-	// Build "Detail" tab (existing functionality).
-	detailTab := buildDetailTab(
-		res,
-		func(code string) string {
-			if g, ok := groupMap[code]; ok {
-				return g.GroupName
-			}
-			return ""
-		},
-		func(code string) string {
-			if it, ok := groupItemMap[code]; ok {
-				return it.ItemName
-			}
-			return ""
-		},
-		lastUpdated,
-	)
+	groupNameByCode := func(code string) string {
+		if g, ok := groupMap[code]; ok {
+			return g.GroupName
+		}
+		return ""
+	}
+	itemNameByCode := func(code string) string {
+		if it, ok := groupItemMap[code]; ok {
+			return it.ItemName
+		}
+		return ""
+	}
 
 	// Collect all unique company codes and site codes from the response
 	companyCodeSet := make(map[string]bool)
@@ -158,14 +154,18 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		} else {
 			// Create a map of inventory data by ID for quick lookup
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			// weight_spec มาระดับ result และต้องใช้ได้แม้ subgroup ไม่มีสต็อก
+			weightSpecMap := make(map[string]float64)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 
 			// Enrich subgroups with inventory data
 			for i := range res {
 				for j := range res[i].SubGroups {
 					sg := &res[i].SubGroups[j]
+					sg.WeightSpec = weightSpecMap[sg.ID.String()]
 					if inventoryWeights, ok := inventoryMap[sg.ID.String()]; ok && len(inventoryWeights) > 0 {
 						// For export, use first inventory record per subgroup
 						inv := inventoryWeights[0]
@@ -180,11 +180,46 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 	}
 
-	// Build "Based price" tab (new functionality).
-	basedPriceTab := buildBasedPriceTab(res, paymentTermMap, lastUpdated)
+	// สูตรราคาและชุดคอลัมน์คงที่ใช้เฉพาะ Pricelist Detail Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
+	var formulas map[string][]priceListRepository.SubgroupFormula
+	var fixedColumns []priceListRepository.SubGroupKeyColumn
+	if req.ReportType == ReportTypePricelistDetail {
+		// ดึงชุดคอลัมน์จากทั้ง price list โดยไม่ใส่ groupCodes เพื่อให้ไฟล์ที่กรองแล้ว
+		// มีคอลัมน์เท่ากับไฟล์เต็มเสมอ
+		fixedColumns, err = priceListRepository.GetSubGroupKeyColumns(req.CompanyCode, req.SiteCodes)
+		if err != nil {
+			// ถอยไปเก็บคอลัมน์จากแถวที่ได้แทน ดีกว่าทำให้ export ทั้งไฟล์ล้ม
+			fmt.Printf("Warning: failed to get sub group key columns: %v\n", err)
+			fixedColumns = nil
+		}
+
+		subgroupCodes := []string{}
+		for _, resp := range res {
+			for _, sg := range resp.SubGroups {
+				if sg.SubgroupCode != "" {
+					subgroupCodes = append(subgroupCodes, sg.SubgroupCode)
+				}
+			}
+		}
+		formulas, err = priceListRepository.GetFormulasBySubgroupCodes(subgroupCodes)
+		if err != nil {
+			// สูตรที่หายไปทำให้เซลล์ว่าง ไม่ควรทำให้ export ทั้งไฟล์ล้ม
+			fmt.Printf("Warning: failed to get subgroup formulas: %v\n", err)
+			formulas = nil
+		}
+	}
 
 	response := GetPriceExportTableResponse{
-		Tabs: []ExportTab{detailTab, basedPriceTab},
+		Tabs: selectExportTabs(
+			req.ReportType,
+			res,
+			groupNameByCode,
+			itemNameByCode,
+			fixedColumns,
+			formulas,
+			paymentTermMap,
+			lastUpdated,
+		),
 	}
 	return response, nil
 }
@@ -412,20 +447,7 @@ func buildExportTableTyped(
 			}
 
 			// Add inventory weight fields
-			if len(sg.InventoryWeight) > 0 {
-				inv := sg.InventoryWeight[0]
-				row["total_weight"] = inv.TotalWeight
-				row["avg_weight"] = inv.AvgWeight
-				row["market_weight"] = inv.WeightSpec
-				row["stock"] = inv.SumQty
-				row["stock_quantity"] = inv.TotalQty
-				row["quantity"] = inv.SumQty
-				row["batch_no"] = inv.BatchNo
-				row["brand"] = inv.SupplierName
-				row["code"] = inv.ProductCode
-				row["warehouse"] = inv.SiteCode
-				row["supplier_name"] = inv.SupplierName
-			}
+			applyInventoryFieldsToRow(row, sg)
 
 			// Fill dynamic group_code fields with value_name.
 			for _, k := range sg.GroupKeys {
@@ -598,3 +620,33 @@ func getGroupNameByCode(groupCode string, groupMap map[string]models.GetGroupRes
 // Compile-time guard: ensure we actually depend on models package (imported for the types below).
 var _ = models.GetGroupResponse{}
 var _ *sqlx.DB
+
+// applyInventoryFieldsToRow เติมค่าที่มาจาก inventory และ product master ลงใน row ของ export
+//
+// row["total_weight"] คือคอลัมน์ที่ผู้ใช้เห็นชื่อ "Weight-spec" ค่าที่ถูกต้องคือน้ำหนัก
+// ของ base unit จาก product master (sg.WeightSpec) ไม่ใช่ inv.TotalWeight ซึ่งเป็น
+// น้ำหนักรวมของสต็อก และต้องเติมนอกเงื่อนไข len(InventoryWeight) > 0 เพราะสินค้าที่
+// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
+func applyInventoryFieldsToRow(row map[string]interface{}, sg SubGroup) {
+	row["total_weight"] = sg.WeightSpec
+
+	if len(sg.InventoryWeight) == 0 {
+		// ต้องเติม 0 ไม่ใช่ปล่อยให้ key หาย เพื่อให้ตรงกับกริดและ Pricelist Detail Report
+		row["avg_weight"] = float64(0)
+		return
+	}
+
+	inv := sg.InventoryWeight[0]
+	// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
+	// AvgWeight เป็นค่าระดับ batch ซึ่งไม่ใช่สิ่งที่คอลัมน์นี้ต้องแสดง
+	row["avg_weight"] = inv.AvgProduct
+	row["market_weight"] = inv.WeightSpec
+	row["stock"] = inv.SumQty
+	row["stock_quantity"] = inv.TotalQty
+	row["quantity"] = inv.SumQty
+	row["batch_no"] = inv.BatchNo
+	row["brand"] = inv.SupplierName
+	row["code"] = inv.ProductCode
+	row["warehouse"] = inv.SiteCode
+	row["supplier_name"] = inv.SupplierName
+}

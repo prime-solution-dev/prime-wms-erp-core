@@ -219,6 +219,11 @@ type GetPOBigLotListRequest struct {
 	Page                 int      `json:"page"`
 	PageSize             int      `json:"page_size"`
 
+	// OnlyRemaining = คัด Big lot ที่โควตารวมทุกบรรทัดถูกใช้จนหมด (remaining รวม <= 0)
+	// ออกจากผลลัพธ์ ใช้กับ picker "Ref. Big lot PO#" หน้า Create PO เพื่อไม่ให้เลือกใบที่หมดโควตา
+	// (มิเรอร์ pattern only_remaining_pick ของ STO) — default false เพื่อไม่กระทบ caller อื่น
+	OnlyRemaining bool `json:"only_remaining"`
+
 	StartCreateDate *time.Time `json:"start_create_date"`
 	EndCreateDate   *time.Time `json:"end_create_date"`
 }
@@ -452,6 +457,7 @@ type GetPurchaseRequest struct {
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
 	UsedStatus                   []string   `json:"used_status"`
+	UsedStatusNot                []string   `json:"used_status_not"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`
