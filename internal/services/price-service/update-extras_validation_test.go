@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"prime-erp-core/internal/models"
 	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -80,6 +81,33 @@ func TestUpdateExtras_RejectsEmptyFields(t *testing.T) {
 			}
 			if _, ok := err.(*utils.BindingError); !ok {
 				t.Fatalf("ต้องเป็น *utils.BindingError เพื่อให้ได้ HTTP 400 แต่ได้ %T: %v", err, err)
+			}
+		})
+	}
+}
+
+// operator ที่ extraConditionMatched รองรับต้องผ่าน validation ทุกตัว
+// test ชุดเดิมเป็นเคส reject ทั้งหมด จึงไม่จับกรณี false rejection
+// ซึ่งเป็นบั๊กที่ whitelist ชุดแรกทำไว้ (ตัด < และ > ออกทั้งที่ UI ให้เลือกและระบบคิดราคารองรับ)
+func TestValidateExtras_AcceptsEveryOperatorTheCalculatorSupports(t *testing.T) {
+	operators := []string{"=", ">=", "<=", "<", ">", "<>"}
+
+	for _, op := range operators {
+		t.Run(op, func(t *testing.T) {
+			extras := []models.UpdatePriceListExtraRequest{{
+				PriceListGroupID: uuid.New(),
+				ExtraKey:         "PG06_1",
+				ConditionCode:    "PG06",
+				Operator:         op,
+				CondRangeMin:     0,
+				CondRangeMax:     45,
+				PriceListGroupExtraKeys: []models.UpdatePriceListGroupExtraKeyRequest{
+					{Code: "PG06", Value: "PG06_1", Seq: 1},
+				},
+			}}
+
+			if err := validateExtras(extras); err != nil {
+				t.Fatalf("operator %q ต้องผ่าน validation แต่ถูกปฏิเสธ: %v", op, err)
 			}
 		})
 	}

@@ -128,6 +128,12 @@ func checkForOverlappingConditions(extras []models.UpdatePriceListExtraRequest) 
 		case "<>":
 			// Range between min and max
 			return e.CondRangeMin, e.CondRangeMax
+		case ">":
+			// Range from min to infinity, same as >= (only min is meaningful)
+			return e.CondRangeMin, 1e18
+		case "<":
+			// Range from min to max, same as <= (only max is meaningful)
+			return e.CondRangeMin, e.CondRangeMax
 		default:
 			// Default: use the full range
 			return e.CondRangeMin, e.CondRangeMax
@@ -163,12 +169,16 @@ func checkForOverlappingConditions(extras []models.UpdatePriceListExtraRequest) 
 	return nil
 }
 
-// validExtraOperators คือ operator ที่ getEffectiveRange รู้จัก
-// operator อื่นจะตกไป default เงียบ ๆ ทำให้การตรวจ overlap ไม่ตรงกับที่ตั้งใจ
+// validExtraOperators คือ operator ที่ extraConditionMatched รองรับ
+// (update-latest-pricelist-subgroup.go) ซึ่งเป็นตัวตัดสินราคาจริง
+// ห้ามใช้ getEffectiveRange เป็นแหล่งความจริง มันเป็นแค่ helper ของการตรวจ overlap
+// และ default ของมันกลืน operator ที่ไม่รู้จักไป
 var validExtraOperators = map[string]bool{
-	"<=": true,
-	">=": true,
 	"=":  true,
+	">=": true,
+	"<=": true,
+	"<":  true,
+	">":  true,
 	"<>": true,
 }
 
@@ -200,7 +210,7 @@ func validateExtras(extras []models.UpdatePriceListExtraRequest) error {
 		}
 		if !validExtraOperators[strings.TrimSpace(e.Operator)] {
 			return &utils.BindingError{
-				Message: fmt.Sprintf("รายการที่ %d: operator %q ไม่ถูกต้อง ต้องเป็น <=, >=, = หรือ <>", i+1, e.Operator),
+				Message: fmt.Sprintf("รายการที่ %d: operator %q ไม่ถูกต้อง ต้องเป็น =, >=, <=, <, > หรือ <>", i+1, e.Operator),
 			}
 		}
 		if e.CondRangeMin > e.CondRangeMax {
