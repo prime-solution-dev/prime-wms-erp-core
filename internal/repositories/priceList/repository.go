@@ -37,6 +37,7 @@ func GetPriceListGroup(companyCode string, siteCode string, groupCodes []string)
 			return tx.Order("subgroup_key").Order("id")
 		}).
 		Preload("PriceListSubGroups.PriceListSubGroupKeys").
+		Order("seq ASC").
 		Find(&priceListGroups).Error; err != nil {
 		return priceListGroups, err
 	}
