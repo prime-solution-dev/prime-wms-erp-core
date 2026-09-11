@@ -624,14 +624,25 @@ func udfNumeric(udfData map[string]interface{}, key string) interface{} {
 }
 
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueNameByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueNameByGroupCode)
 }
 
 func buildCompositeCodeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueCodeByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueCodeByGroupCode)
 }
 
-func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
+// compositeMappingValue ประกอบค่าเซลล์ของคอลัมน์ที่ dataMapping เป็น composite
+// (เช่น "PG04_x_PG03") โดยใช้กติกาเดียวกับ buildCompositeKeyBy คือข้ามค่าว่าง
+// ไม่งั้นชื่อที่ว่างโดยตั้งใจจะทำให้เหลือ separator " x " ห้อยท้าย
+func compositeMappingValue(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, dataMapping string) string {
+	separator := ""
+	if strings.Contains(dataMapping, "_x_") {
+		separator = " x "
+	}
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, separator, getValueNameByGroupCode)
+}
+
+func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, separator string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
 	parts := []string{}
 	for _, code := range groupCodes {
 		value := extractor(subGroupKeys, code)
@@ -639,7 +650,7 @@ func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, gro
 			parts = append(parts, value)
 		}
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, separator)
 }
 
 func sanitizeIdentifier(primary, fallback string) string {
@@ -833,10 +844,12 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 	uniqueValues := make(map[string]columnGroupValue)
 	for _, sg := range subGroups {
 		label := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-		if label == "" {
+		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+		// ข้ามเฉพาะตอนไม่มี key เลยจริง ๆ ถ้ามี code แต่ชื่อว่างต้องยังสร้างคอลัมน์
+		// โดย header แสดงว่าง ไม่งั้นคอลัมน์ราคาหายจากกริดแบบเงียบ ๆ
+		if label == "" && code == "" {
 			continue
 		}
-		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 		mapKey := fmt.Sprintf("%s|%s", label, code)
 		uniqueValues[mapKey] = columnGroupValue{
 			Label: label,
@@ -1108,9 +1121,8 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			columnCode := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 			columnKey = sanitizeIdentifier(columnCode, columnLabel)
 		}
-		if columnLabel == "" {
-			columnLabel = columnKey
-		}
+		// columnLabel คือค่าที่ผู้ใช้เห็น ปล่อยให้ว่างได้เมื่อ item_name ว่างโดยตั้งใจ
+		// ห้าม fallback ไป columnKey ซึ่งเป็น code — columnKey ใช้ระบุตัวตนคอลัมน์เท่านั้น
 		// No longer skip if columnKey is empty - we now always have a fallback
 		if columnKey == "" {
 			columnKey = fmt.Sprintf("col_%s", sg.ID)
@@ -1329,13 +1341,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[fieldName] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fieldName] = val1 + val2
-				}
+				row[fieldName] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
@@ -1699,13 +1705,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(fixedCol.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(fixedCol.DataMapping, "_x_") {
-					row[fixedCol.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fixedCol.Field] = val1 + val2
-				}
+				row[fixedCol.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, fixedCol.DataMapping)
 				continue
 			}
 
@@ -1967,13 +1967,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[colConfig.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[colConfig.Field] = val1 + val2
-				}
+				row[colConfig.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
