@@ -123,6 +123,17 @@ func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]mode
 	return result, nil
 }
 
+// resolveGroupItemName คืนชื่อ item สำหรับ code ที่ให้มา โดยใช้ two-value lookup
+// เพื่อแยก "ไม่มี record ใน group_item" (คืน code) ออกจาก "มี record แต่ item_name
+// ว่างโดยตั้งใจ" (ต้องคืนค่าว่าง) — กติกาเดียวกับ itemNameByCode ฝั่ง export
+func resolveGroupItemName(groupItemMap map[string]models.GetGroupItemResponse, code string) string {
+	item, ok := groupItemMap[code]
+	if !ok {
+		return code
+	}
+	return item.ItemName
+}
+
 // transformToGetPriceListResponse transforms internal response to API response format
 func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
 	// Get group and group item mappings
@@ -187,11 +198,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		for _, sg := range resp.SubGroups {
 			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 			for _, sgk := range sg.GroupKeys {
-				// Check if item name exists in group item map, use default empty string if not found
-				itemName := groupItemMap[sgk.Value].ItemName
-				if itemName == "" {
-					itemName = sgk.Value // Fallback to the value itself if item name not found
-				}
+				itemName := resolveGroupItemName(groupItemMap, sgk.Value)
 
 				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
 					ID:         uuid.New().String(),
