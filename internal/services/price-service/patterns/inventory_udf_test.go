@@ -47,19 +47,19 @@ func TestGetWeightSpecFromInventory(t *testing.T) {
 
 // Avg kg stock must come back as the number 0 when there is no inventory,
 // not as an empty string (which rendered as a blank cell).
-func TestGetAvgProductFromInventory(t *testing.T) {
-	if got := getAvgProductFromInventory(models.PriceListSubGroupResponse{}); got != 0 {
+func TestGetAvgKgStockFromInventoryZeroValues(t *testing.T) {
+	if got := getAvgKgStockFromInventory(models.PriceListSubGroupResponse{}, false); got != 0 {
 		t.Fatalf("want 0 with no inventory, got %v (%T)", got, got)
 	}
 
-	sg := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 11111.114})
-	if got := getAvgProductFromInventory(sg); got != 11111.11 {
+	sg := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 22222.224, AvgProduct: 11111.114})
+	if got := getAvgKgStockFromInventory(sg, false); got != 11111.11 {
 		t.Fatalf("want 11111.11, got %v", got)
 	}
 
-	zero := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 0})
-	if got := getAvgProductFromInventory(zero); got != 0 {
-		t.Fatalf("want 0 for zero AvgWeight, got %v", got)
+	zero := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 0, AvgProduct: 0})
+	if got := getAvgKgStockFromInventory(zero, false); got != 0 {
+		t.Fatalf("want 0 for zero AvgProduct, got %v", got)
 	}
 }
 

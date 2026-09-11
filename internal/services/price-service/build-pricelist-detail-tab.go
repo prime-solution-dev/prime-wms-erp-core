@@ -166,7 +166,7 @@ func buildPricelistDetailTab(
 				"price_per_kg":         sg.TotalNetPriceWeight,
 				"price_per_unit":       sg.TotalNetPriceUnit,
 				"extra_price":          sg.ExtraPriceWeight,
-				"avg_weight":           "",
+				"avg_weight":           float64(0),
 				"formula_kg_name":      "",
 				"formula_kg_code":      "",
 				"formula_unit_name":    "",
@@ -197,8 +197,9 @@ func buildPricelistDetailTab(
 			// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
 			row["total_weight"] = sg.WeightSpec
 
+			// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
 			if len(sg.InventoryWeight) > 0 {
-				row["avg_weight"] = sg.InventoryWeight[0].AvgWeight
+				row["avg_weight"] = sg.InventoryWeight[0].AvgProduct
 			}
 
 			for _, f := range formulas[sg.SubgroupCode] {

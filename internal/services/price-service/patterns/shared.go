@@ -517,14 +517,54 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
-// getAvgProductFromInventory extracts AvgWeight from the first InventoryWeight entry.
-// Returns 0 (not an empty string) when inventory data is unavailable so the grid
-// renders "0" instead of a blank cell and can format the value as a number.
-func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) float64 {
-	if len(sg.InventoryWeight) > 0 {
+// getAvgKgStockFromInventory คืนค่าคอลัมน์ "Avg. kg stock"
+//
+// perBatch = false คือค่าเริ่มต้น ใช้ AvgProduct ซึ่งเป็นค่าเฉลี่ยระดับ site
+// (น้ำหนักรวมของ product ใน site นั้น หารจำนวนชิ้นรวม) ตรงตามนิยามทางธุรกิจ
+//
+// perBatch = true ใช้ AvgWeight ซึ่งเป็นค่าเฉลี่ยระดับ batch สำหรับ pattern ที่
+// แสดงคอลัมน์ batch_no โดย 1 row = 1 batch ค่าระดับ site จะไม่สื่ออะไรใน row แบบนั้น
+//
+// คืน 0 (ไม่ใช่ string ว่าง) เมื่อไม่มีข้อมูลสต็อก เพื่อให้กริดแสดงเลข 0
+// และ format เป็นตัวเลขได้
+func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bool) float64 {
+	if len(sg.InventoryWeight) == 0 {
+		return 0
+	}
+	if perBatch {
 		return roundTo2(sg.InventoryWeight[0].AvgWeight)
 	}
-	return 0
+	return roundTo2(sg.InventoryWeight[0].AvgProduct)
+}
+
+// patternHasBatchColumn บอกว่า pattern นี้แสดงข้อมูลแยกต่อ batch หรือไม่
+//
+// ตัดสินจาก config ไม่ hardcode ชื่อ pattern เพราะ buildDynamicRows ถูกใช้
+// ทั้งโดย pattern ที่มีและไม่มี batch_no
+//
+// บาง pattern เปลี่ยนชื่อคอลัมน์ไปเป็น "โรงงาน" หรือ "Ship No." และบางตัวอ้าง
+// batch_no ผ่าน dataMapping จึงต้องตรวจทั้ง Field และ DataMapping
+//
+// ต้องตรวจ**ทุกช่องทาง**ที่ PatternConfig ประกาศคอลัมน์ได้ คือ Columns,
+// FixedColumns และ ColumnGroups[].Children ถ้าตกช่องใดไป pattern ที่ประกาศ
+// batch_no ที่นั่นจะถูกจัดเป็น non-batch เงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
+// (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
+func patternHasBatchColumn(pattern *PatternConfig) bool {
+	if pattern == nil {
+		return false
+	}
+	cols := [][]ColumnConfigItem{pattern.Columns, pattern.FixedColumns}
+	for _, g := range pattern.ColumnGroups {
+		cols = append(cols, g.Children)
+	}
+	for _, group := range cols {
+		for _, c := range group {
+			if c.Field == "batch_no" || c.DataMapping == "batch_no" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // getWeightSpecFromInventory คืนน้ำหนักของ base unit (flag_base = true) จาก product master
@@ -998,6 +1038,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 }
 
 func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	perBatch := patternHasBatchColumn(pattern)
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -1264,7 +1305,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 		row["is_highlight"] = isHighlightValue
 		row["total_weight"] = getWeightSpecFromInventory(sg)
-		row["avg_kg_stock"] = getAvgProductFromInventory(sg)
+		row["avg_kg_stock"] = getAvgKgStockFromInventory(sg, perBatch)
 
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
@@ -1396,15 +1437,15 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			case "total_weight":
 				row[fieldName] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
 				if colConfig.Field == "total_weight" {
 					row[fieldName] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
-					row[fieldName] = getAvgProductFromInventory(sg)
+					row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 				}
 			}
 		}
@@ -1474,6 +1515,7 @@ func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg mo
 }
 
 func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	perBatch := patternHasBatchColumn(pattern)
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -1712,7 +1754,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			case "total_weight":
 				row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fixedCol.Field] = getAvgProductFromInventory(sg)
+				row[fixedCol.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "import_date":
 				if importDateValue != nil {
 					row[fixedCol.Field] = importDateValue
@@ -1842,7 +1884,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				case "total_weight":
 					row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 				case "avg_kg_stock":
-					row[fixedCol.Field] = getAvgProductFromInventory(sg)
+					row[fixedCol.Field] = getAvgKgStockFromInventory(sg, perBatch)
 				default:
 					// For other fields without dataMapping, try to infer from field name
 					if strings.HasPrefix(fixedCol.Field, "product_group_") {
@@ -2099,9 +2141,9 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			case "total_weight":
 				row[colConfig.Field] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[colConfig.Field] = getAvgProductFromInventory(sg)
+				row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[colConfig.Field] = getAvgProductFromInventory(sg)
+				row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "default_uom":
 				row[colConfig.Field] = sg.DefaultUom
 			case "":
@@ -2109,7 +2151,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if colConfig.Field == "total_weight" {
 					row[colConfig.Field] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
-					row[colConfig.Field] = getAvgProductFromInventory(sg)
+					row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 				} else {
 					// For other fields with empty dataMapping, set to empty string
 					row[colConfig.Field] = ""
@@ -2209,6 +2251,8 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	if len(subGroups) == 0 {
 		return nil
 	}
+
+	perBatch := patternHasBatchColumn(pattern)
 
 	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
 	type pg2Entry struct {
@@ -2367,9 +2411,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 			case "total_weight":
 				row[fieldName] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
 					row[fieldName] = batchNoValue
