@@ -45,18 +45,32 @@ Frontend ไม่ sort อะไรเลย — แสดงตามลำด
 - `price_list_sub_group_key.seq` **ใช้แทนไม่ได้** — `upload-pricelist.go:1476` กำหนด
   `Seq = i + 1` คือลำดับของ `PG0x` ในคีย์ (PG01→1, PG05→5) ไม่ใช่ลำดับของค่า
 
-## ทำไมต้องมี ValueIndex
+## ทำไมต้องเรียงที่ต้นทาง ไม่ใช่เรียง key
 
 จุดที่ sort อยู่ ~23 จุดใน 13 pattern + `shared.go` เทียบค่าอยู่ 3 รูปแบบ
 
 | รูปแบบ | เทียบจาก | ตัวอย่าง |
 |--------|----------|----------|
-| ① struct | `SubGroupKeys` ครบ | `pattern_group_1_item_4.go:76`, `_6.go:60`, `shared.go:903`, `:2239`, `:2310` |
-| ② row map | เหลือแค่ชื่อ เช่น `rows[i]["product_group_6"]` | `_8.go:79`, `_10.go:45`, `_9/_11/_12/_13`, `_7.go:134`, `_1.go:244` |
-| ③ map key | เหลือแค่ string | `_1.go:40,100,131`, `_1.go:298`, `shared.go:1012`, `_3.go:52`, `_4.go:65`, `_5.go:212`, `_7.go:65`, `_8.go:65` |
+| ① struct | `SubGroupKeys` ครบ | `pattern_group_1_item_4.go:76`, `_6.go:60`, `_11.go:56`, `_13.go:45` |
+| ② row map | เหลือแค่ชื่อ เช่น `rows[i]["product_group_6"]` | `_7.go:134`, `_8.go:79`, `_9.go:45`, `_10.go:45`, `_12.go:45`, `_1.go:244` |
+| ③ map key | เหลือแค่ string ที่ประกอบแล้ว | `_1.go:40,100,131,298`, `_3.go:52`, `_4.go:65`, `_5.go:126,212`, `_7.go:65`, `_8.go:65`, `shared.go:903,1012,2239,2310` |
 
-รูปแบบ ② และ ③ ไม่มี struct ให้อ่าน จึงต้องมีทางแปลง **ชื่อ → ตัวเลข** กลับ
-`ValueIndex` คือตัวกลางตัวนั้น — สร้างครั้งเดียวต่อ request จาก `SubGroupKeys` ของข้อมูลชุดนั้น
+**ห้ามแก้รูปแบบ ② และ ③ ด้วยการแปลงชื่อกลับเป็นตัวเลข** เพราะ key เหล่านั้นถูกประกอบ
+มาแล้วหลายชั้นและ reverse ไม่ได้จริง:
+
+- `buildCompositeKeyBy` (`shared.go:683`) **ข้ามค่าว่าง** ตอน join ด้วย `"|"` หรือ `" x "`
+  → segment ที่ i ไม่ได้ตรงกับ `groupCodes[i]` เสมอ
+- `columnKey = sanitizeIdentifier(columnCode, columnLabel)` (`shared.go:1158`) แปลงร่างอีกชั้น
+- ชื่อซ้ำข้ามกลุ่มได้ (`PG05` มี item ชื่อ `"100"` และ `PG06` ก็มี) map แบนจะชนกัน
+
+การ reverse-map จึงเป็นโค้ดเดาใจที่พังเงียบ ๆ
+
+**แนวทางที่ใช้: เรียง `subGroups` ให้เสร็จตั้งแต่ต้นทาง แล้วให้ทุกจุดปลายน้ำเดินตามลำดับนั้น**
+
+`subGroups` มี `SubGroupKeys` ครบ จึงเทียบจาก `ValueNumber` ตรง ๆ ได้โดยไม่ต้องแปลงกลับเลย
+เมื่อ `subGroups` เรียงถูกแล้ว `buildDynamicRows` / `buildDirectRows` ที่วนตาม `subGroups`
+ก็ผลิตแถวออกมาเรียงถูกตาม แล้วจุด `sort.Strings(mapKeys)` ทั้งหลายเปลี่ยนเป็น
+"เก็บ key ตามลำดับที่เจอครั้งแรก" แทน
 
 ## การเปลี่ยนแปลง
 
@@ -95,40 +109,51 @@ func parseGroupItemValue(m map[string]models.GetGroupItemResponse, code string) 
 `get-price-export-table.go` **ไม่ต้องแก้** — ประกอบคอลัมน์เองที่ `:247-290` ด้วย `Seq`
 ของ product group ซึ่งเป็นคนละแกน ไม่ได้เรียกใช้ pattern
 
-### 3. `internal/services/price-service/patterns/value_index.go` (ไฟล์ใหม่)
+### 3. `internal/services/price-service/patterns/sort_by_value.go` (ไฟล์ใหม่)
 
 ```go
-// ValueIndex แปลงชื่อ item (เช่น "4' x 8'") กลับเป็นค่าตัวเลขจาก group_item.value
-// ต้องสร้างใหม่ทุก request ห้ามทำเป็น package-level var — Gin รับ request พร้อมกันได้
-type ValueIndex struct {
-    byGroup map[string]map[string]groupValue // groupCode -> valueName -> ค่า
-}
+// valueOfGroup คืนค่าตัวเลขของ groupCode ใน subgroup นี้
+// bool ตัวที่สองคือ "resolve ได้ไหม" ไม่ใช่ "ไม่ใช่ศูนย์"
+func valueOfGroup(sgks []models.PriceListSubGroupKeyResponse, groupCode string) (float64, bool)
 
-func NewValueIndex(data []models.GetPriceListResponse) *ValueIndex
+// cmpGroupValue เทียบ subgroup สองตัวที่ groupCode เดียว คืน -1 / 0 / 1
+func cmpGroupValue(a, b []models.PriceListSubGroupKeyResponse, groupCode string) int
 
-// Less เทียบชื่อสองตัวในกลุ่มเดียวกัน
-func (vi *ValueIndex) Less(groupCode, nameA, nameB string) bool
+// cmpSubGroupKeys ไล่ groupCodes จากซ้ายไปขวา เจอตัวแรกที่ไม่เท่ากันแล้วจบ
+func cmpSubGroupKeys(a, b []models.PriceListSubGroupKeyResponse, groupCodes ...string) int
 
-// LessKeys เทียบ composite key ที่คั่นด้วย "|" ทีละ segment ตาม groupCodes ที่ให้มา
-func (vi *ValueIndex) LessKeys(groupCodes []string, keyA, keyB string) bool
+// SortSubGroupsByValue เรียง in-place ด้วย sort.SliceStable
+func SortSubGroupsByValue(sgs []models.PriceListSubGroupResponse, groupCodes ...string)
+
+// orderedUnique เก็บค่าของ field จาก rows ตามลำดับที่เจอครั้งแรก ไม่ซ้ำ
+// ใช้แทน sort.Strings(mapKeys) เมื่อ rows ถูกสร้างจาก subGroups ที่เรียงแล้ว
+func orderedUnique(rows []AGGridRowData, field string) []string
+
+// orderedUniqueBy เวอร์ชันที่ดึง key ด้วยฟังก์ชัน ใช้กับ subGroups โดยตรง
+func orderedUniqueBy[T any](items []T, keyOf func(T) string) []string
 ```
 
-กติกาของ `Less` เรียงตามลำดับ:
+กติกาของ `cmpGroupValue` เรียงตามลำดับ:
 
 1. มีค่าทั้งคู่ และไม่เท่ากัน → เทียบตัวเลขจากน้อยไปมาก
 2. มีค่าฝ่ายเดียว → **ฝ่ายที่มีค่ามาก่อน** (ตัวที่ resolve ไม่ได้ไปท้ายเสมอ ไม่กองอยู่หน้าสุดเพราะถูกมองเป็น 0)
-3. ไม่มีค่าทั้งคู่ → เทียบ string ตามเดิม
-4. ค่าเท่ากัน → tie-break ด้วยชื่อ เพื่อให้ deterministic
+3. ไม่มีค่าทั้งคู่ → เทียบ `ValueName` แบบ string ตามเดิม
+4. ค่าเท่ากัน → tie-break ด้วย `ValueName` เพื่อให้ deterministic
    (เช่น `150x200` กับ `100x300` ที่ value = 30,000.00 เท่ากัน)
 
 ### 4. แทนที่จุด sort ทั้งหมด
 
-แต่ละ handler เพิ่ม `vi := NewValueIndex(priceListData)` หนึ่งบรรทัดบนสุด แล้วเปลี่ยน
-comparator ทุกจุดให้เรียก `vi.Less(...)` / `vi.LessKeys(...)` แทน `sort.Strings` และ
-`a < b` บน string
+รูปแบบการแก้ต่อ handler หนึ่งตัว:
 
-ครอบคลุมทุกแกน **รวมลำดับ tab** (`_1.go:298`, `_1.go:40`, `_3.go:52`, `_4.go:65`,
-`_5.go:212`, `_7.go:65`, `_8.go:65`) ตามที่ตกลงไว้ — ลำดับ tab จะเปลี่ยนจาก
+1. เรียก `SortSubGroupsByValue(subGroups, <axis codes>)` ทันทีหลัง group ข้อมูลเสร็จ
+   โดย `<axis codes>` อ่านจาก `getGroupCodeFromConfig(...)` เดิมที่ comparator ตัวเก่าใช้อยู่
+2. รูปแบบ ① เปลี่ยน comparator ให้เรียก `cmpSubGroupKeys(...) < 0`
+3. รูปแบบ ② ลบ `sort.SliceStable` ทิ้ง — แถวถูกผลิตจาก `subGroups` ที่เรียงแล้ว
+   ยกเว้นจุดที่ merge ผ่าน `map` ต้องเปลี่ยนการวน map เป็นวน slice ที่ได้จาก `orderedUnique`
+4. รูปแบบ ③ เปลี่ยน `sort.Strings(keys)` เป็น `orderedUnique(...)` / `orderedUniqueBy(...)`
+
+ครอบคลุมทุกแกน **รวมลำดับ tab** (`_1.go:40,298`, `_3.go:52`, `_4.go:65`, `_5.go:212`,
+`_7.go:65`, `_8.go:65`) ตามที่ตกลงไว้ — ลำดับ tab จะเปลี่ยนจาก
 `เหล็กแผ่น, เหล็กแผ่นตัด SIZE, แผ่นลาย, เหล็กแผ่น special` เป็น
 `เหล็กแผ่น (6), แผ่นลาย (9), เหล็กแผ่น special (19), เหล็กแผ่นตัด SIZE (20)`
 
@@ -143,7 +168,7 @@ comparator ทุกจุดให้เรียก `vi.Less(...)` / `vi.LessK
 
 - `shared.go:590-591` ระบุว่าการเรียง subgroup ที่มี `sg.ID` เดียวกันต้องใช้
   `sort.SliceStable` เท่านั้น ห้าม `sort.Slice` มิฉะนั้น "record แรก" จะไม่ใช่
-  `inventoryWeights[0]` อีกต่อไป — เปลี่ยนแค่ comparator ไม่เปลี่ยนฟังก์ชัน sort
+  `inventoryWeights[0]` อีกต่อไป
 - `get-pricelist.go:320` `ORDER BY plg.group_code, plg.id, plsg.subgroup_key, plsg.id`
   คงไว้ตามเดิม เป็นตัวกัน non-deterministic ระดับ DB ไม่ใช่ลำดับที่ผู้ใช้เห็น
 
@@ -155,14 +180,15 @@ comparator ทุกจุดให้เรียก `vi.Less(...)` / `vi.LessK
 
 ตาม CLAUDE.md ต้องมี unit + integration test และ coverage ไม่ต่ำกว่า 80%
 
-**Unit — `patterns/value_index_test.go`**
+**Unit — `patterns/sort_by_value_test.go`**
 
 - parse `"10,000.00"` → `10000`
 - `value = "0"` → `(0, true)` ต่างจากไม่พบ item → `(0, false)`
 - `value = ""` และ parse ไม่ได้ → `(0, false)`
 - ตัวที่ resolve ไม่ได้ไปท้ายเสมอ
 - ค่าเท่ากัน tie-break ด้วยชื่อ และผลลัพธ์ต้องคงที่เมื่อรันซ้ำ
-- `LessKeys` กับ composite key `"PG03|PG08|PG05"`
+- `cmpSubGroupKeys` ไล่หลาย groupCodes และหยุดที่ตัวแรกที่ไม่เท่ากัน
+- `orderedUnique` เก็บลำดับที่เจอครั้งแรกและไม่ซ้ำ
 
 **Golden order — 1 test ต่อ pattern (13 ตัว)**
 
