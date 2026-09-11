@@ -63,14 +63,18 @@ func nbMaxRowNumber(rows []AGGridRowData) int {
 	return max
 }
 
-// nbHasValue บอกว่ามีช่องไหนในแถวถือค่า want อยู่หรือไม่
-func nbHasValue(row AGGridRowData, want float64) bool {
-	for _, v := range row {
-		if f, ok := v.(float64); ok && f == want {
-			return true
-		}
+// nbFloatField อ่านค่า float ของช่องที่ระบุ ล้มเทสต์ทันทีถ้าช่องนั้นไม่มีหรือไม่ใช่ตัวเลข
+func nbFloatField(t *testing.T, row AGGridRowData, field string) float64 {
+	t.Helper()
+	v, ok := row[field]
+	if !ok {
+		t.Fatalf("แถวไม่มีช่อง %s: %v", field, row)
 	}
-	return false
+	f, ok := v.(float64)
+	if !ok {
+		t.Fatalf("ช่อง %s ไม่ใช่ตัวเลข: %T %v", field, v, v)
+	}
+	return f
 }
 
 // buildDirectRows สร้าง 1 แถวต่อ 1 subgroup ตรง ๆ
@@ -102,8 +106,12 @@ func TestBuildDirectRows_DuplicateSubGroupRowCount(t *testing.T) {
 }
 
 // buildDynamicRows ยุบแถวด้วย rowMap[columnKey|rowKey|sg.ID] อยู่แล้ว จำนวนแถวจึงไม่ต่าง
-// สิ่งที่ต่างคือจำนวนรอบที่ subgroup ถูกประมวลผล (เห็นได้จาก *_row_number)
-// และค่าที่มาจาก inventory ซึ่งเขียนทับกันแบบ last-write-wins
+// สิ่งที่ต่างมีสองอย่าง
+//  1. จำนวนรอบที่ subgroup ถูกประมวลผล เห็นได้จาก *_row_number ซึ่ง GROUP_1_ITEM_5
+//     ประกาศเป็นคอลัมน์ "#" ให้ผู้ใช้เห็นจริง
+//  2. ค่าที่มาจาก inventory (is_highlight, total_weight, avg_kg_stock และคอลัมน์ใน
+//     pattern.Columns) ถูกเขียนนอกบล็อก if !exists จึงเป็น last-write-wins
+//     เมื่อยุบแล้วต้องเป็นค่าของ record แรก ตรงกับ inventoryWeights[0] ฝั่ง export
 func TestBuildDynamicRows_DuplicateSubGroupProcessedOnce(t *testing.T) {
 	item9Keys := []models.PriceListSubGroupKeyResponse{
 		{GroupCode: "PG02", ValueCode: "PG02_10", ValueName: "หมวดเหล็กเส้น", Seq: 2},
@@ -118,14 +126,15 @@ func TestBuildDynamicRows_DuplicateSubGroupProcessedOnce(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		groupCode     string
-		keys          []models.PriceListSubGroupKeyResponse
-		wantBatch     bool
-		wantRowNumber int
+		name           string
+		groupCode      string
+		keys           []models.PriceListSubGroupKeyResponse
+		wantBatch      bool
+		wantRowNumber  int
+		wantAvgKgStock float64
 	}{
-		{name: "pattern ไม่มี batch_no ต้องประมวลผลชุดเดียว", groupCode: "GROUP_1_ITEM_9", keys: item9Keys, wantBatch: false, wantRowNumber: 1},
-		{name: "pattern มี batch_no ต้องประมวลผลครบทุก batch", groupCode: "GROUP_1_ITEM_7", keys: item7Keys, wantBatch: true, wantRowNumber: 3},
+		{name: "pattern ไม่มี batch_no ต้องประมวลผลชุดเดียว", groupCode: "GROUP_1_ITEM_9", keys: item9Keys, wantBatch: false, wantRowNumber: 1, wantAvgKgStock: 10},
+		{name: "pattern มี batch_no ต้องประมวลผลครบทุก batch", groupCode: "GROUP_1_ITEM_7", keys: item7Keys, wantBatch: true, wantRowNumber: 3, wantAvgKgStock: 30},
 	}
 
 	for _, tt := range tests {
@@ -139,8 +148,12 @@ func TestBuildDynamicRows_DuplicateSubGroupProcessedOnce(t *testing.T) {
 			if len(rows) != 1 {
 				t.Fatalf("ต้องได้ 1 แถว (rowMap ยุบด้วย sg.ID อยู่แล้ว) แต่ได้ %d", len(rows))
 			}
+			// รายงานทั้งสองข้อในรอบเดียว (Errorf ไม่ใช่ Fatalf) เพื่อให้เห็นครบตอนวางบน commit ก่อนแก้
 			if got := nbMaxRowNumber(rows); got != tt.wantRowNumber {
-				t.Fatalf("row_number สูงสุดต้องเป็น %d แต่ได้ %d", tt.wantRowNumber, got)
+				t.Errorf("row_number สูงสุดต้องเป็น %d แต่ได้ %d", tt.wantRowNumber, got)
+			}
+			if got := nbFloatField(t, rows[0], "avg_kg_stock"); got != tt.wantAvgKgStock {
+				t.Errorf("avg_kg_stock ต้องเป็น %v แต่ได้ %v", tt.wantAvgKgStock, got)
 			}
 		})
 	}
@@ -171,11 +184,14 @@ func TestBuildDirectRowsWithProductGroup2WithCode_UsesFirstInventoryRecord(t *te
 	tests := []struct {
 		name      string
 		pattern   *PatternConfig
+		column    string
 		wantBatch bool
 		wantValue float64
 	}{
-		{name: "pattern ไม่มี batch_no ต้องใช้ record แรก", pattern: item11Pattern, wantBatch: false, wantValue: 10},
-		{name: "pattern มี batch_no ต้องไม่ถูกยุบ", pattern: item7Pattern, wantBatch: true, wantValue: 30},
+		{name: "pattern ไม่มี batch_no ต้องใช้ record แรก", pattern: item11Pattern, column: "avg_weight", wantBatch: false, wantValue: 10},
+		// synthetic probe: production ไม่มี pattern ที่มี batch_no วิ่งเข้า builder ตัวนี้
+		// (GROUP_1_ITEM_7 เข้า buildDynamicRows) ยืม pattern มาเพื่อกดให้เข้า branch perBatch = true เท่านั้น
+		{name: "pattern มี batch_no ต้องไม่ถูกยุบ", pattern: item7Pattern, column: "avg_weight_ton", wantBatch: true, wantValue: 30},
 	}
 
 	for _, tt := range tests {
@@ -188,8 +204,9 @@ func TestBuildDirectRowsWithProductGroup2WithCode_UsesFirstInventoryRecord(t *te
 			if len(rows) != 1 {
 				t.Fatalf("ต้องได้ 1 แถว แต่ได้ %d", len(rows))
 			}
-			if !nbHasValue(rows[0], tt.wantValue) {
-				t.Fatalf("แถวต้องถือค่าจาก inventory record ที่ถูกต้อง (%v) แต่ไม่พบ: %v", tt.wantValue, rows[0])
+			field := sanitizeIdentifier("PG02_1", "หมวดเหล็กแบน") + "_" + tt.column
+			if got := nbFloatField(t, rows[0], field); got != tt.wantValue {
+				t.Fatalf("%s ต้องเป็น %v แต่ได้ %v", field, tt.wantValue, got)
 			}
 		})
 	}
