@@ -8,6 +8,7 @@ import (
 	groupService "prime-erp-core/internal/services/group-service"
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
+	"sort"
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -259,15 +260,9 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
-		// Convert sets to slices
-		companyCodes := []string{}
-		for code := range companyCodeSet {
-			companyCodes = append(companyCodes, code)
-		}
-		siteCodes := []string{}
-		for code := range siteCodeSet {
-			siteCodes = append(siteCodes, code)
-		}
+		// Convert sets to slices — sort เพื่อให้ companyCodes[0] และลำดับ siteCodes นิ่ง
+		companyCodes := sortedSetKeys(companyCodeSet)
+		siteCodes := sortedSetKeys(siteCodeSet)
 
 		// Use first company code for the request (as per example, it's a single value array)
 		companyCode := ""
@@ -451,4 +446,17 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return response, nil
+}
+
+// sortedSetKeys คืน key ของ set ที่เรียงแล้ว
+//
+// การวน map ใน Go สุ่มลำดับ ผู้เรียกใช้ผลนี้เลือก element ตัวแรกไปส่งต่อ
+// ถ้าไม่ sort ค่าที่ถูกเลือกจะเปลี่ยนทุกครั้งที่เรียก
+func sortedSetKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
