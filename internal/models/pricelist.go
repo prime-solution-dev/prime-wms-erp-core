@@ -25,6 +25,7 @@ type PriceListGroup struct {
 	CreateDtm            time.Time             `json:"create_dtm"`
 	UpdateBy             string                `json:"update_by"`
 	UpdateDtm            time.Time             `json:"update_dtm"`
+	Seq                  int                   `json:"seq"`
 	PriceListGroupTerms  []PriceListGroupTerm  `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_terms"`
 	PriceListGroupExtras []PriceListGroupExtra `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_extras"`
 	PriceListSubGroups   []PriceListSubGroup   `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_sub_groups"`
