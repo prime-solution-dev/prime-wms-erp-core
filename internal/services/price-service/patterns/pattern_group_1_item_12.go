@@ -2,7 +2,6 @@ package patterns
 
 import (
 	"fmt"
-	"sort"
 
 	"prime-erp-core/internal/models"
 
@@ -38,15 +37,12 @@ func BuildGroup1Item12Response(priceListData []models.GetPriceListResponse, grou
 		}, nil
 	}
 
+	// เรียงที่ต้นทางด้วย group_item.value — row_group_value เป็น composite ที่
+	// ข้ามค่าว่างตอน join จึงแยกกลับไปเทียบเป็นตัวเลขไม่ได้
+	SortSubGroupsByValue(allSubGroups, splitGroupCodes(pattern.Grouping.Rows)...)
 	columns := buildDynamicColumns(pattern, allSubGroups)
 	rowData := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rowData)
-
-	sort.SliceStable(mergedRows, func(i, j int) bool {
-		rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
-		rowGroupJ := fmt.Sprintf("%v", mergedRows[j]["row_group_value"])
-		return rowGroupI < rowGroupJ
-	})
 
 	tableData := make([]map[string]interface{}, len(mergedRows))
 	for i, row := range mergedRows {

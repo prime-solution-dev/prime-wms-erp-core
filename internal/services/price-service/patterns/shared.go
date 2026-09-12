@@ -895,13 +895,16 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	// เทียบ label แบบ string จะได้ "1250x8'" < "4' x 8'" < "4'x1500" ซึ่งผิด
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	for _, key := range sortedKeys {
@@ -995,21 +998,29 @@ func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevel
 }
 
 // buildColumnGroupsRecursive recursively builds ColumnDef structures from hierarchy
+//
+// idx ใช้เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value — hierarchy key ถูกประกอบ
+// ด้วย composeHierarchyKey(code, label) จึง splitHierarchyKey แยก item_code
+// กลับมา lookup ได้ตรง ๆ
 func buildColumnGroupsRecursive(
 	hierarchy map[string]interface{},
 	pattern *PatternConfig,
 	levelIndex int,
 	labelPath []string,
 	codePath []string,
+	idx valueByCode,
 ) []ColumnDef {
 	columns := []ColumnDef{}
 
-	// Get sorted keys for current level
 	keys := make([]string, 0, len(hierarchy))
 	for key := range hierarchy {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		codeI, labelI := splitHierarchyKey(keys[i])
+		codeJ, labelJ := splitHierarchyKey(keys[j])
+		return idx.Less(codeI, labelI, codeJ, labelJ)
+	})
 
 	for _, encodedKey := range keys {
 		value := hierarchy[encodedKey]
@@ -1064,7 +1075,7 @@ func buildColumnGroupsRecursive(
 					HeaderName:    label,
 					GroupID:       groupID,
 					OpenByDefault: boolPtr(true),
-					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath),
+					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath, idx),
 				}
 				columns = append(columns, columnGroup)
 			}
@@ -1083,7 +1094,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 	hierarchy := buildHierarchyMap(subGroups, pattern.ColumnLevels)
 
 	// Build columns recursively
-	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{})
+	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{}, newValueByCode(subGroups))
 
 	return columns
 }
@@ -2231,13 +2242,15 @@ func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	// Build column groups with children from pattern.Columns
@@ -2303,12 +2316,14 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		}
 	}
 
+	idxPG2 := newValueByCode(subGroups)
 	pg2Entries := make([]pg2Entry, 0, len(pg2Map))
 	for code, label := range pg2Map {
 		pg2Entries = append(pg2Entries, pg2Entry{Code: code, Label: label})
 	}
 	sort.Slice(pg2Entries, func(i, j int) bool {
-		return pg2Entries[i].Label < pg2Entries[j].Label
+		a, b := pg2Entries[i], pg2Entries[j]
+		return idxPG2.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	rows := []AGGridRowData{}

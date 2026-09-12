@@ -25,6 +25,10 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 	}
 	tabsWithOrder := []tabWithOrder{}
 
+	// tabDisplayOrder เก็บลำดับ tab ที่เรียงด้วย group_item.value ไว้ใช้ตอนเรียง
+	// tabsWithOrder ตอนท้าย เพราะตรงนั้นมองเห็นแค่ชื่อ tab ไม่เห็น subGroups แล้ว
+	tabDisplayOrder := []string{}
+
 	for groupKey, productGroup2Map := range groupedData {
 		config, err := LoadConfiguration(groupKey)
 		if err != nil {
@@ -32,12 +36,23 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 			continue
 		}
 
-		// Sort productGroup2 keys to ensure consistent iteration order
+		// เรียงลำดับ tab ด้วยค่าตัวเลขของ PRODUCT_GROUP2 จาก group_item.value
+		// sort.Strings ยังต้องมีก่อน เพื่อให้ลำดับตั้งต้นนิ่ง — sortLabelsByValue
+		// เป็น stable sort ถ้าลำดับตั้งต้นสุ่ม label ที่ resolve ไม่ได้จะสลับกันเอง
 		productGroup2Keys := make([]string, 0, len(productGroup2Map))
-		for pg2 := range productGroup2Map {
+		allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+		for pg2, sgs := range productGroup2Map {
 			productGroup2Keys = append(productGroup2Keys, pg2)
+			allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		}
 		sort.Strings(productGroup2Keys)
+		// ต้องใช้ call เดียวกับที่ groupDataByGroupKeyAndProductGroup2 ใช้ group
+		// (shared.go) ไม่งั้นจะ lookup คนละแกนแล้ว miss ทุกตัวเงียบ ๆ
+		// pattern.Grouping.Tabs ใช้แทนไม่ได้ — PG01_3_PATTERN.json ตั้ง tabs เป็น
+		// PG01 แต่ group จริงด้วย root mapping productGroup2 = PG02
+		sortLabelsByValue(productGroup2Keys, allSubGroupsForTabs,
+			getGroupCodeFromConfig(config, nil, "productGroup2", "PRODUCT_GROUP2"))
+		tabDisplayOrder = append(tabDisplayOrder, productGroup2Keys...)
 
 		for _, productGroup2 := range productGroup2Keys {
 			subGroups := productGroup2Map[productGroup2]
@@ -47,6 +62,12 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 				continue
 			}
 
+			rowCodes := splitGroupCodes(pattern.Grouping.Rows)
+			colCodes := splitGroupCodes(pattern.Grouping.ColumnGroups)
+
+			// ลำดับคอลัมน์ไม่ได้มาจากลำดับ subGroups — buildDynamicColumns เก็บ
+			// unique key ลง map แล้วเรียงเองภายในด้วย group_item.value
+			SortSubGroupsByValue(subGroups, append(append([]string{}, rowCodes...), colCodes...)...)
 			columns := buildDynamicColumns(pattern, subGroups)
 			rowData := buildDynamicRows(config, pattern, subGroups)
 
@@ -92,12 +113,33 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 				rowsByRowGroup[rowGroupValue] = append(rowsByRowGroup[rowGroupValue], row)
 			}
 
-			// Sort row_group_value keys for deterministic row order
-			rowGroupKeys := make([]string, 0, len(rowsByRowGroup))
-			for k := range rowsByRowGroup {
-				rowGroupKeys = append(rowGroupKeys, k)
+			// rowData ถูกสร้างจาก subGroups ที่เรียงด้วย group_item.value แล้ว
+			// จึงเก็บ key ตามลำดับที่เจอครั้งแรกแทนการ sort ตัว key ที่ประกอบเสร็จแล้ว
+			// (key คือ strings.Join(mergeKeyParts, "|") ซึ่งข้ามค่าว่าง แยกกลับไม่ได้)
+			//
+			// rowGroupValue ในลูปด้านบนอาจไม่ตรงกับ row_group_value ของแถว จึงต้อง
+			// เก็บ key ที่ตกหล่นต่อท้าย ไม่งั้นข้อมูลหาย
+			rowGroupKeys := orderedUnique(rowData, "row_group_value")
+			seenRowGroup := map[string]bool{}
+			for _, k := range rowGroupKeys {
+				seenRowGroup[k] = true
 			}
-			sort.Strings(rowGroupKeys)
+			extraRowGroup := make([]string, 0)
+			for k := range rowsByRowGroup {
+				if !seenRowGroup[k] {
+					extraRowGroup = append(extraRowGroup, k)
+				}
+			}
+			sort.Strings(extraRowGroup)
+			rowGroupKeys = append(rowGroupKeys, extraRowGroup...)
+
+			filteredRowGroup := make([]string, 0, len(rowGroupKeys))
+			for _, k := range rowGroupKeys {
+				if _, ok := rowsByRowGroup[k]; ok {
+					filteredRowGroup = append(filteredRowGroup, k)
+				}
+			}
+			rowGroupKeys = filteredRowGroup
 
 			mergedRows := make([]AGGridRowData, 0, len(rowData))
 
@@ -123,12 +165,8 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 					continue
 				}
 
-				// Sort column keys for deterministic merge order
-				columnKeys := make([]string, 0, len(columnsByKey))
-				for k := range columnsByKey {
-					columnKeys = append(columnKeys, k)
-				}
-				sort.Strings(columnKeys)
+				// groupRows สืบทอดลำดับมาจาก subGroups ที่เรียงแล้ว
+				columnKeys := orderedUnique(groupRows, "column_group_key")
 
 				// Optional: sort each column's rows by its own row_number to keep visual order stable
 				for _, colKey := range columnKeys {
@@ -240,12 +278,9 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 				}
 			}
 
-			// Sort final merged rows by row_group_value to keep the previous behavior
-			sort.SliceStable(mergedRows, func(i, j int) bool {
-				rowGroupI := fmt.Sprintf("%v", mergedRows[i]["row_group_value"])
-				rowGroupJ := fmt.Sprintf("%v", mergedRows[j]["row_group_value"])
-				return rowGroupI < rowGroupJ
-			})
+			// ไม่ต้อง sort ซ้ำ — mergedRows ถูกสร้างโดยไล่ rowGroupKeys ที่เรียงด้วย
+			// group_item.value มาแล้ว การ sort ด้วย row_group_value แบบ string
+			// จะทำลายลำดับที่ถูกต้อง
 
 			tableData := make([]map[string]interface{}, len(mergedRows))
 			for i, row := range mergedRows {
@@ -294,10 +329,25 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 		}
 	}
 
-	// Sort tabs by pattern order (patternIdx), then by productGroup2 name for same pattern
-	sort.Slice(tabsWithOrder, func(i, j int) bool {
+	// เรียง tab ตาม pattern ก่อน แล้วจึงเรียงด้วยค่าตัวเลขของ PRODUCT_GROUP2
+	// ภายใน pattern เดียวกัน — เทียบชื่อ tab แบบ string ให้ลำดับที่ไม่สื่ออะไร
+	tabOrderIdx := map[string]int{}
+	for i, label := range tabDisplayOrder {
+		if _, ok := tabOrderIdx[label]; !ok {
+			tabOrderIdx[label] = i
+		}
+	}
+	sort.SliceStable(tabsWithOrder, func(i, j int) bool {
 		if tabsWithOrder[i].patternIdx != tabsWithOrder[j].patternIdx {
 			return tabsWithOrder[i].patternIdx < tabsWithOrder[j].patternIdx
+		}
+		oi, okI := tabOrderIdx[tabsWithOrder[i].productGroup2]
+		oj, okJ := tabOrderIdx[tabsWithOrder[j].productGroup2]
+		if okI && okJ && oi != oj {
+			return oi < oj
+		}
+		if okI != okJ {
+			return okI
 		}
 		return tabsWithOrder[i].productGroup2 < tabsWithOrder[j].productGroup2
 	})
