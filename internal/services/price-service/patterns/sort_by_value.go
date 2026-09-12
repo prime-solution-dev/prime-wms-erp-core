@@ -219,3 +219,27 @@ func sortLabelsByValue(labels []string, sgs []models.PriceListSubGroupResponse, 
 		return idx.Less(labels[i], labels[i], labels[j], labels[j])
 	})
 }
+
+// lessTabByValue เทียบ tab สองตัวสำหรับ pattern ที่มีหลาย tab
+//
+// order คือ label -> ลำดับที่ได้จากการเรียงด้วย group_item.value มาแล้ว
+//
+// patternIdx ใช้เป็นคีย์หลักไม่ได้ — pattern ถูกเลือกด้วย selectPatternForCategory
+// ซึ่ง match จาก applicableCategories แบบ substring และตกไป defaultPattern เมื่อไม่
+// match อะไรเลย ลำดับของ pattern ใน config จึงไม่ได้สื่อถึงลำดับที่ business อยากเห็น
+// จึงเหลือไว้เป็น tie-break ชั้นสุดท้ายสำหรับ tab ที่ resolve ค่าไม่ได้เท่านั้น
+func lessTabByValue(order map[string]int, labelA string, patternIdxA int, labelB string, patternIdxB int) bool {
+	oa, okA := order[labelA]
+	ob, okB := order[labelB]
+
+	if okA && okB && oa != ob {
+		return oa < ob
+	}
+	if okA != okB {
+		return okA
+	}
+	if patternIdxA != patternIdxB {
+		return patternIdxA < patternIdxB
+	}
+	return labelA < labelB
+}

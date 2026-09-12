@@ -329,8 +329,7 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 		}
 	}
 
-	// เรียง tab ตาม pattern ก่อน แล้วจึงเรียงด้วยค่าตัวเลขของ PRODUCT_GROUP2
-	// ภายใน pattern เดียวกัน — เทียบชื่อ tab แบบ string ให้ลำดับที่ไม่สื่ออะไร
+	// เรียง tab ด้วยค่าตัวเลขของ PRODUCT_GROUP2 จาก group_item.value เป็นคีย์หลัก
 	tabOrderIdx := map[string]int{}
 	for i, label := range tabDisplayOrder {
 		if _, ok := tabOrderIdx[label]; !ok {
@@ -338,18 +337,9 @@ func BuildGroup1Item1Response(priceListData []models.GetPriceListResponse) (Pric
 		}
 	}
 	sort.SliceStable(tabsWithOrder, func(i, j int) bool {
-		if tabsWithOrder[i].patternIdx != tabsWithOrder[j].patternIdx {
-			return tabsWithOrder[i].patternIdx < tabsWithOrder[j].patternIdx
-		}
-		oi, okI := tabOrderIdx[tabsWithOrder[i].productGroup2]
-		oj, okJ := tabOrderIdx[tabsWithOrder[j].productGroup2]
-		if okI && okJ && oi != oj {
-			return oi < oj
-		}
-		if okI != okJ {
-			return okI
-		}
-		return tabsWithOrder[i].productGroup2 < tabsWithOrder[j].productGroup2
+		return lessTabByValue(tabOrderIdx,
+			tabsWithOrder[i].productGroup2, tabsWithOrder[i].patternIdx,
+			tabsWithOrder[j].productGroup2, tabsWithOrder[j].patternIdx)
 	})
 
 	// Extract sorted tabs
