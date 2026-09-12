@@ -11,6 +11,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -147,6 +148,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"TRANS":   3,
 		"Deposit": 4,
 	}
+
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
@@ -155,9 +157,46 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoice[i].PartyName = customerValue.CustomerName
 		}
 
-		sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
-			return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		sort.SliceStable(invoice[i].InvoiceItem, func(o, j int) bool {
+			left := invoice[i].InvoiceItem[o]
+			right := invoice[i].InvoiceItem[j]
+
+			// 1. เรียงตาม InvoiceType ก่อน
+			typeOrderO, okO := order[left.InvoiceType]
+			typeOrderJ, okJ := order[right.InvoiceType]
+
+			// ถ้าเป็น Type ที่ไม่มีใน map ให้ไปอยู่ท้าย
+			if !okO {
+				typeOrderO = 999
+			}
+			if !okJ {
+				typeOrderJ = 999
+			}
+
+			if typeOrderO != typeOrderJ {
+				return typeOrderO < typeOrderJ
+			}
+
+			// 2. ถ้า InvoiceType เดียวกัน
+			// ให้เรียงตาม invoice_item
+			itemO, errO := strconv.Atoi(left.InvoiceItem)
+			itemJ, errJ := strconv.Atoi(right.InvoiceItem)
+
+			if errO != nil && errJ != nil {
+				return false
+			}
+
+			if errO != nil {
+				return false
+			}
+
+			if errJ != nil {
+				return true
+			}
+
+			return itemO < itemJ
 		})
+
 		for j := range invoice[i].InvoiceItem {
 			if productDetail, ok := mapProduct[invoice[i].InvoiceItem[j].ProductCode]; ok {
 				invoice[i].InvoiceItem[j].ProductName = productDetail.ProductName
