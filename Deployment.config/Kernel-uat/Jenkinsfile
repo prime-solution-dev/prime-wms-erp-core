@@ -89,37 +89,31 @@ pipeline {
                 }
             }
         }
-stage('Fetch .env from Vault (Remote)') {
-    steps {
-        script {
-            withVault([
-                vaultSecrets: [
-                    [
-                        path: "${VAULT_PATH}",
-                        engineVersion: 2,
-                        secretValues: [
-                            [
-                                envVar: 'AUTHEN_ENV',
-                                vaultKey: "${ENV_FILE_KEY}"
-                            ]
-                        ]
-                    ]
-                ]
-            ]) {
-                sh '''
-                    set +x
+        stage('Fetch .env from Vault') {
+            steps {
+                script {
+                    echo "Fetching .env from Vault..."
 
-                    printf '%s\\n' "$AUTHEN_ENV" |
-                    ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
-                    "cd '$REPO_NAME' && \
-                     mkdir -p cmd && \
-                     cat > cmd/.env && \
-                     chmod 600 cmd/.env"
-                '''
+                    // ดึงค่า .env จาก Vault
+                    withVault([vaultSecrets: [
+                        [path: "${VAULT_PATH}",
+                         engineVersion: 2,
+                         secretValues: [
+                             [envVar: 'AUTHEN_ENV', vaultKey: "${ENV_FILE_KEY}"]
+                         ]
+                        ]
+                    ]]) {
+                        sh '''
+                            mkdir -p cmd &&
+                    cat << "EOF" > cmd/.env
+                            echo "$AUTHEN_ENV" > cmd/.env
+                            chmod 600 cmd/.env
+                            echo ".env created at cmd/.env"
+                        '''
+                    }
+                }
             }
         }
-    }
-}
         stage('Build Docker Image') {
             steps {
                 script {
@@ -143,7 +137,7 @@ stage('Fetch .env from Vault (Remote)') {
                 script {
                     echo 'Deploying container on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
+                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
                 }
             }
         }
@@ -182,7 +176,5 @@ stage('Clean Up Repository') {
         }
     }
 }
-
-
 
 
