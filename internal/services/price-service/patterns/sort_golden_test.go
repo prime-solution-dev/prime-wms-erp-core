@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"prime-erp-core/internal/models"
@@ -178,5 +179,61 @@ func TestGolden_TabOrder(t *testing.T) {
 		if labels[i] != want[i] {
 			t.Fatalf("tab ที่ %d ได้ %q ต้องเป็น %q — ทั้งหมด %v", i, labels[i], want[i], labels)
 		}
+	}
+}
+
+// เคสจริงจาก PG01_3_PATTERN.json: "เหล็กแผ่นตัด SIZE" ไม่ match applicableCategories
+// ของ pattern ไหนเลย จึงตกไป defaultPattern = pattern_g6_g5 (idx 1) ร่วมกับ "แผ่นลาย"
+// ส่วน "เหล็กแผ่น special" อยู่ idx 2
+//
+// ถ้า patternIdx เป็นคีย์หลัก ตัด SIZE (value 20) จะแซง special (value 19) ขึ้นมา
+func TestGolden_TabOrder_ValueBeatsPatternIndex(t *testing.T) {
+	// order ได้จาก sortLabelsByValue ตามค่า PG02: 6, 9, 19, 20
+	order := map[string]int{
+		"เหล็กแผ่น":         0,
+		"แผ่นลาย":           1,
+		"เหล็กแผ่น special": 2,
+		"เหล็กแผ่นตัด SIZE": 3,
+	}
+
+	type tab struct {
+		label      string
+		patternIdx int
+	}
+	tabs := []tab{
+		{"เหล็กแผ่น", 0},
+		{"แผ่นลาย", 1},
+		{"เหล็กแผ่นตัด SIZE", 1},
+		{"เหล็กแผ่น special", 2},
+	}
+
+	sort.SliceStable(tabs, func(i, j int) bool {
+		return lessTabByValue(order, tabs[i].label, tabs[i].patternIdx, tabs[j].label, tabs[j].patternIdx)
+	})
+
+	want := []string{"เหล็กแผ่น", "แผ่นลาย", "เหล็กแผ่น special", "เหล็กแผ่นตัด SIZE"}
+	for i := range want {
+		if tabs[i].label != want[i] {
+			got := make([]string, 0, len(tabs))
+			for _, x := range tabs {
+				got = append(got, x.label)
+			}
+			t.Fatalf("tab ที่ %d ได้ %q ต้องเป็น %q — ทั้งหมด %v", i, tabs[i].label, want[i], got)
+		}
+	}
+}
+
+// tab ที่ resolve ค่าไม่ได้ต้องไปท้าย และเรียงกันเองด้วย patternIdx
+func TestLessTabByValue_UnresolvedGoesLast(t *testing.T) {
+	order := map[string]int{"มีค่า": 0}
+
+	if !lessTabByValue(order, "มีค่า", 9, "ไม่มีค่า", 0) {
+		t.Fatal("tab ที่มีค่าต้องมาก่อน แม้ patternIdx จะมากกว่า")
+	}
+	if !lessTabByValue(order, "ไม่มีค่า A", 0, "ไม่มีค่า B", 1) {
+		t.Fatal("resolve ไม่ได้ทั้งคู่ ต้อง tie-break ด้วย patternIdx")
+	}
+	if !lessTabByValue(order, "A", 0, "B", 0) {
+		t.Fatal("patternIdx เท่ากันด้วย ต้อง tie-break ด้วยชื่อ")
 	}
 }
