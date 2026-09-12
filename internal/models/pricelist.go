@@ -279,6 +279,17 @@ type PriceListSubGroupKeyResponse struct {
 	ValueCode  string `json:"value_code"`
 	ValueName  string `json:"value_name"`
 	Seq        int    `json:"seq"`
+
+	// ValueNumber คือ group_item.value ของ ValueCode แปลงเป็นตัวเลข ใช้เป็นลำดับ
+	// การแสดงผลของทุกแกนในหน้า Price List Detail
+	//
+	// Seq ด้านบนใช้แทนไม่ได้ — upload-pricelist.go:1476 กำหนด Seq = i + 1 ซึ่งเป็น
+	// ลำดับของ PG0x ในคีย์ (PG01 -> 1, PG05 -> 5) ไม่ใช่ลำดับของค่า
+	ValueNumber float64 `json:"value_number"`
+
+	// HasValue แยก "ValueNumber = 0 จริง" ออกจาก "resolve ค่าไม่ได้"
+	// ไม่ส่งออก JSON เพราะเป็นข้อมูลภายในสำหรับ comparator เท่านั้น
+	HasValue bool `json:"-"`
 }
 
 type InventoryWeightResponse struct {

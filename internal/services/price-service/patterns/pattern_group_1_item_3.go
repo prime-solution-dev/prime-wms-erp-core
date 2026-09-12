@@ -44,12 +44,16 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 		groupedByProductGroup4[productGroup4] = append(groupedByProductGroup4[productGroup4], sg)
 	}
 
-	// Sort productGroup4 keys for consistent tab order
+	// เรียงลำดับ tab ด้วยค่าตัวเลขของ PRODUCT_GROUP4 จาก group_item.value
+	// sort.Strings ยังต้องมีก่อน เพื่อให้ลำดับตั้งต้นนิ่ง
 	productGroup4Keys := make([]string, 0, len(groupedByProductGroup4))
-	for pg4 := range groupedByProductGroup4 {
+	allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+	for pg4, sgs := range groupedByProductGroup4 {
 		productGroup4Keys = append(productGroup4Keys, pg4)
+		allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 	}
 	sort.Strings(productGroup4Keys)
+	sortLabelsByValue(productGroup4Keys, allSubGroupsForTabs, productGroup4Code)
 
 	// Build columns once (same for all tabs)
 	columns := buildFixedColumns(pattern)
@@ -58,6 +62,9 @@ func BuildGroup1Item3Response(priceListData []models.GetPriceListResponse, group
 	tabs := make([]PriceListDetailTabConfig, 0)
 	for _, productGroup4 := range productGroup4Keys {
 		subGroups := groupedByProductGroup4[productGroup4]
+		SortSubGroupsByValue(subGroups,
+			append(append([]string{}, splitGroupCodes(pattern.Grouping.Rows)...),
+				splitGroupCodes(pattern.Grouping.ColumnGroups)...)...)
 		rowData := buildDirectRows(config, pattern, subGroups)
 
 		tableData := make([]map[string]interface{}, len(rowData))

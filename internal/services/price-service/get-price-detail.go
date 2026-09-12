@@ -199,15 +199,18 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 			for _, sgk := range sg.GroupKeys {
 				itemName := resolveGroupItemName(groupItemMap, sgk.Value)
+				valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
 
 				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
-					ID:         uuid.New().String(),
-					SubGroupID: sg.ID.String(),
-					GroupCode:  sgk.Code,
-					GroupName:  groupMap[sgk.Code].GroupName,
-					ValueCode:  sgk.Value,
-					ValueName:  itemName,
-					Seq:        sgk.Seq,
+					ID:          uuid.New().String(),
+					SubGroupID:  sg.ID.String(),
+					GroupCode:   sgk.Code,
+					GroupName:   groupMap[sgk.Code].GroupName,
+					ValueCode:   sgk.Value,
+					ValueName:   itemName,
+					Seq:         sgk.Seq,
+					ValueNumber: valueNumber,
+					HasValue:    hasValue,
 				})
 			}
 

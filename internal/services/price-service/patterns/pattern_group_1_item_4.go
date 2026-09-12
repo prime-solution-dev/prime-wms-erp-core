@@ -57,12 +57,17 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 		}
 	}
 	remaining := make([]string, 0)
-	for key := range groupedByProductGroup2 {
+	allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+	for key, sgs := range groupedByProductGroup2 {
+		allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		if !seen[key] {
 			remaining = append(remaining, key)
 		}
 	}
+	// sort.Strings ก่อนเพื่อให้ลำดับตั้งต้นนิ่ง แล้วจึงเรียงด้วย group_item.value
 	sort.Strings(remaining)
+	sortLabelsByValue(remaining, allSubGroupsForTabs,
+		getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2"))
 	tabOrder = append(tabOrder, remaining...)
 
 	columns := buildFixedColumns(pattern)
@@ -73,16 +78,9 @@ func BuildGroup1Item4Response(priceListData []models.GetPriceListResponse, group
 
 		productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
 		productGroup6Code := getGroupCodeFromConfig(config, pattern, "productGroup6", "PRODUCT_GROUP6")
-		sort.SliceStable(subGroups, func(i, j int) bool {
-			sizeI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup4Code)
-			sizeJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup4Code)
-			if sizeI == sizeJ {
-				thicknessI := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup6Code)
-				thicknessJ := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup6Code)
-				return thicknessI < thicknessJ
-			}
-			return sizeI < sizeJ
-		})
+		// เรียงด้วยค่าตัวเลขจาก group_item.value — เทียบ ValueName แบบ string
+		// ให้ 1.2, 1.4, 1.9, 10, 100, 12 ซึ่งผิด
+		SortSubGroupsByValue(subGroups, productGroup4Code, productGroup6Code)
 
 		rowData := buildDirectRows(config, pattern, subGroups)
 		tableData := make([]map[string]interface{}, len(rowData))
