@@ -18,27 +18,28 @@ import (
 )
 
 type GetInvoiceRequest struct {
-	ID                []uuid.UUID `json:"id"`
-	InvoiceCode       []string    `json:"invoice_code"`
-	InvoiceRef        []string    `json:"invoice_ref"`
-	InvoiceType       []string    `json:"invoice_type"`
-	CustomerCode      []string    `json:"customer_code"`
-	Status            []string    `json:"status"`
-	DocRef            []string    `json:"document_ref"`
-	InvoiceItemDocRef []string    `json:"invoice_item_document_ref"`
-	CompanyCode       string      `json:"company_code"`
-	SiteCode          string      `json:"site_code"`
-	Page              int         `json:"page"`
-	PageSize          int         `json:"page_size"`
-	InvoiceCodeLike   string      `json:"invoice_code_like"`
-	InvoiceRefLike    string      `json:"invoice_ref_like"`
-	PackingLike       string      `json:"packing_like"`
-	SalesOrderLike    string      `json:"sales_order_like"`
-	CustomerCodeLike  string      `json:"customer_code_like"`
-	CustomerNameLike  string      `json:"customer_name_like"`
-	DocumentDate      *time.Time  `json:"document_date"`
-	CreateDate        *time.Time  `json:"create_date"`
-	LastSubmitDate    *time.Time  `json:"last_submit_date"`
+	ID                 []uuid.UUID `json:"id"`
+	InvoiceCode        []string    `json:"invoice_code"`
+	InvoiceRef         []string    `json:"invoice_ref"`
+	InvoiceType        []string    `json:"invoice_type"`
+	CustomerCode       []string    `json:"customer_code"`
+	Status             []string    `json:"status"`
+	DocRef             []string    `json:"document_ref"`
+	InvoiceItemDocRef  []string    `json:"invoice_item_document_ref"`
+	CompanyCode        string      `json:"company_code"`
+	SiteCode           string      `json:"site_code"`
+	Page               int         `json:"page"`
+	PageSize           int         `json:"page_size"`
+	InvoiceCodeLike    string      `json:"invoice_code_like"`
+	InvoiceRefLike     string      `json:"invoice_ref_like"`
+	PackingLike        string      `json:"packing_like"`
+	SalesOrderLike     string      `json:"sales_order_like"`
+	CustomerCodeLike   string      `json:"customer_code_like"`
+	CustomerNameLike   string      `json:"customer_name_like"`
+	DocumentDate       *time.Time  `json:"document_date"`
+	CreateDate         *time.Time  `json:"create_date"`
+	LastSubmitDate     *time.Time  `json:"last_submit_date"`
+	InvoiceNotGrReturn *bool       `json:"invoice_not_gr_return"`
 }
 type ResultInvoice struct {
 	Total      int              `json:"total"`
@@ -56,7 +57,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
