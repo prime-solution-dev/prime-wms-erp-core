@@ -51,16 +51,17 @@ func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if err := gormx.Where("invoice_id = ?", invoice.ID).Find(&oldItems).Error; err != nil {
 			return nil, err
 		}
-		numberedItems, err := assignInvoiceItemNumbers(oldItems, invoice.InvoiceItem)
+		/* numberedItems, err := assignInvoiceItemNumbers(oldItems, invoice.InvoiceItem)
 		if err != nil {
 			return nil, err
 		}
-		req[i].InvoiceItem = numberedItems
+		req[i].InvoiceItem = numberedItems */
 		invoiceId = append(invoiceId, invoice.ID)
 		req[i].UpdateBy = userID
 		for o := range invoice.InvoiceItem {
 			invoiceItemID := uuid.New()
 			req[i].InvoiceItem[o].ID = invoiceItemID
+			req[i].InvoiceItem[o].InvoiceItem = uuid.New().String()
 			req[i].InvoiceItem[o].InvoiceID = invoice.ID
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
@@ -85,12 +86,12 @@ func UpdateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if rowsAffected > 0 {
 		return map[string]interface{}{
 			"status":  "success",
-			"message": "Approval updated successfully",
+			"message": "UpdateInvoice updated successfully",
 		}, nil
 	} else {
 		return map[string]interface{}{
 			"status":  "success",
-			"message": "Approval Not Have Rows Affected ",
+			"message": "UpdateInvoice Not Have Rows Affected ",
 		}, nil
 	}
 }
