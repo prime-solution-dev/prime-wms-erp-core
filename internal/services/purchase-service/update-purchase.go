@@ -142,6 +142,20 @@ func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
+func CancelPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CancelPO(req.PurchaseCodes); err != nil {
+		return nil, errors.New("failed to cancel PO: " + err.Error())
+	}
+
+	return nil, nil
+}
+
 func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseItemRequest{}
 
