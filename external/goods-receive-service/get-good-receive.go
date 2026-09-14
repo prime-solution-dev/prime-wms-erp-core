@@ -109,7 +109,7 @@ type GoodsReceiveItem struct {
 	ProductCode               string                      `json:"product_code"`
 	Qty                       float64                     `json:"qty"`
 	TotalWeight               float64                     `json:"total_weight"`
-	WeightUnit                string                      `json:"weight_unit"`
+	WeightUnit                float64                     `json:"weight_unit"`
 	ActualQty                 float64                     `json:"actual_qty"`
 	UnitCode                  string                      `json:"unit_code"`
 	BaseQty                   float64                     `json:"base_qty"`
@@ -177,7 +177,7 @@ type GoodsReceiveConfirm struct {
 	ContainerCode             string                      `json:"container_code"`
 	Qty                       float64                     `json:"qty"`
 	TotalWeight               float64                     `json:"total_weight"`
-	WeightUnit                string                      `json:"weight_unit"`
+	WeightUnit                float64                     `json:"weight_unit"`
 	UnitCode                  string                      `json:"unit_code"`
 	BaseQty                   float64                     `json:"base_qty"`
 	BaseUnitCode              string                      `json:"base_unit_code"`

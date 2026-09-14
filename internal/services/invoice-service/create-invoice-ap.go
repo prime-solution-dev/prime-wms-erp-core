@@ -12,16 +12,19 @@ import (
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	xService "prime-erp-core/internal/services/x-service"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type POData struct {
-	QTY    float64
-	Weight float64
-	POITEM string
+	QTY          float64
+	Weight       float64
+	POITEM       string
+	PurchaseUnit string
 }
 
 type ToleranceErrorItem struct {
@@ -42,6 +45,74 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
+
+	// ── Idempotency guard for AP-FAB (GRA) ──────────────────────────────
+	// FABRICATION Complete re-sends every already-COMPLETED output, so the
+	// production-core AP-FAB block builds a second GRA merging output lines
+	// that were already invoiced per-line at Confirm. Drop output lines that
+	// already have a live AP-FAB invoice (matched on document_ref|document_ref_item),
+	// and skip creation entirely if nothing new remains. Scoped to AP-FAB only —
+	// regular AP invoices keep their current behavior.
+	{
+		filtered := req[:0]
+		for _, invoice := range req {
+			if invoice.InvoiceType != "AP-FAB" {
+				filtered = append(filtered, invoice)
+				continue
+			}
+
+			docRefs := []string{}
+			docRefItems := []string{}
+			seenRef := map[string]bool{}
+			seenItem := map[string]bool{}
+			for _, item := range invoice.InvoiceItem {
+				if item.DocumentRef != "" && !seenRef[item.DocumentRef] {
+					seenRef[item.DocumentRef] = true
+					docRefs = append(docRefs, item.DocumentRef)
+				}
+				if item.DocumentRefItem != "" && !seenItem[item.DocumentRefItem] {
+					seenItem[item.DocumentRefItem] = true
+					docRefItems = append(docRefItems, item.DocumentRefItem)
+				}
+			}
+
+			existing := map[string]bool{}
+			if len(docRefs) > 0 && len(docRefItems) > 0 {
+				existingInvoices, errExisting := repositoryInvoice.GetInvoiceRelatedByPO(
+					invoice.CompanyCode, invoice.SiteCode, docRefs, docRefItems,
+					[]string{"AP-FAB"}, []string{"PENDING", "COMPLETED"})
+				if errExisting != nil {
+					return nil, errors.New("failed to check existing AP-FAB invoices: " + errExisting.Error())
+				}
+				for _, ex := range existingInvoices {
+					for _, exItem := range ex.InvoiceItem {
+						existing[exItem.DocumentRef+"|"+exItem.DocumentRefItem] = true
+					}
+				}
+			}
+
+			newItems := invoice.InvoiceItem[:0]
+			for _, item := range invoice.InvoiceItem {
+				if existing[item.DocumentRef+"|"+item.DocumentRefItem] {
+					continue
+				}
+				newItems = append(newItems, item)
+			}
+			invoice.InvoiceItem = newItems
+			if len(invoice.InvoiceItem) > 0 {
+				filtered = append(filtered, invoice)
+			}
+		}
+		req = filtered
+		if len(req) == 0 {
+			return map[string]interface{}{
+				"status":  "success",
+				"message": "AP-FAB invoice already exists for all output lines; skipped duplicate creation",
+				"skipped": true,
+			}, nil
+		}
+	}
+
 	poNumber := []string{}
 	companyCode := ""
 	siteCode := ""
@@ -79,6 +150,64 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 
+	validateRequest := xService.ValidateAPOverPurchaseRequest{}
+	for _, invoice := range req {
+		for _, invoiceItem := range invoice.InvoiceItem {
+			key := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
+			validateUnit := ""
+			if poItem, ok := poMap[key]; ok {
+				switch strings.ToUpper(strings.TrimSpace(poItem.PurchaseUnit)) {
+				case "KG":
+					validateUnit = "WEIGHT"
+				default:
+					validateUnit = "UNIT"
+				}
+
+				validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
+					PurchaseCode: invoiceItem.DocumentRef,
+					PurchaseItem: invoiceItem.DocumentRefItem,
+					Qty:          invoiceItem.Qty,
+					TotalWeight:  invoiceItem.Weight,
+					ValidateUnit: validateUnit,
+				})
+			}
+
+		}
+	}
+	toleranceErrorResponse := ToleranceErrorResponse{}
+	if len(validateRequest.Datas) > 0 {
+
+		validatePayload, err := json.Marshal(validateRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
+		}
+		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
+		if err != nil {
+			return nil, err
+		}
+		validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
+		if !ok {
+			return nil, errors.New("invalid AP over-purchase validation response")
+		}
+
+		for _, validation := range validateResponse.Datas {
+			if validation.Status == "ERROR" {
+				errorType := strings.ToLower(validation.ValidateUnit)
+				if validation.ValidateUnit == "UNIT" {
+					errorType = "qty"
+				}
+				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					Index:   validation.Index,
+					Message: validation.Message,
+					Status:  "error",
+					Type:    errorType,
+				})
+			}
+		}
+		/* if len(toleranceErrorResponse.ToleranceError) > 0 {
+			return toleranceErrorResponse, nil
+		} */
+	}
 	topicCodes := []string{"INVOICE"}
 	configCodes := []string{"AP"}
 
@@ -96,7 +225,6 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		tolerance = floatVal
 	}
-	toleranceErrorResponse := ToleranceErrorResponse{}
 
 	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
 	if errGetSupplierByCode != nil {
@@ -172,38 +300,29 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				req[i].InvoiceItem[it].Avg_weightUnit = poQTYMapResult.WeightUnit
 				req[i].InvoiceItem[it].TotalDiscount = poQTYMapResult.TotalDiscount
 				req[i].InvoiceItem[it].TotalDiscount_percent = poQTYMapResult.TotalDiscountPercent
-				xxx := 0.0
-				if poQTYMapResult.UnitUom == "KG" {
-					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
+				totalBeforeDiscount := 0.0
+				priceUnit, err := calculateAPPriceUnit(
+					poQTYMapResult.UnitUom, req[i].InvoiceItem[it].UnitUom,
+					poQTYMapResult.PriceUnit, invoiceItem.Qty, invoiceItem.Weight,
+				)
+				req[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+				if strings.EqualFold(strings.TrimSpace(poQTYMapResult.UnitUom), "KG") {
+					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Weight
 				} else {
-					xxx = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
+					totalBeforeDiscount = poQTYMapResult.PriceUnit * req[i].InvoiceItem[it].Qty
 				}
-				req[i].InvoiceItem[it].SubtotalExclVat = xxx - req[i].InvoiceItem[it].TotalDiscount
+				req[i].InvoiceItem[it].TotalDiscount = calculateAPDiscount(totalBeforeDiscount,
+					req[i].InvoiceItem[it].TotalDiscount_percent, poQTYMapResult.TotalDiscount)
+				req[i].InvoiceItem[it].SubtotalExclVat = totalBeforeDiscount - req[i].InvoiceItem[it].TotalDiscount
+
 				req[i].InvoiceItem[it].TotalVat = req[i].InvoiceItem[it].SubtotalExclVat * 0.07
 				req[i].InvoiceItem[it].TotalAmount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalVat
 
 				totalAmount += req[i].InvoiceItem[it].TotalAmount //total cost
 
-				totalBeforeDiscount := 0.0
-				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
-					totalBeforeDiscount = req[i].InvoiceItem[it].SubtotalExclVat + req[i].InvoiceItem[it].TotalDiscount //TotalAmount
-				} else {
-					totalBeforeDiscount = req[i].InvoiceItem[it].SubtotalExclVat / (1 - (req[i].InvoiceItem[it].TotalDiscount_percent)) // TotalAmount
+				if err != nil {
+					return nil, fmt.Errorf("PO %s item %s: %w", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem, err)
 				}
-
-				if req[i].InvoiceItem[it].UnitUom == "KG" {
-					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Weight
-				} else {
-					req[i].InvoiceItem[it].PriceUnit = totalBeforeDiscount / req[i].InvoiceItem[it].Qty
-				}
-
-				totalDiscount := 0.0
-				if req[i].InvoiceItem[it].TotalDiscount_percent > 0 {
-					totalDiscount = totalBeforeDiscount * req[i].InvoiceItem[it].TotalDiscount_percent
-				} else {
-					totalDiscount = req[i].InvoiceItem[it].TotalDiscount
-				}
-				req[i].InvoiceItem[it].TotalDiscount = totalDiscount
 
 				//movingAvgCost ใช้ เฉพาะ fab
 				if req[i].InvoiceType == "AP-FAB" {
@@ -221,22 +340,22 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				poQTY := poQTYMapResult.Qty + (poQTYMapResult.Qty * tolerance / 100)
 				if invoiceItem.Qty > poQTY {
 
-					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 						Index:   it,
 						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
 						Status:  "error",
 						Type:    "qty",
-					})
+					}) */
 
 				}
 				if invoiceItem.Weight > 0 {
 					if invoiceItem.Weight > poQTYMapResult.TotalWeight {
-						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+						/* 	toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
 							Index:   it,
 							Message: "เกินน้ำหนักสูงสุด : " + strconv.FormatFloat(poQTYMapResult.TotalWeight, 'f', -1, 64),
 							Status:  "error",
 							Type:    "weight",
-						})
+						}) */
 					}
 				}
 			} /*  else {

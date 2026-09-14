@@ -3,12 +3,15 @@ package invoiceService
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	externalService "prime-erp-core/external/customer-service"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,27 +19,28 @@ import (
 )
 
 type GetInvoiceRequest struct {
-	ID                []uuid.UUID `json:"id"`
-	InvoiceCode       []string    `json:"invoice_code"`
-	InvoiceRef        []string    `json:"invoice_ref"`
-	InvoiceType       []string    `json:"invoice_type"`
-	CustomerCode      []string    `json:"customer_code"`
-	Status            []string    `json:"status"`
-	DocRef            []string    `json:"document_ref"`
-	InvoiceItemDocRef []string    `json:"invoice_item_document_ref"`
-	CompanyCode       string      `json:"company_code"`
-	SiteCode          string      `json:"site_code"`
-	Page              int         `json:"page"`
-	PageSize          int         `json:"page_size"`
-	InvoiceCodeLike   string      `json:"invoice_code_like"`
-	InvoiceRefLike    string      `json:"invoice_ref_like"`
-	PackingLike       string      `json:"packing_like"`
-	SalesOrderLike    string      `json:"sales_order_like"`
-	CustomerCodeLike  string      `json:"customer_code_like"`
-	CustomerNameLike  string      `json:"customer_name_like"`
-	DocumentDate      *time.Time  `json:"document_date"`
-	CreateDate        *time.Time  `json:"create_date"`
-	LastSubmitDate    *time.Time  `json:"last_submit_date"`
+	ID                 []uuid.UUID `json:"id"`
+	InvoiceCode        []string    `json:"invoice_code"`
+	InvoiceRef         []string    `json:"invoice_ref"`
+	InvoiceType        []string    `json:"invoice_type"`
+	CustomerCode       []string    `json:"customer_code"`
+	Status             []string    `json:"status"`
+	DocRef             []string    `json:"document_ref"`
+	InvoiceItemDocRef  []string    `json:"invoice_item_document_ref"`
+	CompanyCode        string      `json:"company_code"`
+	SiteCode           string      `json:"site_code"`
+	Page               int         `json:"page"`
+	PageSize           int         `json:"page_size"`
+	InvoiceCodeLike    string      `json:"invoice_code_like"`
+	InvoiceRefLike     string      `json:"invoice_ref_like"`
+	PackingLike        string      `json:"packing_like"`
+	SalesOrderLike     string      `json:"sales_order_like"`
+	CustomerCodeLike   string      `json:"customer_code_like"`
+	CustomerNameLike   string      `json:"customer_name_like"`
+	DocumentDate       *time.Time  `json:"document_date"`
+	CreateDate         *time.Time  `json:"create_date"`
+	LastSubmitDate     *time.Time  `json:"last_submit_date"`
+	InvoiceNotGrReturn *bool       `json:"invoice_not_gr_return"`
 }
 type ResultInvoice struct {
 	Total      int              `json:"total"`
@@ -54,11 +58,12 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}
 	supplierReq := models.GetSupplierListRequest{}
+	customerCode := []string{}
 	productCodes := []string{}
 	siteCode := []string{}
 	companyCode := []string{}
@@ -67,6 +72,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		siteCode = append(siteCode, invoiceValue.SiteCode)
 		companyCode = append(companyCode, invoiceValue.CompanyCode)
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
+		customerCode = append(customerCode, invoiceValue.PartyCode)
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
 		}
@@ -76,6 +82,21 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if err != nil {
 		return nil, errors.New("failed to get supplier list: " + err.Error())
 	}
+
+	getCustomerByNameRequest := externalService.GetCustomerRequest{
+		Customers: customerCode,
+	}
+
+	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	if err != nil {
+		fmt.Println("failed to fetch customers by name:", err)
+		return nil, errors.New("failed to fetch customers by name: " + err.Error())
+	}
+	mapCustomer := map[string]externalService.GetCustomerResponse{}
+	for _, customer := range customerByNameData.Customers {
+		mapCustomer[customer.CustomerCode] = customer
+	}
+
 	mapProduct := map[string]models.GetProductsDetailComponent{}
 	if len(productCodes) > 0 {
 		productReq := models.GetProductRequest{
@@ -127,13 +148,55 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"TRANS":   3,
 		"Deposit": 4,
 	}
+
 	for i := range invoice {
 		if supplier, ok := mapSupplier[invoice[i].PartyCode]; ok {
 			invoice[i].PartyName = supplier.SupplierName
 		}
-		sort.Slice(invoice[i].InvoiceItem, func(o, j int) bool {
-			return order[invoice[i].InvoiceItem[o].InvoiceType] < order[invoice[i].InvoiceItem[j].InvoiceType]
+		if customerValue, ok := mapCustomer[invoice[i].PartyCode]; ok {
+			invoice[i].PartyName = customerValue.CustomerName
+		}
+
+		sort.SliceStable(invoice[i].InvoiceItem, func(o, j int) bool {
+			left := invoice[i].InvoiceItem[o]
+			right := invoice[i].InvoiceItem[j]
+
+			// 1. เรียงตาม InvoiceType ก่อน
+			typeOrderO, okO := order[left.InvoiceType]
+			typeOrderJ, okJ := order[right.InvoiceType]
+
+			// ถ้าเป็น Type ที่ไม่มีใน map ให้ไปอยู่ท้าย
+			if !okO {
+				typeOrderO = 999
+			}
+			if !okJ {
+				typeOrderJ = 999
+			}
+
+			if typeOrderO != typeOrderJ {
+				return typeOrderO < typeOrderJ
+			}
+
+			// 2. ถ้า InvoiceType เดียวกัน
+			// ให้เรียงตาม invoice_item
+			itemO, errO := strconv.Atoi(left.InvoiceItem)
+			itemJ, errJ := strconv.Atoi(right.InvoiceItem)
+
+			if errO != nil && errJ != nil {
+				return false
+			}
+
+			if errO != nil {
+				return false
+			}
+
+			if errJ != nil {
+				return true
+			}
+
+			return itemO < itemJ
 		})
+
 		for j := range invoice[i].InvoiceItem {
 			if productDetail, ok := mapProduct[invoice[i].InvoiceItem[j].ProductCode]; ok {
 				invoice[i].InvoiceItem[j].ProductName = productDetail.ProductName

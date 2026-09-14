@@ -31,7 +31,7 @@ type GetCreditReq struct {
 	ConsumedCreditLike      float64     `json:"consumed_credit_like"`
 	BalanceCreditLimitLike  float64     `json:"balance_credit_limit_like"`
 	CustomerStatus          *bool       `json:"customer_status"`
-	PendingApprove          string      `json:"pending_approve"`
+	PendingApprove          *bool       `json:"pending_approve"`
 	CompletedDateStart      *time.Time  `json:"completed_date_start"`
 	CompletedDateEnd        *time.Time  `json:"completed_date_end"`
 	CreateDateStart         *time.Time  `json:"create_date_start"`
@@ -68,7 +68,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	}
 	if req.CustomerStatus != nil {
 		requestData := map[string]interface{}{
-			"active_flg": req.CustomerStatus,
+			"active_flg": []bool{*req.CustomerStatus},
 		}
 
 		customers, err := customerService.GetCustomers(requestData)

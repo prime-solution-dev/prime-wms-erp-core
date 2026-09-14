@@ -131,11 +131,12 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 		}
 
-		// ตั้งค่า validation flags เป็นค่าเริ่มต้น (หน้าบ้านได้ validate แล้ว)
-		tempSale.PassPriceList = "Y"
-		tempSale.PassPriceExpire = "Y"
-		tempSale.PassCreditLimit = "Y"
-		tempSale.PassAtpCheck = "Y"
+		// ผลตรวจมาจากหน้าบ้าน (ยิง ValidateSaleOrder ก่อน convert) ห้ามเขียนทับเป็น Y
+		// ไม่งั้นใบที่ราคาไม่ผ่านจะดูเหมือนผ่าน และจอรออนุมัติจะหาใบไม่เจอ
+		tempSale.PassPriceList = normalizePassFlag(tempSale.PassPriceList)
+		tempSale.PassPriceExpire = normalizePassFlag(tempSale.PassPriceExpire)
+		tempSale.PassCreditLimit = normalizePassFlag(tempSale.PassCreditLimit)
+		tempSale.PassAtpCheck = normalizePassFlag(tempSale.PassAtpCheck)
 
 		createSales = append(createSales, tempSale)
 

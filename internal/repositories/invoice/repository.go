@@ -13,7 +13,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time, invoiceNotGrReturn *bool) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -94,6 +94,9 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 		}
 		whereInClause := strings.Join(quotedStrings, ", ")
 		searchDocRef += fmt.Sprintf(` and invoice_item.document_ref IN (%s)`, whereInClause)
+	}
+	if invoiceNotGrReturn != nil && *invoiceNotGrReturn {
+		searchDocRef += " AND invoice.document_ref NOT LIKE 'RT%' "
 	}
 	if invoiceCodeLike != "" {
 		searchInvoiceCode += fmt.Sprintf(" and invoice.invoice_code ILIKE '%%%s%%' ", invoiceCodeLike)

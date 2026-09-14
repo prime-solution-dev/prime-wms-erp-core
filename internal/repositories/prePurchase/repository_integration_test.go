@@ -1,0 +1,347 @@
+//go:build integration
+
+package prePurchaseRepository
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/models"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	tc "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/gorm"
+)
+
+const (
+	testCompanyCode  = "C001"
+	testSiteCode     = "S001"
+	testDateSiteCode = "S002"
+)
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+	req := tc.ContainerRequest{
+		Image:        "postgres:16",
+		Env:          map[string]string{"POSTGRES_PASSWORD": "test", "POSTGRES_USER": "test", "POSTGRES_DB": "testdb"},
+		ExposedPorts: []string{"5432/tcp"},
+		WaitingFor:   wait.ForListeningPort("5432/tcp").WithStartupTimeout(60 * time.Second),
+	}
+
+	container, err := tc.GenericContainer(ctx, tc.GenericContainerRequest{ContainerRequest: req, Started: true})
+	if err != nil {
+		fmt.Printf("failed to start postgres container: %v\n", err)
+		os.Exit(1)
+	}
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		fmt.Printf("failed to get host: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	mapped, err := container.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		fmt.Printf("failed to get mapped port: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	os.Setenv("database_gorm_url_prime_erp", fmt.Sprintf(
+		"postgres://test:test@%s:%s/testdb?sslmode=disable", host, mapped.Port()))
+
+	if err := seed(); err != nil {
+		fmt.Printf("failed to seed: %v\n", err)
+		_ = container.Terminate(ctx)
+		os.Exit(1)
+	}
+
+	code := m.Run()
+
+	_ = container.Terminate(ctx)
+	os.Exit(code)
+}
+
+func seed() error {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	if err := gormx.AutoMigrate(&models.PrePurchase{}, &models.PrePurchaseItem{}); err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+	rows := []struct {
+		code          string
+		supplierCode  string
+		supplierName  string
+		hierarchyCode string
+		hierarchyType string
+	}{
+		{"PB202609-0012", "SUP-STEEL-01", "Siam Steel Co.", "PG01_1", "เหล็กแบนตัด"},
+		{"PB202609-0013", "SUP-STEEL-02", "Bangkok Steel Ltd.", "PG01_2", "เหล็กแบนพับ"},
+		{"PB202510-0099", "VENDOR-77", "Thai Plastic", "PG02_9", "ท่อพลาสติก"},
+	}
+
+	for _, row := range rows {
+		id := uuid.New()
+		prePurchase := models.PrePurchase{
+			ID:              id,
+			PrePurchaseCode: row.code,
+			CompanyCode:     testCompanyCode,
+			SiteCode:        testSiteCode,
+			SupplierCode:    row.supplierCode,
+			SupplierName:    row.supplierName,
+			Status:          "PENDING",
+			StatusApprove:   "COMPLETED",
+			CreateDtm:       now,
+			UpdateDtm:       now,
+			PrePurchaseItems: []models.PrePurchaseItem{{
+				ID:            uuid.New(),
+				PrePurchaseID: id,
+				PreItem:       row.code + "-001",
+				HierarchyCode: row.hierarchyCode,
+				HierarchyType: row.hierarchyType,
+				Status:        "PENDING",
+				CreateDtm:     now,
+				UpdateDtm:     now,
+			}},
+		}
+
+		if err := gormx.Create(&prePurchase).Error; err != nil {
+			return err
+		}
+	}
+
+	return seedCreateDateRows(gormx)
+}
+
+// แถวสำหรับทดสอบช่วง create date อยู่คนละ site เพื่อไม่ให้กระทบ test ชุดอื่น
+var createDateRows = []struct {
+	code      string
+	createDtm time.Time
+}{
+	{"PB-DATE-0902", time.Date(2025, 9, 2, 9, 0, 0, 0, time.UTC)},
+	{"PB-DATE-0903", time.Date(2025, 9, 3, 14, 0, 0, 0, time.UTC)},
+	{"PB-DATE-0904", time.Date(2025, 9, 4, 9, 0, 0, 0, time.UTC)},
+}
+
+func seedCreateDateRows(gormx *gorm.DB) error {
+	for _, row := range createDateRows {
+		prePurchase := models.PrePurchase{
+			ID:              uuid.New(),
+			PrePurchaseCode: row.code,
+			CompanyCode:     testCompanyCode,
+			SiteCode:        testDateSiteCode,
+			SupplierCode:    "SUP-01",
+			Status:          "PENDING",
+			StatusApprove:   "COMPLETED",
+			CreateDtm:       row.createDtm,
+			UpdateDtm:       row.createDtm,
+		}
+
+		if err := gormx.Create(&prePurchase).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func codesOf(list []models.PrePurchase) []string {
+	codes := []string{}
+	for _, prePurchase := range list {
+		codes = append(codes, prePurchase.PrePurchaseCode)
+	}
+	return codes
+}
+
+func baseRequest() models.GetPOBigLotListRequest {
+	return models.GetPOBigLotListRequest{
+		CompanyCode: testCompanyCode,
+		SiteCode:    testSiteCode,
+		Page:        1,
+		PageSize:    50,
+	}
+}
+
+func TestGetPOBigLotList_PrePurchaseCodeLike(t *testing.T) {
+	req := baseRequest()
+	req.PrePurchaseCodeLike = "202609"
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, total)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_PrePurchaseCodeLikeIsCaseInsensitive(t *testing.T) {
+	req := baseRequest()
+	req.PrePurchaseCodeLike = "pb202510"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202510-0099"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_PrePurchaseCodeLikeNoMatch(t *testing.T) {
+	req := baseRequest()
+	req.PrePurchaseCodeLike = "ไม่มีอยู่จริง"
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, total)
+	assert.Empty(t, list)
+}
+
+func TestGetPOBigLotList_SupplierCodeLike(t *testing.T) {
+	req := baseRequest()
+	req.SupplierCodeLike = "STEEL"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupCodeLike(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupCodeLike = "PG01"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+// ชื่อกลุ่มสินค้าเก็บใน hierarchy_type — คอลัมน์ Product group บนหน้าจอแสดงค่านี้
+// ผู้ใช้จึงค้นด้วยชื่อที่เห็น
+func TestGetPOBigLotList_ProductGroupNameLike(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "เหล็กแบน"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupNameLikeNarrowsToOne(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "ท่อพลาสติก"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202510-0099"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupNameLikeNoMatch(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "ไม่มีกลุ่มนี้"
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, total)
+	assert.Empty(t, list)
+}
+
+// code กับ name เป็นคนละคอลัมน์ ส่งพร้อมกันต้อง AND ไม่ใช่ทับกัน
+func TestGetPOBigLotList_ProductGroupNameAndCodeAreCombinedWithAnd(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupNameLike = "เหล็กแบน"
+	req.ProductGroupCodeLike = "PG01_2"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_LikeFiltersAreCombinedWithAnd(t *testing.T) {
+	req := baseRequest()
+	req.PrePurchaseCodeLike = "202609"
+	req.SupplierCodeLike = "STEEL-02"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0013"}, codesOf(list))
+}
+
+// regression: การค้นหาแบบเป๊ะที่หน้าอื่นใช้อยู่ต้องไม่เปลี่ยนพฤติกรรม
+func TestGetPOBigLotList_ExactCodesStillExact(t *testing.T) {
+	req := baseRequest()
+	req.PrePurchaseCodes = []string{"PB202609-0012"}
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0012"}, codesOf(list))
+
+	req.PrePurchaseCodes = []string{"202609"}
+	list, _, _, _, _, err = GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Empty(t, list)
+}
+
+// regression: ไม่ส่งเงื่อนไขค้นหา ต้องได้ทุกแถวของ site
+func TestGetPOBigLotList_NoFilterReturnsAll(t *testing.T) {
+	list, total, _, _, _, err := GetPOBigLotList(baseRequest())
+
+	assert.NoError(t, err)
+	assert.Equal(t, 3, total)
+	assert.Len(t, list, 3)
+}
+
+func TestGetPOBigLotList_SupplierNameLike(t *testing.T) {
+	req := baseRequest()
+	req.SupplierNameLike = "steel"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []string{"PB202609-0012", "PB202609-0013"}, codesOf(list))
+}
+
+func TestGetPOBigLotList_ProductGroupCodeLikePartial(t *testing.T) {
+	req := baseRequest()
+	req.ProductGroupCodeLike = "G01_2"
+
+	list, _, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"PB202609-0013"}, codesOf(list))
+}
+
+// ปลายช่วงต้องนับทั้งวัน แถวที่สร้างตอนบ่ายของวันสุดท้ายต้องไม่หลุด
+func TestGetPOBigLotList_CreateDateRangeIncludesLastDay(t *testing.T) {
+	start := time.Date(2025, 9, 2, 0, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 9, 3, 23, 59, 59, 0, time.UTC)
+
+	req := baseRequest()
+	req.SiteCode = testDateSiteCode
+	req.StartCreateDate = &start
+	req.EndCreateDate = &end
+
+	list, total, _, _, _, err := GetPOBigLotList(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, total)
+	assert.ElementsMatch(t, []string{"PB-DATE-0902", "PB-DATE-0903"}, codesOf(list))
+}

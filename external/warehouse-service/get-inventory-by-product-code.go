@@ -30,12 +30,15 @@ type InventoryByProductCodeKeyValue struct {
 
 // InventoryByProductCodeResponse represents the response structure from inventory service
 type InventoryByProductCodeResponse struct {
-	ID              string                           `json:"id"`
-	GroupCodeKeys   string                           `json:"group_code_keys"`
-	GroupValueKeys  string                           `json:"group_value_keys"`
-	ProductCode     string                           `json:"product_code"`
-	SupplierCode    string                           `json:"supplier_code"`
-	SupplierName    string                           `json:"supplier_name"`
+	ID             string `json:"id"`
+	GroupCodeKeys  string `json:"group_code_keys"`
+	GroupValueKeys string `json:"group_value_keys"`
+	ProductCode    string `json:"product_code"`
+	SupplierCode   string `json:"supplier_code"`
+	SupplierName   string `json:"supplier_name"`
+	// WeightSpec คือน้ำหนักของ base unit (flag_base = true) จาก product master
+	// มีค่าแม้สินค้าไม่มีสต็อก ต่างจาก InventoryWeight ที่จะว่างเมื่อไม่มีสต็อก
+	WeightSpec      float64                          `json:"weight_spec"`
 	InventoryWeight []models.InventoryWeightResponse `json:"inventory_weight"`
 }
 

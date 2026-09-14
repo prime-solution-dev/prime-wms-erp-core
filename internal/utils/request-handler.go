@@ -20,6 +20,15 @@ func ProcessRequest(c *gin.Context, serviceFunc func(*gin.Context, string) (inte
 	// เรียกใช้ service function ที่ส่งเข้ามา
 	response, err := serviceFunc(c, string(jsonData))
 	if err != nil {
+		// แยก "ผู้ใช้ส่งข้อมูลไม่ครบ" ออกจาก "ระบบพัง" ให้ตรงกับ
+		// ProcessRequestWithBinding ไม่งั้น validation error จะกลายเป็น 500
+		if bindingErr, ok := err.(*BindingError); ok {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Validation failed",
+				"details": bindingErr.Message,
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

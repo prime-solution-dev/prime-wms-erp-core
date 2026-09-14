@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"prime-erp-core/internal/models"
 	"regexp"
 	"sort"
@@ -334,6 +335,13 @@ func getEffectiveValueMappings(root *PriceTableConfiguration, pattern *PatternCo
 	if pattern != nil && pattern.ValueMappings != nil {
 		return pattern.ValueMappings
 	}
+	// ผู้เรียกทั้งสามจุดเช็ค nil ก่อนใช้ผลลัพธ์อยู่แล้ว (ส่งต่อให้
+	// getGroupCodeByMapping / getSpecialMapping ซึ่งคืน fallback เมื่อรับ nil
+	// หรือเช็ค vm != nil เอง) จึงคืน nil ตาม contract ที่ doc comment ด้านบน
+	// ประกาศไว้ แทนที่จะ deref root จน panic
+	if root == nil {
+		return nil
+	}
 	return root.ValueMappings
 }
 
@@ -516,33 +524,163 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 	return ""
 }
 
-// getAvgProductFromInventory extracts AvgProduct from the first InventoryWeight entry
-// Returns 0.0 if inventory data is not available
-func getAvgProductFromInventory(sg models.PriceListSubGroupResponse) string {
-	if len(sg.InventoryWeight) > 0 {
-		return fmt.Sprintf("%.2f", sg.InventoryWeight[0].AvgWeight)
+// getAvgKgStockFromInventory คืนค่าคอลัมน์ "Avg. kg stock"
+//
+// perBatch = false คือค่าเริ่มต้น ใช้ AvgProduct ซึ่งเป็นค่าเฉลี่ยระดับ site
+// (น้ำหนักรวมของ product ใน site นั้น หารจำนวนชิ้นรวม) ตรงตามนิยามทางธุรกิจ
+//
+// perBatch = true ใช้ AvgWeight ซึ่งเป็นค่าเฉลี่ยระดับ batch สำหรับ pattern ที่
+// แสดงคอลัมน์ batch_no โดย 1 row = 1 batch ค่าระดับ site จะไม่สื่ออะไรใน row แบบนั้น
+//
+// คืน 0 (ไม่ใช่ string ว่าง) เมื่อไม่มีข้อมูลสต็อก เพื่อให้กริดแสดงเลข 0
+// และ format เป็นตัวเลขได้
+func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bool) float64 {
+	if len(sg.InventoryWeight) == 0 {
+		return 0
 	}
-	return ""
+	if perBatch {
+		return roundTo2(sg.InventoryWeight[0].AvgWeight)
+	}
+	return roundTo2(sg.InventoryWeight[0].AvgProduct)
 }
 
-// getWeightSpecFromInventory extracts WeightSpec from the first InventoryWeight entry
-// Returns 0.0 if inventory data is not available
-func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
-	if len(sg.InventoryWeight) > 0 {
-		return sg.InventoryWeight[0].TotalWeight
+// patternHasBatchColumn บอกว่า pattern นี้แสดงข้อมูลแยกต่อ batch หรือไม่
+//
+// ตัดสินจาก config ไม่ hardcode ชื่อ pattern เพราะ buildDynamicRows ถูกใช้
+// ทั้งโดย pattern ที่มีและไม่มี batch_no
+//
+// บาง pattern เปลี่ยนชื่อคอลัมน์ไปเป็น "โรงงาน" หรือ "Ship No." และบางตัวอ้าง
+// batch_no ผ่าน dataMapping จึงต้องตรวจทั้ง Field และ DataMapping
+//
+// ต้องตรวจ**ทุกช่องทาง**ที่ PatternConfig ประกาศคอลัมน์ได้ คือ Columns,
+// FixedColumns และ ColumnGroups[].Children ถ้าตกช่องใดไป pattern ที่ประกาศ
+// batch_no ที่นั่นจะถูกจัดเป็น non-batch เงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
+// (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
+func patternHasBatchColumn(pattern *PatternConfig) bool {
+	if pattern == nil {
+		return false
 	}
-	return 0.0
+	cols := [][]ColumnConfigItem{pattern.Columns, pattern.FixedColumns}
+	for _, g := range pattern.ColumnGroups {
+		cols = append(cols, g.Children)
+	}
+	for _, group := range cols {
+		for _, c := range group {
+			if c.Field == "batch_no" || c.DataMapping == "batch_no" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// collapseNonBatchSubGroups ยุบ subGroups ให้เหลือ record แรกของแต่ละ sg.ID
+// เมื่อ pattern ไม่มีคอลัมน์ batch_no
+//
+// warehouse-core รวม inventory ด้วยคีย์ company|site|product|batch จึงคืนหลาย
+// record ต่อ 1 subgroup ซึ่งฝั่ง build row จะ expand เป็นหลายแถว
+// pattern ที่ไม่แสดง batch_no ไม่มีคอลัมน์ไหนแยกแถวเหล่านั้นได้ (ค่า Avg. kg stock
+// ก็เป็นค่าระดับ site เท่ากันทุกแถวโดยการออกแบบ) ผู้ใช้จึงเห็นแถวซ้ำ
+//
+// เลือก record ตัวแรกให้ตรงกับฝั่ง export ที่ใช้ inventoryWeights[0]
+// และวน slice ตามลำดับเดิม (ห้ามวน map) เพื่อให้ผลลัพธ์ deterministic
+//
+// perBatch = true คืน slice เดิมทั้งก้อน เพราะ 1 row = 1 batch ตามที่ตั้งใจ
+//
+// caller ต้องรักษาลำดับ relative ของ record ที่มี sg.ID เดียวกันไว้ (ใช้ sort.SliceStable
+// เท่านั้น ห้าม sort.Slice) ไม่งั้น "record แรก" จะไม่ใช่ inventoryWeights[0] อีกต่อไป
+func collapseNonBatchSubGroups(subGroups []models.PriceListSubGroupResponse, perBatch bool) []models.PriceListSubGroupResponse {
+	if perBatch || len(subGroups) == 0 {
+		return subGroups
+	}
+	seen := make(map[string]bool, len(subGroups))
+	collapsed := make([]models.PriceListSubGroupResponse, 0, len(subGroups))
+	for _, sg := range subGroups {
+		if seen[sg.ID] {
+			continue
+		}
+		seen[sg.ID] = true
+		collapsed = append(collapsed, sg)
+	}
+	return collapsed
+}
+
+// getWeightSpecFromInventory คืนน้ำหนักของ base unit (flag_base = true) จาก product master
+// ซึ่งคือค่าที่คอลัมน์ "Weight-spec" ต้องแสดง
+//
+// ค่านี้อยู่ระดับ subgroup ไม่ใช่ใน InventoryWeight เพราะต้องมีค่าแม้สินค้าไม่มีสต็อก
+// คืน 0 เมื่อหาไม่เจอ เพื่อให้ผู้ใช้เห็นว่า master data ยังไม่ครบ
+// (ฝั่งสูตรคำนวณ fallback เป็น 1.0 เองผ่าน weightSpecForFormula)
+func getWeightSpecFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	return sg.WeightSpec
+}
+
+// getQtyFromInventory extracts the on-hand quantity (จำนวน / ลูก) from the first
+// InventoryWeight entry. Returns 0 when inventory data is unavailable so the grid
+// shows "0" rather than a blank cell.
+func getQtyFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	if len(sg.InventoryWeight) > 0 {
+		inv := sg.InventoryWeight[0]
+		if inv.SumQty != 0 {
+			return inv.SumQty
+		}
+		return inv.TotalQty
+	}
+	return 0
+}
+
+func roundTo2(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
+// udfNumeric reads a numeric udf_json value. The grid saves these fields through
+// both number and text cell editors, so the same key can be stored as a JSON
+// number or a JSON string. Numeric strings are parsed; a non-numeric string is
+// passed through unchanged so whatever the user typed still round-trips instead
+// of coming back blank. Returns nil only when the key is absent or empty.
+func udfNumeric(udfData map[string]interface{}, key string) interface{} {
+	raw, ok := udfData[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return nil
+		}
+		if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
+			return f
+		}
+		return v
+	}
+	return raw
 }
 
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueNameByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueNameByGroupCode)
 }
 
 func buildCompositeCodeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueCodeByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueCodeByGroupCode)
 }
 
-func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
+// compositeMappingValue ประกอบค่าเซลล์ของคอลัมน์ที่ dataMapping เป็น composite
+// (เช่น "PG04_x_PG03") โดยใช้กติกาเดียวกับ buildCompositeKeyBy คือข้ามค่าว่าง
+// ไม่งั้นชื่อที่ว่างโดยตั้งใจจะทำให้เหลือ separator " x " ห้อยท้าย
+func compositeMappingValue(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, dataMapping string) string {
+	separator := ""
+	if strings.Contains(dataMapping, "_x_") {
+		separator = " x "
+	}
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, separator, getValueNameByGroupCode)
+}
+
+func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, separator string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
 	parts := []string{}
 	for _, code := range groupCodes {
 		value := extractor(subGroupKeys, code)
@@ -550,7 +688,7 @@ func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, gro
 			parts = append(parts, value)
 		}
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, separator)
 }
 
 func sanitizeIdentifier(primary, fallback string) string {
@@ -744,10 +882,12 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 	uniqueValues := make(map[string]columnGroupValue)
 	for _, sg := range subGroups {
 		label := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-		if label == "" {
+		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+		// ข้ามเฉพาะตอนไม่มี key เลยจริง ๆ ถ้ามี code แต่ชื่อว่างต้องยังสร้างคอลัมน์
+		// โดย header แสดงว่าง ไม่งั้นคอลัมน์ราคาหายจากกริดแบบเงียบ ๆ
+		if label == "" && code == "" {
 			continue
 		}
-		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 		mapKey := fmt.Sprintf("%s|%s", label, code)
 		uniqueValues[mapKey] = columnGroupValue{
 			Label: label,
@@ -755,13 +895,16 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	// เทียบ label แบบ string จะได้ "1250x8'" < "4' x 8'" < "4'x1500" ซึ่งผิด
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	for _, key := range sortedKeys {
@@ -855,21 +998,29 @@ func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevel
 }
 
 // buildColumnGroupsRecursive recursively builds ColumnDef structures from hierarchy
+//
+// idx ใช้เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value — hierarchy key ถูกประกอบ
+// ด้วย composeHierarchyKey(code, label) จึง splitHierarchyKey แยก item_code
+// กลับมา lookup ได้ตรง ๆ
 func buildColumnGroupsRecursive(
 	hierarchy map[string]interface{},
 	pattern *PatternConfig,
 	levelIndex int,
 	labelPath []string,
 	codePath []string,
+	idx valueByCode,
 ) []ColumnDef {
 	columns := []ColumnDef{}
 
-	// Get sorted keys for current level
 	keys := make([]string, 0, len(hierarchy))
 	for key := range hierarchy {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		codeI, labelI := splitHierarchyKey(keys[i])
+		codeJ, labelJ := splitHierarchyKey(keys[j])
+		return idx.Less(codeI, labelI, codeJ, labelJ)
+	})
 
 	for _, encodedKey := range keys {
 		value := hierarchy[encodedKey]
@@ -924,7 +1075,7 @@ func buildColumnGroupsRecursive(
 					HeaderName:    label,
 					GroupID:       groupID,
 					OpenByDefault: boolPtr(true),
-					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath),
+					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath, idx),
 				}
 				columns = append(columns, columnGroup)
 			}
@@ -943,12 +1094,14 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 	hierarchy := buildHierarchyMap(subGroups, pattern.ColumnLevels)
 
 	// Build columns recursively
-	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{})
+	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{}, newValueByCode(subGroups))
 
 	return columns
 }
 
 func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -1007,20 +1160,18 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			}
 
 			// Fallback: if all group codes are missing, use subgroup ID
+			// เฉพาะ columnKey เท่านั้น — columnLabel ปล่อยว่างไว้ เพราะ col_<uuid>
+			// เป็นตัวระบุตัวตน ไม่ใช่ค่าที่เอาไปโชว์เป็นหัวคอลัมน์ได้
 			if columnKey == "" {
 				columnKey = fmt.Sprintf("col_%s", sg.ID)
-				if columnLabel == "" {
-					columnLabel = columnKey
-				}
 			}
 		} else {
 			columnLabel = buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
 			columnCode := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 			columnKey = sanitizeIdentifier(columnCode, columnLabel)
 		}
-		if columnLabel == "" {
-			columnLabel = columnKey
-		}
+		// columnLabel คือค่าที่ผู้ใช้เห็น ปล่อยให้ว่างได้เมื่อ item_name ว่างโดยตั้งใจ
+		// ห้าม fallback ไป columnKey ซึ่งเป็น code — columnKey ใช้ระบุตัวตนคอลัมน์เท่านั้น
 		// No longer skip if columnKey is empty - we now always have a fallback
 		if columnKey == "" {
 			columnKey = fmt.Sprintf("col_%s", sg.ID)
@@ -1063,7 +1214,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
-		var lineBundleValue *float64
+		var lineBundleValue interface{}
 		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
@@ -1101,12 +1252,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					inactiveValue = inactive
 					hasInactiveValue = true
 				}
-				if lb, ok := udfData["line_bundle"].(float64); ok {
-					lineBundleValue = &lb
-				} else if lb, ok := udfData["line_bundle"].(int); ok {
-					lbFloat := float64(lb)
-					lineBundleValue = &lbFloat
-				}
+				lineBundleValue = udfNumeric(udfData, "line_bundle")
 				if sq, ok := udfData["stock_quantity"]; ok {
 					stockQuantityValue = sq
 				}
@@ -1220,7 +1366,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 
 		row["is_highlight"] = isHighlightValue
 		row["total_weight"] = getWeightSpecFromInventory(sg)
-		row["avg_kg_stock"] = getAvgProductFromInventory(sg)
+		row["avg_kg_stock"] = getAvgKgStockFromInventory(sg, perBatch)
 
 		for _, colConfig := range pattern.Columns {
 			fieldName := fmt.Sprintf("%s_%s", columnKey, colConfig.Field)
@@ -1244,13 +1390,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[fieldName] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fieldName] = val1 + val2
-				}
+				row[fieldName] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
@@ -1319,12 +1459,16 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				row[fieldName] = stockValue
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[fieldName] = *lineBundleValue
+					row[fieldName] = lineBundleValue
 				} else {
 					row[fieldName] = nil
 				}
 			case "stock_quantity":
-				row[fieldName] = stockQuantityValue
+				if stockQuantityValue != nil {
+					row[fieldName] = stockQuantityValue
+				} else {
+					row[fieldName] = getQtyFromInventory(sg)
+				}
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
 					row[fieldName] = batchNoValue
@@ -1348,15 +1492,15 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			case "total_weight":
 				row[fieldName] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "":
 				// Empty dataMapping - set default values for calculated/empty fields
 				if colConfig.Field == "total_weight" {
 					row[fieldName] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
-					row[fieldName] = getAvgProductFromInventory(sg)
+					row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 				}
 			}
 		}
@@ -1426,6 +1570,8 @@ func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg mo
 }
 
 func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
+	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -1437,8 +1583,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		isHighlightValue := false
 		inactiveValue := false
 		hasInactiveValue := false
-		var lineBundleValue *float64
-		var marketWeightValue *float64
+		var lineBundleValue interface{}
+		var marketWeightValue interface{}
 		var odValue interface{}
 		var stockValue interface{}
 		var importDateValue interface{}
@@ -1485,18 +1631,8 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					inactiveValue = inactive
 					hasInactiveValue = true
 				}
-				if lb, ok := udfData["line_bundle"].(float64); ok {
-					lineBundleValue = &lb
-				} else if lb, ok := udfData["line_bundle"].(int); ok {
-					lbFloat := float64(lb)
-					lineBundleValue = &lbFloat
-				}
-				if mw, ok := udfData["market_weight"].(float64); ok {
-					marketWeightValue = &mw
-				} else if mw, ok := udfData["market_weight"].(int); ok {
-					mwFloat := float64(mw)
-					marketWeightValue = &mwFloat
-				}
+				lineBundleValue = udfNumeric(udfData, "line_bundle")
+				marketWeightValue = udfNumeric(udfData, "market_weight")
 				if od, ok := udfData["od"]; ok {
 					odValue = od
 				}
@@ -1619,13 +1755,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(fixedCol.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(fixedCol.DataMapping, "_x_") {
-					row[fixedCol.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fixedCol.Field] = val1 + val2
-				}
+				row[fixedCol.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, fixedCol.DataMapping)
 				continue
 			}
 
@@ -1643,13 +1773,13 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[fixedCol.Field] = sg.ExtraPriceWeight
 			case "market_weight":
 				if marketWeightValue != nil {
-					row[fixedCol.Field] = *marketWeightValue
+					row[fixedCol.Field] = marketWeightValue
 				} else {
 					row[fixedCol.Field] = nil
 				}
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[fixedCol.Field] = *lineBundleValue
+					row[fixedCol.Field] = lineBundleValue
 				} else {
 					row[fixedCol.Field] = nil
 				}
@@ -1674,7 +1804,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			case "total_weight":
 				row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fixedCol.Field] = getAvgProductFromInventory(sg)
+				row[fixedCol.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "import_date":
 				if importDateValue != nil {
 					row[fixedCol.Field] = importDateValue
@@ -1719,7 +1849,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if stockQuantityValue != nil {
 					row[fixedCol.Field] = stockQuantityValue
 				} else {
-					row[fixedCol.Field] = nil
+					row[fixedCol.Field] = getQtyFromInventory(sg)
 				}
 			case "batch_no":
 				if sg.BatchNo != "" {
@@ -1804,7 +1934,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				case "total_weight":
 					row[fixedCol.Field] = getWeightSpecFromInventory(sg)
 				case "avg_kg_stock":
-					row[fixedCol.Field] = getAvgProductFromInventory(sg)
+					row[fixedCol.Field] = getAvgKgStockFromInventory(sg, perBatch)
 				default:
 					// For other fields without dataMapping, try to infer from field name
 					if strings.HasPrefix(fixedCol.Field, "product_group_") {
@@ -1887,13 +2017,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[colConfig.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[colConfig.Field] = val1 + val2
-				}
+				row[colConfig.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
@@ -1910,7 +2034,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				row[colConfig.Field] = sg.PriceWeight
 			case "line_bundle":
 				if lineBundleValue != nil {
-					row[colConfig.Field] = *lineBundleValue
+					row[colConfig.Field] = lineBundleValue
 				} else {
 					row[colConfig.Field] = nil
 				}
@@ -1972,7 +2096,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if stockQuantityValue != nil {
 					row[colConfig.Field] = stockQuantityValue
 				} else {
-					row[colConfig.Field] = nil
+					row[colConfig.Field] = getQtyFromInventory(sg)
 				}
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
@@ -2061,9 +2185,9 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			case "total_weight":
 				row[colConfig.Field] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[colConfig.Field] = getAvgProductFromInventory(sg)
+				row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[colConfig.Field] = getAvgProductFromInventory(sg)
+				row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 			case "default_uom":
 				row[colConfig.Field] = sg.DefaultUom
 			case "":
@@ -2071,7 +2195,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				if colConfig.Field == "total_weight" {
 					row[colConfig.Field] = getWeightSpecFromInventory(sg)
 				} else if colConfig.Field == "avg_kg_stock" {
-					row[colConfig.Field] = getAvgProductFromInventory(sg)
+					row[colConfig.Field] = getAvgKgStockFromInventory(sg, perBatch)
 				} else {
 					// For other fields with empty dataMapping, set to empty string
 					row[colConfig.Field] = ""
@@ -2118,13 +2242,15 @@ func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	// Build column groups with children from pattern.Columns
@@ -2172,6 +2298,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		return nil
 	}
 
+	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
+
 	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
 	type pg2Entry struct {
 		Code  string
@@ -2187,12 +2316,14 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		}
 	}
 
+	idxPG2 := newValueByCode(subGroups)
 	pg2Entries := make([]pg2Entry, 0, len(pg2Map))
 	for code, label := range pg2Map {
 		pg2Entries = append(pg2Entries, pg2Entry{Code: code, Label: label})
 	}
 	sort.Slice(pg2Entries, func(i, j int) bool {
-		return pg2Entries[i].Label < pg2Entries[j].Label
+		a, b := pg2Entries[i], pg2Entries[j]
+		return idxPG2.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	rows := []AGGridRowData{}
@@ -2200,9 +2331,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	rowOrder := []string{}
 
 	for _, sg := range subGroups {
-		thickness := getValueNameByGroupCode(sg.SubGroupKeys, productGroup6Code)
-		length := getValueNameByGroupCode(sg.SubGroupKeys, productGroup7Code)
-		thicknessLength := strings.TrimSpace(fmt.Sprintf("%s x %s", thickness, length))
+		// ใช้กติกาเดียวกับคอลัมน์ composite อื่น ๆ คือข้ามค่าว่าง ไม่งั้นชื่อที่ว่าง
+		// โดยตั้งใจจะเหลือ "6 x" หรือ "x 6" ค้างไว้ (TrimSpace ตัดได้แค่ช่องว่าง)
+		thicknessLength := compositeMappingValue(sg.SubGroupKeys, []string{productGroup6Code, productGroup7Code}, "_x_")
 
 		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup5Code)
 		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup3Code)
@@ -2305,7 +2436,13 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 					row[fieldName] = false
 				}
 			case "remark":
-				row[fieldName] = remarkValue
+				// remark lives on the price_list_sub_group column; the udf copy only
+				// exists for rows saved before that was settled.
+				if sg.Remark != "" {
+					row[fieldName] = sg.Remark
+				} else {
+					row[fieldName] = remarkValue
+				}
 			case "price_weight":
 				row[fieldName] = sg.PriceWeight
 			case "before_total_net_price_weight":
@@ -2323,9 +2460,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 			case "total_weight":
 				row[fieldName] = getWeightSpecFromInventory(sg)
 			case "avg_weight":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "avg_kg_stock":
-				row[fieldName] = getAvgProductFromInventory(sg)
+				row[fieldName] = getAvgKgStockFromInventory(sg, perBatch)
 			case "batch_no":
 				if batchNoValue != nil && fmt.Sprintf("%v", batchNoValue) != "" {
 					row[fieldName] = batchNoValue
@@ -2787,5 +2924,8 @@ func GetDefaultHandlers() map[string]PriceTableHandler {
 		"GROUP_1_ITEM_21": func(data []models.GetPriceListResponse, _ string) (PriceListDetailApiResponse, error) {
 			return BuildGroup1Item1Response(data)
 		},
+		// ม้วนลาย is the second tab of the coil page, not a page of its own - the
+		// Base Price list still links to it directly, so it renders the same table.
+		"GROUP_1_ITEM_22": BuildGroup1Item7Response,
 	}
 }

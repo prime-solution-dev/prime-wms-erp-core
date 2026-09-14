@@ -45,56 +45,59 @@ func (GetQuotationResponse) TableName() string { return "quotation" }
 func (GetQuotationItemResponse) TableName() string { return "quotation_item" }
 
 type GetQuotationResponse struct {
-	ID                          uuid.UUID                  `gorm:"type:uuid;primary_key" json:"id"`
-	QuotationCode               string                     `gorm:"type:varchar(50)" json:"quotation_code"`
-	CompanyCode                 string                     `gorm:"type:varchar(50)" json:"company_code"`
-	SiteCode                    string                     `gorm:"type:varchar(50)" json:"site_code"`
-	CustomerCode                string                     `gorm:"type:varchar(50)" json:"customer_code"`
-	CustomerName                string                     `gorm:"type:varchar(255)" json:"customer_name"`
-	DeliveryDate                *time.Time                 `gorm:"type:date" json:"delivery_date"`
-	SoldToCode                  string                     `gorm:"type:varchar(50)" json:"sold_to_code"`
-	SoldToAddress               string                     `gorm:"type:varchar(255)" json:"sold_to_address"`
-	BillToCode                  string                     `gorm:"type:varchar(50)" json:"bill_to_code"`
-	BillToAddress               string                     `gorm:"type:varchar(255)" json:"bill_to_address"`
-	ShipToCode                  string                     `gorm:"type:varchar(50)" json:"ship_to_code"`
-	ShipToType                  string                     `gorm:"type:varchar(50)" json:"ship_to_type"`
-	ShipToAddress               string                     `gorm:"type:varchar(255)" json:"ship_to_address"`
-	DeliveryMethod              string                     `gorm:"type:varchar(50)" json:"delivery_method"`
-	TransportCostType           string                     `gorm:"type:varchar(50)" json:"transport_cost_type"`
-	TotalTransportCost          float64                    `gorm:"type:numeric" json:"total_transport_cost"`
-	PassPrice                   bool                       `gorm:"type:boolean" json:"pass_price"`
-	TotalAmount                 float64                    `gorm:"type:numeric" json:"total_amount"` //TotalPrice
-	TotalWeight                 float64                    `gorm:"type:numeric" json:"total_weight"`
-	SubtotalExclTransport       float64                    `gorm:"type:numeric" json:"subtotal_excl_transport"`        //TotalNetPrice
-	SubtotalWeightExclTransport float64                    `gorm:"type:numeric" json:"subtotal_weight_excl_transport"` //TotalNetPriceWeight
-	PaymentMethod               string                     `gorm:"type:varchar(50)" json:"payment_method"`
-	PeymentTermCode             string                     `gorm:"type:varchar(50)" json:"peyment_term_code"`
-	SalePersonCode              string                     `gorm:"type:varchar(50)" json:"sale_person_code"`
-	EffectiveDatePrice          *time.Time                 `gorm:"type:date" json:"effective_date_price"`
-	ExpirePriceDay              int                        `gorm:"type:int" json:"expire_price_day"`
-	ExpirePriceDate             *time.Time                 `gorm:"type:date" json:"expire_price_date"`
-	PassPriceList               string                     `gorm:"type:varchar(50)" json:"pass_price_list"`
-	PassAtpCheck                string                     `gorm:"type:varchar(50)" json:"pass_atp_check"`
-	PassCreditLimit             string                     `gorm:"type:varchar(50)" json:"pass_credit_limit"`
-	PassPriceExpire             string                     `gorm:"type:varchar(50)" json:"pass_price_expire"`
-	Status                      string                     `gorm:"type:varchar(50)" json:"status"`
-	Remark                      string                     `gorm:"type:varchar(255)" json:"remark"`
-	IsApproved                  bool                       `gorm:"type:boolean" json:"is_approved"`
-	StatusApprove               string                     `gorm:"type:varchar(50)" json:"status_approve"`
-	TotalVat                    float64                    `gorm:"type:numeric" json:"total_vat"`
-	TotalDiscount               float64                    `gorm:"type:numeric" json:"total_discount"`
-	SubtotalExclVat             float64                    `gorm:"type:numeric" json:"subtotal_excl_vat"`
-	TotalTransportCostVat       float64                    `gorm:"type:numeric" json:"total_transport_cost_vat"`
-	RemarkApproval              string                     `gorm:"type:varchar(255)" json:"remark_approval"`
-	Revision                    float64                    `gorm:"type:numeric" json:"revision"`
-	QuotationCodeRef            string                     `gorm:"type:varchar(50)" json:"quotation_code_ref"`
-	CreditTerm                  string                     `gorm:"type:varchar(50)" json:"credit_term"`
-	PayerTerm                   string                     `gorm:"type:varchar(50)" json:"payer_term"`
-	CreateDate                  *time.Time                 `gorm:"type:date" json:"create_date"`
-	CreateBy                    string                     `gorm:"type:varchar(50)" json:"create_by"`
-	UpdateDate                  *time.Time                 `gorm:"type:date" json:"update_date"`
-	UpdateBy                    string                     `gorm:"type:varchar(50)" json:"update_by"`
-	Items                       []GetQuotationItemResponse `gorm:"foreignKey:QuotationID" json:"items"`
+	ID                          uuid.UUID  `gorm:"type:uuid;primary_key" json:"id"`
+	QuotationCode               string     `gorm:"type:varchar(50)" json:"quotation_code"`
+	CompanyCode                 string     `gorm:"type:varchar(50)" json:"company_code"`
+	SiteCode                    string     `gorm:"type:varchar(50)" json:"site_code"`
+	CustomerCode                string     `gorm:"type:varchar(50)" json:"customer_code"`
+	CustomerName                string     `gorm:"type:varchar(255)" json:"customer_name"`
+	DeliveryDate                *time.Time `gorm:"type:date" json:"delivery_date"`
+	SoldToCode                  string     `gorm:"type:varchar(50)" json:"sold_to_code"`
+	SoldToAddress               string     `gorm:"type:varchar(255)" json:"sold_to_address"`
+	BillToCode                  string     `gorm:"type:varchar(50)" json:"bill_to_code"`
+	BillToAddress               string     `gorm:"type:varchar(255)" json:"bill_to_address"`
+	ShipToCode                  string     `gorm:"type:varchar(50)" json:"ship_to_code"`
+	ShipToType                  string     `gorm:"type:varchar(50)" json:"ship_to_type"`
+	ShipToAddress               string     `gorm:"type:varchar(255)" json:"ship_to_address"`
+	DeliveryMethod              string     `gorm:"type:varchar(50)" json:"delivery_method"`
+	TransportCostType           string     `gorm:"type:varchar(50)" json:"transport_cost_type"`
+	TotalTransportCost          float64    `gorm:"type:numeric" json:"total_transport_cost"`
+	PassPrice                   bool       `gorm:"type:boolean" json:"pass_price"`
+	TotalAmount                 float64    `gorm:"type:numeric" json:"total_amount"` //TotalPrice
+	TotalWeight                 float64    `gorm:"type:numeric" json:"total_weight"`
+	SubtotalExclTransport       float64    `gorm:"type:numeric" json:"subtotal_excl_transport"`        //TotalNetPrice
+	SubtotalWeightExclTransport float64    `gorm:"type:numeric" json:"subtotal_weight_excl_transport"` //TotalNetPriceWeight
+	PaymentMethod               string     `gorm:"type:varchar(50)" json:"payment_method"`
+	PeymentTermCode             string     `gorm:"type:varchar(50)" json:"peyment_term_code"`
+	SalePersonCode              string     `gorm:"type:varchar(50)" json:"sale_person_code"`
+	EffectiveDatePrice          *time.Time `gorm:"type:date" json:"effective_date_price"`
+	ExpirePriceDay              int        `gorm:"type:int" json:"expire_price_day"`
+	ExpirePriceDate             *time.Time `gorm:"type:date" json:"expire_price_date"`
+	PassPriceList               string     `gorm:"type:varchar(50)" json:"pass_price_list"`
+	PassAtpCheck                string     `gorm:"type:varchar(50)" json:"pass_atp_check"`
+	PassCreditLimit             string     `gorm:"type:varchar(50)" json:"pass_credit_limit"`
+	PassPriceExpire             string     `gorm:"type:varchar(50)" json:"pass_price_expire"`
+	Status                      string     `gorm:"type:varchar(50)" json:"status"`
+	Remark                      string     `gorm:"type:varchar(255)" json:"remark"`
+	IsApproved                  bool       `gorm:"type:boolean" json:"is_approved"`
+	StatusApprove               string     `gorm:"type:varchar(50)" json:"status_approve"`
+	TotalVat                    float64    `gorm:"type:numeric" json:"total_vat"`
+	TotalDiscount               float64    `gorm:"type:numeric" json:"total_discount"`
+	SubtotalExclVat             float64    `gorm:"type:numeric" json:"subtotal_excl_vat"`
+	TotalTransportCostVat       float64    `gorm:"type:numeric" json:"total_transport_cost_vat"`
+	RemarkApproval              string     `gorm:"type:varchar(255)" json:"remark_approval"`
+	Revision                    float64    `gorm:"type:numeric" json:"revision"`
+	QuotationCodeRef            string     `gorm:"type:varchar(50)" json:"quotation_code_ref"`
+	CreditTerm                  string     `gorm:"type:varchar(50)" json:"credit_term"`
+	PayerTerm                   string     `gorm:"type:varchar(50)" json:"payer_term"`
+	CreateDate                  *time.Time `gorm:"type:date" json:"create_date"`
+	CreateBy                    string     `gorm:"type:varchar(50)" json:"create_by"`
+	UpdateDate                  *time.Time `gorm:"type:date" json:"update_date"`
+	UpdateBy                    string     `gorm:"type:varchar(50)" json:"update_by"`
+	// ApproveDate ไม่มีคอลัมน์นี้ในตาราง quotation จริง ๆ ต้องดึงจากตาราง approval แยกต่างหาก
+	// (document_type='QO', document_code=quotation_code, status='COMPLETED') แล้วเติมทีหลัง
+	ApproveDate *time.Time                 `gorm:"-" json:"approve_date"`
+	Items       []GetQuotationItemResponse `gorm:"foreignKey:QuotationID" json:"items"`
 }
 
 type GetQuotationItemResponse struct {
@@ -198,6 +201,40 @@ func buildStatusConditions(statusFilters []string) ([]string, []interface{}) {
 	}
 
 	return conditions, args
+}
+
+// quotationApprovalRow คือแถวดิบจากตาราง approval สำหรับ document_type='QO'
+type quotationApprovalRow struct {
+	DocumentCode string
+	Status       string
+	UpdateDate   time.Time
+}
+
+// buildQuotationApproveDateMap แปลงแถว approval ดิบ ให้เป็น map quotation_code -> วันที่อนุมัติ
+// นับเฉพาะแถวที่ status='COMPLETED' เท่านั้น ถ้า quotation เดียวกันมีหลายแถว (เช่นถูก REJECT
+// แล้ว COMPLETED ทีหลัง) ให้ใช้ update_date ล่าสุด
+func buildQuotationApproveDateMap(rows []quotationApprovalRow) map[string]time.Time {
+	result := make(map[string]time.Time)
+	for _, row := range rows {
+		if row.Status != "COMPLETED" {
+			continue
+		}
+		if existing, ok := result[row.DocumentCode]; !ok || row.UpdateDate.After(existing) {
+			result[row.DocumentCode] = row.UpdateDate
+		}
+	}
+	return result
+}
+
+// fillQuotationApproveDates เติม ApproveDate ให้ quotation แต่ละใบจาก approveDateMap
+// ใบที่ไม่มีใน map (ยังไม่อนุมัติ/ไม่พบ) จะปล่อย ApproveDate เป็น nil ตามเดิม
+func fillQuotationApproveDates(quotations []GetQuotationResponse, approveDateMap map[string]time.Time) {
+	for i := range quotations {
+		if d, ok := approveDateMap[quotations[i].QuotationCode]; ok {
+			approveDate := d
+			quotations[i].ApproveDate = &approveDate
+		}
+	}
 }
 
 // getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
@@ -433,6 +470,25 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		fmt.Println(err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 		return nil, err
+	}
+
+	// เติมวันที่อนุมัติ (ดึงจากตาราง approval เพราะ quotation ไม่มีคอลัมน์นี้) เป็น batch เดียว
+	// กัน N+1 query — ถ้าดึงไม่สำเร็จหรือไม่พบ ให้ปล่อย ApproveDate เป็น nil ไม่ทำให้ request ทั้งก้อนล้ม
+	if len(res) > 0 {
+		quotationCodes := make([]string, 0, len(res))
+		for _, q := range res {
+			quotationCodes = append(quotationCodes, q.QuotationCode)
+		}
+
+		var approvalRows []quotationApprovalRow
+		if err := gormx.Table("approval").
+			Select("document_code, status, update_date").
+			Where("document_type = ? AND document_code IN ?", "QO", quotationCodes).
+			Find(&approvalRows).Error; err != nil {
+			fmt.Println("failed to fetch quotation approve dates:", err)
+		} else {
+			fillQuotationApproveDates(res, buildQuotationApproveDateMap(approvalRows))
+		}
 	}
 
 	resultQuotation := ResultQuotationResponse{

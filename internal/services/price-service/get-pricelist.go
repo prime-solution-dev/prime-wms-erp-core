@@ -25,7 +25,14 @@ type GetPriceListGroupRequest struct {
 	EffectiveDateFrom *time.Time `json:"effective_date_from"`
 	EffectiveDateTo   *time.Time `json:"effective_date_to"`
 	SubGroupCodes     []string   `json:"sub_group_codes"` // TODO: อาจจะต้อง filter ละเอียดขึ้น หรือ แยกเส้น
+	// ReportType เลือกรูปแบบ tab ที่ GetPriceExportTable คืน
+	// ค่าว่าง = พฤติกรรมเดิม (Detail + Based price), "PRICELIST_DETAIL" = tab Template ตัวเดียว
+	ReportType string `json:"report_type"`
 }
+
+// ReportTypePricelistDetail คือค่า report_type ที่ทำให้ GetPriceExportTable
+// คืน tab "Template" ตัวเดียวตามรูปแบบ Pricelist Detail Report
+const ReportTypePricelistDetail = "PRICELIST_DETAIL"
 
 type GetPriceListGroupResponse struct {
 	PriceListGroup
@@ -75,36 +82,37 @@ type GroupKey struct {
 }
 
 type SubGroup struct {
-	ID                        uuid.UUID       `json:"id"`
-	SubGroupKey               string          `json:"subgroup_key"`
-	IsTrading                 bool            `json:"is_trading"`
-	PriceUnit                 float64         `json:"price_unit"`
-	ExtraPriceUnit            float64         `json:"extra_price_unit"`
-	TermPriceUnit             float64         `json:"term_price_unit"`
-	TotalNetPriceUnit         float64         `json:"total_net_price_unit"`
-	PriceWeight               float64         `json:"price_weight"`
-	ExtraPriceWeight          float64         `json:"extra_price_weight"`
-	TermPriceWeight           float64         `json:"term_price_weight"`
-	TotalNetPriceWeight       float64         `json:"total_net_price_weight"`
-	BeforePriceUnit           float64         `json:"before_price_unit"`
-	BeforeExtraPriceUnit      float64         `json:"before_extra_price_unit"`
-	BeforeTermPriceUnit       float64         `json:"before_term_price_unit"`
-	BeforeTotalNetPriceUnit   float64         `json:"before_total_net_price_unit"`
-	BeforePriceWeight         float64         `json:"before_price_weight"`
-	BeforeExtraPriceWeight    float64         `json:"before_extra_price_weight"`
-	BeforeTermPriceWeight     float64         `json:"before_term_price_weight"`
-	BeforeTotalNetPriceWeight float64         `json:"before_total_net_price_weight"`
-	EffectiveDate             time.Time       `json:"effective_date"`
-	UdfJson                   json.RawMessage `json:"udf_json"`
-	Remark                    string          `json:"remark"`
-	GroupKeys                 []GroupKey      `json:"group_keys"`
-	SubgroupCode              string          `json:"subgroup_code,omitempty"`
-	DefaultUom                string          `json:"default_uom,omitempty"`
+	ID                        uuid.UUID                        `json:"id"`
+	SubGroupKey               string                           `json:"subgroup_key"`
+	IsTrading                 bool                             `json:"is_trading"`
+	PriceUnit                 float64                          `json:"price_unit"`
+	ExtraPriceUnit            float64                          `json:"extra_price_unit"`
+	TermPriceUnit             float64                          `json:"term_price_unit"`
+	TotalNetPriceUnit         float64                          `json:"total_net_price_unit"`
+	PriceWeight               float64                          `json:"price_weight"`
+	ExtraPriceWeight          float64                          `json:"extra_price_weight"`
+	TermPriceWeight           float64                          `json:"term_price_weight"`
+	TotalNetPriceWeight       float64                          `json:"total_net_price_weight"`
+	BeforePriceUnit           float64                          `json:"before_price_unit"`
+	BeforeExtraPriceUnit      float64                          `json:"before_extra_price_unit"`
+	BeforeTermPriceUnit       float64                          `json:"before_term_price_unit"`
+	BeforeTotalNetPriceUnit   float64                          `json:"before_total_net_price_unit"`
+	BeforePriceWeight         float64                          `json:"before_price_weight"`
+	BeforeExtraPriceWeight    float64                          `json:"before_extra_price_weight"`
+	BeforeTermPriceWeight     float64                          `json:"before_term_price_weight"`
+	BeforeTotalNetPriceWeight float64                          `json:"before_total_net_price_weight"`
+	EffectiveDate             time.Time                        `json:"effective_date"`
+	UdfJson                   json.RawMessage                  `json:"udf_json"`
+	Remark                    string                           `json:"remark"`
+	GroupKeys                 []GroupKey                       `json:"group_keys"`
+	SubgroupCode              string                           `json:"subgroup_code,omitempty"`
+	DefaultUom                string                           `json:"default_uom,omitempty"`
 	InventoryWeight           []models.InventoryWeightResponse `json:"inventory_weight,omitempty"`
-	ProductCode               string          `json:"product_code,omitempty"`
-	SupplierCode              string          `json:"supplier_code,omitempty"`
-	SupplierName              string          `json:"supplier_name,omitempty"`
-	BatchNo                   string          `json:"batch_no,omitempty"`
+	ProductCode               string                           `json:"product_code,omitempty"`
+	WeightSpec                float64                          `json:"weight_spec"`
+	SupplierCode              string                           `json:"supplier_code,omitempty"`
+	SupplierName              string                           `json:"supplier_name,omitempty"`
+	BatchNo                   string                           `json:"batch_no,omitempty"`
 }
 
 func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -262,46 +270,11 @@ func getTerms(sqlx *sqlx.DB, res []GetPriceListGroupResponse) ([]GetPriceListGro
 	return res, nil
 }
 
-func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceListGroupResponse, error) {
-	res := []GetPriceListGroupResponse{}
-	cond := ``
-
-	if req.CompanyCode != "" {
-		cond += fmt.Sprintf(` and plg.company_code = '%s' `, req.CompanyCode)
-	}
-
-	if len(req.SiteCodes) > 0 {
-		cond += fmt.Sprintf(` and plg.site_code in ('%s') `, strings.Join(req.SiteCodes, `','`))
-	}
-
-	if req.EffectiveDateFrom != nil {
-		cond += fmt.Sprintf(` and plg.effective_date >= '%s' `, req.EffectiveDateFrom.Format(`2006-01-02`))
-	}
-
-	if req.EffectiveDateTo != nil {
-		cond += fmt.Sprintf(` and plg.effective_date <= '%s' `, req.EffectiveDateTo.Format(`2006-01-02`))
-	}
-
-	if len(req.GroupCodes) > 0 {
-		cond += fmt.Sprintf(` and plg.group_code in ('%s') `, strings.Join(req.GroupCodes, `','`))
-	}
-
-	if len(req.SubGroupCodes) > 0 {
-		cond += fmt.Sprintf(` and plsg.subgroup_key in ('%s') `, strings.Join(req.SubGroupCodes, `','`))
-		// cond += fmt.Sprintf(`
-		// 	and exists (
-		// 		select 0
-		// 		from price_list_group plgx
-		// 		left join price_list_sub_group plsgx on plgx.id = plsgx.price_list_group_id
-		// 		where 1=1
-		// 			and plgx.id = plg.id
-		// 			and plsgx.subgroup_key in ('%s')
-		// 	)
-		// `, strings.Join(req.SubGroupCodes, `','`))
-	}
-
-	// Query Group + SubGroup
-	query := fmt.Sprintf(`
+// buildGroupSubGroupQuery builds the price list group + sub group query.
+// Extracted so the ORDER BY (which keeps detail tables from reshuffling after
+// an update) is covered by a test.
+func buildGroupSubGroupQuery(cond string) string {
+	return fmt.Sprintf(`
 		SELECT 
 			plg.id as group_id,
 			plg.company_code,
@@ -341,7 +314,53 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 		FROM price_list_group plg
 		LEFT JOIN price_list_sub_group plsg ON plg.id = plsg.price_list_group_id
 		WHERE 1=1 %s
-	`, cond)
+		-- Without an explicit order Postgres may return rows in a different order
+		-- after any UPDATE, which reshuffles every price list detail table and makes
+		-- the group picked by GetPriceDetail non-deterministic.
+		ORDER BY plg.group_code, plg.id, plsg.subgroup_key, plsg.id
+`, cond)
+}
+
+func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceListGroupResponse, error) {
+	res := []GetPriceListGroupResponse{}
+	cond := ``
+
+	if req.CompanyCode != "" {
+		cond += fmt.Sprintf(` and plg.company_code = '%s' `, req.CompanyCode)
+	}
+
+	if len(req.SiteCodes) > 0 {
+		cond += fmt.Sprintf(` and plg.site_code in ('%s') `, strings.Join(req.SiteCodes, `','`))
+	}
+
+	if req.EffectiveDateFrom != nil {
+		cond += fmt.Sprintf(` and plg.effective_date >= '%s' `, req.EffectiveDateFrom.Format(`2006-01-02`))
+	}
+
+	if req.EffectiveDateTo != nil {
+		cond += fmt.Sprintf(` and plg.effective_date <= '%s' `, req.EffectiveDateTo.Format(`2006-01-02`))
+	}
+
+	if len(req.GroupCodes) > 0 {
+		cond += fmt.Sprintf(` and plg.group_code in ('%s') `, strings.Join(req.GroupCodes, `','`))
+	}
+
+	if len(req.SubGroupCodes) > 0 {
+		cond += fmt.Sprintf(` and plsg.subgroup_key in ('%s') `, strings.Join(req.SubGroupCodes, `','`))
+		// cond += fmt.Sprintf(`
+		// 	and exists (
+		// 		select 0
+		// 		from price_list_group plgx
+		// 		left join price_list_sub_group plsgx on plgx.id = plsgx.price_list_group_id
+		// 		where 1=1
+		// 			and plgx.id = plg.id
+		// 			and plsgx.subgroup_key in ('%s')
+		// 	)
+		// `, strings.Join(req.SubGroupCodes, `','`))
+	}
+
+	// Query Group + SubGroup
+	query := buildGroupSubGroupQuery(cond)
 	//println(query)
 	rows, err := db.ExecuteQuery(sqlx, query)
 	if err != nil {
@@ -349,6 +368,9 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 	}
 
 	groupMap := map[string]*PriceListGroup{}
+	// Map iteration order is random in Go; keep the query's order so the caller
+	// always sees the same group first.
+	groupOrder := []string{}
 
 	for _, row := range rows {
 		groupID := toString(row["group_id"])
@@ -371,6 +393,7 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 				group.EffectiveDate = *t
 			}
 			groupMap[groupID] = group
+			groupOrder = append(groupOrder, groupID)
 		}
 
 		// Append SubGroup
@@ -478,8 +501,8 @@ func getGroupSubGroup(sqlx *sqlx.DB, req GetPriceListGroupRequest) ([]GetPriceLi
 
 	// convert map to slice
 	res = []GetPriceListGroupResponse{}
-	for _, g := range groupMap {
-		res = append(res, GetPriceListGroupResponse{PriceListGroup: *g})
+	for _, groupID := range groupOrder {
+		res = append(res, GetPriceListGroupResponse{PriceListGroup: *groupMap[groupID]})
 	}
 
 	return res, nil
@@ -802,14 +825,17 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 				if len(sg.PriceListSubGroupKeys) > 0 {
 					for _, sgk := range sg.PriceListSubGroupKeys {
+						valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
 						subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
-							ID:         sgk.ID.String(),
-							SubGroupID: sgk.SubGroupID.String(),
-							GroupCode:  sgk.Code,
-							GroupName:  groupMap[sgk.Code].GroupName,
-							ValueCode:  sgk.Value,
-							ValueName:  groupItemMap[sgk.Value].ItemName,
-							Seq:        sgk.Seq,
+							ID:          sgk.ID.String(),
+							SubGroupID:  sgk.SubGroupID.String(),
+							GroupCode:   sgk.Code,
+							GroupName:   groupMap[sgk.Code].GroupName,
+							ValueCode:   sgk.Value,
+							ValueName:   groupItemMap[sgk.Value].ItemName,
+							Seq:         sgk.Seq,
+							ValueNumber: valueNumber,
+							HasValue:    hasValue,
 						})
 					}
 				}

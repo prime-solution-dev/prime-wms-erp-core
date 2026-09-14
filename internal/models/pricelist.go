@@ -25,6 +25,7 @@ type PriceListGroup struct {
 	CreateDtm            time.Time             `json:"create_dtm"`
 	UpdateBy             string                `json:"update_by"`
 	UpdateDtm            time.Time             `json:"update_dtm"`
+	Seq                  int                   `json:"seq"`
 	PriceListGroupTerms  []PriceListGroupTerm  `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_terms"`
 	PriceListGroupExtras []PriceListGroupExtra `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_extras"`
 	PriceListSubGroups   []PriceListSubGroup   `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_sub_groups"`
@@ -278,27 +279,38 @@ type PriceListSubGroupKeyResponse struct {
 	ValueCode  string `json:"value_code"`
 	ValueName  string `json:"value_name"`
 	Seq        int    `json:"seq"`
+
+	// ValueNumber คือ group_item.value ของ ValueCode แปลงเป็นตัวเลข ใช้เป็นลำดับ
+	// การแสดงผลของทุกแกนในหน้า Price List Detail
+	//
+	// Seq ด้านบนใช้แทนไม่ได้ — upload-pricelist.go:1476 กำหนด Seq = i + 1 ซึ่งเป็น
+	// ลำดับของ PG0x ในคีย์ (PG01 -> 1, PG05 -> 5) ไม่ใช่ลำดับของค่า
+	ValueNumber float64 `json:"value_number"`
+
+	// HasValue แยก "ValueNumber = 0 จริง" ออกจาก "resolve ค่าไม่ได้"
+	// ไม่ส่งออก JSON เพราะเป็นข้อมูลภายในสำหรับ comparator เท่านั้น
+	HasValue bool `json:"-"`
 }
 
 type InventoryWeightResponse struct {
-	Key               string  `json:"key"`
-	InventoryKeyCode  string  `json:"inventory_weightkey_code,omitempty"`
-	ProductCode       string  `json:"product_code"`
-	CompanyCode       string  `json:"company_code,omitempty"`
-	SiteCode          string  `json:"site_code,omitempty"`
-	BatchNo           string  `json:"batch_no"`
-	SerialCode        string  `json:"serial_code,omitempty"`
-	SupplierCode      string  `json:"supplier_code"`
-	SupplierName      string  `json:"supplier_name"`
-	AvgProduct        float64 `json:"avg_product,omitempty"`
-	AvgBatch          float64 `json:"avg_batch,omitempty"`
-	AvgSerial         float64 `json:"avg_serial,omitempty"`
-	AvgWeight         float64 `json:"avg_weight,omitempty"`
-	WeightSpec        float64 `json:"weight_spec,omitempty"`
-	SumQty            float64 `json:"sum_qty,omitempty"`
-	SumWeight         float64 `json:"sum_weight,omitempty"`
-	TotalQty          float64 `json:"total_qty,omitempty"`
-	TotalWeight       float64 `json:"total_weight,omitempty"`
+	Key              string  `json:"key"`
+	InventoryKeyCode string  `json:"inventory_weightkey_code,omitempty"`
+	ProductCode      string  `json:"product_code"`
+	CompanyCode      string  `json:"company_code,omitempty"`
+	SiteCode         string  `json:"site_code,omitempty"`
+	BatchNo          string  `json:"batch_no"`
+	SerialCode       string  `json:"serial_code,omitempty"`
+	SupplierCode     string  `json:"supplier_code"`
+	SupplierName     string  `json:"supplier_name"`
+	AvgProduct       float64 `json:"avg_product"`
+	AvgBatch         float64 `json:"avg_batch"`
+	AvgSerial        float64 `json:"avg_serial"`
+	AvgWeight        float64 `json:"avg_weight"`
+	WeightSpec       float64 `json:"weight_spec"`
+	SumQty           float64 `json:"sum_qty"`
+	SumWeight        float64 `json:"sum_weight"`
+	TotalQty         float64 `json:"total_qty"`
+	TotalWeight      float64 `json:"total_weight"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -334,8 +346,11 @@ type PriceListSubGroupResponse struct {
 	SupplierCode              string                         `json:"supplier_code,omitempty"`
 	SupplierName              string                         `json:"supplier_name,omitempty"`
 	ProductCode               string                         `json:"product_code,omitempty"`
-	BatchNo                   string                         `json:"batch_no,omitempty"`
-	DefaultUom                string                         `json:"default_uom,omitempty"`
+	// WeightSpec คือน้ำหนักของ base unit จาก product master — เก็บระดับ subgroup
+	// ไม่ใช่ใน InventoryWeight เพราะต้องมีค่าแม้ subgroup นั้นไม่มีสต็อก
+	WeightSpec float64 `json:"weight_spec"`
+	BatchNo    string  `json:"batch_no,omitempty"`
+	DefaultUom string  `json:"default_uom,omitempty"`
 }
 
 type GetPriceListResponse struct {
@@ -439,7 +454,7 @@ type UpdateLatestPriceListSubGroupRequest struct {
 	// - "group"   : update all subgroups under the given group_codes
 	UpdateType  string   `json:"update_type" binding:"omitempty,oneof=subgroup group"`
 	GroupCodes  []string `json:"group_codes" binding:"omitempty,dive"`
-	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid4"`
+	SubGroupIDs []string `json:"subgroup_ids" binding:"omitempty,dive,uuid"`
 }
 
 type UpdatePriceListGroupExtraKeyRequest struct {
@@ -499,6 +514,7 @@ type GetCalculatedPriceListSubGroupItem struct {
 	TotalNetPriceWeight       float64 `json:"total_net_price_weight"`
 	ExtraPriceUnit            float64 `json:"extra_price_unit"`
 	ExtraPriceWeight          float64 `json:"extra_price_weight"`
+	WeightSpec                float64 `json:"weight_spec"`
 	BeforeTotalNetPriceUnit   float64 `json:"before_total_net_price_unit"`
 	BeforeTotalNetPriceWeight float64 `json:"before_total_net_price_weight"`
 	DefaultUom                string  `json:"default_uom,omitempty"`

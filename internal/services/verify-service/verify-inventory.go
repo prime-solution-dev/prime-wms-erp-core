@@ -21,6 +21,7 @@ type VerifyInventoryRequest struct {
 type VerifyInventoryProduct struct {
 	ProductCode string  `json:"product_code"`
 	Qty         float64 `json:"qty"`
+	TotalWeight float64 `json:"total_weight"`
 }
 
 type VerifyInventoryResponse struct {
@@ -30,24 +31,32 @@ type VerifyInventoryResponse struct {
 }
 
 type VerifyInventoryProductAtp struct {
-	CompanyCode   string `json:"company_code"`
-	SiteCode      string `json:"site_code"`
-	ProductCode   string `json:"product_code"`
-	WarehouseCode string `json:"warehouse_code"`
-	TodayStockQty int    `json:"current_stock_qty"`
-	TodayAtpQty   int    `json:"current_atp_qty"`
-	TotalAtpQty   int    `json:"atp_qty"`
+	CompanyCode      string  `json:"company_code"`
+	SiteCode         string  `json:"site_code"`
+	ProductCode      string  `json:"product_code"`
+	WarehouseCode    string  `json:"warehouse_code"`
+	TodayStockQty    float64 `json:"current_stock_qty"`
+	TodayStockWeight float64 `json:"current_stock_weight"`
+	TodayAtpQty      float64 `json:"current_atp_qty"`
+	TodayAtpWeight   float64 `json:"current_atp_weight"`
+	TotalAtpQty      float64 `json:"atp_qty"`
+	TotalAtpWeight   float64 `json:"atp_weight"`
 }
 
 type VerifyInventoryCalculation struct {
-	Subject      string  `json:"subject"`
-	ProductCode  string  `json:"product_code"`
-	NeedQty      float64 `json:"need_qty"`
-	AvailableQty float64 `json:"available_qty"`
-	AllocatedQty float64 `json:"allocated_qty"`
-	RemainQty    float64 `json:"remain_qty"`
-	ShortageQty  float64 `json:"shortage_qty"`
-	IsPass       bool    `json:"is_pass"`
+	Subject         string  `json:"subject"`
+	ProductCode     string  `json:"product_code"`
+	NeedQty         float64 `json:"need_qty"`
+	NeedWeight      float64 `json:"need_weight"`
+	AvailableQty    float64 `json:"available_qty"`
+	AvailableWeight float64 `json:"available_weight"`
+	AllocatedQty    float64 `json:"allocated_qty"`
+	AllocatedWeight float64 `json:"allocated_weight"`
+	RemainQty       float64 `json:"remain_qty"`
+	RemainWeight    float64 `json:"remain_weight"`
+	ShortageQty     float64 `json:"shortage_qty"`
+	ShortageWeight  float64 `json:"shortage_weight"`
+	IsPass          bool    `json:"is_pass"`
 }
 
 func GetSystemConfigWarehouse() ([]string, error) {
@@ -88,10 +97,14 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 		return res, fmt.Errorf("require at least one product")
 	}
 
-	// ดึง warehouse codes จาก system config
-	warehouseCodes, err := GetSystemConfigWarehouse()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get warehouse config: %v", err)
+	warehouseCodes := req.WarehouseCodes
+	if len(warehouseCodes) == 0 {
+		// ถ้า request ไม่ระบุ warehouse ให้ใช้ค่า default จาก system config
+		var err error
+		warehouseCodes, err = GetSystemConfigWarehouse()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get warehouse config: %v", err)
+		}
 	}
 
 	productExists := map[string]bool{}
@@ -128,18 +141,23 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 	}
 
 	remainingATP := map[string]float64{}
+	remainingATPWeight := map[string]float64{}
 	for _, atp := range resAtp.ProductAtps {
 		atpKey := fmt.Sprintf(`%s|%s|%s`, atp.CompanyCode, atp.SiteCode, atp.ProductCode)
-		remainingATP[atpKey] += float64(atp.TotalAtpQty)
+		remainingATP[atpKey] += atp.TotalAtpQty
+		remainingATPWeight[atpKey] += atp.TotalAtpWeight
 
 		res.ProductAtps = append(res.ProductAtps, VerifyInventoryProductAtp{
-			CompanyCode:   atp.CompanyCode,
-			SiteCode:      atp.SiteCode,
-			ProductCode:   atp.ProductCode,
-			WarehouseCode: "",
-			TodayStockQty: int(atp.TodayStockQty),
-			TodayAtpQty:   int(atp.TodayAtpQty),
-			TotalAtpQty:   int(atp.TotalAtpQty),
+			CompanyCode:      atp.CompanyCode,
+			SiteCode:         atp.SiteCode,
+			ProductCode:      atp.ProductCode,
+			WarehouseCode:    "",
+			TodayStockQty:    atp.TodayStockQty,
+			TodayStockWeight: atp.TodayStockWeight,
+			TodayAtpQty:      atp.TodayAtpQty,
+			TodayAtpWeight:   atp.TodayAtpWeight,
+			TotalAtpQty:      atp.TotalAtpQty,
+			TotalAtpWeight:   atp.TotalAtpWeight,
 		})
 	}
 
@@ -149,21 +167,35 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 		if !existAtp {
 			available = 0
 		}
+		availableWeight := remainingATPWeight[atpKey]
 
 		allocated := minFloat(p.Qty, available)
 		remain := available - allocated
 		shortage := maxFloat(p.Qty-available, 0)
-		isPass := shortage == 0
+		allocatedWeight := 0.0
+		remainWeight := availableWeight
+		shortageWeight := 0.0
+		if p.TotalWeight > 0 {
+			allocatedWeight = minFloat(p.TotalWeight, availableWeight)
+			remainWeight = availableWeight - allocatedWeight
+			shortageWeight = maxFloat(p.TotalWeight-availableWeight, 0)
+		}
+		isPass := shortage == 0 && shortageWeight == 0
 
 		res.InventoryCalculations = append(res.InventoryCalculations, VerifyInventoryCalculation{
-			Subject:      "inventory",
-			ProductCode:  p.ProductCode,
-			NeedQty:      p.Qty,
-			AvailableQty: available,
-			AllocatedQty: allocated,
-			RemainQty:    remain,
-			ShortageQty:  shortage,
-			IsPass:       isPass,
+			Subject:         "inventory",
+			ProductCode:     p.ProductCode,
+			NeedQty:         p.Qty,
+			NeedWeight:      p.TotalWeight,
+			AvailableQty:    available,
+			AvailableWeight: availableWeight,
+			AllocatedQty:    allocated,
+			AllocatedWeight: allocatedWeight,
+			RemainQty:       remain,
+			RemainWeight:    remainWeight,
+			ShortageQty:     shortage,
+			ShortageWeight:  shortageWeight,
+			IsPass:          isPass,
 		})
 
 		if !isPass {
@@ -171,6 +203,7 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 		}
 
 		remainingATP[atpKey] = remain
+		remainingATPWeight[atpKey] = remainWeight
 	}
 
 	return res, nil

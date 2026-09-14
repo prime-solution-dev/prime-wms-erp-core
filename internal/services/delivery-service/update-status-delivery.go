@@ -11,6 +11,7 @@ import (
 	"prime-erp-core/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type UpdateStatusDeliveryRequest struct {
@@ -65,36 +66,26 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		deliveryOf[delivery.DeliveryCode] = delivery
 	}
 
-	// เดิมไม่เช็คสถานะเดิมเลย สั่งซ้ำกี่รอบก็ยิง WMS ซ้ำทุกรอบ
-	//
-	// ใบที่อยู่สถานะปลายทางอยู่แล้วให้ "ข้าม" ไม่ใช่ทำให้ทั้ง request พัง เพราะ endpoint นี้
-	// รับได้หลายใบต่อครั้งและ status ว่างจะ default เป็น COMPLETED ซึ่งเป็นรูปแบบของ callback
-	// ที่ยิงซ้ำได้ ใบเดียวที่ซ้ำจึงไม่ควรทำให้อีกเก้าใบไม่ถูกอัปเดต
-	toUpdate := []string{}
-	for _, deliveryCode := range req.DeliveryCodes {
-		delivery, found := deliveryOf[deliveryCode]
-		if !found {
-			return nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
-		}
+	toUpdate, alreadyAtStatus, err := partitionDeliveriesByStatus(req.DeliveryCodes, deliveryOf, req.Status)
+	if err != nil {
+		return nil, err
+	}
 
-		if delivery.Status == req.Status {
-			res = append(res, UpdateStatusDeliveryResponse{
-				DeliveryCode: deliveryCode,
-				Status:       "success",
-				Message:      fmt.Sprintf("Delivery is already %s", req.Status),
-			})
-			continue
-		}
-
-		// ยกเลิกไปแล้วย้อนกลับไม่ได้
-		if delivery.Status == "CANCELED" {
-			return nil, fmt.Errorf("delivery %s is already canceled", deliveryCode)
-		}
-
-		toUpdate = append(toUpdate, deliveryCode)
+	for _, deliveryCode := range alreadyAtStatus {
+		res = append(res, UpdateStatusDeliveryResponse{
+			DeliveryCode: deliveryCode,
+			Status:       "success",
+			Message:      fmt.Sprintf("Delivery is already %s", req.Status),
+		})
 	}
 
 	if len(toUpdate) == 0 {
+		// ไม่มีใบไหนต้องอัปเดต แต่ยังต้องลองปิด SO ของใบที่อยู่ COMPLETED อยู่แล้ว
+		// (hook ตัวที่สองของ outbound เดียวกันมาถึงตรงนี้ และเป็นรอบที่ข้อมูลครบ)
+		if req.Status == "COMPLETED" {
+			closeSalesOfDeliveries(gormx, deliveryOf, alreadyAtStatus, user)
+		}
+
 		return res, nil
 	}
 
@@ -183,7 +174,77 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		return nil, err
 	}
 
+	// ใบจองที่ปิดแล้ว แปลว่าของออกไปแล้ว ให้ไปดูว่า SO ต้นทางส่งครบหรือยัง
+	//
+	// นับทั้งใบที่รอบนี้เพิ่งพลิกและใบที่อยู่ COMPLETED มาก่อนแล้ว การปิดเป็น idempotent
+	// รันซ้ำได้และนั่นคือเจตนา (ดูเหตุผลที่ partitionDeliveriesByStatus)
+	if req.Status == "COMPLETED" {
+		completed := make([]string, 0, len(toUpdate)+len(alreadyAtStatus))
+		completed = append(completed, toUpdate...)
+		completed = append(completed, alreadyAtStatus...)
+
+		closeSalesOfDeliveries(gormx, deliveryOf, completed, user)
+	}
+
 	return res, nil
+}
+
+// partitionDeliveriesByStatus แยกใบที่ต้องอัปเดตจริง ออกจากใบที่อยู่สถานะปลายทางอยู่แล้ว
+//
+// เดิมไม่เช็คสถานะเดิมเลย สั่งซ้ำกี่รอบก็ยิง WMS ซ้ำทุกรอบ
+//
+// ใบที่อยู่สถานะปลายทางอยู่แล้วให้ "ข้าม" ไม่ใช่ทำให้ทั้ง request พัง เพราะ endpoint นี้
+// รับได้หลายใบต่อครั้งและ status ว่างจะ default เป็น COMPLETED ซึ่งเป็นรูปแบบของ callback
+// ที่ยิงซ้ำได้ ใบเดียวที่ซ้ำจึงไม่ควรทำให้อีกเก้าใบไม่ถูกอัปเดต
+//
+// คืน alreadyAtStatus แยกออกมาด้วย เพราะเส้นปิด SO ต้องนับใบพวกนี้ด้วย:
+// outbound ใบเดียวยืนยันได้หลาย CO และแต่ละ CO ยิง hook ของตัวเอง hook ตัวแรกพลิก DBS
+// เป็น COMPLETED แล้วรันปิด SO ตอนที่บรรทัดของ CO ตัวที่สองยังเปิดอยู่ พอ hook ตัวที่สอง
+// มาถึง DBS ก็ COMPLETED ไปแล้ว ถ้าตัดใบพวกนี้ออกจากการปิด จะไม่มีรอบไหนเลยที่ข้อมูลครบ
+func partitionDeliveriesByStatus(deliveryCodes []string, deliveryOf map[string]models.Delivery, targetStatus string) ([]string, []string, error) {
+	toUpdate := []string{}
+	alreadyAtStatus := []string{}
+
+	for _, deliveryCode := range deliveryCodes {
+		delivery, found := deliveryOf[deliveryCode]
+		if !found {
+			return nil, nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
+		}
+
+		if delivery.Status == targetStatus {
+			alreadyAtStatus = append(alreadyAtStatus, deliveryCode)
+			continue
+		}
+
+		// ยกเลิกไปแล้วย้อนกลับไม่ได้
+		if delivery.Status == "CANCELED" {
+			return nil, nil, fmt.Errorf("delivery %s is already canceled", deliveryCode)
+		}
+
+		toUpdate = append(toUpdate, deliveryCode)
+	}
+
+	return toUpdate, alreadyAtStatus, nil
+}
+
+// closeSalesOfDeliveries ไล่ปิด SO ต้นทางของใบจองที่ตอนนี้อยู่ COMPLETED
+//
+// ต้องทำหลัง commit และ "log ทิ้งถ้าพัง" ห้ามคืน error — hook ORDER/DELIVERY/UPDATE
+// ยิงเข้ามาระหว่างที่ wms-order-service ยังไม่ commit ถ้าเราคืน error ฝั่งนั้นจะ rollback
+// แล้วยืนยัน pack ล้มทั้งใบ ทั้งที่สต็อกกับ GI ตัดไปแล้ว
+func closeSalesOfDeliveries(gormx *gorm.DB, deliveryOf map[string]models.Delivery, deliveryCodes []string, user string) {
+	if len(deliveryCodes) == 0 {
+		return
+	}
+
+	saleCodes := []string{}
+	for _, deliveryCode := range deliveryCodes {
+		saleCodes = append(saleCodes, deliveryOf[deliveryCode].DocumentRef)
+	}
+
+	if err := CloseSalesFullyDelivered(gormx, saleCodes, user); err != nil {
+		fmt.Printf("UpdateStatusDelivery: cannot close sales of %v: %v\n", deliveryCodes, err)
+	}
 }
 
 func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {

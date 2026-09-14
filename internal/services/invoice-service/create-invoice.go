@@ -44,7 +44,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceItemID := uuid.New()
 			req[i].InvoiceItem[o].ID = invoiceItemID
 			req[i].InvoiceItem[o].InvoiceID = invoiceID
-			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
+			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(o + 1)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
 		for d := range invoice.InvoiceDeposit {
