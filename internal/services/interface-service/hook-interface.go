@@ -55,11 +55,21 @@ func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
 				return productMap, nil
 			}
 		} else {
-			if productMap["HTTP"].(string) == "200 Success" {
-				return productMap["message"].(string), nil
-			} else {
-				return nil, errors.New(productMap["message"].(string))
+			httpStatus, ok := productMap["HTTP"].(string)
+			if !ok || httpStatus == "" {
+				return nil, errors.New("HTTP is nil or invalid")
 			}
+
+			message, ok := productMap["message"].(string)
+			if !ok {
+				message = ""
+			}
+
+			if httpStatus == "200 Success" {
+				return message, nil
+			}
+
+			return nil, errors.New(message)
 
 		}
 	}
