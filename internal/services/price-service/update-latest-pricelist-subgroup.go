@@ -374,6 +374,15 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup, groupItemValu
 	extraWeight, extraUnit := 0.0, 0.0
 
 	for _, e := range subGroup.PriceListGroup.PriceListGroupExtras {
+		// extra ที่ไม่มีคีย์เลยคือข้อมูลเสีย ไม่ใช่ "ตรงทุกคีย์"
+		//
+		// matchedAllKeys เริ่มที่ true แล้ววนลูป 0 รอบ แถวแบบนี้จึงผ่านการจับคู่
+		// อัตโนมัติและบวกให้ทุก subgroup โดยไม่สนกลุ่มสินค้า · validateExtras กันไว้
+		// ที่ path บันทึกจากหน้าเว็บแล้ว แต่ upload path ไม่ได้เรียก
+		if len(e.PriceListGroupExtraKeys) == 0 {
+			continue
+		}
+
 		// First check that all extra keys match this subgroup's keys
 		matchedAllKeys := true
 		for _, ek := range e.PriceListGroupExtraKeys {
