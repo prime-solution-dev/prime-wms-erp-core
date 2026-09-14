@@ -99,6 +99,21 @@ type PriceListGroupExtraCreateDTO struct {
 	CreateBy       string
 }
 
+// normalizeExtraOperator แปลง label ที่ผู้ใช้เห็นบนหน้าจอกลับเป็น operator จริง
+//
+// ไฟล์ที่อัปโหลดเข้ามาถูก export จากตารางหน้าเว็บ ซึ่งแสดง BETWEEN เป็น "to"
+// (OPERATOR_OPTIONS ใน prime-wms-web/src/utils/helper/priceListExtra.ts)
+// การเก็บค่าดิบทำให้ extraConditionMatched ตกเข้า default แล้วคืน false เสมอ
+// และ validateExtras reject ทั้งหน้าตอนผู้ใช้กด Update
+// ไฟล์ที่ export จาก Excel อาจมาเป็น "To" หรือ "TO" จึงเทียบแบบไม่สนตัวพิมพ์
+func normalizeExtraOperator(raw string) string {
+	s := strings.TrimSpace(raw)
+	if strings.EqualFold(s, "to") || s == "ถึง" {
+		return "<>"
+	}
+	return s
+}
+
 type PriceListSubGroupCreateDTO struct {
 	CompanyCode               string
 	SiteCode                  string
@@ -1303,7 +1318,7 @@ func buildCreatePricelistRequestFromExcel(r io.Reader) (*CreatePricelistRequest,
 			ExtraKey:       exKey,
 			ConditionCode:  r["condition_code"],
 			RowNo:          i + 2,
-			Operator:       r["operator"],
+			Operator:       normalizeExtraOperator(r["operator"]),
 			ValueInt:       parseFloat(r["value_int"]),
 			LengthExtraKey: parseInt(r["length_extra_key"]),
 			CondRangeMin:   parseFloat(r["cond_range_min"]),

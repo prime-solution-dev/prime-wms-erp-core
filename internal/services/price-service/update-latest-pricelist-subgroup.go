@@ -216,6 +216,13 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		}
 	}
 
+	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
+	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
+	groupItemValues, err := loadGroupItemValueIntsFunc(subGroups)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load group item values: %w", err)
+	}
+
 	// Prepare update requests for each sub group
 	updateChanges := make([]models.UpdatePriceListSubGroupItem, 0, len(subGroupUUIDs))
 
@@ -229,10 +236,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
-		}
+		extraPriceWeight, extraPriceUnit := calculateExtraForSubGroup(subGroup, groupItemValues)
 
 		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
 		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch
@@ -344,20 +348,32 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
-func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
+//
+// groupItemValues ถูกโหลดมาก่อนเข้า loop แล้ว (ดู loadGroupItemValueInts) จึงไม่มี
+// การแตะ DB ในนี้อีก
+func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup, groupItemValues groupItemValueInts) (float64, float64) {
 	// Build a quick lookup map from subgroup keys: code -> value
 	subGroupKeyMap := make(map[string]string, len(subGroup.PriceListSubGroupKeys))
 	for _, k := range subGroup.PriceListSubGroupKeys {
 		subGroupKeyMap[k.Code] = k.Value
 	}
 
-	// Start from existing ExtraPriceWeight so that, in absence of matching config,
-	// we preserve the current extra behavior.
-	extraWeight := subGroup.ExtraPriceWeight
-	extraUnit := subGroup.ExtraPriceUnit
+	// rule เป็นแหล่งความจริงเฉพาะกับ subgroup ที่มี rule ควบคุมอยู่จริง
+	//
+	// เดิมเริ่มจาก subGroup.ExtraPriceWeight แล้วเขียนทับเฉพาะตอน match ทำให้ค่าที่
+	// ไม่ตรงเงื่อนไขใดเลยค้างอยู่ตลอดไป ข้อมูลจริงเคยมี LT ขนาด 40 ที่ได้ทั้ง 0 และ 1
+	// ปนกันเพราะค่าเก่าจากการอัปโหลดไม่เคยถูกล้าง
+	//
+	// แต่การเริ่มจาก 0 เสมอจะล้างค่าที่อัปโหลดมาของ subgroup ที่ไม่มี rule ไหน
+	// key ตรงเลย ซึ่งเป็นคนละเรื่องกับ "มี rule แต่ไม่เข้าเงื่อนไข" และกู้คืนไม่ได้
+	// เพราะไม่มีแหล่งข้อมูลอื่น · cascadeBasePriceToSubGroups เรียกเส้นนี้ทุกครั้ง
+	// ที่แก้ราคาฐาน การล้างจึงจะลามเป็นวงกว้าง
+	//
+	// จึงรีเซ็ตเป็น 0 เฉพาะเมื่อมี rule อย่างน้อยหนึ่งแถวที่ key ตรงกับ subgroup นี้
+	matchedAnyRule := false
+	extraWeight, extraUnit := 0.0, 0.0
 
-	extras := subGroup.PriceListGroup.PriceListGroupExtras
-	for _, e := range extras {
+	for _, e := range subGroup.PriceListGroup.PriceListGroupExtras {
 		// First check that all extra keys match this subgroup's keys
 		matchedAllKeys := true
 		for _, ek := range e.PriceListGroupExtraKeys {
@@ -370,9 +386,15 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 		if !matchedAllKeys {
 			continue
 		}
+		matchedAnyRule = true
 
 		// Now handle condition_code logic against group_item.value_int
+		//
+		// group ที่ config ไม่มีแกน condition (เช่น หมวดตัวซี: PG01, PG04) จะมี
+		// condition_code ว่างเสมอ · แถวแบบนี้คือ extra ที่บวกทันทีเมื่อ key ตรงครบ
+		// ไม่ใช่แถวที่ต้องข้าม การ continue เดิมทำให้ extra ของ group เหล่านี้ไม่เคยถูกใช้
 		if e.ConditionCode == "" {
+			extraWeight, extraUnit = e.ValueInt, e.ValueInt
 			continue
 		}
 
@@ -382,39 +404,44 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 			continue
 		}
 
-		valInt, found, err := priceListRepository.GetGroupItemValueInt(e.ConditionCode, condValue)
-		if err != nil {
-			return 0, 0, err
-		}
+		valInt, found := groupItemValues.lookup(e.ConditionCode, condValue)
 		if !found {
 			continue
 		}
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extraWeight = float64(e.ValueInt)
-			extraUnit = float64(e.ValueInt)
+			extraWeight = e.ValueInt
+			extraUnit = e.ValueInt
 		}
 	}
 
-	return extraWeight, extraUnit, nil
+	if !matchedAnyRule {
+		return subGroup.ExtraPriceWeight, subGroup.ExtraPriceUnit
+	}
+
+	return extraWeight, extraUnit
 }
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
 // group_item.value_int.
+//
+// operator ที่รับค่าตัวเดียวใช้ cond_range_max ทั้งหมด เพราะหน้าจอวางคอลัมน์เป็น
+// [min] [operator] [max] แล้วล็อคช่อง min ให้กรอกได้เฉพาะ "<>" (ExtraPriceTable.vue)
+// ช่องที่ผู้ใช้พิมพ์จึงเป็น max เสมอ · เดิม ">" กับ ">=" อ่าน min ที่ถูกล็อคเป็น 0
+// ทำให้ "> 38" กลายเป็น "> 0" คือ match ทุกแถว
 func extraConditionMatched(val float64, operator string, min, max float64) bool {
 	switch operator {
 	case "=":
-		// Example from requirement: value_int must match cond_range_max
 		return val == max
 	case ">=":
-		return val >= min
+		return val >= max
 	case "<=":
 		return val <= max
 	case "<":
 		return val < max
 	case ">":
-		return val > min
+		return val > max
 	case "<>":
 		return val >= min && val <= max
 	default:
