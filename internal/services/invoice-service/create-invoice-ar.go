@@ -151,7 +151,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errCreateInvoice
 			}
 
-			if req[0].ExternalID != "" && req[0].Status != "COMPLETED" {
+			if req[0].ExternalID != "" && req[0].Status == "COMPLETED" {
 				depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
 				if err != nil {
 					return nil, err
