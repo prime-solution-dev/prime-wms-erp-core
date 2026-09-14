@@ -6,7 +6,7 @@ pipeline {
         PORT = '9106:9106'  
         CONTAINER_NAME = 'wms-document-core-container'
         TARGET_BRANCH = 'Kernel-uat'
-        REMOTE_USER = 'ec2-user'
+        REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '47.128.166.228'
         SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.kernaluatWMS'
