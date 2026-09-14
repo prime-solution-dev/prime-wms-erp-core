@@ -114,9 +114,9 @@ func TestValidateExtras_AcceptsEveryOperatorTheCalculatorSupports(t *testing.T) 
 	}
 }
 
-// operator ที่ใช้ขอบเดียว (>=, <=, <, >, =) ไม่ควรถูกตรวจ min > max เพราะอีกขอบไม่มี
+// operator ที่ใช้ขอบเดียว (>=, <=, <, >, =) ไม่ควรถูกตรวจ min > max เพราะ min ไม่มี
 // ความหมาย ข้อมูลเก่าใน DB ที่มี operator=">=" กับ min=100,max=0 เป็นรูปแบบที่ถูกต้อง
-// ตาม extraConditionMatched (">=" ใช้แค่ min) ต้องไม่ถูกปฏิเสธ
+// ตาม extraConditionMatched (operator ตัวเดียวใช้แค่ max) ต้องไม่ถูกปฏิเสธ
 func TestValidateExtras_MinGreaterThanMaxOnlyRejectedForBetween(t *testing.T) {
 	baseExtra := func(operator string, min, max float64) []models.UpdatePriceListExtraRequest {
 		return []models.UpdatePriceListExtraRequest{{

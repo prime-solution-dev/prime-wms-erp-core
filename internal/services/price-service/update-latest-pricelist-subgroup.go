@@ -342,6 +342,9 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	}, nil
 }
 
+// seam for unit testing: allow stubbing the group_item lookup
+var getGroupItemValueIntFunc = priceListRepository.GetGroupItemValueInt
+
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
 func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
@@ -351,13 +354,22 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 		subGroupKeyMap[k.Code] = k.Value
 	}
 
-	// Start from existing ExtraPriceWeight so that, in absence of matching config,
-	// we preserve the current extra behavior.
-	extraWeight := subGroup.ExtraPriceWeight
-	extraUnit := subGroup.ExtraPriceUnit
+	// rule เป็นแหล่งความจริงเฉพาะกับ subgroup ที่มี rule ควบคุมอยู่จริง
+	//
+	// เดิมเริ่มจาก subGroup.ExtraPriceWeight แล้วเขียนทับเฉพาะตอน match ทำให้ค่าที่
+	// ไม่ตรงเงื่อนไขใดเลยค้างอยู่ตลอดไป ข้อมูลจริงเคยมี LT ขนาด 40 ที่ได้ทั้ง 0 และ 1
+	// ปนกันเพราะค่าเก่าจากการอัปโหลดไม่เคยถูกล้าง
+	//
+	// แต่การเริ่มจาก 0 เสมอจะล้างค่าที่อัปโหลดมาของ subgroup ที่ไม่มี rule ไหน
+	// key ตรงเลย ซึ่งเป็นคนละเรื่องกับ "มี rule แต่ไม่เข้าเงื่อนไข" และกู้คืนไม่ได้
+	// เพราะไม่มีแหล่งข้อมูลอื่น · cascadeBasePriceToSubGroups เรียกเส้นนี้ทุกครั้ง
+	// ที่แก้ราคาฐาน การล้างจึงจะลามเป็นวงกว้าง
+	//
+	// จึงรีเซ็ตเป็น 0 เฉพาะเมื่อมี rule อย่างน้อยหนึ่งแถวที่ key ตรงกับ subgroup นี้
+	matchedAnyRule := false
+	extraWeight, extraUnit := 0.0, 0.0
 
-	extras := subGroup.PriceListGroup.PriceListGroupExtras
-	for _, e := range extras {
+	for _, e := range subGroup.PriceListGroup.PriceListGroupExtras {
 		// First check that all extra keys match this subgroup's keys
 		matchedAllKeys := true
 		for _, ek := range e.PriceListGroupExtraKeys {
@@ -370,9 +382,15 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 		if !matchedAllKeys {
 			continue
 		}
+		matchedAnyRule = true
 
 		// Now handle condition_code logic against group_item.value_int
+		//
+		// group ที่ config ไม่มีแกน condition (เช่น หมวดตัวซี: PG01, PG04) จะมี
+		// condition_code ว่างเสมอ · แถวแบบนี้คือ extra ที่บวกทันทีเมื่อ key ตรงครบ
+		// ไม่ใช่แถวที่ต้องข้าม การ continue เดิมทำให้ extra ของ group เหล่านี้ไม่เคยถูกใช้
 		if e.ConditionCode == "" {
+			extraWeight, extraUnit = e.ValueInt, e.ValueInt
 			continue
 		}
 
@@ -382,7 +400,7 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 			continue
 		}
 
-		valInt, found, err := priceListRepository.GetGroupItemValueInt(e.ConditionCode, condValue)
+		valInt, found, err := getGroupItemValueIntFunc(e.ConditionCode, condValue)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -392,9 +410,13 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extraWeight = float64(e.ValueInt)
-			extraUnit = float64(e.ValueInt)
+			extraWeight = e.ValueInt
+			extraUnit = e.ValueInt
 		}
+	}
+
+	if !matchedAnyRule {
+		return subGroup.ExtraPriceWeight, subGroup.ExtraPriceUnit, nil
 	}
 
 	return extraWeight, extraUnit, nil
@@ -402,19 +424,23 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
 // group_item.value_int.
+//
+// operator ที่รับค่าตัวเดียวใช้ cond_range_max ทั้งหมด เพราะหน้าจอวางคอลัมน์เป็น
+// [min] [operator] [max] แล้วล็อคช่อง min ให้กรอกได้เฉพาะ "<>" (ExtraPriceTable.vue)
+// ช่องที่ผู้ใช้พิมพ์จึงเป็น max เสมอ · เดิม ">" กับ ">=" อ่าน min ที่ถูกล็อคเป็น 0
+// ทำให้ "> 38" กลายเป็น "> 0" คือ match ทุกแถว
 func extraConditionMatched(val float64, operator string, min, max float64) bool {
 	switch operator {
 	case "=":
-		// Example from requirement: value_int must match cond_range_max
 		return val == max
 	case ">=":
-		return val >= min
+		return val >= max
 	case "<=":
 		return val <= max
 	case "<":
 		return val < max
 	case ">":
-		return val > min
+		return val > max
 	case "<>":
 		return val >= min && val <= max
 	default:
