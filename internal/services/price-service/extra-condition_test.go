@@ -227,21 +227,16 @@ func subGroupWith(keys map[string]string, extras []models.PriceListGroupExtra, c
 	}
 }
 
-func stubGroupItemValueInt(t *testing.T, values map[string]float64) {
-	t.Helper()
-	original := getGroupItemValueIntFunc
-	getGroupItemValueIntFunc = func(groupCode, value string) (float64, bool, error) {
-		v, ok := values[value]
-		return v, ok, nil
-	}
-	t.Cleanup(func() { getGroupItemValueIntFunc = original })
+// pg06Values ห่อ value_int ของ PG06 ให้อยู่ในรูป map ที่ calculateExtraForSubGroup รับ
+func pg06Values(values map[string]float64) groupItemValueInts {
+	return groupItemValueInts{"PG06": values}
 }
 
 // ค่า extra เก่าที่ไม่ตรงเงื่อนไขใดเลยต้องถูกล้างเป็น 0
 // เดิมเริ่มจากค่าเดิมแล้วเขียนทับเฉพาะตอน match ทำให้ค่าที่อัปโหลดมาค้างถาวร
 // ข้อมูลจริงเคยมี LT ขนาด 40 ที่ได้ทั้ง 0 และ 1 ปนกันเพราะสาเหตุนี้
 func TestCalculateExtraForSubGroup_ClearsStaleExtraWhenNothingMatches(t *testing.T) {
-	stubGroupItemValueInt(t, map[string]float64{"PG06_40": 40})
+	groupItemValues := pg06Values(map[string]float64{"PG06_40": 40})
 
 	extras := []models.PriceListGroupExtra{{
 		ExtraKey:      "PG03_18",
@@ -257,10 +252,7 @@ func TestCalculateExtraForSubGroup_ClearsStaleExtraWhenNothingMatches(t *testing
 
 	sg := subGroupWith(map[string]string{"PG03": "PG03_18", "PG06": "PG06_40"}, extras, 1)
 
-	weight, unit, err := calculateExtraForSubGroup(sg)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	weight, unit := calculateExtraForSubGroup(sg, groupItemValues)
 	if weight != 0 || unit != 0 {
 		t.Fatalf("ขนาด 40 อยู่นอกช่วง 30..38 ต้องได้ 0 แต่ได้ weight=%v unit=%v", weight, unit)
 	}
@@ -269,11 +261,9 @@ func TestCalculateExtraForSubGroup_ClearsStaleExtraWhenNothingMatches(t *testing
 // group ที่ยังไม่ได้ตั้ง extra ไว้เลย ต้องคงค่าที่อัปโหลดมาตามเดิม
 func TestCalculateExtraForSubGroup_KeepsUploadedValueWhenNoExtrasConfigured(t *testing.T) {
 	sg := subGroupWith(map[string]string{"PG03": "PG03_18"}, nil, 2.5)
+	groupItemValues := groupItemValueInts{}
 
-	weight, unit, err := calculateExtraForSubGroup(sg)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	weight, unit := calculateExtraForSubGroup(sg, groupItemValues)
 	if weight != 2.5 || unit != 2.5 {
 		t.Fatalf("group ที่ไม่มี extra config ต้องคงค่าเดิม 2.5 แต่ได้ weight=%v unit=%v", weight, unit)
 	}
@@ -285,7 +275,7 @@ func TestCalculateExtraForSubGroup_KeepsUploadedValueWhenNoExtrasConfigured(t *t
 // เกรดที่ไม่ได้ตั้ง rule ไว้จะหายทั้งหมดตอน cascadeBasePriceToSubGroups ทำงาน
 // และกู้คืนไม่ได้เพราะไม่มีแหล่งข้อมูลอื่น
 func TestCalculateExtraForSubGroup_KeepsUploadedValueWhenNoRuleMatchesKeys(t *testing.T) {
-	stubGroupItemValueInt(t, map[string]float64{"PG06_40": 40})
+	groupItemValues := pg06Values(map[string]float64{"PG06_40": 40})
 
 	extras := []models.PriceListGroupExtra{{
 		ExtraKey:      "PG03_18",
@@ -302,10 +292,7 @@ func TestCalculateExtraForSubGroup_KeepsUploadedValueWhenNoRuleMatchesKeys(t *te
 	// เกรด PG03_99 ไม่มี rule ควบคุมอยู่เลย
 	sg := subGroupWith(map[string]string{"PG03": "PG03_99", "PG06": "PG06_40"}, extras, 2.5)
 
-	weight, unit, err := calculateExtraForSubGroup(sg)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	weight, unit := calculateExtraForSubGroup(sg, groupItemValues)
 	if weight != 2.5 || unit != 2.5 {
 		t.Fatalf("subgroup ที่ไม่มี rule ตรง key ต้องคงค่าเดิม 2.5 แต่ได้ weight=%v unit=%v", weight, unit)
 	}
@@ -314,7 +301,7 @@ func TestCalculateExtraForSubGroup_KeepsUploadedValueWhenNoRuleMatchesKeys(t *te
 // มี rule ที่ key ตรง แต่ subgroup ไม่มี key ของแกน condition อยู่เลย
 // ต้องไม่บวก extra และต้องล้างค่าเก่า เพราะถือว่ามี rule ควบคุมอยู่
 func TestCalculateExtraForSubGroup_ClearsWhenConditionKeyMissing(t *testing.T) {
-	stubGroupItemValueInt(t, map[string]float64{"PG06_32": 32})
+	groupItemValues := pg06Values(map[string]float64{"PG06_32": 32})
 
 	extras := []models.PriceListGroupExtra{{
 		ExtraKey:      "PG03_18",
@@ -330,10 +317,7 @@ func TestCalculateExtraForSubGroup_ClearsWhenConditionKeyMissing(t *testing.T) {
 
 	sg := subGroupWith(map[string]string{"PG03": "PG03_18"}, extras, 1)
 
-	weight, _, err := calculateExtraForSubGroup(sg)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	weight, _ := calculateExtraForSubGroup(sg, groupItemValues)
 	if weight != 0 {
 		t.Fatalf("subgroup ไม่มี key ของแกน condition ต้องได้ 0 แต่ได้ %v", weight)
 	}
@@ -341,7 +325,7 @@ func TestCalculateExtraForSubGroup_ClearsWhenConditionKeyMissing(t *testing.T) {
 
 // เงื่อนไขที่ตรงต้องบวก extra เข้าไป — เคสจริงจาก GROUP_1_ITEM_1 (S4 "<> 30..38")
 func TestCalculateExtraForSubGroup_AppliesMatchingRange(t *testing.T) {
-	stubGroupItemValueInt(t, map[string]float64{
+	groupItemValues := pg06Values(map[string]float64{
 		"PG06_30": 30, "PG06_32": 32, "PG06_38": 38, "PG06_40": 40,
 	})
 
@@ -365,10 +349,7 @@ func TestCalculateExtraForSubGroup_AppliesMatchingRange(t *testing.T) {
 	} {
 		t.Run(tc.size, func(t *testing.T) {
 			sg := subGroupWith(map[string]string{"PG03": "PG03_18", "PG06": tc.size}, extras, 0)
-			weight, _, err := calculateExtraForSubGroup(sg)
-			if err != nil {
-				t.Fatalf("ไม่ควร error: %v", err)
-			}
+			weight, _ := calculateExtraForSubGroup(sg, groupItemValues)
 			if weight != tc.want {
 				t.Fatalf("ขนาด %s ต้องได้ extra %v แต่ได้ %v", tc.size, tc.want, weight)
 			}
@@ -378,7 +359,7 @@ func TestCalculateExtraForSubGroup_AppliesMatchingRange(t *testing.T) {
 
 // เคสจริงจาก GROUP_1_ITEM_1 (LT "> 38") ต้องเริ่มบวกที่ 40 ไม่ใช่ที่ 38
 func TestCalculateExtraForSubGroup_GreaterThanIsExclusive(t *testing.T) {
-	stubGroupItemValueInt(t, map[string]float64{
+	groupItemValues := pg06Values(map[string]float64{
 		"PG06_32": 32, "PG06_38": 38, "PG06_40": 40,
 	})
 
@@ -402,10 +383,7 @@ func TestCalculateExtraForSubGroup_GreaterThanIsExclusive(t *testing.T) {
 	} {
 		t.Run(tc.size, func(t *testing.T) {
 			sg := subGroupWith(map[string]string{"PG03": "PG03_21", "PG06": tc.size}, extras, 0)
-			weight, _, err := calculateExtraForSubGroup(sg)
-			if err != nil {
-				t.Fatalf("ไม่ควร error: %v", err)
-			}
+			weight, _ := calculateExtraForSubGroup(sg, groupItemValues)
 			if weight != tc.want {
 				t.Fatalf("ขนาด %s ต้องได้ extra %v แต่ได้ %v", tc.size, tc.want, weight)
 			}
@@ -428,19 +406,14 @@ func TestCalculateExtraForSubGroup_AppliesExtraWithoutCondition(t *testing.T) {
 	}}
 
 	matching := subGroupWith(map[string]string{"PG01": "PG01_7", "PG04": "PG04_65"}, extras, 0)
-	weight, unit, err := calculateExtraForSubGroup(matching)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	groupItemValues := groupItemValueInts{}
+	weight, unit := calculateExtraForSubGroup(matching, groupItemValues)
 	if weight != 0.1 || unit != 0.1 {
 		t.Fatalf("key ตรงครบและไม่มีเงื่อนไข ต้องได้ 0.1 แต่ได้ weight=%v unit=%v", weight, unit)
 	}
 
 	other := subGroupWith(map[string]string{"PG01": "PG01_7", "PG04": "PG04_99"}, extras, 0)
-	weight, _, err = calculateExtraForSubGroup(other)
-	if err != nil {
-		t.Fatalf("ไม่ควร error: %v", err)
-	}
+	weight, _ = calculateExtraForSubGroup(other, groupItemValues)
 	if weight != 0 {
 		t.Fatalf("key ไม่ตรงต้องได้ 0 แต่ได้ %v", weight)
 	}
