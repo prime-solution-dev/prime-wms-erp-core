@@ -5,12 +5,15 @@ import (
 	"errors"
 	"math"
 	models "prime-erp-core/internal/models"
+	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -24,6 +27,52 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	jsonBytesCreateInvoice, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(req) == 0 {
+		return nil, errors.New("invoice is required")
+	}
+	ids := make([]uuid.UUID, 0, len(req))
+	seen := make(map[uuid.UUID]bool, len(req))
+	for _, invoice := range req {
+		if invoice.ID == uuid.Nil || seen[invoice.ID] {
+			return nil, errors.New("invoice IDs must be non-empty and unique")
+		}
+		seen[invoice.ID] = true
+		ids = append(ids, invoice.ID)
+	}
+	getPayload, err := json.Marshal(GetInvoiceRequest{ID: ids})
+	if err != nil {
+		return nil, err
+	}
+	value, err := GetInvoice(ctx, string(getPayload))
+	if err != nil {
+		return nil, err
+	}
+
+	stored, ok := value.(ResultInvoice)
+	if !ok {
+		return nil, errors.New("invalid GetInvoice response")
+	}
+	statuses := make(map[uuid.UUID]string, len(stored.Invoice))
+	for _, invoice := range stored.Invoice {
+		statuses[invoice.ID] = invoice.Status
+	}
+	tempIDs := make([]uuid.UUID, 0, len(req))
+	for _, invoice := range req {
+		status, exists := statuses[invoice.ID]
+		if !exists {
+			return nil, errors.New("invoice not found: " + invoice.ID.String())
+		}
+		if strings.EqualFold(status, "TEMP") {
+			tempIDs = append(tempIDs, invoice.ID)
+		}
+	}
+	if len(tempIDs) == len(req) {
+		if err := repositoryInvoice.DeleteInvoice(tempIDs); err != nil {
+			return nil, err
+		}
+		return CreateInvoiceAR(ctx, jsonPayload)
 	}
 
 	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
