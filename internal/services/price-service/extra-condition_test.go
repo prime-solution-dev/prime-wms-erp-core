@@ -436,3 +436,47 @@ func TestNormalizeExtraOperator(t *testing.T) {
 		}
 	}
 }
+
+// extra ที่ไม่มี key เลย (ข้อมูลที่เสียจากบั๊ก extra_key ซ้ำใน upload path) เคยผ่าน
+// การจับคู่ "ตรงทุกคีย์" โดยอัตโนมัติ เพราะ matchedAllKeys เริ่มที่ true แล้ววนลูป 0 รอบ
+// จึงบวกให้ทุก subgroup ที่เข้าเงื่อนไขโดยไม่สนกลุ่มสินค้า (ITEM_4 บวกผิด 78/207 subgroup)
+func TestCalculateExtraForSubGroup_SkipsExtraWithoutKeys(t *testing.T) {
+	extras := []models.PriceListGroupExtra{{
+		ExtraKey:                "PG01_7|PG04_65",
+		ConditionCode:           "",
+		ValueInt:                0.1,
+		PriceListGroupExtraKeys: nil,
+	}}
+
+	sg := subGroupWith(map[string]string{"PG01": "PG01_99", "PG04": "PG04_99"}, extras, 5)
+	weight, unit := calculateExtraForSubGroup(sg, groupItemValueInts{})
+	if weight != 5 || unit != 5 {
+		t.Fatalf("extra ที่ไม่มีคีย์ต้องถูกข้าม และคงค่าเดิม 5 ไว้ แต่ได้ weight=%v unit=%v", weight, unit)
+	}
+}
+
+// extra ที่ไม่มีคีย์ต้องไม่ถูกนับเป็น rule ที่ควบคุม subgroup นี้ จึงต้องไม่ไป trigger
+// การรีเซ็ตเป็น 0 ของ subgroup ที่ไม่มี rule ไหนคุมอยู่จริง
+func TestCalculateExtraForSubGroup_KeylessExtraDoesNotGovern(t *testing.T) {
+	extras := []models.PriceListGroupExtra{
+		{ExtraKey: "x", ValueInt: 0.1},
+		{
+			ExtraKey: "PG01_7|PG04_65",
+			ValueInt: 0.2,
+			PriceListGroupExtraKeys: []models.PriceListGroupExtraKey{
+				{Code: "PG01", Value: "PG01_7"},
+				{Code: "PG04", Value: "PG04_65"},
+			},
+		},
+	}
+
+	governed := subGroupWith(map[string]string{"PG01": "PG01_7", "PG04": "PG04_65"}, extras, 9)
+	if weight, _ := calculateExtraForSubGroup(governed, groupItemValueInts{}); weight != 0.2 {
+		t.Fatalf("subgroup ที่ตรง rule จริงต้องได้ 0.2 แต่ได้ %v", weight)
+	}
+
+	ungoverned := subGroupWith(map[string]string{"PG01": "PG01_1", "PG04": "PG04_1"}, extras, 9)
+	if weight, _ := calculateExtraForSubGroup(ungoverned, groupItemValueInts{}); weight != 9 {
+		t.Fatalf("subgroup ที่ไม่มี rule คุมต้องคงค่าเดิม 9 แต่ได้ %v", weight)
+	}
+}
