@@ -7,10 +7,12 @@ import (
 	"math"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
+	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"slices"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -138,48 +140,23 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if HookInterfaceValue != nil {
 			externalID := HookInterfaceValue.(map[string]interface{})
 			str, _ := externalID["id"].(string)
-
-			/* 	invoiceValue := []models.Invoice{}
-			invoiceValue = append(invoiceValue, models.Invoice{
-				ID:         idInvoice[0],
-				ExternalID: str,
-			})
-
-			_, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, []models.InvoiceItem{})
-			if errCreateApproval != nil {
-				return nil, errCreateApproval
-			} */
 			req[0].ExternalID = str
 			jsonBytesCreateInvoice, err := json.Marshal(req)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Println(string(jsonBytesCreateInvoice))
 
 			createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
 			if errCreateInvoice != nil {
 				return nil, errCreateInvoice
 			}
-			requestData := map[string]interface{}{
-				"module":    []string{"INVOICE"},
-				"topic":     []string{"DEPOSIT"},
-				"sub_topic": []string{"CREATE"},
-			}
 
-			hookConfig, err := interfaceService.GetHookConfig(requestData)
-			if err != nil {
-				return nil, err
-			}
-			if len(hookConfig) > 0 {
-				for _, hookConfigValue := range hookConfig {
-					urlHook = hookConfigValue.HookUrl
-				}
-				_, err := interfaceService.GetDeposits(str, urlHook)
+			if req[0].ExternalID != "" && req[0].Status != "COMPLETED" {
+				depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
 				if err != nil {
 					return nil, err
 				}
-				/* 	if len(depositMapResult) > 0 {
-
+				if len(depositMapResult) > 0 {
 					var deposit []models.Deposit
 
 					for _, v := range depositMapResult {
@@ -191,11 +168,11 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						}
 						drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
 						if err != nil {
-							totalFloat = 0
+							drFloat = 0
 						}
 						crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
 						if err != nil {
-							totalFloat = 0
+							crFloat = 0
 						}
 
 						deposit = append(deposit, models.Deposit{
@@ -219,7 +196,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						}
 					}
 
-				} */
+				}
 			}
 
 			return createInvoiceReturn, nil
@@ -236,18 +213,6 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		return createInvoiceReturn, nil
 	}
-	/* if len(depositCut) > 0 {
-		jsonBytesDepositCut, err := json.Marshal(depositCut)
-		if err != nil {
-			return nil, err
-		}
-
-		_, errCutDepost := depositService.CutDepost(ctx, string(jsonBytesDepositCut))
-		if errCutDepost != nil {
-			return nil, errCutDepost
-		}
-
-	} */
 
 	return nil, nil
 }
