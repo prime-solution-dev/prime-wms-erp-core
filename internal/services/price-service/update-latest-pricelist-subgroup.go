@@ -216,6 +216,13 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		}
 	}
 
+	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
+	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
+	groupItemValues, err := loadGroupItemValueIntsFunc(subGroups)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load group item values: %w", err)
+	}
+
 	// Prepare update requests for each sub group
 	updateChanges := make([]models.UpdatePriceListSubGroupItem, 0, len(subGroupUUIDs))
 
@@ -229,10 +236,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
-		}
+		extraPriceWeight, extraPriceUnit := calculateExtraForSubGroup(subGroup, groupItemValues)
 
 		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
 		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch
@@ -342,12 +346,12 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	}, nil
 }
 
-// seam for unit testing: allow stubbing the group_item lookup
-var getGroupItemValueIntFunc = priceListRepository.GetGroupItemValueInt
-
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
-func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
+//
+// groupItemValues ถูกโหลดมาก่อนเข้า loop แล้ว (ดู loadGroupItemValueInts) จึงไม่มี
+// การแตะ DB ในนี้อีก
+func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup, groupItemValues groupItemValueInts) (float64, float64) {
 	// Build a quick lookup map from subgroup keys: code -> value
 	subGroupKeyMap := make(map[string]string, len(subGroup.PriceListSubGroupKeys))
 	for _, k := range subGroup.PriceListSubGroupKeys {
@@ -400,10 +404,7 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 			continue
 		}
 
-		valInt, found, err := getGroupItemValueIntFunc(e.ConditionCode, condValue)
-		if err != nil {
-			return 0, 0, err
-		}
+		valInt, found := groupItemValues.lookup(e.ConditionCode, condValue)
 		if !found {
 			continue
 		}
@@ -416,10 +417,10 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 	}
 
 	if !matchedAnyRule {
-		return subGroup.ExtraPriceWeight, subGroup.ExtraPriceUnit, nil
+		return subGroup.ExtraPriceWeight, subGroup.ExtraPriceUnit
 	}
 
-	return extraWeight, extraUnit, nil
+	return extraWeight, extraUnit
 }
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
