@@ -3,6 +3,7 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	customerService "prime-erp-core/internal/services/customer-service"
@@ -198,11 +199,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	getDeposit := getDepositRes.(depositService.ResultDeposit).Deposit
 	remainDepositMap := map[string]float64{}
 	for _, depositValue := range getDeposit {
+		amountRemainVat := math.Round((depositValue.AmountRemain*1.07)*100) / 100
 		remainDepositItemMap, exist := remainDepositMap[depositValue.CustomerCode]
 		if exist {
-			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + amountRemainVat
 		} else {
-			remainDepositMap[depositValue.CustomerCode] = depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = amountRemainVat
 		}
 	}
 

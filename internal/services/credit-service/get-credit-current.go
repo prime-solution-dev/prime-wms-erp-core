@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"prime-erp-core/internal/db"
 	"strings"
 
@@ -113,10 +114,11 @@ func getDepositByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []s
 	for _, row := range rows {
 		customerCode := row["customer_code"].(string)
 		amountRemain := row["amount_remain"].(float64)
+		amountRemainVat := math.Round((amountRemain*1.07)*100) / 100
 
 		for i, customer := range res.CreditCustomers {
 			if customer.CustomerCode == customerCode {
-				customer.RemainDeposit += amountRemain
+				customer.RemainDeposit += amountRemainVat
 				res.CreditCustomers[i] = customer
 				break
 			}
