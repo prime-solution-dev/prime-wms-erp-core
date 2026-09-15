@@ -109,3 +109,31 @@ func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interfac
 
 	return nil, nil
 }
+
+func CompletePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePOBigLotRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := prePurchaseRepository.CompletePOBigLot(req.PrePurchaseCodes); err != nil {
+		return nil, errors.New("failed to complete PO big lot: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CancelPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePOBigLotRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := prePurchaseRepository.CancelPOBigLot(req.PrePurchaseCodes); err != nil {
+		return nil, errors.New("failed to cancel PO big lot: " + err.Error())
+	}
+
+	return nil, nil
+}

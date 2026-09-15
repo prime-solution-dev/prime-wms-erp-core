@@ -335,6 +335,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
 	})
+	purchase.POST("/CompletePOBigLot", func(c *gin.Context) {
+		utils.ProcessRequest(c, prePurchaseService.CompletePOBigLot)
+	})
+	purchase.POST("/CancelPOBigLot", func(c *gin.Context) {
+		utils.ProcessRequest(c, prePurchaseService.CancelPOBigLot)
+	})
 	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
 		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})

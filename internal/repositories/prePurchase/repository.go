@@ -406,3 +406,54 @@ func UpdateStatusApprovePOBigLot(prePurchases []models.UpdateStatusApprovePOBigL
 
 	return
 }
+
+// CompletePOBigLot finalises Big lot POs (Close). The pre_purchase table has NO
+// used_status column, so "Complete" is expressed as status=COMPLETED +
+// status_approve=PENDING — the FE wording mapper renders COMPLETED with
+// status_approve != COMPLETED as "Complete". Header-only write keyed by
+// pre_purchase_code (mirrors the normal-purchase CompletePO).
+func CompletePOBigLot(prePurchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.PrePurchase{}).
+			Where("pre_purchase_code IN ?", prePurchaseCodes).
+			Updates(map[string]interface{}{
+				"status":         "COMPLETED",
+				"status_approve": "PENDING",
+				"update_dtm":     time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// CancelPOBigLot cancels Big lot POs (status=CANCELLED, status_approve=PENDING =
+// the "Cancel" wording). Header-only, no item rewrite. Cancelling a Big lot never
+// affects consumer-PO quota math — that reads the purchase table (purchase_type=PRE),
+// not pre_purchase.status. Keyed by pre_purchase_code.
+func CancelPOBigLot(prePurchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.PrePurchase{}).
+			Where("pre_purchase_code IN ?", prePurchaseCodes).
+			Updates(map[string]interface{}{
+				"status":         "CANCELLED",
+				"status_approve": "PENDING",
+				"update_dtm":     time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
