@@ -71,30 +71,40 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, invoiceValue := range invoice {
 		siteCode = append(siteCode, invoiceValue.SiteCode)
 		companyCode = append(companyCode, invoiceValue.CompanyCode)
-		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
-		customerCode = append(customerCode, invoiceValue.PartyCode)
+		if invoiceValue.PartyType == "SUPPLIER" {
+			supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoiceValue.PartyCode)
+		}
+		if invoiceValue.PartyType == "CUSTOMER" {
+			customerCode = append(customerCode, invoiceValue.PartyCode)
+		}
+
 		for _, invoiceItemValue := range invoiceValue.InvoiceItem {
 			productCodes = append(productCodes, invoiceItemValue.ProductCode)
 		}
 		invoiceCode = append(invoiceCode, invoiceValue.InvoiceCode)
 	}
-	mapSupplier, err := prePurchaseService.GetSupplierByCode(supplierReq)
-	if err != nil {
-		return nil, errors.New("failed to get supplier list: " + err.Error())
+	var mapSupplier map[string]models.Supplier
+	if len(supplierReq.SupplierCodes) > 0 {
+		mapSuppliers, err := prePurchaseService.GetSupplierByCode(supplierReq)
+		if err != nil {
+			return nil, errors.New("failed to get supplier list: " + err.Error())
+		}
+		mapSupplier = mapSuppliers
 	}
 
-	getCustomerByNameRequest := externalService.GetCustomerRequest{
-		Customers: customerCode,
-	}
-
-	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
-	if err != nil {
-		fmt.Println("failed to fetch customers by name:", err)
-		return nil, errors.New("failed to fetch customers by name: " + err.Error())
-	}
 	mapCustomer := map[string]externalService.GetCustomerResponse{}
-	for _, customer := range customerByNameData.Customers {
-		mapCustomer[customer.CustomerCode] = customer
+	if len(customerCode) > 0 {
+		getCustomerByNameRequest := externalService.GetCustomerRequest{
+			Customers: customerCode,
+		}
+		customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+		if err != nil {
+			fmt.Println("failed to fetch customers by name:", err)
+			return nil, errors.New("failed to fetch customers by name: " + err.Error())
+		}
+		for _, customer := range customerByNameData.Customers {
+			mapCustomer[customer.CustomerCode] = customer
+		}
 	}
 
 	mapProduct := map[string]models.GetProductsDetailComponent{}
@@ -105,43 +115,46 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			CompanyCode: companyCode,
 		}
 
-		mapProduct, err = purchaseService.GetProductByCode(productReq)
+		mapProducts, err := purchaseService.GetProductByCode(productReq)
 		if err != nil {
 			return nil, errors.New("failed to get product list: " + err.Error())
 		}
+		mapProduct = mapProducts
 	}
 
 	// Get Product Group One
-
-	requestDataGetPayment := map[string]interface{}{
-		"invoice_code": invoiceCode,
-	}
-
-	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
-	if err != nil {
-		return nil, err
-	}
-
-	payment, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
-	if errGetPayment != nil {
-		return nil, errGetPayment
-	}
-	resultPayment := payment.(paymentService.ResultPayment).Payment
 	paymentValueMap := map[string]float64{}
+	if len(invoiceCode) > 0 {
+		requestDataGetPayment := map[string]interface{}{
+			"invoice_code": invoiceCode,
+		}
 
-	for _, paymentValue := range resultPayment {
-		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+		jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
+		if err != nil {
+			return nil, err
+		}
 
-			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
-			if exist {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
-			} else {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
+		payment, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+		if errGetPayment != nil {
+			return nil, errGetPayment
+		}
+		resultPayment := payment.(paymentService.ResultPayment).Payment
+
+		for _, paymentValue := range resultPayment {
+			for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+
+				paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
+				if exist {
+					paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
+				} else {
+					paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
+				}
+
 			}
 
 		}
-
 	}
+
 	order := map[string]int{
 		"PRODUCT": 1,
 		"ADJUST":  2,
