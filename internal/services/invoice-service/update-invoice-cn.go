@@ -63,8 +63,8 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		return CreateInvoiceCN(ctx, jsonPayload)
 	}
-	if len(tempIDs) > 0 {
-		// Mixed batches recreate only the invoices whose stored status is TEMP.
+	/* 	if len(tempIDs) > 0 {
+		 Mixed batches recreate only the invoices whose stored status is TEMP.
 		results := make([]interface{}, 0, len(req))
 		for _, invoice := range req {
 			payload, err := json.Marshal([]models.Invoice{invoice})
@@ -78,7 +78,7 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				}
 				result, err = CreateInvoiceCN(ctx, string(payload))
 			} else {
-				result, err = UpdateInvoice(ctx, string(payload))
+				result, err = UpdateInvoiceCN(ctx, string(payload))
 			}
 			if err != nil {
 				return nil, err
@@ -86,7 +86,7 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			results = append(results, result)
 		}
 		return results, nil
-	}
+	} */
 	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, jsonPayload)
 	if errCreateInvoice != nil {
 		return nil, errCreateInvoice
