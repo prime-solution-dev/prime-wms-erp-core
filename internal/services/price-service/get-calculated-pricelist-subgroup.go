@@ -198,6 +198,13 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 	}
 
+	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
+	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
+	groupItemValues, err := loadGroupItemValueIntsFunc(subGroups)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load group item values: %w", err)
+	}
+
 	// Prepare response data for each sub group
 	responseData := make([]models.GetCalculatedPriceListSubGroupItem, 0, len(subGroupUUIDs))
 
@@ -215,10 +222,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
-		}
+		extraPriceWeight, extraPriceUnit := calculateExtraForSubGroup(subGroup, groupItemValues)
 
 		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
 		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch

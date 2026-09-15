@@ -500,8 +500,40 @@ func CompletePO(purchaseCodes []string) (err error) {
 		if err := tx.Model(&models.Purchase{}).
 			Where("purchase_code IN ?", purchaseCodes).
 			Updates(map[string]interface{}{
-				"status":     "COMPLETED",
-				"update_dtm": time.Now().UTC(),
+				"status": "COMPLETED",
+				// Close PO = manually finalise the document. The FE wording mapper
+				// resolves COMPLETED to "Complete" only when used_status=COMPLETED
+				// (otherwise a still-approved row falls back to "Approved"), so set
+				// it here to mirror a fully-received PO. status=COMPLETED already
+				// excludes it from Plan-GR/receiving, so no more goods can be taken in.
+				"used_status": "COMPLETED",
+				"update_dtm":  time.Now().UTC(),
+			}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// CancelPO cancels one or more purchase orders with a lightweight, header-only
+// status write (mirrors CompletePO): status=CANCELLED, status_approve=PENDING
+// (the "Cancel" wording, distinct from approval "Reject" which is REJECT). Unlike
+// UpdatePurchase it does NOT rewrite purchase_item rows. Used by the Draft/New
+// Cancel button on the PO detail page.
+func CancelPO(purchaseCodes []string) (err error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return err
+	}
+	defer db.CloseGORM(gormx)
+
+	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Purchase{}).
+			Where("purchase_code IN ?", purchaseCodes).
+			Updates(map[string]interface{}{
+				"status":         "CANCELLED",
+				"status_approve": "PENDING",
+				"update_dtm":     time.Now().UTC(),
 			}).Error; err != nil {
 			return err
 		}

@@ -277,3 +277,38 @@ func TestParse_PercentKeepsWholeNumberConvention(t *testing.T) {
 		})
 	}
 }
+
+// สอง extra row ที่ PG เหมือนกัน (เช่น "30 to 38" กับ "> 38" ของเกรดเดียวกัน) จะได้
+// extra_key ซ้ำกันเสมอ เพราะ extra_key gen จากค่า PG01..PG10 · ถ้า key ผูกกลับด้วย
+// string นี้ คีย์ของทุกแถวจะไปกองที่แถวแรกและแถวหลังเหลือ 0 คีย์
+// ExtraKeys จึงต้องพก RowNo ของแถวที่มันเกิดมาด้วย
+func TestParse_ExtraKeysBindToOwnRow(t *testing.T) {
+	sh := baseSheets()
+	sh["price_list_group_extra"] = [][]string{
+		{"company_code", "site_code", "group_code", "condition_code", "operator", "value_int", "cond_range_min", "cond_range_max", "PG01", "PG02"},
+		{testCompany, testSite, "G1", "PG06", "<>", "1", "30", "38", "PG01_8", "PG02_17"},
+		{testCompany, testSite, "G1", "PG06", ">", "1", "", "38", "PG01_8", "PG02_17"},
+	}
+
+	req, err := buildCreatePricelistRequestFromExcel(buildXlsx(t, sh))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(req.Extras) != 2 {
+		t.Fatalf("extras = %d, want 2", len(req.Extras))
+	}
+
+	keysByRow := map[int][]PriceListGroupExtraKeyDTO{}
+	for _, k := range req.ExtraKeys {
+		keysByRow[k.RowNo] = append(keysByRow[k.RowNo], k)
+	}
+	for _, e := range req.Extras {
+		got := keysByRow[e.RowNo]
+		if len(got) != 2 {
+			t.Fatalf("extra RowNo %d ได้ %d คีย์ ต้องได้ 2 (PG01+PG02) ของแถวตัวเอง", e.RowNo, len(got))
+		}
+		if got[0].Code != "PG01" || got[0].Value != "PG01_8" || got[1].Code != "PG02" || got[1].Value != "PG02_17" {
+			t.Errorf("extra RowNo %d คีย์ผิด: %+v", e.RowNo, got)
+		}
+	}
+}

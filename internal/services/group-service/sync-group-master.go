@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
@@ -62,6 +64,7 @@ func SyncGroupMasterWithDB(gormx *gorm.DB, req SyncGroupMasterRequest) (*SyncGro
 	}
 	items := make([]models.GroupItem, len(req.GroupItems))
 	copy(items, req.GroupItems)
+	deriveGroupItemValueInt(items)
 
 	if err := gormx.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Unscoped().Where("1 = 1").Delete(&models.GroupItem{}).Error; err != nil {
@@ -90,4 +93,25 @@ func SyncGroupMasterWithDB(gormx *gorm.DB, req SyncGroupMasterRequest) (*SyncGro
 		Message: fmt.Sprintf("Group master sync completed. Replaced with %d groups and %d group items.",
 			len(groups), len(items)),
 	}, nil
+}
+
+// deriveGroupItemValueInt เติม value_int จาก value เมื่อ WMS ไม่ได้ส่งมา
+//
+// WMS เก็บขนาดไว้ในคอลัมน์ value เป็น text ("38.00") และไม่ได้ส่ง value_int มาด้วย
+// แต่ extraConditionMatched ใช้ value_int เป็นตัวเทียบเงื่อนไข extra ทั้งหมด
+// ถ้าไม่ derive ตรงนี้ เงื่อนไขทุกข้อจะถูกเทียบกับ 0
+//
+// ต้องอยู่ใน sync ไม่ใช่แค่ migration เพราะ sync ลบ group_item ทั้งตารางแล้วสร้างใหม่
+// การ backfill ด้วย SQL อย่างเดียวจึงอยู่ได้แค่ถึง sync ครั้งถัดไป
+//
+// value ที่ไม่ใช่ตัวเลข (เช่น "BULK") ถูกข้ามไปโดยคง value_int เดิมไว้
+func deriveGroupItemValueInt(items []models.GroupItem) {
+	for i := range items {
+		if items[i].ValueInt != 0 {
+			continue
+		}
+		if v, err := strconv.ParseFloat(strings.TrimSpace(items[i].Value), 64); err == nil {
+			items[i].ValueInt = v
+		}
+	}
 }
