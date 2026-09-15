@@ -652,8 +652,12 @@ func applyInventoryFieldsToRow(row map[string]interface{}, sg SubGroup) {
 	//
 	// เดิม stock อ่าน inv.SumQty ซึ่ง endpoint get-inventory-weight-by-key ไม่เคยส่งมา
 	// จึงเป็น 0 เสมอ และ warehouse อ่าน SiteCode ซึ่งเป็นรหัส site ไม่ใช่รหัสคลัง
-	row["stock"] = inv.WarehouseCode
-	row["warehouse"] = inv.WarehouseCode
+	warehouseLabel := inv.WarehouseName
+	if warehouseLabel == "" {
+		warehouseLabel = inv.WarehouseCode
+	}
+	row["stock"] = warehouseLabel
+	row["warehouse"] = warehouseLabel
 	row["stock_quantity"] = inv.TotalQty
 	row["quantity"] = inv.SumQty
 	row["batch_no"] = inv.BatchNo

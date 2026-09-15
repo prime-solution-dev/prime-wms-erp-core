@@ -602,14 +602,20 @@ func patternDeclaresColumn(pattern *PatternConfig, name string) bool {
 //
 // สอง pattern ตั้งหัวคอลัมน์ต่างกันแต่หมายถึงค่าเดียวกัน คือคลังที่สินค้าตัวนั้นถูกเก็บอยู่
 //
-// ค่าจาก udf_json มาก่อนเพื่อไม่ทำลายค่าที่เคยถูกบันทึกไว้ แต่ในทางปฏิบัติไม่มีโค้ดไหน
-// เขียน key นี้ลง udf_json เลย ค่าจริงจึงมาจาก sg.WarehouseCode ที่ warehouse-core
-// อ่านมาจากตาราง inventory ซึ่งเป็นตารางเดียวกับหน้า Stock on hand
+// แสดง "ชื่อ" คลัง ไม่ใช่รหัส แต่ถอยไปใช้รหัสเมื่อ warehouse master ไม่มีชื่อให้
+// เพราะรหัสยังบอกผู้ใช้ได้ว่าของอยู่ไหน ดีกว่าปล่อยช่องว่างทั้งที่รู้คำตอบอยู่
 //
-// คืน nil เมื่อไม่มีทั้งสองทาง เพื่อให้เป็นช่องว่าง ไม่ใช่ "" ที่ดูเหมือนค่าที่ตั้งใจ
+// ค่าจาก udf_json มาก่อนเพื่อไม่ทำลายค่าที่เคยถูกบันทึกไว้ แต่ในทางปฏิบัติไม่มีโค้ดไหน
+// เขียน key นี้ลง udf_json เลย ค่าจริงจึงมาจาก subgroup ที่ warehouse-core อ่าน
+// มาจากตาราง inventory + warehouse ซึ่งเป็นแหล่งเดียวกับหน้า Stock on hand
+//
+// คืน nil เมื่อไม่มีทั้งสามทาง เพื่อให้เป็นช่องว่าง ไม่ใช่ "" ที่ดูเหมือนค่าที่ตั้งใจ
 func warehouseForRow(sg models.PriceListSubGroupResponse, udfValue interface{}) interface{} {
 	if udfValue != nil {
 		return udfValue
+	}
+	if sg.WarehouseName != "" {
+		return sg.WarehouseName
 	}
 	if sg.WarehouseCode != "" {
 		return sg.WarehouseCode

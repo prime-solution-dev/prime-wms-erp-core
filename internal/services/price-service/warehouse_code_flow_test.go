@@ -30,9 +30,9 @@ func TestGetPriceDetailCarriesWarehouseCodePerBatch(t *testing.T) {
 		"supplier_name": "Supplier 1",
 		"weight_spec": 12.5,
 		"inventory_weight": [
-			{"batch_no": "A-1509", "warehouse_code": "07", "total_qty": 75, "total_weight": 1455},
-			{"batch_no": "A-1509", "warehouse_code": "09", "total_qty": 25, "total_weight": 485},
-			{"batch_no": "B-1509", "warehouse_code": "07", "total_qty": 120, "total_weight": 2328}
+			{"batch_no": "A-1509", "warehouse_code": "07", "warehouse_name": "คลังหลัก", "total_qty": 75, "total_weight": 1455},
+			{"batch_no": "A-1509", "warehouse_code": "09", "warehouse_name": "คลังนอก", "total_qty": 25, "total_weight": 485},
+			{"batch_no": "B-1509", "warehouse_code": "07", "warehouse_name": "คลังหลัก", "total_qty": 120, "total_weight": 2328}
 		]
 	}]`
 	srv := fakeWarehouseServer(t, body)
@@ -62,6 +62,11 @@ func TestGetPriceDetailCarriesWarehouseCodePerBatch(t *testing.T) {
 		if sg.InventoryWeight[0].WarehouseCode != sg.WarehouseCode {
 			t.Errorf("คลังใน InventoryWeight ไม่ตรงกับที่ copy ขึ้น subgroup: %q vs %q",
 				sg.InventoryWeight[0].WarehouseCode, sg.WarehouseCode)
+		}
+		// ชื่อคลังคือค่าที่คอลัมน์แสดงจริง ต้องเดินทางมาถึง subgroup ด้วย
+		wantName := map[string]string{"07": "คลังหลัก", "09": "คลังนอก"}[sg.WarehouseCode]
+		if sg.WarehouseName != wantName {
+			t.Errorf("คลัง %s: ชื่อต้องเป็น %q ได้ %q", sg.WarehouseCode, wantName, sg.WarehouseName)
 		}
 	}
 

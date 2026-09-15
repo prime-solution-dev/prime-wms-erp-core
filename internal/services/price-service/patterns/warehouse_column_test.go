@@ -103,14 +103,20 @@ func TestCollapseSubGroupRowsKeyDoesNotCollideOnSeparator(t *testing.T) {
 	}
 }
 
-func TestWarehouseForRowPrefersUdfThenSubGroup(t *testing.T) {
-	sg := models.PriceListSubGroupResponse{WarehouseCode: "07"}
+func TestWarehouseForRowShowsNameNotCode(t *testing.T) {
+	named := models.PriceListSubGroupResponse{WarehouseCode: "07", WarehouseName: "คลังสินค้าสำเร็จรูป"}
 
-	if got := warehouseForRow(sg, "99"); got != "99" {
+	// คอลัมน์นี้ต้องแสดงชื่อคลัง ไม่ใช่รหัส
+	if got := warehouseForRow(named, nil); got != "คลังสินค้าสำเร็จรูป" {
+		t.Errorf("ต้องแสดงชื่อคลัง ได้ %#v", got)
+	}
+	if got := warehouseForRow(named, "99"); got != "99" {
 		t.Errorf("ค่าที่บันทึกไว้ใน udf_json ต้องชนะ ได้ %#v", got)
 	}
-	if got := warehouseForRow(sg, nil); got != "07" {
-		t.Errorf("ไม่มี udf ต้อง fallback ไปคลังจาก inventory ได้ %#v", got)
+	// master ไม่มีชื่อ ถอยไปใช้รหัสดีกว่าปล่อยว่างทั้งที่รู้คำตอบ
+	codeOnly := models.PriceListSubGroupResponse{WarehouseCode: "07"}
+	if got := warehouseForRow(codeOnly, nil); got != "07" {
+		t.Errorf("ไม่มีชื่อต้องถอยไปใช้รหัส ได้ %#v", got)
 	}
 	// ต้องเป็น nil ไม่ใช่ "" เพื่อให้เป็นช่องว่าง ไม่ใช่ค่าที่ดูเหมือนตั้งใจ
 	if got := warehouseForRow(models.PriceListSubGroupResponse{}, nil); got != nil {

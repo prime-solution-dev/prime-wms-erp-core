@@ -317,6 +317,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.SupplierName = inv.SupplierName
 							expandedSG.BatchNo = inv.BatchNo
 							expandedSG.WarehouseCode = inv.WarehouseCode
+							expandedSG.WarehouseName = inv.WarehouseName
 							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
 							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0

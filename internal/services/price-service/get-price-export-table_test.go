@@ -491,6 +491,7 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 								SupplierName:  "โรงงานเหล็ก",
 								SiteCode:      "S1",
 								WarehouseCode: "07",
+								WarehouseName: "คลังสินค้าสำเร็จรูป",
 								SumQty:        3,
 								TotalQty:      7,
 								AvgWeight:     1.5,
@@ -560,8 +561,8 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 	}
 	// คอลัมน์ "Stock" และ "โกดัง" แสดงคลังที่ของตั้งอยู่เหมือนกัน ไม่ใช่จำนวน
 	// (จำนวนอยู่ที่ quantity / stock_quantity)
-	if inv["stock"] != "07" {
-		t.Fatalf("expected stock to be the warehouse code, got %#v", inv["stock"])
+	if inv["stock"] != "คลังสินค้าสำเร็จรูป" {
+		t.Fatalf("expected stock to be the warehouse name, got %#v", inv["stock"])
 	}
 	if inv["quantity"] != float64(3) {
 		t.Fatalf("expected quantity to come from SumQty, got %#v", inv["quantity"])
@@ -569,8 +570,8 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 	if inv["stock_quantity"] != float64(7) {
 		t.Fatalf("expected stock_quantity to come from TotalQty, got %#v", inv["stock_quantity"])
 	}
-	// เดิมคอลัมน์นี้ใส่ SiteCode ("S1") ซึ่งเป็นรหัส site ไม่ใช่รหัสคลัง
-	if inv["warehouse"] != "07" || inv["batch_no"] != "B-9" {
+	// เดิมคอลัมน์นี้ใส่ SiteCode ("S1") ซึ่งเป็นรหัส site ไม่ใช่คลัง
+	if inv["warehouse"] != "คลังสินค้าสำเร็จรูป" || inv["batch_no"] != "B-9" {
 		t.Fatalf("expected warehouse/batch_no from inventory, got %#v / %#v", inv["warehouse"], inv["batch_no"])
 	}
 	if inv["DYN_B"] != "แปลงแล้ว" {
