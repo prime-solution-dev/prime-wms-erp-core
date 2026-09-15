@@ -220,7 +220,7 @@ func buildCreatePricelistRequestFromTemplate(r io.Reader, opts templateParseOpti
 	if err != nil {
 		return nil, err
 	}
-	cName := col["Product name"]           // optional -> remark
+	cName := col["Product name"] // optional -> remark
 	cFDefault := col["formula_code_default"]
 	cFConvert := col["formula_code_convert"]
 
