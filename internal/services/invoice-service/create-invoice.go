@@ -31,7 +31,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for i, invoice := range req {
 		invoiceID := uuid.New()
 
-		if req[i].InvoiceCode == "" {
+		if req[i].ID == uuid.Nil {
 			req[i].ID = invoiceID
 		}
 		req[i].CreateBy = userID
