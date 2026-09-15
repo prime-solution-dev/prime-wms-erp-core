@@ -58,57 +58,61 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 		}
 	}
-
-	requestDataGetPayment := map[string]interface{}{
-		"invoice_code": invoiceCode,
-	}
-
-	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
-	if err != nil {
-		return nil, err
-	}
-
-	paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
-	if errGetPayment != nil {
-		return nil, errGetPayment
-	}
-	resultPayment := paymentle.(paymentService.ResultPayment).Payment
 	paymentValueMap := map[string]float64{}
 	sumPaidInvoice := 0.00
-	for _, paymentValue := range resultPayment {
-		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
-
-			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
-			if exist {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
-			} else {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
-			}
-			sumPaidInvoice += paymentInvoiceValue.Amount
-
-		}
-
-	}
-	requestDataGetInvoice := map[string]interface{}{
-		"invoice_ref": invoiceCode,
-	}
-	jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
-	if err != nil {
-		return nil, err
-	}
-	invoice, errGetInvoice := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoice))
-	if errGetInvoice != nil {
-		return nil, errGetInvoice
-	}
-	resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
 	resultInvoiceMap := map[string]models.Invoice{}
-	for _, resultInvoiceValue := range resultInvoice {
-		sumAmunt := 0.0
-		for _, invoiceItemValue := range resultInvoiceValue.InvoiceItem {
-			sumAmunt += invoiceItemValue.TotalAmount
+	if len(invoiceCode) > 0 {
+		requestDataGetPayment := map[string]interface{}{
+			"invoice_code": invoiceCode,
 		}
-		resultInvoiceValue.TotalAmount = sumAmunt
-		resultInvoiceMap[resultInvoiceValue.InvoiceRef] = resultInvoiceValue
+
+		jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
+		if err != nil {
+			return nil, err
+		}
+
+		paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+		if errGetPayment != nil {
+			return nil, errGetPayment
+		}
+		resultPayment := paymentle.(paymentService.ResultPayment).Payment
+
+		for _, paymentValue := range resultPayment {
+			for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+
+				paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
+				if exist {
+					paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
+				} else {
+					paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
+				}
+				sumPaidInvoice += paymentInvoiceValue.Amount
+
+			}
+
+		}
+
+		requestDataGetInvoice := map[string]interface{}{
+			"invoice_ref": invoiceCode,
+		}
+		jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
+		if err != nil {
+			return nil, err
+		}
+		invoice, errGetInvoice := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoice))
+		if errGetInvoice != nil {
+			return nil, errGetInvoice
+		}
+		resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
+
+		for _, resultInvoiceValue := range resultInvoice {
+			sumAmunt := 0.0
+			for _, invoiceItemValue := range resultInvoiceValue.InvoiceItem {
+				sumAmunt += invoiceItemValue.TotalAmount
+			}
+			resultInvoiceValue.TotalAmount = sumAmunt
+			resultInvoiceMap[resultInvoiceValue.InvoiceRef] = resultInvoiceValue
+		}
 	}
 
 	saleAmount := 0.00
