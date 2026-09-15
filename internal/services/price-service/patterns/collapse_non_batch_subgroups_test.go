@@ -48,7 +48,7 @@ func TestCollapseNonBatchSubGroupsCollapsesWhenNotPerBatch(t *testing.T) {
 		sgWith("a", 6),
 	}
 
-	got := collapseNonBatchSubGroups(in, false)
+	got := collapseSubGroupRows(in, false, false)
 
 	if want := []string{"a", "b", "c"}; !equalStrings(ids(got), want) {
 		t.Fatalf("ได้ %v ต้องเป็น %v", ids(got), want)
@@ -68,7 +68,7 @@ func TestCollapseNonBatchSubGroupsCollapsesWhenNotPerBatch(t *testing.T) {
 func TestCollapseNonBatchSubGroupsKeepsAllWhenNoDuplicate(t *testing.T) {
 	in := []models.PriceListSubGroupResponse{sgWith("a", 1), sgWith("b", 2), sgWith("c", 3)}
 
-	got := collapseNonBatchSubGroups(in, false)
+	got := collapseSubGroupRows(in, false, false)
 
 	if want := []string{"a", "b", "c"}; !equalStrings(ids(got), want) {
 		t.Fatalf("ได้ %v ต้องเป็น %v", ids(got), want)
@@ -83,7 +83,7 @@ func TestCollapseNonBatchSubGroupsKeepsAllWhenPerBatch(t *testing.T) {
 		sgWith("a", 3),
 	}
 
-	got := collapseNonBatchSubGroups(in, true)
+	got := collapseSubGroupRows(in, true, true)
 
 	if want := []string{"a", "a", "a"}; !equalStrings(ids(got), want) {
 		t.Fatalf("ได้ %v ต้องเป็น %v", ids(got), want)
@@ -97,10 +97,10 @@ func TestCollapseNonBatchSubGroupsKeepsAllWhenPerBatch(t *testing.T) {
 
 // slice ว่าง / nil ต้องไม่ panic
 func TestCollapseNonBatchSubGroupsEmpty(t *testing.T) {
-	if got := collapseNonBatchSubGroups(nil, false); len(got) != 0 {
+	if got := collapseSubGroupRows(nil, false, false); len(got) != 0 {
 		t.Errorf("nil ต้องได้ผลลัพธ์ว่าง ได้ len %d", len(got))
 	}
-	if got := collapseNonBatchSubGroups([]models.PriceListSubGroupResponse{}, true); len(got) != 0 {
+	if got := collapseSubGroupRows([]models.PriceListSubGroupResponse{}, true, true); len(got) != 0 {
 		t.Errorf("slice ว่างต้องได้ผลลัพธ์ว่าง ได้ len %d", len(got))
 	}
 }
