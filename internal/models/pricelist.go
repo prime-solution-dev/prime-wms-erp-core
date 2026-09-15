@@ -311,6 +311,10 @@ type InventoryWeightResponse struct {
 	SumWeight        float64 `json:"sum_weight"`
 	TotalQty         float64 `json:"total_qty"`
 	TotalWeight      float64 `json:"total_weight"`
+	// WarehouseCode คือคลังที่ของตั้งอยู่ warehouse-core อ่านมาจากตาราง inventory
+	// ซึ่งเป็นตารางเดียวกับหน้า Stock on hand ค่าจึงตรงกันโดยนิยาม
+	// 1 batch ที่กระจายหลายคลังถูกแตกเป็นหลาย entry แบ่งยอดตามสัดส่วนมาแล้ว
+	WarehouseCode string `json:"warehouse_code,omitempty"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -351,6 +355,9 @@ type PriceListSubGroupResponse struct {
 	WeightSpec float64 `json:"weight_spec"`
 	BatchNo    string  `json:"batch_no,omitempty"`
 	DefaultUom string  `json:"default_uom,omitempty"`
+	// WarehouseCode คือคลังของ inventory record ที่ subgroup แถวนี้ถูก expand ออกมา
+	// เป็นค่าที่คอลัมน์ "โกดัง" / "Stock" แสดง
+	WarehouseCode string `json:"warehouse_code,omitempty"`
 }
 
 type GetPriceListResponse struct {

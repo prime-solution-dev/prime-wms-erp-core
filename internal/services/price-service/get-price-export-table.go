@@ -429,12 +429,12 @@ func buildExportTableTyped(
 			}
 
 			row := map[string]interface{}{
-				"id":                           sg.ID.String(),
-				"total_net_price_unit":         sg.TotalNetPriceUnit,
-				"total_net_price_weight":       sg.TotalNetPriceWeight,
+				"id":                            sg.ID.String(),
+				"total_net_price_unit":          sg.TotalNetPriceUnit,
+				"total_net_price_weight":        sg.TotalNetPriceWeight,
 				"before_total_net_price_unit":   sg.BeforeTotalNetPriceUnit,
 				"before_total_net_price_weight": sg.BeforeTotalNetPriceWeight,
-				"remark":                       sg.Remark,
+				"remark":                        sg.Remark,
 			}
 			// Map UDF values dynamically from udf_json to their corresponding columns
 			if len(sg.UdfJson) > 0 {
@@ -647,12 +647,17 @@ func applyInventoryFieldsToRow(row map[string]interface{}, sg SubGroup) {
 	// AvgWeight เป็นค่าระดับ batch ซึ่งไม่ใช่สิ่งที่คอลัมน์นี้ต้องแสดง
 	row["avg_weight"] = inv.AvgProduct
 	row["market_weight"] = inv.WeightSpec
-	row["stock"] = inv.SumQty
+	// คอลัมน์ "Stock" และ "โกดัง" ตั้งหัวคอลัมน์ต่างกันแต่แสดงค่าเดียวกัน คือคลังที่ของ
+	// ตั้งอยู่ ให้ตรงกับกริดที่ map ทั้งสองชื่อไปที่ dataMapping "warehouse" เหมือนกัน
+	//
+	// เดิม stock อ่าน inv.SumQty ซึ่ง endpoint get-inventory-weight-by-key ไม่เคยส่งมา
+	// จึงเป็น 0 เสมอ และ warehouse อ่าน SiteCode ซึ่งเป็นรหัส site ไม่ใช่รหัสคลัง
+	row["stock"] = inv.WarehouseCode
+	row["warehouse"] = inv.WarehouseCode
 	row["stock_quantity"] = inv.TotalQty
 	row["quantity"] = inv.SumQty
 	row["batch_no"] = inv.BatchNo
 	row["brand"] = inv.SupplierName
 	row["code"] = inv.ProductCode
-	row["warehouse"] = inv.SiteCode
 	row["supplier_name"] = inv.SupplierName
 }

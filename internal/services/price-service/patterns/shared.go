@@ -557,6 +557,30 @@ func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bo
 // batch_no ที่นั่นจะถูกจัดเป็น non-batch เงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
 // (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
 func patternHasBatchColumn(pattern *PatternConfig) bool {
+	return patternDeclaresColumn(pattern, "batch_no")
+}
+
+// patternHasWarehouseColumn บอกว่า pattern นี้แสดงคลังที่เก็บของหรือไม่
+//
+// pattern ที่แสดงคลังต้องแยกแถวต่อคลัง ไม่งั้นของที่กระจายอยู่หลายคลังจะถูกยุบเหลือ
+// คลังเดียวแล้วผู้ใช้เห็นคลังเดียวโดยไม่รู้ว่ามีที่อื่นอีก
+//
+// บาง pattern ตั้ง headerName เป็น "Stock" บางตัวเป็น "โกดัง" แต่ค่าที่แสดงคือคลัง
+// เดียวกัน จึงตัดสินจาก dataMapping ไม่ใช่ชื่อหัวคอลัมน์
+func patternHasWarehouseColumn(pattern *PatternConfig) bool {
+	return patternDeclaresColumn(pattern, "warehouse")
+}
+
+// patternDeclaresColumn ตรวจว่า pattern ประกาศคอลัมน์ชื่อนี้ไว้หรือไม่
+//
+// ต้องตรวจ**ทุกช่องทาง**ที่ PatternConfig ประกาศคอลัมน์ได้ คือ Columns,
+// FixedColumns และ ColumnGroups[].Children ถ้าตกช่องใดไป pattern ที่ประกาศคอลัมน์
+// ที่นั่นจะถูกจัดผิดประเภทเงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
+// (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
+//
+// ตรวจทั้ง Field และ DataMapping เพราะบาง pattern เปลี่ยนชื่อคอลัมน์ไปเป็น "โรงงาน"
+// หรือ "Ship No." แล้วอ้างความหมายจริงผ่าน dataMapping แทน
+func patternDeclaresColumn(pattern *PatternConfig, name string) bool {
 	if pattern == nil {
 		return false
 	}
@@ -566,7 +590,7 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 	}
 	for _, group := range cols {
 		for _, c := range group {
-			if c.Field == "batch_no" || c.DataMapping == "batch_no" {
+			if c.Field == name || c.DataMapping == name {
 				return true
 			}
 		}
@@ -574,8 +598,26 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 	return false
 }
 
-// collapseNonBatchSubGroups ยุบ subGroups ให้เหลือ record แรกของแต่ละ sg.ID
-// เมื่อ pattern ไม่มีคอลัมน์ batch_no
+// warehouseForRow คืนคลังที่จะแสดงในคอลัมน์ "โกดัง" / "Stock"
+//
+// สอง pattern ตั้งหัวคอลัมน์ต่างกันแต่หมายถึงค่าเดียวกัน คือคลังที่สินค้าตัวนั้นถูกเก็บอยู่
+//
+// ค่าจาก udf_json มาก่อนเพื่อไม่ทำลายค่าที่เคยถูกบันทึกไว้ แต่ในทางปฏิบัติไม่มีโค้ดไหน
+// เขียน key นี้ลง udf_json เลย ค่าจริงจึงมาจาก sg.WarehouseCode ที่ warehouse-core
+// อ่านมาจากตาราง inventory ซึ่งเป็นตารางเดียวกับหน้า Stock on hand
+//
+// คืน nil เมื่อไม่มีทั้งสองทาง เพื่อให้เป็นช่องว่าง ไม่ใช่ "" ที่ดูเหมือนค่าที่ตั้งใจ
+func warehouseForRow(sg models.PriceListSubGroupResponse, udfValue interface{}) interface{} {
+	if udfValue != nil {
+		return udfValue
+	}
+	if sg.WarehouseCode != "" {
+		return sg.WarehouseCode
+	}
+	return nil
+}
+
+// collapseSubGroupRows ยุบ subGroups ให้เหลือ record แรกของแต่ละมิติที่ตารางแสดงจริง
 //
 // warehouse-core รวม inventory ด้วยคีย์ company|site|product|batch จึงคืนหลาย
 // record ต่อ 1 subgroup ซึ่งฝั่ง build row จะ expand เป็นหลายแถว
@@ -585,21 +627,37 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 // เลือก record ตัวแรกให้ตรงกับฝั่ง export ที่ใช้ inventoryWeights[0]
 // และวน slice ตามลำดับเดิม (ห้ามวน map) เพื่อให้ผลลัพธ์ deterministic
 //
-// perBatch = true คืน slice เดิมทั้งก้อน เพราะ 1 row = 1 batch ตามที่ตั้งใจ
+// perBatch และ perWarehouse = true ทั้งคู่ คืน slice เดิมทั้งก้อน เพราะทุก record
+// ต่างกันในมิติที่ตารางแสดงอยู่แล้ว
 //
 // caller ต้องรักษาลำดับ relative ของ record ที่มี sg.ID เดียวกันไว้ (ใช้ sort.SliceStable
 // เท่านั้น ห้าม sort.Slice) ไม่งั้น "record แรก" จะไม่ใช่ inventoryWeights[0] อีกต่อไป
-func collapseNonBatchSubGroups(subGroups []models.PriceListSubGroupResponse, perBatch bool) []models.PriceListSubGroupResponse {
-	if perBatch || len(subGroups) == 0 {
+//
+// การหยิบ record แรกแทนการรวมยอดปลอดภัยเพราะคอลัมน์ที่ pattern แบบไม่แยก batch
+// แสดงคือ avg_weight (ค่าเฉลี่ยระดับ site) และ total_weight (Weight-spec จาก product
+// master) ซึ่งเท่ากันทุก record อยู่แล้ว ไม่มีคอลัมน์ที่เป็นผลรวมให้คิดผิด
+// ถ้าวันหนึ่งมี pattern แบบนี้เพิ่มคอลัมน์ยอดรวม ต้องเปลี่ยนมารวมยอดตรงนี้
+func collapseSubGroupRows(subGroups []models.PriceListSubGroupResponse, perBatch bool, perWarehouse bool) []models.PriceListSubGroupResponse {
+	if (perBatch && perWarehouse) || len(subGroups) == 0 {
 		return subGroups
 	}
 	seen := make(map[string]bool, len(subGroups))
 	collapsed := make([]models.PriceListSubGroupResponse, 0, len(subGroups))
 	for _, sg := range subGroups {
-		if seen[sg.ID] {
+		// คีย์ประกอบจากมิติที่ตารางนี้แสดงจริงเท่านั้น มิติที่ไม่ได้แสดงถูกยุบทิ้ง
+		// ใช้ \x00 คั่นเพราะเป็นอักขระที่ไม่มีทางอยู่ใน batch หรือรหัสคลัง
+		// (ต่างจาก "|" ที่ batch_no มีได้จริง — ดู aggregateInventoryWeights)
+		key := sg.ID
+		if perBatch {
+			key += "\x00" + sg.BatchNo
+		}
+		if perWarehouse {
+			key += "\x00" + sg.WarehouseCode
+		}
+		if seen[key] {
 			continue
 		}
-		seen[sg.ID] = true
+		seen[key] = true
 		collapsed = append(collapsed, sg)
 	}
 	return collapsed
@@ -1101,7 +1159,7 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 
 func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
-	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -1215,7 +1273,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		inactiveValue := false
 		hasInactiveValue := false
 		var lineBundleValue interface{}
-		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
 		var supplierNameValue interface{}
@@ -1281,10 +1338,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				for key, value := range udfData {
 					if key == "is_highlight" || key == "inactive" || key == "stock_quantity" || key == "batch_no" || key == "warehouse" || key == "code" {
 						continue
-					}
-
-					if key == "stock" {
-						stockValue = value
 					}
 
 					// Handle awaiting_production fields directly from udf_json
@@ -1455,8 +1508,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				} else {
 					row[fieldName] = false
 				}
-			case "stock":
-				row[fieldName] = stockValue
 			case "line_bundle":
 				if lineBundleValue != nil {
 					row[fieldName] = lineBundleValue
@@ -1486,7 +1537,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					row[fieldName] = nil
 				}
 			case "warehouse":
-				row[fieldName] = warehouseValue
+				row[fieldName] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				row[fieldName] = codeValue
 			case "total_weight":
@@ -1571,7 +1622,7 @@ func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg mo
 
 func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
-	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -1586,7 +1637,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		var lineBundleValue interface{}
 		var marketWeightValue interface{}
 		var odValue interface{}
-		var stockValue interface{}
 		var importDateValue interface{}
 		var deliveryDateValue interface{}
 		var nextProductionValue interface{}
@@ -1635,9 +1685,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				marketWeightValue = udfNumeric(udfData, "market_weight")
 				if od, ok := udfData["od"]; ok {
 					odValue = od
-				}
-				if stock, ok := udfData["stock"]; ok {
-					stockValue = stock
 				}
 				if importDate, ok := udfData["import_date"]; ok {
 					importDateValue = importDate
@@ -1795,8 +1842,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				}
 			case "od":
 				row[fixedCol.Field] = odValue
-			case "stock":
-				row[fixedCol.Field] = stockValue
 			case "extra_price_unit":
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
@@ -1860,11 +1905,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					row[fixedCol.Field] = nil
 				}
 			case "warehouse":
-				if warehouseValue != nil {
-					row[fixedCol.Field] = warehouseValue
-				} else {
-					row[fixedCol.Field] = nil
-				}
+				row[fixedCol.Field] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				if codeValue != nil {
 					row[fixedCol.Field] = codeValue
@@ -2046,12 +2087,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				} else {
 					row[colConfig.Field] = nil
 				}
-			case "stock":
-				if stockValue != nil {
-					row[colConfig.Field] = stockValue
-				} else {
-					row[colConfig.Field] = nil
-				}
 			case "import_date":
 				if importDateValue != nil {
 					row[colConfig.Field] = importDateValue
@@ -2115,11 +2150,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					row[colConfig.Field] = nil
 				}
 			case "warehouse":
-				if warehouseValue != nil {
-					row[colConfig.Field] = warehouseValue
-				} else {
-					row[colConfig.Field] = nil
-				}
+				row[colConfig.Field] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				if codeValue != nil {
 					row[colConfig.Field] = codeValue
@@ -2299,7 +2330,7 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	}
 
 	perBatch := patternHasBatchColumn(pattern)
-	subGroups = collapseNonBatchSubGroups(subGroups, perBatch)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 
 	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
 	type pg2Entry struct {
