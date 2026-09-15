@@ -176,12 +176,13 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						}
 
 						deposit = append(deposit, models.Deposit{
-							DepositCode:  depMap["anchor"].(string),
-							CustomerCode: req[0].PartyCode,
-							AmountTotal:  totalFloat,
-							AmountUsed:   drFloat,
-							AmountRemain: crFloat,
-							Status:       "PENDING",
+							DepositCode:   depMap["anchor"].(string),
+							CustomerCode:  req[0].PartyCode,
+							AmountTotal:   totalFloat,
+							AmountUsed:    drFloat,
+							AmountRemain:  crFloat,
+							Status:        "PENDING",
+							CompanyFormat: "IV",
 						})
 					}
 					if len(deposit) > 0 {
