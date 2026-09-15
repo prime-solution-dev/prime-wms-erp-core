@@ -85,6 +85,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	if errApproval != nil {
 		return nil, errApproval
 	}
+	if len(credit) == 0 {
+		return ResultCreditRequest{
+			Total: totalRecords, Page: req.Page, PageSize: req.PageSize,
+			TotalPages: totalPages, CreditRequest: credit,
+		}, nil
+	}
 	customerCode := []string{}
 
 	for _, creditValue := range credit {
@@ -208,29 +214,17 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
+	consumedTotals, err := summaryService.GetConsumedCreditTotals(ctx.Request.Context(), customerCode)
+	if err != nil {
+		return nil, err
+	}
 	for i := range credit {
-
-		requestDataGetConsumend := map[string]interface{}{
-			"customer_code": credit[i].CustomerCode,
-			"paid_invoice":  true,
-		}
-		jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
-		if err != nil {
-			return nil, err
-		}
-
-		paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
-		if errApproval != nil {
-			return nil, errApproval
-		}
-		resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
-
 		conMapCustomer, exist := convertCustomerMap[credit[i].CustomerCode]
 		if exist {
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-		credit[i].ConsumedCredit = resultGetPaidInvoice.TotalAmount
+		credit[i].ConsumedCredit = consumedTotals[credit[i].CustomerCode]
 		/* credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
 		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) */
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
