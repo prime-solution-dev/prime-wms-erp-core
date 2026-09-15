@@ -6,10 +6,8 @@ import (
 	"math"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
-	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -135,7 +133,7 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, err
 		}
 	}
-	if req[0].ExternalID != "" {
+	/* 	if req[0].ExternalID != "" {
 		depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
 		if err != nil {
 			return nil, err
@@ -160,12 +158,13 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				}
 
 				deposit = append(deposit, models.Deposit{
-					DepositCode:  depMap["anchor"].(string),
-					CustomerCode: req[0].PartyCode,
-					AmountTotal:  totalFloat,
-					AmountUsed:   drFloat,
-					AmountRemain: crFloat,
-					Status:       "PENDING",
+					DepositCode:   depMap["anchor"].(string),
+					CustomerCode:  req[0].PartyCode,
+					AmountTotal:   totalFloat,
+					AmountUsed:    drFloat,
+					AmountRemain:  crFloat,
+					Status:        "PENDING",
+					CompanyFormat: "IV",
 				})
 			}
 			if len(deposit) > 0 {
@@ -181,7 +180,7 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 		}
-	}
+	} */
 
 	return createInvoiceReturn, nil
 

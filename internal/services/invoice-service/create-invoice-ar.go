@@ -7,12 +7,10 @@ import (
 	"math"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
-	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"slices"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -151,7 +149,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errCreateInvoice
 			}
 
-			if req[0].ExternalID != "" && req[0].Status == "COMPLETED" {
+			/* 	if req[0].ExternalID != "" && req[0].Status == "COMPLETED" {
 				depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
 				if err != nil {
 					return nil, err
@@ -198,7 +196,7 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					}
 
 				}
-			}
+			} */
 
 			return createInvoiceReturn, nil
 		}
