@@ -5,12 +5,12 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Demo' 
-        REMOTE_USER = 'ec2-user'
-        REMOTE_HOST = '18.139.159.17'
-        SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.DemoWMS' 
-        ENV_FILE_KEY = 'Demo.env.erp' 
+        TARGET_BRANCH = 'shi-main'
+        REMOTE_USER = 'ubuntu'
+        REMOTE_HOST = '56.10.15.199'
+        SSH_KEY_PATH = '/home/ec2-user/key/shiseido-main.pem'
+        VAULT_PATH = 'JenkinsWMS/jenkins.shiseidomain'
+        ENV_FILE_KEY = 'shiseidomain.env.erp' 
     }
     stages {
         stage('Check SSH Key Access and User') {
