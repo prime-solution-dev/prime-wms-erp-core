@@ -671,6 +671,8 @@ type GetProductsDetailComponent struct {
 	ExternalID                    string                         `json:"external_id"`
 	GRTolerance                   float64                        `json:"gr_tolerance"`
 	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	GRWeightTolerance             float64                        `json:"gr_weight_tolerance"`
+	GRWeightToleranceActive       bool                           `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`
