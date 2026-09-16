@@ -389,6 +389,16 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
 		}
+
+		// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+		// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+		// The invoice is already saved here; a reconcile failure must NOT fail the request
+		// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+		// next GRA on this PO, or a manual reconcile, self-heals.
+		if err := reconcilePOAfterAPSave(req); err != nil {
+			log.Printf("CreateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
+		}
+
 		invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 		idInvoice := invoiceMap["id"].([]uuid.UUID)
 		requestData := map[string]interface{}{
