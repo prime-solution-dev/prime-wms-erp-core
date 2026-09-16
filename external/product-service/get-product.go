@@ -91,6 +91,7 @@ type GetProductsComponent struct {
 	GRTolerance                   float64               `json:"gr_tolerance"`
 	GRWeightTolerance             float64               `json:"gr_weight_tolerance"`
 	GRToleranceActive             bool                  `json:"gr_tolerance_active"`
+	GRWeightToleranceActive       bool                  `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                `json:"unit_interface"`
 	AdjustmentUnit                string                `json:"adjustment_unit"`
 	Weight                        float64               `json:"weight"`

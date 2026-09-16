@@ -169,3 +169,14 @@ func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	return nil, nil
 }
+
+// ReconcilePOFromAP recomputes each PO's completion from persisted COMPLETED-AP
+// state (product-master tolerance, per-unit) and closes lines / headers.
+// Called after an AP invoice (GRA) is saved with status COMPLETED. productMap is
+// keyed by product_code and carries the gr_tolerance / gr_weight_tolerance master.
+func ReconcilePOFromAP(purchaseCodes []string, productMap map[string]models.GetProductsDetailComponent) error {
+	if err := purchaseRepository.ReconcilePOFromAP(purchaseCodes, productMap); err != nil {
+		return errors.New("failed to reconcile PO from AP: " + err.Error())
+	}
+	return nil
+}
