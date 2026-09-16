@@ -359,7 +359,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Action:       "X",
 			OrderID:      uuid.New(),
 			OrderCode:    "",
-			OrderType:    "DELIVERY",
+			OrderType:    "NORMAL",
 			OrderDate:    time.Now(),
 			TenantID:     nil,
 			CustomerCode: deliveryReq.CustomerCode,
