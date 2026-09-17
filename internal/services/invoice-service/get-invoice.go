@@ -41,6 +41,13 @@ type GetInvoiceRequest struct {
 	CreateDate         *time.Time  `json:"create_date"`
 	LastSubmitDate     *time.Time  `json:"last_submit_date"`
 	InvoiceNotGrReturn *bool       `json:"invoice_not_gr_return"`
+
+	EndCreateDate       *time.Time `json:"end_create_date"`
+	EndDocumentDate     *time.Time `json:"end_document_date"`
+	EndLastSubmitDate   *time.Time `json:"end_last_submit_date"`
+	StartCreateDate     *time.Time `json:"start_create_date"`
+	StartDocumentDate   *time.Time `json:"start_document_date"`
+	StartLastSubmitDate *time.Time `json:"start_last_submit_date"`
 }
 type ResultInvoice struct {
 	Total      int              `json:"total"`
@@ -58,7 +65,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn, req.StartCreateDate, req.EndCreateDate, req.StartDocumentDate, req.EndDocumentDate, req.StartLastSubmitDate, req.EndLastSubmitDate)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

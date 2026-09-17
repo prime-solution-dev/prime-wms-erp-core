@@ -20,11 +20,13 @@ type GetSalePackRequest struct {
 	IsNotMatchIv bool     `json:"is_not_match_iv"`
 	PackingCode  []string `json:"packing_code"`
 	StatusPack   []string `json:"status_pack"`
-	SaleCode     []string `json:"sale_code"`
-	CompanyCode  []string `json:"company_code"`
-	SiteCode     []string `json:"site_code"`
-	Page         int      `json:"page"`
-	PageSize     int      `json:"page_size"`
+	// StatusInvoice สถานะ invoice ที่ถือว่า pack ถูกใช้ไปแล้ว (ใช้คู่กับ is_not_match_iv) ถ้าไม่ส่งมาใช้ PENDING, COMPLETED
+	StatusInvoice []string `json:"status_invoice"`
+	SaleCode      []string `json:"sale_code"`
+	CompanyCode   []string `json:"company_code"`
+	SiteCode      []string `json:"site_code"`
+	Page          int      `json:"page"`
+	PageSize      int      `json:"page_size"`
 }
 
 type GetSalePackResponse struct {
@@ -216,10 +218,15 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		// If is_not_match_iv == true, join with invoice items to get excluded pack codes
 		if req.IsNotMatchIv {
+			statusInvoice := req.StatusInvoice
+			if len(statusInvoice) == 0 {
+				statusInvoice = []string{"PENDING", "COMPLETED"}
+			}
+
 			var invoiceItems []models.InvoiceItem
 			if err := gormx.Joins("JOIN invoice ON invoice_item.invoice_id = invoice.id").
 				Where("invoice.status IN ? AND invoice_item.document_ref = ? AND invoice.invoice_type = ?",
-					[]string{"PENDING", "COMPLETED"}, sale.SaleCode, "AR").
+					statusInvoice, sale.SaleCode, "AR").
 				Find(&invoiceItems).Error; err == nil {
 
 				// Extract unique excluded pack codes from sourceCode (pack codes to avoid)
