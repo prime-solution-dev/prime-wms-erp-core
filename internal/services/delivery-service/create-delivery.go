@@ -47,6 +47,7 @@ type CreateDeliveryRequest struct {
 
 type CreateDeliveryItemsRequest struct {
 	ProductCode     string  `json:"product_code"`
+	ProductDesc     string  `json:"product_desc"`
 	Qty             float64 `json:"qty"`
 	UnitCode        string  `json:"unit_code"`
 	Weight          float64 `json:"weight"`
@@ -225,6 +226,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
 				DeliveryID:      deliveryId,
 				ProductCode:     deliveryItem.ProductCode,
+				ProductDesc:     deliveryItem.ProductDesc,
 				Qty:             deliveryItem.Qty,
 				UnitCode:        deliveryItem.UnitCode,
 				Weight:          roundWeight(deliveryItem.Weight),
@@ -326,6 +328,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				OrderItem:         "",
 				DocumentRefItem:   srcItem.DeliveryItem,
 				ProductCode:       item.ProductCode,
+				ProductDesc:       item.ProductDesc,
 				ProductType:       "normal",
 				InterfaceOrderQty: item.Qty,
 				Qty:               item.Qty,

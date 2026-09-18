@@ -92,6 +92,7 @@ type GetDeliveryItemResponse struct {
 	DeliveryItem    string     `gorm:"type:varchar(50)" json:"delivery_item"`
 	DeliveryID      uuid.UUID  `gorm:"type:uuid" json:"delivery_id"`
 	ProductCode     string     `gorm:"type:varchar(50)" json:"product_code"`
+	ProductDesc     string     `gorm:"type:varchar(255)" json:"product_desc"`
 	Qty             float64    `gorm:"type:numeric" json:"qty"`
 	UnitCode        string     `gorm:"type:varchar(20)" json:"unit_code"`
 	PriceListUnit   float64    `gorm:"type:numeric" json:"price_list_unit"`

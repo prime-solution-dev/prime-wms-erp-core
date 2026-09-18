@@ -183,6 +183,11 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if item.DeliveryItem.DocumentRefItem != "" {
 				itemUpdateFields[item.DeliveryItem.ID]["document_ref_item"] = item.DeliveryItem.DocumentRefItem
 			}
+			// product_desc มาจาก sale_item ผ่านหน้าจอ ใบเก่าก่อนมีฟิลด์นี้จะส่งค่าว่างมา
+			// เขียนทับเฉพาะเมื่อมีค่าจริง ไม่งั้นกด Edit ครั้งเดียวคำอธิบายหายทั้งใบ
+			if item.DeliveryItem.ProductDesc != "" {
+				itemUpdateFields[item.DeliveryItem.ID]["product_desc"] = item.DeliveryItem.ProductDesc
+			}
 		}
 	}
 
@@ -339,6 +344,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				OrderItem:         "",
 				DocumentRefItem:   srcItem.DeliveryItem,
 				ProductCode:       item.ProductCode,
+				ProductDesc:       item.ProductDesc,
 				ProductType:       "normal",
 				InterfaceOrderQty: item.Qty,
 				Qty:               item.Qty,
@@ -448,6 +454,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 			// จองคิวเลยจับคู่ CO กับใบจองไม่เจอ (hasOutbound/calculateBookedUsage)
 			DocumentRefItem:      item.DeliveryItem.DeliveryItem,
 			ProductCode:          item.ProductCode,
+			ProductDesc:          item.ProductDesc,
 			ProductType:          "normal",
 			InterfaceOrderQty:    item.Qty,
 			Qty:                  item.Qty,
