@@ -27,6 +27,7 @@ type UpdateOrderByDeliveryItemDetail struct {
 	OrderItem            string     `json:"order_item"`
 	DocumentRefItem      string     `json:"document_ref_item"`
 	ProductCode          string     `json:"product_code"`
+	ProductDesc          string     `json:"product_desc"`
 	ProductType          string     `json:"product_type"`
 	InterfaceOrderQty    float64    `json:"interface_order_qty"`
 	Qty                  float64    `json:"qty"`
