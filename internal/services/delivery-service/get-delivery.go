@@ -293,15 +293,12 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 		return nil, errors.New("failed to fetch customers by name: " + err.Error())
 	}
 
-	fmt.Printf("Found %d customers matching name like '%s'\n", len(customerByNameData.Customers), customerNameLike)
-
 	// เก็บ customerCode ทั้งหมดที่ได้จากการค้นหาด้วย name
 	var customerCodes []string
 	for _, customer := range customerByNameData.Customers {
 		customerCodes = append(customerCodes, customer.CustomerCode)
 	}
 
-	fmt.Println("Customer codes from name search:", customerCodes)
 	return customerCodes, nil
 }
 
@@ -316,12 +313,10 @@ func GetOrderDeliveryForDelivery(allDeliveries []GetDeliveryResponse) (orderExte
 		}
 	}
 
-	fmt.Println("getOrderRequest : ", getOrderRequest)
 	getOrderResponse, err := orderExternalService.GetOrdersDelivery(getOrderRequest)
 	if err != nil {
 		return orderExternalService.ResultOrderDeliveryResponse{}, errors.New("Error get orders delivery : " + err.Error())
 	}
-	fmt.Println("getOrderResponse : ", getOrderResponse)
 
 	return getOrderResponse, nil
 }

@@ -1,7 +1,6 @@
 package verifyService
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -130,10 +129,6 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 			productExists[p.ProductCode] = true
 		}
 	}
-
-	requestJSON, _ := json.MarshalIndent(reqAtp, "", "  ")
-	fmt.Println("CreateGoodsIssueRequest JSON:")
-	fmt.Println(string(requestJSON))
 
 	resAtp, err := externalService.GetInventoryATP(reqAtp)
 	if err != nil {

@@ -24,6 +24,7 @@ type GetSalePackRequest struct {
 	// StatusInvoice สถานะ invoice ที่ถือว่า pack ถูกใช้ไปแล้ว (ใช้คู่กับ is_not_match_iv) ถ้าไม่ส่งมาใช้ PENDING, COMPLETED
 	StatusInvoice []string `json:"status_invoice"`
 	SaleCode      []string `json:"sale_code"`
+	CustomerCode  []string `json:"customer_code"`
 	// ค้นหาแบบ contains (ILIKE) ตามคอลัมน์ในตารางเลือก pack หลายช่อง = AND กัน
 	PackingCodeLike  string   `json:"packing_code_like"`
 	SaleCodeLike     string   `json:"sale_code_like"`
@@ -163,6 +164,10 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("sale_code IN ?", req.SaleCode)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		query = query.Where("customer_code IN ?", req.CustomerCode)
+	}
+
 	if len(req.CompanyCode) > 0 {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
@@ -271,7 +276,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// กรองฝั่ง sale แล้วไม่เหลือ delivery ต้องตอบว่างเอง
 	// เพราะ pack service ได้ delivery_codes ว่างจะไม่กรองอะไรเลยแล้วส่ง pack ทั้งหมดกลับมา
-	if saleCodeLike != "" || customerCodeLike != "" || customerNameLike != "" {
+	if len(req.CustomerCode) > 0 || saleCodeLike != "" || customerCodeLike != "" || customerNameLike != "" {
 		hasDelivery := false
 		for _, sale := range res {
 			if len(sale.DeliveryCodes) > 0 {
@@ -357,12 +362,10 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 		PageSize:         req.PageSize,
 	}
 
-	fmt.Printf("packingRequest: %+v\n", packingRequest)
 	packingResponse, err := externalService.GetPackSo(packingRequest)
 	if err != nil {
 		return externalService.ResultPackingResponse{}, errors.New("Error calling packing service: " + err.Error())
 	}
-	fmt.Printf("packingResponse: %+v\n", packingResponse)
 
 	return packingResponse, nil
 }
@@ -512,7 +515,6 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 									continue
 								}
 
-								fmt.Printf("Added delivery_data for %s to order item %s\n", orderDocRef, outboundItem.OrderData.OrderItem[l].OrderItem)
 							}
 						}
 					}
@@ -521,6 +523,5 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 		}
 	}
 
-	fmt.Printf("Successfully processed delivery data mapping\n")
 	return nil
 }
