@@ -416,6 +416,28 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			for _, hookConfigValue := range hookConfig {
 				urlHook = hookConfigValue.HookUrl
 			}
+			productReq := models.GetProductRequest{
+				ProductType: []string{"PROD_SERVICE"},
+				SiteCode:    []string{siteCode},
+				CompanyCode: []string{companyCode},
+			}
+
+			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+			if errmapProduct != nil {
+				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+			}
+			firstProduct := models.GetProductsDetailComponent{}
+			for _, product := range mapProduct {
+				firstProduct = product
+				break
+			}
+
+			for r := range req {
+				for it := range req[r].InvoiceItem {
+					req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+					req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+				}
+			}
 
 			requestDataCreateHook := interfaceService.HookInterfaceRequest{
 				RequestData: req,

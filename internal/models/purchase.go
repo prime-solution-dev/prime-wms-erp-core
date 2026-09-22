@@ -585,6 +585,7 @@ type GetProductRequest struct {
 	ProductCode []string `json:"product_code"`
 	SiteCode    []string `json:"site_code"`
 	CompanyCode []string `json:"company_code"`
+	ProductType []string `json:"product_type"`
 }
 
 type GetProductsDetailResponse struct {

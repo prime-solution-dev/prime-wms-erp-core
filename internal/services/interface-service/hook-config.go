@@ -29,7 +29,6 @@ func GetHookConfig(requestData map[string]interface{}) ([]HookConfig, error) {
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	fmt.Println(string(jsonData))
 
 	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_document")+"/interface/get-hook-config", bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -48,15 +47,13 @@ func GetHookConfig(requestData map[string]interface{}) ([]HookConfig, error) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetHookConfig: read body failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
 	var hookConfig []HookConfig
 	err = json.Unmarshal(body, &hookConfig)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetHookConfig: decode response failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
-
-	fmt.Println("Response Status:", resp.Status)
 
 	return hookConfig, nil
 

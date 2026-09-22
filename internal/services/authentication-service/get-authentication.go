@@ -45,15 +45,13 @@ func GetRequester(requestData map[string]interface{}) ([]Requester, error) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetRequester: read body failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
 	var requesters []Requester
 	err = json.Unmarshal(body, &requesters)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetRequester: decode response failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
-
-	fmt.Println("Response Status:", resp.Status)
 
 	return requesters, nil
 
