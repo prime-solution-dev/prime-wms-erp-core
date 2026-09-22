@@ -279,7 +279,6 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 			from payment_invoice t 
 			where t.invoice_code in ('%s')
 		`, strings.Join(invoiceCodeString, `','`))
-		fmt.Println(queryPayment)
 		rowsPayment, err := db.ExecuteQuery(sqlx, queryPayment)
 		if err != nil {
 			return res, err
@@ -307,7 +306,6 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 				and ii.document_ref <> '' and ii.document_ref_item != ''
 				and (ii.document_ref, ii.document_ref_item ) in (%s) 
 		`, strings.Join(invoiceCodeItemString, `,`))
-		fmt.Println(queryDN)
 		rowsDN, err := db.ExecuteQuery(sqlx, queryDN)
 		if err != nil {
 			return res, err
