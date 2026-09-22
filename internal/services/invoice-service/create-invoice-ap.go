@@ -427,15 +427,18 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 			}
 			firstProduct := models.GetProductsDetailComponent{}
+			hasProduct := false
 			for _, product := range mapProduct {
 				firstProduct = product
+				hasProduct = true
 				break
 			}
-
-			for r := range req {
-				for it := range req[r].InvoiceItem {
-					req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
-					req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+			if hasProduct {
+				for r := range req {
+					for it := range req[r].InvoiceItem {
+						req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+					}
 				}
 			}
 
