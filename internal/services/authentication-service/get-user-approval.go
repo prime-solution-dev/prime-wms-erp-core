@@ -70,15 +70,13 @@ func GetUserApproval(requestData map[string]interface{}) (GetUserApprovalRespons
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetUserApproval: read body failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
 	var requesters GetUserApprovalResponse
 	err = json.Unmarshal(body, &requesters)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetUserApproval: decode response failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
-
-	fmt.Println("Response Status:", resp.Status)
 
 	return requesters, nil
 
