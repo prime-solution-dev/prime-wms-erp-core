@@ -357,12 +357,10 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 		PageSize:         req.PageSize,
 	}
 
-	fmt.Printf("packingRequest: %+v\n", packingRequest)
 	packingResponse, err := externalService.GetPackSo(packingRequest)
 	if err != nil {
 		return externalService.ResultPackingResponse{}, errors.New("Error calling packing service: " + err.Error())
 	}
-	fmt.Printf("packingResponse: %+v\n", packingResponse)
 
 	return packingResponse, nil
 }
@@ -512,7 +510,6 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 									continue
 								}
 
-								fmt.Printf("Added delivery_data for %s to order item %s\n", orderDocRef, outboundItem.OrderData.OrderItem[l].OrderItem)
 							}
 						}
 					}
@@ -521,6 +518,5 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 		}
 	}
 
-	fmt.Printf("Successfully processed delivery data mapping\n")
 	return nil
 }

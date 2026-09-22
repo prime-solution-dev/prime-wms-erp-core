@@ -420,15 +420,10 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	requestJSON, _ := json.MarshalIndent(createOrderRequest, "", "  ")
-	fmt.Println("CreateGoodsIssueRequest JSON:")
-	fmt.Println(string(requestJSON))
-	fmt.Println("createOrderRequest : ", createOrderRequest)
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
-	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
 }
@@ -491,11 +486,10 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	resp, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}
 
-	fmt.Println("updateOrderResponse : ", resp)
 	return nil
 }
