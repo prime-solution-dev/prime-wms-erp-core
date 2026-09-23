@@ -115,7 +115,7 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 120,
-          "dataMapping": "stock"
+          "dataMapping": "warehouse"
         },
         {
           "field": "bkk",

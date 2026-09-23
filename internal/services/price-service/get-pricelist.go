@@ -825,14 +825,17 @@ func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 				if len(sg.PriceListSubGroupKeys) > 0 {
 					for _, sgk := range sg.PriceListSubGroupKeys {
+						valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
 						subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
-							ID:         sgk.ID.String(),
-							SubGroupID: sgk.SubGroupID.String(),
-							GroupCode:  sgk.Code,
-							GroupName:  groupMap[sgk.Code].GroupName,
-							ValueCode:  sgk.Value,
-							ValueName:  groupItemMap[sgk.Value].ItemName,
-							Seq:        sgk.Seq,
+							ID:          sgk.ID.String(),
+							SubGroupID:  sgk.SubGroupID.String(),
+							GroupCode:   sgk.Code,
+							GroupName:   groupMap[sgk.Code].GroupName,
+							ValueCode:   sgk.Value,
+							ValueName:   groupItemMap[sgk.Value].ItemName,
+							Seq:         sgk.Seq,
+							ValueNumber: valueNumber,
+							HasValue:    hasValue,
 						})
 					}
 				}

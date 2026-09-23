@@ -9,6 +9,8 @@ import (
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -116,8 +118,9 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
-		reqHook := req
+		reqHook := slices.Clone(req)
 		for i := range reqHook {
+			reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
 			for it := range reqHook[i].InvoiceItem {
 				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
 				if exists {
@@ -126,7 +129,13 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
 					)
 					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
 				}
+				reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
+					reqHook[i].InvoiceItem[it].ProductDesc,
+					"\\",
+					"",
+				)
 			}
 		}
 

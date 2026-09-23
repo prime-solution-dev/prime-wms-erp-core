@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"log"
 	models "prime-erp-core/internal/models"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	xService "prime-erp-core/internal/services/x-service"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -119,30 +117,11 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return toleranceErrorResponse, nil
 		}
 	}
-	topicCodes := []string{"INVOICE"}
-	configCodes := []string{"AP"}
-
-	invoiceConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
-	if err != nil {
-		return nil, err
-	}
-	invoiceConfigsMap := make(map[string]models.SystemConfig)
-	tolerance := 0.0
-	for _, invoiceConfigsValue := range invoiceConfigs {
-		invoiceConfigsMap[fmt.Sprintf("%s|%s", invoiceConfigsValue.TopicCode, invoiceConfigsValue.ConfigCode)] = invoiceConfigsValue
-		floatVal, err := strconv.ParseFloat(invoiceConfigsValue.Value, 64)
-		if err != nil {
-			log.Fatalf("Invalid float value: %v", err)
-		}
-		tolerance = floatVal
-	}
-
 	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
 
-	completePOItem := []models.PurchaseItemUsed{}
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -153,37 +132,11 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = supplier.TaxID
 			req[i].PartyExternalID = supplier.ExternalID
 		}
-		for it, invoiceItem := range invoice.InvoiceItem {
-			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
-			_, exist := poMap[keyConvert]
-			if exist {
-				completePOItem = append(completePOItem, models.PurchaseItemUsed{
-					PurchaseCode:     invoiceItem.DocumentRef,
-					PurchaseItemCode: invoiceItem.DocumentRefItem,
-					QTY:              invoiceItem.Qty,
-					Weight:           invoiceItem.Weight,
-					Tolerance:        tolerance,
-				})
-			}
+		for it := range invoice.InvoiceItem {
 			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
 			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
-		}
-	}
-	if len(completePOItem) > 0 {
-		requestDataGetPO := map[string]interface{}{
-			"used_type":          "GR",
-			"purchase_item_used": completePOItem,
-		}
-
-		jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
-		if err != nil {
-			errors.New("Error marshalling data :")
-		}
-		_, errCompletePOItem := purchaseService.CompletePOItem(ctx, string(jsonBytesGetPO))
-		if errCompletePOItem != nil {
-			return nil, errCompletePOItem
 		}
 	}
 
@@ -195,6 +148,16 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if errCreateInvoice != nil {
 		return nil, errCreateInvoice
 	}
+
+	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+	// The invoice is already saved here; a reconcile failure must NOT fail the request
+	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+	// next GRA on this PO, or a manual reconcile, self-heals.
+	if err := reconcilePOAfterAPSave(req); err != nil {
+		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
+	}
+
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
 		"topic":     []string{"AP"},
@@ -209,6 +172,32 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		urlProduct := ""
 		for _, hookConfigValue := range hookConfig {
 			urlProduct = hookConfigValue.HookUrl
+		}
+
+		productReq := models.GetProductRequest{
+			ProductType: []string{"PROD_SERVICE"},
+			SiteCode:    []string{siteCode},
+			CompanyCode: []string{companyCode},
+		}
+
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+		if errmapProduct != nil {
+			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+		}
+		firstProduct := models.GetProductsDetailComponent{}
+		hasProduct := false
+		for _, product := range mapProduct {
+			firstProduct = product
+			hasProduct = true
+			break
+		}
+		if hasProduct {
+			for r := range req {
+				for it := range req[r].InvoiceItem {
+					req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+					req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+				}
+			}
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{

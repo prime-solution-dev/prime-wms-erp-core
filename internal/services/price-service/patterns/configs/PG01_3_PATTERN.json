@@ -58,10 +58,10 @@
           "dataMapping": "total_weight"
         },
         {
-          "field": "total_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 150,
-          "dataMapping": "total_weight"
+          "dataMapping": "avg_kg_stock"
         },
         {
           "field": "remark",
@@ -174,10 +174,10 @@
           "dataMapping": "total_weight"
         },
         {
-          "field": "total_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "total_weight"
+          "dataMapping": "avg_kg_stock"
         },
         {
           "field": "remark",
@@ -303,10 +303,10 @@
           "dataMapping": "total_weight"
         },
         {
-          "field": "total_weight",
+          "field": "avg_kg_stock",
           "headerName": "Avg.kg stock",
           "width": 170,
-          "dataMapping": "total_weight"
+          "dataMapping": "avg_kg_stock"
         },
         {
           "field": "remark",

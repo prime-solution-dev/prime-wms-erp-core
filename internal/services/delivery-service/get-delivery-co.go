@@ -260,12 +260,10 @@ func GetOrderDelivery(allDeliveries []GetDeliverySOResponse) (externalService.Re
 		}
 	}
 
-	fmt.Println("getOrderRequest : ", getOrderRequest)
 	getOrderResponse, err := externalService.GetOrdersDelivery(getOrderRequest)
 	if err != nil {
 		return externalService.ResultOrderDeliveryResponse{}, errors.New("Error get outbound : " + err.Error())
 	}
-	fmt.Println("getOrderResponse : ", getOrderResponse)
 
 	return getOrderResponse, nil
 }

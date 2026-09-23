@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,11 +21,19 @@ type GetSalePackRequest struct {
 	IsNotMatchIv bool     `json:"is_not_match_iv"`
 	PackingCode  []string `json:"packing_code"`
 	StatusPack   []string `json:"status_pack"`
-	SaleCode     []string `json:"sale_code"`
-	CompanyCode  []string `json:"company_code"`
-	SiteCode     []string `json:"site_code"`
-	Page         int      `json:"page"`
-	PageSize     int      `json:"page_size"`
+	// StatusInvoice สถานะ invoice ที่ถือว่า pack ถูกใช้ไปแล้ว (ใช้คู่กับ is_not_match_iv) ถ้าไม่ส่งมาใช้ PENDING, COMPLETED
+	StatusInvoice []string `json:"status_invoice"`
+	SaleCode      []string `json:"sale_code"`
+	CustomerCode  []string `json:"customer_code"`
+	// ค้นหาแบบ contains (ILIKE) ตามคอลัมน์ในตารางเลือก pack หลายช่อง = AND กัน
+	PackingCodeLike  string   `json:"packing_code_like"`
+	SaleCodeLike     string   `json:"sale_code_like"`
+	CustomerCodeLike string   `json:"customer_code_like"`
+	CustomerNameLike string   `json:"customer_name_like"`
+	CompanyCode      []string `json:"company_code"`
+	SiteCode         []string `json:"site_code"`
+	Page             int      `json:"page"`
+	PageSize         int      `json:"page_size"`
 }
 
 type GetSalePackResponse struct {
@@ -155,12 +164,32 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		query = query.Where("sale_code IN ?", req.SaleCode)
 	}
 
+	if len(req.CustomerCode) > 0 {
+		query = query.Where("customer_code IN ?", req.CustomerCode)
+	}
+
 	if len(req.CompanyCode) > 0 {
 		query = query.Where("company_code IN ?", req.CompanyCode)
 	}
 
 	if len(req.SiteCode) > 0 {
 		query = query.Where("site_code IN ?", req.SiteCode)
+	}
+
+	saleCodeLike := strings.TrimSpace(req.SaleCodeLike)
+	customerCodeLike := strings.TrimSpace(req.CustomerCodeLike)
+	customerNameLike := strings.TrimSpace(req.CustomerNameLike)
+
+	if saleCodeLike != "" {
+		query = query.Where("sale_code ILIKE ?", "%"+saleCodeLike+"%")
+	}
+
+	if customerCodeLike != "" {
+		query = query.Where("customer_code ILIKE ?", "%"+customerCodeLike+"%")
+	}
+
+	if customerNameLike != "" {
+		query = query.Where("customer_name ILIKE ?", "%"+customerNameLike+"%")
 	}
 
 	// Execute query
@@ -216,10 +245,15 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		// If is_not_match_iv == true, join with invoice items to get excluded pack codes
 		if req.IsNotMatchIv {
+			statusInvoice := req.StatusInvoice
+			if len(statusInvoice) == 0 {
+				statusInvoice = []string{"PENDING", "COMPLETED"}
+			}
+
 			var invoiceItems []models.InvoiceItem
 			if err := gormx.Joins("JOIN invoice ON invoice_item.invoice_id = invoice.id").
 				Where("invoice.status IN ? AND invoice_item.document_ref = ? AND invoice.invoice_type = ?",
-					[]string{"PENDING", "COMPLETED"}, sale.SaleCode, "AR").
+					statusInvoice, sale.SaleCode, "AR").
 				Find(&invoiceItems).Error; err == nil {
 
 				// Extract unique excluded pack codes from sourceCode (pack codes to avoid)
@@ -238,6 +272,27 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		res = append(res, saleResponse)
+	}
+
+	// กรองฝั่ง sale แล้วไม่เหลือ delivery ต้องตอบว่างเอง
+	// เพราะ pack service ได้ delivery_codes ว่างจะไม่กรองอะไรเลยแล้วส่ง pack ทั้งหมดกลับมา
+	if len(req.CustomerCode) > 0 || saleCodeLike != "" || customerCodeLike != "" || customerNameLike != "" {
+		hasDelivery := false
+		for _, sale := range res {
+			if len(sale.DeliveryCodes) > 0 {
+				hasDelivery = true
+				break
+			}
+		}
+		if !hasDelivery {
+			return externalService.ResultPackingResponse{
+				Total:      0,
+				Page:       req.Page,
+				PageSize:   req.PageSize,
+				TotalPages: 0,
+				Packings:   []externalService.GetPackingResponse{},
+			}, nil
+		}
 	}
 
 	// Call external packing service
@@ -301,17 +356,16 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 		DeliveryCodes:    deliveryCodes,
 		ExcludedPackCode: excludedPackCodes,
 		PackingCode:      req.PackingCode,
+		PackingCodeLike:  strings.TrimSpace(req.PackingCodeLike),
 		StatusPack:       req.StatusPack,
 		Page:             req.Page,
 		PageSize:         req.PageSize,
 	}
 
-	fmt.Printf("packingRequest: %+v\n", packingRequest)
 	packingResponse, err := externalService.GetPackSo(packingRequest)
 	if err != nil {
 		return externalService.ResultPackingResponse{}, errors.New("Error calling packing service: " + err.Error())
 	}
-	fmt.Printf("packingResponse: %+v\n", packingResponse)
 
 	return packingResponse, nil
 }
@@ -461,7 +515,6 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 									continue
 								}
 
-								fmt.Printf("Added delivery_data for %s to order item %s\n", orderDocRef, outboundItem.OrderData.OrderItem[l].OrderItem)
 							}
 						}
 					}
@@ -470,6 +523,5 @@ func mapDeliveryDataToOrderItems(gormx *gorm.DB, packings *[]externalService.Get
 		}
 	}
 
-	fmt.Printf("Successfully processed delivery data mapping\n")
 	return nil
 }

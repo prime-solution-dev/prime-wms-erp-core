@@ -25,6 +25,7 @@ type PriceListGroup struct {
 	CreateDtm            time.Time             `json:"create_dtm"`
 	UpdateBy             string                `json:"update_by"`
 	UpdateDtm            time.Time             `json:"update_dtm"`
+	Seq                  int                   `json:"seq"`
 	PriceListGroupTerms  []PriceListGroupTerm  `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_terms"`
 	PriceListGroupExtras []PriceListGroupExtra `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_group_extras"`
 	PriceListSubGroups   []PriceListSubGroup   `gorm:"foreignKey:PriceListGroupID;references:ID" json:"price_list_sub_groups"`
@@ -278,6 +279,17 @@ type PriceListSubGroupKeyResponse struct {
 	ValueCode  string `json:"value_code"`
 	ValueName  string `json:"value_name"`
 	Seq        int    `json:"seq"`
+
+	// ValueNumber คือ group_item.value ของ ValueCode แปลงเป็นตัวเลข ใช้เป็นลำดับ
+	// การแสดงผลของทุกแกนในหน้า Price List Detail
+	//
+	// Seq ด้านบนใช้แทนไม่ได้ — upload-pricelist.go:1476 กำหนด Seq = i + 1 ซึ่งเป็น
+	// ลำดับของ PG0x ในคีย์ (PG01 -> 1, PG05 -> 5) ไม่ใช่ลำดับของค่า
+	ValueNumber float64 `json:"value_number"`
+
+	// HasValue แยก "ValueNumber = 0 จริง" ออกจาก "resolve ค่าไม่ได้"
+	// ไม่ส่งออก JSON เพราะเป็นข้อมูลภายในสำหรับ comparator เท่านั้น
+	HasValue bool `json:"-"`
 }
 
 type InventoryWeightResponse struct {
@@ -299,6 +311,12 @@ type InventoryWeightResponse struct {
 	SumWeight        float64 `json:"sum_weight"`
 	TotalQty         float64 `json:"total_qty"`
 	TotalWeight      float64 `json:"total_weight"`
+	// WarehouseCode คือคลังที่ของตั้งอยู่ warehouse-core อ่านมาจากตาราง inventory
+	// ซึ่งเป็นตารางเดียวกับหน้า Stock on hand ค่าจึงตรงกันโดยนิยาม
+	// 1 batch ที่กระจายหลายคลังถูกแตกเป็นหลาย entry แบ่งยอดตามสัดส่วนมาแล้ว
+	WarehouseCode string `json:"warehouse_code,omitempty"`
+	// WarehouseName คือชื่อคลังจาก warehouse master เป็นค่าที่คอลัมน์แสดงจริง
+	WarehouseName string `json:"warehouse_name,omitempty"`
 }
 
 type PriceListSubGroupResponse struct {
@@ -339,6 +357,11 @@ type PriceListSubGroupResponse struct {
 	WeightSpec float64 `json:"weight_spec"`
 	BatchNo    string  `json:"batch_no,omitempty"`
 	DefaultUom string  `json:"default_uom,omitempty"`
+	// WarehouseCode คือคลังของ inventory record ที่ subgroup แถวนี้ถูก expand ออกมา
+	// ใช้เป็นตัวระบุตัวตนของแถว (แยกแถว) และเป็น fallback ตอนแสดงผล
+	WarehouseCode string `json:"warehouse_code,omitempty"`
+	// WarehouseName คือชื่อคลัง เป็นค่าที่คอลัมน์ "โกดัง" / "Stock" แสดงจริง
+	WarehouseName string `json:"warehouse_name,omitempty"`
 }
 
 type GetPriceListResponse struct {

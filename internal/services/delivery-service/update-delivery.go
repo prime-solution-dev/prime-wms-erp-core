@@ -183,6 +183,11 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if item.DeliveryItem.DocumentRefItem != "" {
 				itemUpdateFields[item.DeliveryItem.ID]["document_ref_item"] = item.DeliveryItem.DocumentRefItem
 			}
+			// product_desc มาจาก sale_item ผ่านหน้าจอ ใบเก่าก่อนมีฟิลด์นี้จะส่งค่าว่างมา
+			// เขียนทับเฉพาะเมื่อมีค่าจริง ไม่งั้นกด Edit ครั้งเดียวคำอธิบายหายทั้งใบ
+			if item.DeliveryItem.ProductDesc != "" {
+				itemUpdateFields[item.DeliveryItem.ID]["product_desc"] = item.DeliveryItem.ProductDesc
+			}
 		}
 	}
 
@@ -339,6 +344,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				OrderItem:         "",
 				DocumentRefItem:   srcItem.DeliveryItem,
 				ProductCode:       item.ProductCode,
+				ProductDesc:       item.ProductDesc,
 				ProductType:       "normal",
 				InterfaceOrderQty: item.Qty,
 				Qty:               item.Qty,
@@ -372,7 +378,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			Action:              "X",
 			OrderID:             uuid.New(),
 			OrderCode:           "",
-			OrderType:           "DELIVERY",
+			OrderType:           "NORMAL",
 			OrderDate:           time.Now(),
 			TenantID:            nil,
 			CustomerCode:        deliveryReq.CustomerCode,
@@ -414,15 +420,10 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	requestJSON, _ := json.MarshalIndent(createOrderRequest, "", "  ")
-	fmt.Println("CreateGoodsIssueRequest JSON:")
-	fmt.Println(string(requestJSON))
-	fmt.Println("createOrderRequest : ", createOrderRequest)
 	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
-	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
 }
@@ -448,6 +449,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 			// จองคิวเลยจับคู่ CO กับใบจองไม่เจอ (hasOutbound/calculateBookedUsage)
 			DocumentRefItem:      item.DeliveryItem.DeliveryItem,
 			ProductCode:          item.ProductCode,
+			ProductDesc:          item.ProductDesc,
 			ProductType:          "normal",
 			InterfaceOrderQty:    item.Qty,
 			Qty:                  item.Qty,
@@ -484,11 +486,10 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	resp, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}
 
-	fmt.Println("updateOrderResponse : ", resp)
 	return nil
 }

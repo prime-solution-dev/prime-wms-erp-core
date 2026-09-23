@@ -3,6 +3,7 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	customerService "prime-erp-core/internal/services/customer-service"
@@ -83,6 +84,12 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd)
 	if errApproval != nil {
 		return nil, errApproval
+	}
+	if len(credit) == 0 {
+		return ResultCreditRequest{
+			Total: totalRecords, Page: req.Page, PageSize: req.PageSize,
+			TotalPages: totalPages, CreditRequest: credit,
+		}, nil
 	}
 	customerCode := []string{}
 
@@ -198,37 +205,26 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	getDeposit := getDepositRes.(depositService.ResultDeposit).Deposit
 	remainDepositMap := map[string]float64{}
 	for _, depositValue := range getDeposit {
+		amountRemainVat := math.Round((depositValue.AmountRemain*1.07)*100) / 100
 		remainDepositItemMap, exist := remainDepositMap[depositValue.CustomerCode]
 		if exist {
-			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + amountRemainVat
 		} else {
-			remainDepositMap[depositValue.CustomerCode] = depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = amountRemainVat
 		}
 	}
 
+	consumedTotals, err := summaryService.GetConsumedCreditTotals(ctx.Request.Context(), customerCode)
+	if err != nil {
+		return nil, err
+	}
 	for i := range credit {
-
-		requestDataGetConsumend := map[string]interface{}{
-			"customer_code": credit[i].CustomerCode,
-			"paid_invoice":  true,
-		}
-		jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
-		if err != nil {
-			return nil, err
-		}
-
-		paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
-		if errApproval != nil {
-			return nil, errApproval
-		}
-		resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
-
 		conMapCustomer, exist := convertCustomerMap[credit[i].CustomerCode]
 		if exist {
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-		credit[i].ConsumedCredit = resultGetPaidInvoice.TotalAmount
+		credit[i].ConsumedCredit = consumedTotals[credit[i].CustomerCode]
 		/* credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
 		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) */
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]

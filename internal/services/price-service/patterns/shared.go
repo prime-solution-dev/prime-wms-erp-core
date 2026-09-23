@@ -335,6 +335,13 @@ func getEffectiveValueMappings(root *PriceTableConfiguration, pattern *PatternCo
 	if pattern != nil && pattern.ValueMappings != nil {
 		return pattern.ValueMappings
 	}
+	// ผู้เรียกทั้งสามจุดเช็ค nil ก่อนใช้ผลลัพธ์อยู่แล้ว (ส่งต่อให้
+	// getGroupCodeByMapping / getSpecialMapping ซึ่งคืน fallback เมื่อรับ nil
+	// หรือเช็ค vm != nil เอง) จึงคืน nil ตาม contract ที่ doc comment ด้านบน
+	// ประกาศไว้ แทนที่จะ deref root จน panic
+	if root == nil {
+		return nil
+	}
 	return root.ValueMappings
 }
 
@@ -550,6 +557,30 @@ func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bo
 // batch_no ที่นั่นจะถูกจัดเป็น non-batch เงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
 // (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
 func patternHasBatchColumn(pattern *PatternConfig) bool {
+	return patternDeclaresColumn(pattern, "batch_no")
+}
+
+// patternHasWarehouseColumn บอกว่า pattern นี้แสดงคลังที่เก็บของหรือไม่
+//
+// pattern ที่แสดงคลังต้องแยกแถวต่อคลัง ไม่งั้นของที่กระจายอยู่หลายคลังจะถูกยุบเหลือ
+// คลังเดียวแล้วผู้ใช้เห็นคลังเดียวโดยไม่รู้ว่ามีที่อื่นอีก
+//
+// บาง pattern ตั้ง headerName เป็น "Stock" บางตัวเป็น "โกดัง" แต่ค่าที่แสดงคือคลัง
+// เดียวกัน จึงตัดสินจาก dataMapping ไม่ใช่ชื่อหัวคอลัมน์
+func patternHasWarehouseColumn(pattern *PatternConfig) bool {
+	return patternDeclaresColumn(pattern, "warehouse")
+}
+
+// patternDeclaresColumn ตรวจว่า pattern ประกาศคอลัมน์ชื่อนี้ไว้หรือไม่
+//
+// ต้องตรวจ**ทุกช่องทาง**ที่ PatternConfig ประกาศคอลัมน์ได้ คือ Columns,
+// FixedColumns และ ColumnGroups[].Children ถ้าตกช่องใดไป pattern ที่ประกาศคอลัมน์
+// ที่นั่นจะถูกจัดผิดประเภทเงียบ ๆ แล้วแสดงค่าผิดโดยไม่มี error
+// (ColumnLevels เป็น metadata ของ hierarchy ไม่ใช่การประกาศคอลัมน์ที่ map ไป row)
+//
+// ตรวจทั้ง Field และ DataMapping เพราะบาง pattern เปลี่ยนชื่อคอลัมน์ไปเป็น "โรงงาน"
+// หรือ "Ship No." แล้วอ้างความหมายจริงผ่าน dataMapping แทน
+func patternDeclaresColumn(pattern *PatternConfig, name string) bool {
 	if pattern == nil {
 		return false
 	}
@@ -559,12 +590,83 @@ func patternHasBatchColumn(pattern *PatternConfig) bool {
 	}
 	for _, group := range cols {
 		for _, c := range group {
-			if c.Field == "batch_no" || c.DataMapping == "batch_no" {
+			if c.Field == name || c.DataMapping == name {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// warehouseForRow คืนคลังที่จะแสดงในคอลัมน์ "โกดัง" / "Stock"
+//
+// สอง pattern ตั้งหัวคอลัมน์ต่างกันแต่หมายถึงค่าเดียวกัน คือคลังที่สินค้าตัวนั้นถูกเก็บอยู่
+//
+// แสดง "ชื่อ" คลัง ไม่ใช่รหัส แต่ถอยไปใช้รหัสเมื่อ warehouse master ไม่มีชื่อให้
+// เพราะรหัสยังบอกผู้ใช้ได้ว่าของอยู่ไหน ดีกว่าปล่อยช่องว่างทั้งที่รู้คำตอบอยู่
+//
+// ค่าจาก udf_json มาก่อนเพื่อไม่ทำลายค่าที่เคยถูกบันทึกไว้ แต่ในทางปฏิบัติไม่มีโค้ดไหน
+// เขียน key นี้ลง udf_json เลย ค่าจริงจึงมาจาก subgroup ที่ warehouse-core อ่าน
+// มาจากตาราง inventory + warehouse ซึ่งเป็นแหล่งเดียวกับหน้า Stock on hand
+//
+// คืน nil เมื่อไม่มีทั้งสามทาง เพื่อให้เป็นช่องว่าง ไม่ใช่ "" ที่ดูเหมือนค่าที่ตั้งใจ
+func warehouseForRow(sg models.PriceListSubGroupResponse, udfValue interface{}) interface{} {
+	if udfValue != nil {
+		return udfValue
+	}
+	if sg.WarehouseName != "" {
+		return sg.WarehouseName
+	}
+	if sg.WarehouseCode != "" {
+		return sg.WarehouseCode
+	}
+	return nil
+}
+
+// collapseSubGroupRows ยุบ subGroups ให้เหลือ record แรกของแต่ละมิติที่ตารางแสดงจริง
+//
+// warehouse-core รวม inventory ด้วยคีย์ company|site|product|batch จึงคืนหลาย
+// record ต่อ 1 subgroup ซึ่งฝั่ง build row จะ expand เป็นหลายแถว
+// pattern ที่ไม่แสดง batch_no ไม่มีคอลัมน์ไหนแยกแถวเหล่านั้นได้ (ค่า Avg. kg stock
+// ก็เป็นค่าระดับ site เท่ากันทุกแถวโดยการออกแบบ) ผู้ใช้จึงเห็นแถวซ้ำ
+//
+// เลือก record ตัวแรกให้ตรงกับฝั่ง export ที่ใช้ inventoryWeights[0]
+// และวน slice ตามลำดับเดิม (ห้ามวน map) เพื่อให้ผลลัพธ์ deterministic
+//
+// perBatch และ perWarehouse = true ทั้งคู่ คืน slice เดิมทั้งก้อน เพราะทุก record
+// ต่างกันในมิติที่ตารางแสดงอยู่แล้ว
+//
+// caller ต้องรักษาลำดับ relative ของ record ที่มี sg.ID เดียวกันไว้ (ใช้ sort.SliceStable
+// เท่านั้น ห้าม sort.Slice) ไม่งั้น "record แรก" จะไม่ใช่ inventoryWeights[0] อีกต่อไป
+//
+// การหยิบ record แรกแทนการรวมยอดปลอดภัยเพราะคอลัมน์ที่ pattern แบบไม่แยก batch
+// แสดงคือ avg_weight (ค่าเฉลี่ยระดับ site) และ total_weight (Weight-spec จาก product
+// master) ซึ่งเท่ากันทุก record อยู่แล้ว ไม่มีคอลัมน์ที่เป็นผลรวมให้คิดผิด
+// ถ้าวันหนึ่งมี pattern แบบนี้เพิ่มคอลัมน์ยอดรวม ต้องเปลี่ยนมารวมยอดตรงนี้
+func collapseSubGroupRows(subGroups []models.PriceListSubGroupResponse, perBatch bool, perWarehouse bool) []models.PriceListSubGroupResponse {
+	if (perBatch && perWarehouse) || len(subGroups) == 0 {
+		return subGroups
+	}
+	seen := make(map[string]bool, len(subGroups))
+	collapsed := make([]models.PriceListSubGroupResponse, 0, len(subGroups))
+	for _, sg := range subGroups {
+		// คีย์ประกอบจากมิติที่ตารางนี้แสดงจริงเท่านั้น มิติที่ไม่ได้แสดงถูกยุบทิ้ง
+		// ใช้ \x00 คั่นเพราะเป็นอักขระที่ไม่มีทางอยู่ใน batch หรือรหัสคลัง
+		// (ต่างจาก "|" ที่ batch_no มีได้จริง — ดู aggregateInventoryWeights)
+		key := sg.ID
+		if perBatch {
+			key += "\x00" + sg.BatchNo
+		}
+		if perWarehouse {
+			key += "\x00" + sg.WarehouseCode
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		collapsed = append(collapsed, sg)
+	}
+	return collapsed
 }
 
 // getWeightSpecFromInventory คืนน้ำหนักของ base unit (flag_base = true) จาก product master
@@ -624,14 +726,25 @@ func udfNumeric(udfData map[string]interface{}, key string) interface{} {
 }
 
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueNameByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueNameByGroupCode)
 }
 
 func buildCompositeCodeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
-	return buildCompositeKeyBy(subGroupKeys, groupCodes, getValueCodeByGroupCode)
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueCodeByGroupCode)
 }
 
-func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
+// compositeMappingValue ประกอบค่าเซลล์ของคอลัมน์ที่ dataMapping เป็น composite
+// (เช่น "PG04_x_PG03") โดยใช้กติกาเดียวกับ buildCompositeKeyBy คือข้ามค่าว่าง
+// ไม่งั้นชื่อที่ว่างโดยตั้งใจจะทำให้เหลือ separator " x " ห้อยท้าย
+func compositeMappingValue(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, dataMapping string) string {
+	separator := ""
+	if strings.Contains(dataMapping, "_x_") {
+		separator = " x "
+	}
+	return buildCompositeKeyBy(subGroupKeys, groupCodes, separator, getValueNameByGroupCode)
+}
+
+func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string, separator string, extractor func([]models.PriceListSubGroupKeyResponse, string) string) string {
 	parts := []string{}
 	for _, code := range groupCodes {
 		value := extractor(subGroupKeys, code)
@@ -639,7 +752,7 @@ func buildCompositeKeyBy(subGroupKeys []models.PriceListSubGroupKeyResponse, gro
 			parts = append(parts, value)
 		}
 	}
-	return strings.Join(parts, "|")
+	return strings.Join(parts, separator)
 }
 
 func sanitizeIdentifier(primary, fallback string) string {
@@ -833,10 +946,12 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 	uniqueValues := make(map[string]columnGroupValue)
 	for _, sg := range subGroups {
 		label := buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
-		if label == "" {
+		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
+		// ข้ามเฉพาะตอนไม่มี key เลยจริง ๆ ถ้ามี code แต่ชื่อว่างต้องยังสร้างคอลัมน์
+		// โดย header แสดงว่าง ไม่งั้นคอลัมน์ราคาหายจากกริดแบบเงียบ ๆ
+		if label == "" && code == "" {
 			continue
 		}
-		code := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 		mapKey := fmt.Sprintf("%s|%s", label, code)
 		uniqueValues[mapKey] = columnGroupValue{
 			Label: label,
@@ -844,13 +959,16 @@ func buildSingleLevelColumns(pattern *PatternConfig, subGroups []models.PriceLis
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	// เทียบ label แบบ string จะได้ "1250x8'" < "4' x 8'" < "4'x1500" ซึ่งผิด
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	for _, key := range sortedKeys {
@@ -944,21 +1062,29 @@ func buildHierarchyMap(subGroups []models.PriceListSubGroupResponse, columnLevel
 }
 
 // buildColumnGroupsRecursive recursively builds ColumnDef structures from hierarchy
+//
+// idx ใช้เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value — hierarchy key ถูกประกอบ
+// ด้วย composeHierarchyKey(code, label) จึง splitHierarchyKey แยก item_code
+// กลับมา lookup ได้ตรง ๆ
 func buildColumnGroupsRecursive(
 	hierarchy map[string]interface{},
 	pattern *PatternConfig,
 	levelIndex int,
 	labelPath []string,
 	codePath []string,
+	idx valueByCode,
 ) []ColumnDef {
 	columns := []ColumnDef{}
 
-	// Get sorted keys for current level
 	keys := make([]string, 0, len(hierarchy))
 	for key := range hierarchy {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	sort.Slice(keys, func(i, j int) bool {
+		codeI, labelI := splitHierarchyKey(keys[i])
+		codeJ, labelJ := splitHierarchyKey(keys[j])
+		return idx.Less(codeI, labelI, codeJ, labelJ)
+	})
 
 	for _, encodedKey := range keys {
 		value := hierarchy[encodedKey]
@@ -1013,7 +1139,7 @@ func buildColumnGroupsRecursive(
 					HeaderName:    label,
 					GroupID:       groupID,
 					OpenByDefault: boolPtr(true),
-					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath),
+					Children:      buildColumnGroupsRecursive(nestedMap, pattern, levelIndex+1, currentLabelPath, currentCodePath, idx),
 				}
 				columns = append(columns, columnGroup)
 			}
@@ -1032,13 +1158,14 @@ func buildMultiLevelColumns(pattern *PatternConfig, subGroups []models.PriceList
 	hierarchy := buildHierarchyMap(subGroups, pattern.ColumnLevels)
 
 	// Build columns recursively
-	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{})
+	columns := buildColumnGroupsRecursive(hierarchy, pattern, 0, []string{}, []string{}, newValueByCode(subGroups))
 
 	return columns
 }
 
 func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 	rowMap := make(map[string]AGGridRowData)
 	rowFields := strings.Split(pattern.Grouping.Rows, "|")
 	columnGroupFields := strings.Split(pattern.Grouping.ColumnGroups, "|")
@@ -1097,20 +1224,18 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			}
 
 			// Fallback: if all group codes are missing, use subgroup ID
+			// เฉพาะ columnKey เท่านั้น — columnLabel ปล่อยว่างไว้ เพราะ col_<uuid>
+			// เป็นตัวระบุตัวตน ไม่ใช่ค่าที่เอาไปโชว์เป็นหัวคอลัมน์ได้
 			if columnKey == "" {
 				columnKey = fmt.Sprintf("col_%s", sg.ID)
-				if columnLabel == "" {
-					columnLabel = columnKey
-				}
 			}
 		} else {
 			columnLabel = buildCompositeKey(sg.SubGroupKeys, columnGroupFields)
 			columnCode := buildCompositeCodeKey(sg.SubGroupKeys, columnGroupFields)
 			columnKey = sanitizeIdentifier(columnCode, columnLabel)
 		}
-		if columnLabel == "" {
-			columnLabel = columnKey
-		}
+		// columnLabel คือค่าที่ผู้ใช้เห็น ปล่อยให้ว่างได้เมื่อ item_name ว่างโดยตั้งใจ
+		// ห้าม fallback ไป columnKey ซึ่งเป็น code — columnKey ใช้ระบุตัวตนคอลัมน์เท่านั้น
 		// No longer skip if columnKey is empty - we now always have a fallback
 		if columnKey == "" {
 			columnKey = fmt.Sprintf("col_%s", sg.ID)
@@ -1154,7 +1279,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 		inactiveValue := false
 		hasInactiveValue := false
 		var lineBundleValue interface{}
-		var stockValue interface{}
 		var stockQuantityValue interface{}
 		var batchNoValue interface{}
 		var supplierNameValue interface{}
@@ -1220,10 +1344,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				for key, value := range udfData {
 					if key == "is_highlight" || key == "inactive" || key == "stock_quantity" || key == "batch_no" || key == "warehouse" || key == "code" {
 						continue
-					}
-
-					if key == "stock" {
-						stockValue = value
 					}
 
 					// Handle awaiting_production fields directly from udf_json
@@ -1329,13 +1449,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[fieldName] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fieldName] = val1 + val2
-				}
+				row[fieldName] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
@@ -1400,8 +1514,6 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 				} else {
 					row[fieldName] = false
 				}
-			case "stock":
-				row[fieldName] = stockValue
 			case "line_bundle":
 				if lineBundleValue != nil {
 					row[fieldName] = lineBundleValue
@@ -1431,7 +1543,7 @@ func buildDynamicRows(root *PriceTableConfiguration, pattern *PatternConfig, sub
 					row[fieldName] = nil
 				}
 			case "warehouse":
-				row[fieldName] = warehouseValue
+				row[fieldName] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				row[fieldName] = codeValue
 			case "total_weight":
@@ -1516,6 +1628,7 @@ func buildItemValue(root *PriceTableConfiguration, pattern *PatternConfig, sg mo
 
 func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subGroups []models.PriceListSubGroupResponse) []AGGridRowData {
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 	rows := []AGGridRowData{}
 
 	for _, sg := range subGroups {
@@ -1530,7 +1643,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 		var lineBundleValue interface{}
 		var marketWeightValue interface{}
 		var odValue interface{}
-		var stockValue interface{}
 		var importDateValue interface{}
 		var deliveryDateValue interface{}
 		var nextProductionValue interface{}
@@ -1579,9 +1691,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				marketWeightValue = udfNumeric(udfData, "market_weight")
 				if od, ok := udfData["od"]; ok {
 					odValue = od
-				}
-				if stock, ok := udfData["stock"]; ok {
-					stockValue = stock
 				}
 				if importDate, ok := udfData["import_date"]; ok {
 					importDateValue = importDate
@@ -1699,13 +1808,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(fixedCol.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(fixedCol.DataMapping, "_x_") {
-					row[fixedCol.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[fixedCol.Field] = val1 + val2
-				}
+				row[fixedCol.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, fixedCol.DataMapping)
 				continue
 			}
 
@@ -1745,8 +1848,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 				}
 			case "od":
 				row[fixedCol.Field] = odValue
-			case "stock":
-				row[fixedCol.Field] = stockValue
 			case "extra_price_unit":
 				row[fixedCol.Field] = sg.ExtraPriceUnit
 			case "remark":
@@ -1810,11 +1911,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					row[fixedCol.Field] = nil
 				}
 			case "warehouse":
-				if warehouseValue != nil {
-					row[fixedCol.Field] = warehouseValue
-				} else {
-					row[fixedCol.Field] = nil
-				}
+				row[fixedCol.Field] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				if codeValue != nil {
 					row[fixedCol.Field] = codeValue
@@ -1967,13 +2064,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			// Check if dataMapping is a composite product group reference
 			compositeGroupCodes := extractGroupCodesFromCompositeMapping(colConfig.DataMapping)
 			if len(compositeGroupCodes) == 2 {
-				val1 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[0])
-				val2 := getValueNameByGroupCode(sg.SubGroupKeys, compositeGroupCodes[1])
-				if strings.Contains(colConfig.DataMapping, "_x_") {
-					row[colConfig.Field] = fmt.Sprintf("%s x %s", val1, val2)
-				} else {
-					row[colConfig.Field] = val1 + val2
-				}
+				row[colConfig.Field] = compositeMappingValue(sg.SubGroupKeys, compositeGroupCodes, colConfig.DataMapping)
 				continue
 			}
 
@@ -1999,12 +2090,6 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 			case "od":
 				if odValue != nil {
 					row[colConfig.Field] = odValue
-				} else {
-					row[colConfig.Field] = nil
-				}
-			case "stock":
-				if stockValue != nil {
-					row[colConfig.Field] = stockValue
 				} else {
 					row[colConfig.Field] = nil
 				}
@@ -2071,11 +2156,7 @@ func buildDirectRows(root *PriceTableConfiguration, pattern *PatternConfig, subG
 					row[colConfig.Field] = nil
 				}
 			case "warehouse":
-				if warehouseValue != nil {
-					row[colConfig.Field] = warehouseValue
-				} else {
-					row[colConfig.Field] = nil
-				}
+				row[colConfig.Field] = warehouseForRow(sg, warehouseValue)
 			case "code":
 				if codeValue != nil {
 					row[colConfig.Field] = codeValue
@@ -2198,13 +2279,15 @@ func buildProductGroup2ColumnGroupsWithCode(pattern *PatternConfig, subGroups []
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	// Build column groups with children from pattern.Columns
@@ -2253,6 +2336,7 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	}
 
 	perBatch := patternHasBatchColumn(pattern)
+	subGroups = collapseSubGroupRows(subGroups, perBatch, patternHasWarehouseColumn(pattern))
 
 	// Collect PRODUCT_GROUP2 metadata for consistent column ordering/defaults
 	type pg2Entry struct {
@@ -2269,12 +2353,14 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 		}
 	}
 
+	idxPG2 := newValueByCode(subGroups)
 	pg2Entries := make([]pg2Entry, 0, len(pg2Map))
 	for code, label := range pg2Map {
 		pg2Entries = append(pg2Entries, pg2Entry{Code: code, Label: label})
 	}
 	sort.Slice(pg2Entries, func(i, j int) bool {
-		return pg2Entries[i].Label < pg2Entries[j].Label
+		a, b := pg2Entries[i], pg2Entries[j]
+		return idxPG2.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	rows := []AGGridRowData{}
@@ -2282,9 +2368,9 @@ func buildDirectRowsWithProductGroup2WithCode(root *PriceTableConfiguration, pat
 	rowOrder := []string{}
 
 	for _, sg := range subGroups {
-		thickness := getValueNameByGroupCode(sg.SubGroupKeys, productGroup6Code)
-		length := getValueNameByGroupCode(sg.SubGroupKeys, productGroup7Code)
-		thicknessLength := strings.TrimSpace(fmt.Sprintf("%s x %s", thickness, length))
+		// ใช้กติกาเดียวกับคอลัมน์ composite อื่น ๆ คือข้ามค่าว่าง ไม่งั้นชื่อที่ว่าง
+		// โดยตั้งใจจะเหลือ "6 x" หรือ "x 6" ค้างไว้ (TrimSpace ตัดได้แค่ช่องว่าง)
+		thicknessLength := compositeMappingValue(sg.SubGroupKeys, []string{productGroup6Code, productGroup7Code}, "_x_")
 
 		sizePart1 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup5Code)
 		sizePart2 := getValueNameByGroupCode(sg.SubGroupKeys, productGroup3Code)

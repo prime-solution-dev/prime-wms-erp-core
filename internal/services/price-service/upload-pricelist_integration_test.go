@@ -436,3 +436,49 @@ func TestCreatePricelist_DuplicateSubGroupKeyKeepsBothRows(t *testing.T) {
 		t.Errorf("both subgroups share id %s", ids[0])
 	}
 }
+
+// extra สองแถวที่ PG ชุดเดียวกันมี extra_key ซ้ำกันเสมอ (extra_key gen จากค่า PG01..PG10)
+// เดิมคีย์ถูกผูกกลับด้วยสตริง extra_key จึงกองอยู่ที่ extra แถวแรกทั้งหมด แถวที่สองเหลือ 0 คีย์
+// จำนวนแถวรวมเท่าเดิม test นับแถวจึงจับไม่ได้ ต้องตรวจการกระจายตัว
+//
+// รันสองรอบเพื่อคลุมทั้ง insert path และ path ที่ group มีอยู่แล้วใน DB
+func TestCreatePricelist_ExtraKeysBindToOwnExtraRow(t *testing.T) {
+	gormx := openTestDB(t)
+	truncateAll(t, gormx)
+
+	for _, round := range []string{"อัปโหลดครั้งแรก", "อัปโหลดซ้ำ"} {
+		uploadFullSheets(t, gormx, false)
+
+		var rows []struct {
+			ID       uuid.UUID `gorm:"column:id"`
+			ExtraKey string    `gorm:"column:extra_key"`
+			ValueInt float64   `gorm:"column:value_int"`
+			NKeys    int64     `gorm:"column:n_keys"`
+		}
+		if err := gormx.Table("price_list_group_extra e").
+			Select("e.id, e.extra_key, e.value_int, (SELECT count(*) FROM price_list_group_extra_key k WHERE k.group_extra_id = e.id) AS n_keys").
+			Order("e.value_int").Scan(&rows).Error; err != nil {
+			t.Fatalf("%s: scan: %v", round, err)
+		}
+		if len(rows) != 3 {
+			t.Fatalf("%s: extra = %d แถว ต้องได้ 3", round, len(rows))
+		}
+		// fullSheets: value_int 0.1 และ 0.2 ใช้ PG01_1 (extra_key ซ้ำ) · 0.3 ใช้ PG01_2
+		for _, r := range rows {
+			if r.NKeys != 1 {
+				t.Errorf("%s: extra value_int=%v extra_key=%q ได้ %d คีย์ ต้องได้ 1 (คีย์ต้องอยู่กับแถวตัวเอง ไม่กองที่แถวแรก)",
+					round, r.ValueInt, r.ExtraKey, r.NKeys)
+			}
+		}
+
+		var mismatched int64
+		if err := gormx.Table("price_list_group_extra e").
+			Joins("JOIN price_list_group_extra_key k ON k.group_extra_id = e.id").
+			Where("k.value <> ALL(string_to_array(e.extra_key, '|'))").Count(&mismatched).Error; err != nil {
+			t.Fatalf("%s: count mismatch: %v", round, err)
+		}
+		if mismatched != 0 {
+			t.Errorf("%s: มี %d คีย์ที่ value ไม่ตรงกับ extra_key ของ extra ที่มันสังกัด", round, mismatched)
+		}
+	}
+}

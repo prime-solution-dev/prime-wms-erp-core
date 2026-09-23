@@ -127,10 +127,6 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			requestJSON, _ := json.MarshalIndent(autoApprovalReq, "", "  ")
-			fmt.Println("CreateGoodsIssueRequest JSON:")
-			fmt.Println(string(requestJSON))
-
 			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
 			if err != nil {
 				return nil, err
@@ -179,14 +175,13 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			Items:              []verifyService.VerifyApproveItem{},
 		}
 
-		for index, item := range quotationReq.Items {
+		for _, item := range quotationReq.Items {
 			item.ID = uuid.New()
 			item.QuotationID = tempQuotation.ID
 
-			// if item.QuotationItem == "" {
-			// 	item.QuotationItem = uuid.New().String()
-			// }
-			item.QuotationItem = strconv.Itoa(index)
+			if item.QuotationItem == "" {
+				item.QuotationItem = uuid.New().String()
+			}
 
 			item.CreateDate = &nowDateOnly
 			item.CreateBy = user

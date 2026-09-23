@@ -1,6 +1,8 @@
 package patterns
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"prime-erp-core/internal/models"
@@ -168,4 +170,80 @@ func TestPatternHasBatchColumnAgainstRealConfigs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// คอลัมน์ Avg.kg stock ต้องผูกกับ field ของ avg ไม่ใช่ total_weight
+//
+// PG01_3_PATTERN.json เคย copy บล็อกคอลัมน์ Weight-spec มาทำ Avg.kg stock
+// แล้วลืมเปลี่ยน field/dataMapping ทำให้กริดวาดเลข Weight-spec ซ้ำสองคอลัมน์
+// ผู้ใช้เห็น Avg.kg stock เป็นเลขที่ดูสมเหตุสมผลทั้งที่ไม่มีสต็อก ส่วน Excel
+// ซึ่งผูก avg_weight ถูกอยู่แล้วแสดง 0 ตามความจริง
+//
+// test นี้เดินทุกไฟล์ใน configs/*.json แบบ generic เพื่อกันเคสเดียวกันกลับมา
+// ในไฟล์ไหนก็ตาม ไม่ใช่แค่ไฟล์ที่เคยพัง
+func TestPatternConfigs_AvgColumnsBindToAvgField(t *testing.T) {
+	entries, err := patternConfigs.ReadDir("configs")
+	if err != nil {
+		t.Fatalf("อ่าน configs ไม่ได้: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("ไม่พบไฟล์ config เลย — embed.FS อาจเปลี่ยน path")
+	}
+
+	// เดิน JSON แบบ generic แทนการ unmarshal เข้า struct
+	// เพราะคอลัมน์กระจายอยู่หลาย key (columns, fixedColumns, columnGroups.children, patterns[])
+	// การเดินดิบ ๆ จับได้ทุกที่โดยไม่ต้องไล่ตามโครงสร้างที่อาจเพิ่มในอนาคต
+	var walk func(file string, node any, t *testing.T)
+	walk = func(file string, node any, t *testing.T) {
+		switch n := node.(type) {
+		case map[string]any:
+			header, _ := n["headerName"].(string)
+			if strings.Contains(strings.ToLower(header), "avg") {
+				field, _ := n["field"].(string)
+				mapping, _ := n["dataMapping"].(string)
+				// อย่างน้อยหนึ่งในสองต้องชี้ไปที่ avg ถึงจะดึงค่าจริงมาได้
+				// (shared.go รับ dataMapping ทั้ง avg_weight และ avg_kg_stock
+				// และ fallback ไปอ่าน field เมื่อ dataMapping ว่าง)
+				if field != "" || mapping != "" {
+					if !strings.Contains(strings.ToLower(field), "avg") &&
+						!strings.Contains(strings.ToLower(mapping), "avg") {
+						t.Errorf("%s: คอลัมน์ %q ผูกกับ field=%q dataMapping=%q ซึ่งไม่ใช่ค่า avg",
+							file, header, field, mapping)
+					}
+				}
+			}
+			for _, v := range n {
+				walk(file, v, t)
+			}
+		case []any:
+			for _, v := range n {
+				walk(file, v, t)
+			}
+		}
+	}
+
+	checked := 0
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		data, err := patternConfigs.ReadFile("configs/" + entry.Name())
+		if err != nil {
+			t.Fatalf("%s: อ่านไม่ได้: %v", entry.Name(), err)
+		}
+
+		var root any
+		if err := json.Unmarshal(data, &root); err != nil {
+			t.Fatalf("%s: parse ไม่ผ่าน: %v", entry.Name(), err)
+		}
+
+		walk(entry.Name(), root, t)
+		checked++
+	}
+
+	if checked == 0 {
+		t.Fatal("ไม่ได้ตรวจไฟล์ config ใดเลย")
+	}
+	t.Logf("ตรวจ config %d ไฟล์", checked)
 }

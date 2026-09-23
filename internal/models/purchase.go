@@ -349,6 +349,12 @@ type UpdateStatusApprovePOBigLotRequest struct {
 	Remark          string    `json:"remark"`
 }
 
+// CompletePOBigLotRequest is the payload for both Close (Complete) and Cancel of
+// Big lot POs — a list of pre_purchase_code to act on.
+type CompletePOBigLotRequest struct {
+	PrePurchaseCodes []string `json:"pre_purchase_codes"`
+}
+
 // Supplier DTOs
 type GetSupplierListRequest struct {
 	SupplierCodes []string `json:"supplier_code"`
@@ -579,6 +585,7 @@ type GetProductRequest struct {
 	ProductCode []string `json:"product_code"`
 	SiteCode    []string `json:"site_code"`
 	CompanyCode []string `json:"company_code"`
+	ProductType []string `json:"product_type"`
 }
 
 type GetProductsDetailResponse struct {
@@ -665,6 +672,8 @@ type GetProductsDetailComponent struct {
 	ExternalID                    string                         `json:"external_id"`
 	GRTolerance                   float64                        `json:"gr_tolerance"`
 	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	GRWeightTolerance             float64                        `json:"gr_weight_tolerance"`
+	GRWeightToleranceActive       bool                           `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`

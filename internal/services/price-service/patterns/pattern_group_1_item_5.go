@@ -49,11 +49,14 @@ func BuildGroup1Item5Response(priceListData []models.GetPriceListResponse, group
 		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
 	}
 
-	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2)
+	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2,
+		getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2"))
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
 
 	for _, tabLabel := range tabOrder {
 		subGroups := groupedByProductGroup2[tabLabel]
+		// แกนแถวของ pattern นี้คือ PG06 ความหนา ซึ่งเป็นแกนที่เป็นต้นเหตุของบั๊ก
+		SortSubGroupsByValue(subGroups, splitGroupCodes(pattern.Grouping.Rows)...)
 		columns := buildGroup1Item5Columns(pattern, subGroups)
 		rowData := buildDynamicRows(config, pattern, subGroups)
 
@@ -118,13 +121,15 @@ func buildGroup1Item5Columns(pattern *PatternConfig, subGroups []models.PriceLis
 		}
 	}
 
-	// Sort keys to ensure consistent column order by label
+	// เรียงคอลัมน์ด้วยค่าตัวเลขจาก group_item.value ไม่ใช่ label
+	idx := newValueByCode(subGroups)
 	sortedKeys := make([]string, 0, len(uniqueValues))
 	for key := range uniqueValues {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Slice(sortedKeys, func(i, j int) bool {
-		return uniqueValues[sortedKeys[i]].Label < uniqueValues[sortedKeys[j]].Label
+		a, b := uniqueValues[sortedKeys[i]], uniqueValues[sortedKeys[j]]
+		return idx.Less(a.Code, a.Label, b.Code, b.Label)
 	})
 
 	columns := make([]ColumnDef, 0, len(sortedKeys))
@@ -192,7 +197,9 @@ func buildItem5NestedGroup(config ColumnGroupConfig, prefix string) ColumnDef {
 	return group
 }
 
-func buildTabOrder(preferred []string, groupedData map[string][]models.PriceListSubGroupResponse) []string {
+// tabGroupCode คือ group code ของแกน tab ใช้เรียง label ที่ไม่ได้อยู่ใน preferred
+// ด้วยค่าตัวเลขจาก group_item.value แทนการเทียบชื่อแบบ string
+func buildTabOrder(preferred []string, groupedData map[string][]models.PriceListSubGroupResponse, tabGroupCode string) []string {
 	tabOrder := make([]string, 0, len(groupedData))
 	seen := make(map[string]bool)
 
@@ -204,12 +211,16 @@ func buildTabOrder(preferred []string, groupedData map[string][]models.PriceList
 	}
 
 	remaining := make([]string, 0)
-	for label := range groupedData {
+	allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+	for label, sgs := range groupedData {
+		allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		if !seen[label] {
 			remaining = append(remaining, label)
 		}
 	}
+	// sort.Strings ก่อนเพื่อให้ลำดับตั้งต้นนิ่ง แล้วจึงเรียงด้วย group_item.value
 	sort.Strings(remaining)
+	sortLabelsByValue(remaining, allSubGroupsForTabs, tabGroupCode)
 
 	return append(tabOrder, remaining...)
 }

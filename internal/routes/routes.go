@@ -335,6 +335,12 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
 	})
+	purchase.POST("/CompletePOBigLot", func(c *gin.Context) {
+		utils.ProcessRequest(c, prePurchaseService.CompletePOBigLot)
+	})
+	purchase.POST("/CancelPOBigLot", func(c *gin.Context) {
+		utils.ProcessRequest(c, prePurchaseService.CancelPOBigLot)
+	})
 	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
 		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})
@@ -363,6 +369,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	})
 	purchase.POST("/CompletePO", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePO)
+	})
+	purchase.POST("/CancelPO", func(c *gin.Context) {
+		utils.ProcessRequest(c, purchaseService.CancelPO)
 	})
 	purchase.POST("/CompletePOItem", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.CompletePOItem)

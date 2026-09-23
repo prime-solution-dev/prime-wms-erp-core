@@ -389,6 +389,16 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errCreateInvoice != nil {
 			return nil, errCreateInvoice
 		}
+
+		// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+		// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+		// The invoice is already saved here; a reconcile failure must NOT fail the request
+		// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+		// next GRA on this PO, or a manual reconcile, self-heals.
+		if err := reconcilePOAfterAPSave(req); err != nil {
+			log.Printf("CreateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
+		}
+
 		invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 		idInvoice := invoiceMap["id"].([]uuid.UUID)
 		requestData := map[string]interface{}{
@@ -405,6 +415,31 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			urlHook := ""
 			for _, hookConfigValue := range hookConfig {
 				urlHook = hookConfigValue.HookUrl
+			}
+			productReq := models.GetProductRequest{
+				ProductType: []string{"PROD_SERVICE"},
+				SiteCode:    []string{siteCode},
+				CompanyCode: []string{companyCode},
+			}
+
+			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+			if errmapProduct != nil {
+				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+			}
+			firstProduct := models.GetProductsDetailComponent{}
+			hasProduct := false
+			for _, product := range mapProduct {
+				firstProduct = product
+				hasProduct = true
+				break
+			}
+			if hasProduct {
+				for r := range req {
+					for it := range req[r].InvoiceItem {
+						req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+					}
+				}
 			}
 
 			requestDataCreateHook := interfaceService.HookInterfaceRequest{

@@ -57,12 +57,17 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 		}
 	}
 	remaining := make([]string, 0)
-	for key := range groupedByProductGroup1 {
+	allSubGroupsForTabs := make([]models.PriceListSubGroupResponse, 0)
+	for key, sgs := range groupedByProductGroup1 {
+		allSubGroupsForTabs = append(allSubGroupsForTabs, sgs...)
 		if !seen[key] {
 			remaining = append(remaining, key)
 		}
 	}
+	// sort.Strings ก่อนเพื่อให้ลำดับตั้งต้นนิ่ง แล้วจึงเรียงด้วย group_item.value
 	sort.Strings(remaining)
+	sortLabelsByValue(remaining, allSubGroupsForTabs,
+		getGroupCodeFromConfig(config, pattern, "productGroup1", "PRODUCT_GROUP1"))
 	tabOrder = append(tabOrder, remaining...)
 
 	columns := buildFixedColumns(pattern)
@@ -74,17 +79,24 @@ func BuildGroup1Item8Response(priceListData []models.GetPriceListResponse, group
 			continue
 		}
 
+		// เรียงที่ต้นทางด้วย group_item.value แล้ว buildDirectRows จะผลิตแถวตามลำดับนั้น
+		productGroup6Code := getGroupCodeFromConfig(config, pattern, "productGroup6", "PRODUCT_GROUP6")
+		SortSubGroupsByValue(subGroups, productGroup6Code)
+
 		rows := buildDirectRows(config, pattern, subGroups)
 
+		// ship_no ไม่ได้มาจาก product group จึงยัง tie-break ด้วย string ตามเดิม
+		// ใช้ SliceStable และคืน false เมื่อ product_group_6 ต่างกัน เพื่อไม่ทำลาย
+		// ลำดับที่เรียงมาแล้วจากต้นทาง
 		sort.SliceStable(rows, func(i, j int) bool {
 			thicknessI := fmt.Sprintf("%v", rows[i]["product_group_6"])
 			thicknessJ := fmt.Sprintf("%v", rows[j]["product_group_6"])
-			if thicknessI == thicknessJ {
-				shipI := fmt.Sprintf("%v", rows[i]["ship_no"])
-				shipJ := fmt.Sprintf("%v", rows[j]["ship_no"])
-				return shipI < shipJ
+			if thicknessI != thicknessJ {
+				return false
 			}
-			return thicknessI < thicknessJ
+			shipI := fmt.Sprintf("%v", rows[i]["ship_no"])
+			shipJ := fmt.Sprintf("%v", rows[j]["ship_no"])
+			return shipI < shipJ
 		})
 
 		tableData := make([]map[string]interface{}, len(rows))
