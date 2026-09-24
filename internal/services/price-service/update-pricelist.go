@@ -73,7 +73,12 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 	// touched above. Recalculate them here so the new base price is stamped as the
 	// "after" price (and the previous "after" moves to "before") right away,
 	// instead of only when someone happens to hit /price/SubGroup/UpdateLatest.
-	if err := cascadeBasePriceToSubGroups(ctx.Request.Context(), priceListGroup); err != nil {
+	//
+	// The base price write above already committed. If the caller disconnects while
+	// this cascade is still running, cancelling ctx.Request.Context() would abandon
+	// it mid-way and leave price_list_sub_group stale relative to the base price
+	// that already landed — so this part must outlive the request.
+	if err := cascadeBasePriceToSubGroups(context.WithoutCancel(ctx.Request.Context()), priceListGroup); err != nil {
 		return nil, err
 	}
 
