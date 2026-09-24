@@ -324,22 +324,22 @@ func RegisterRoutes(ctx *gin.Engine) {
 	purchase := ctx.Group("/purchase")
 	//pre-purchase
 	purchase.POST("/CreatePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.CreatePOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.CreatePOBigLot)
 	})
 	purchase.POST("/GetPOBigLot", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, prePurchaseService.GetPOBigLot)
 	})
 	purchase.POST("/UpdatePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.UpdatePOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.UpdatePOBigLot)
 	})
 	purchase.POST("/UpdateStatusApprovePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.UpdateStatusApprovePOBigLot)
 	})
 	purchase.POST("/CompletePOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.CompletePOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.CompletePOBigLot)
 	})
 	purchase.POST("/CancelPOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.CancelPOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.CancelPOBigLot)
 	})
 	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
 		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
@@ -350,31 +350,31 @@ func RegisterRoutes(ctx *gin.Engine) {
 
 	//purchase
 	purchase.POST("/CreatePO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CreatePO)
+		utils.ProcessContextRequest(c, purchaseService.CreatePO)
 	})
 	purchase.POST("/GetPO", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, purchaseService.GetPO)
 	})
 	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.GetPOItem)
+		utils.ProcessContextRequest(c, purchaseService.GetPOItem)
 	})
 	purchase.POST("/UpdatePO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.UpdatePO)
+		utils.ProcessContextRequest(c, purchaseService.UpdatePO)
 	})
 	purchase.POST("/UpdateStatusApprovePO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.UpdateStatusApprovePO)
+		utils.ProcessContextRequest(c, purchaseService.UpdateStatusApprovePO)
 	})
 	purchase.POST("/CompleteStatusPaymentPO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CompleteStatusPaymentPO)
+		utils.ProcessContextRequest(c, purchaseService.CompleteStatusPaymentPO)
 	})
 	purchase.POST("/CompletePO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CompletePO)
+		utils.ProcessContextRequest(c, purchaseService.CompletePO)
 	})
 	purchase.POST("/CancelPO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CancelPO)
+		utils.ProcessContextRequest(c, purchaseService.CancelPO)
 	})
 	purchase.POST("/CompletePOItem", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.CompletePOItem)
+		utils.ProcessContextRequest(c, purchaseService.CompletePOItem)
 	})
 
 	///cronjob

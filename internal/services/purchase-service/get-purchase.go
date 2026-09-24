@@ -9,8 +9,6 @@ import (
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func GetPO(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -129,7 +127,7 @@ func GetPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	return result, nil
 }
 
-func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPOItem(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPurchaseItemRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -169,7 +167,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	reqInboundFilter := goodsReceiveService.InboundFilter{
 		InboundItemDocumentRefItem: purchaseItemCodes,
 	}
-	inbounds, err := goodsReceiveService.GetInbounds(ctx.Request.Context(), reqInboundFilter)
+	inbounds, err := goodsReceiveService.GetInbounds(ctx, reqInboundFilter)
 	if err != nil {
 		return nil, errors.New("failed to get used qty from inbound: " + err.Error())
 	}
@@ -194,7 +192,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		reqGoodsReceiveFilter := goodsReceiveService.GoodsReceiveFilter{
 			ReferenceNo: inboundCodes,
 		}
-		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(ctx.Request.Context(), reqGoodsReceiveFilter)
+		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(ctx, reqGoodsReceiveFilter)
 		if err != nil {
 			return nil, errors.New("failed to get goods receive: " + err.Error())
 		}
@@ -320,9 +318,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Get Approvals
-	// GetPOApproval รับ context.Context แล้ว แต่ GetPOItem เองยังไม่แปลง ต้องส่ง
-	// ctx.Request.Context() ไม่ใช่ ctx ตรงๆ (ดู eaa539a)
-	approvalsResp, err := prePurchaseService.GetPOApproval(ctx.Request.Context(), purchaseCodes)
+	approvalsResp, err := prePurchaseService.GetPOApproval(ctx, purchaseCodes)
 	if err != nil {
 		return nil, errors.New("failed to get purchase approvals: " + err.Error())
 	}
@@ -341,8 +337,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		PageSize:         len(prePurchaseCodes),
 	}
 
-	// GetRelatedPrePurchase รับ context.Context แล้ว เช่นกัน
-	mapPrePurchase, err := GetRelatedPrePurchase(ctx.Request.Context(), prePurchaseReq)
+	mapPrePurchase, err := GetRelatedPrePurchase(ctx, prePurchaseReq)
 	if err != nil {
 		return nil, errors.New("failed to get pre purchase list: " + err.Error())
 	}

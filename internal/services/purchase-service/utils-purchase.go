@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	saleRepository "prime-erp-core/internal/repositories/invoice"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
@@ -18,9 +20,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// postCommitContext คืน context สำหรับงานที่ทำหลังเขียนฐานข้อมูลเสร็จ (เช่น สร้าง approval ต่อ)
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย งานที่เหลือ
+// จะไม่เกิดขึ้นเลยและเงียบด้วย — รูปแบบเดียวกับ sale-service/create-sale.go
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
+}
 
 // NextPurchaseItemSeq returns the running number to assign to the first item
 // that has no purchase_item yet: max(existing numeric purchase_item) + 1.
@@ -220,59 +228,46 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 }
 
 // Running code actions
-func GeneratePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
+//
+// เดิมเรียก systemConfigService.GetRunningSystemConfig (SELECT เฉยๆ ไม่มี lock) แล้วค่อยเรียก
+// UpdateRunningSystemConfig ทีหลัง คนละ transaction — ทั้งคู่ยังรับพารามิเตอร์ตัวแรกแบบ gin เดิม
+// (ไม่ได้แปลงและอยู่นอก scope งานนี้ ดู system-config package) เปลี่ยนมาใช้ ReserveRunningCodes +
+// StandardRunningPeriod ที่ระบบมีอยู่แล้ว (system-config/reserve-running-code.go) ซึ่งใช้ปี ค.ศ.
+// เต็มแบบเดียวกับของเดิม (sale/delivery/quotation/purchase ใช้ตัวเดียวกันนี้) ล็อกแถว config ด้วย
+// SELECT ... FOR UPDATE จนกว่าจะเขียน current_running เสร็จ ปิดช่องเลขซ้ำไปในตัว
+// prefix ส่ง "" เหมือนของเดิม (getReq/updateReq ไม่เคยส่ง prefix มา) เพื่อให้ยังใช้ prefix ที่
+// เก็บอยู่ใน system_config row เดิม
+func GeneratePurchaseCodes(ctx context.Context, count int) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No purchases to generate codes for
 	}
 
-	configCode := "RUNNING_PO"
-
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
+	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+		// ข้อความเดิมตอน ConnectGORM ล้มเหลวใน GetRunningSystemConfig/UpdateRunningSystemConfig
+		// คือสตริงตายตัว "failed to connect to database" (เขียนผ่าน ctx.JSON ตรงๆ) ไม่ใช่ err ดิบ
+		// คงข้อความเดิมไว้ ไม่ต่อท้าย driver error กันข้อมูลภายในหลุดออกไปหา client
+		return nil, errors.New("failed to connect to database")
 	}
+	defer db.CloseGORM(gormx)
 
-	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_PO", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate purchase order codes: %v", err)
 	}
 
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-	}
-
-	reqUpdateJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	purchaseCodeResult, ok := purchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(purchaseCodeResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of purchase order codes from system config")
 	}
 
-	return purchaseCodeResult.Data, nil
+	return codes, nil
 }
 
 // Approval actions
-func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error {
+func CreatePurchaseApproval(ctx context.Context, purchases []models.Purchase) error {
 
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	approvalReq := []models.Approval{}
 
 	for _, p := range purchases {
@@ -304,10 +299,7 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 
 	approvalReqString := string(approvalReqJson)
 
-	// approvalService.CreateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context() ไม่ใช่
-	// ctx ตรงๆ ไม่งั้น requestcontext อ่าน user จาก gin.Context ไม่เจอ (gin.Context.Value() เช็คแค่
-	// string key แล้ว fallback ไป hasRequestContext() ที่ repo นี้ไม่ได้เปิดไว้ เลยคืน nil เงียบๆ)
-	approvalIDs, err := approvalService.CreateApproval(ctx.Request.Context(), approvalReqString)
+	approvalIDs, err := approvalService.CreateApproval(ctx, approvalReqString)
 	if err != nil {
 		return err
 	}
@@ -316,7 +308,7 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 	return nil
 }
 
-func UpdatePOToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePurchaseRequest) error {
+func UpdatePOToApproval(ctx context.Context, updateReqs []models.UpdateStatusApprovePurchaseRequest) error {
 	purchaseCodes := []string{}
 	mapUpdateList := make(map[string]models.Approval)
 
