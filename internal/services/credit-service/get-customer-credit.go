@@ -1,13 +1,12 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"prime-erp-core/internal/db"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +24,7 @@ type GetCustomerCreditResponseResult struct {
 	CustomerCodes []string `json:"customer_codes"`
 }
 
-func GetCustomerCreditRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCustomerCreditRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetCustomerCreditRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -35,8 +34,7 @@ func GetCustomerCreditRest(ctx *gin.Context, jsonPayload string) (interface{}, e
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.CloseGORM(gormx)
 

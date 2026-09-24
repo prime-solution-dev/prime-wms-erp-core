@@ -1,14 +1,13 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetSummaryCreditRequest struct {
@@ -22,7 +21,7 @@ type ResultGetSummaryCredit struct {
 	BalanceCreditLimit  float64 `json:"balance_credit_limit"`
 }
 
-func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSummaryCredit(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest
 
@@ -63,7 +62,9 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		}
 	}
 
-	getDepositRes, errGetDeposit := depositService.GetDeposit(ctx, string(jsonBytesCustomerCode))
+	// depositService.GetDeposit ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+	// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+	getDepositRes, errGetDeposit := depositService.GetDeposit(nil, string(jsonBytesCustomerCode))
 	if errGetDeposit != nil {
 		return nil, errGetDeposit
 	}

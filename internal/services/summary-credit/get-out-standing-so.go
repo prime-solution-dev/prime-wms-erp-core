@@ -1,6 +1,7 @@
 package summaryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	repositorySale "prime-erp-core/internal/repositories/sale"
@@ -8,7 +9,6 @@ import (
 	paymentService "prime-erp-core/internal/services/payment-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -24,7 +24,7 @@ type OutStandingSoRes struct {
 	OutStandingSo float64    `json:"out_standing_so"`
 }
 
-func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetOutStandingSo(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
 
@@ -55,7 +55,9 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		return nil, err
 	}
 
-	paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+	// paymentService.GetPayment ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+	// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+	paymentle, errGetPayment := paymentService.GetPayment(nil, string(jsonBytesPayment))
 	if errGetPayment != nil {
 		return nil, errGetPayment
 	}

@@ -1,30 +1,27 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.CreditRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	creditRequestValue := []models.CreditRequest{}
 	creditTransaction := []models.CreditTransaction{}
 	credit := []models.Credit{}
@@ -192,10 +189,7 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 	if len(updateApproval) > 0 {
 		updateApprovalPayload, _ := json.Marshal(updateApproval)
-		// approvalService.UpdateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context()
-		// ไม่ใช่ ctx ตรงๆ ไม่งั้น requestcontext อ่าน user จาก gin.Context ไม่เจอ (ดู comment ที่
-		// create-credit-request.go)
-		_, err := approvalService.UpdateApproval(ctx.Request.Context(), string(updateApprovalPayload))
+		_, err := approvalService.UpdateApproval(ctx, string(updateApprovalPayload))
 		if err != nil {
 			return nil, fmt.Errorf("failed to update approval: %v", err)
 		}

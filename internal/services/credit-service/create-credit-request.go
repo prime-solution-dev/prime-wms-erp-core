@@ -1,18 +1,19 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.CreditRequest
 
@@ -23,11 +24,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	approvalValue := []models.Approval{}
 	approvalIDForReturn := []uuid.UUID{}
 	//createdAt := time.Now()
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	for i := range req {
 		creditID := uuid.New()
 		req[i].ID = creditID
@@ -62,11 +59,7 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	// approvalService.CreateApproval รับ context.Context แล้ว (แปลงในงาน context-user-propagation)
-	// แต่ package นี้ยังไม่แปลง ต้องส่ง ctx.Request.Context() ไม่ใช่ ctx ตรงๆ — ของ gin เก็บ user
-	// ด้วย typed key (contextKey) ซึ่ง gin.Context.Value() เช็คแค่ string key แล้ว fallback ไป
-	// hasRequestContext() ที่ repo นี้ไม่ได้เปิด engine.ContextWithFallback เลยคืน nil เงียบๆ
-	resultCreateApproval, errApproval := approvalService.CreateApproval(ctx.Request.Context(), string(jsonBytesCreateApproval))
+	resultCreateApproval, errApproval := approvalService.CreateApproval(ctx, string(jsonBytesCreateApproval))
 	if errApproval != nil {
 		return nil, errApproval
 	}
@@ -77,24 +70,22 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 	if len(approvalValue) > 0 {
 
-		requestDataCheckAutoApprovalRest := map[string]interface{}{
-			"request_user_code": userID,
-			"module_code":       "CUSTOMIZE",
-			"topic_code":        "CUSTOMIZE",
-			"md_item_code":      "CTM-CTM7",
-			"cond_range_min":    req[0].Amount,
+		// approvalService.CheckAutoApprovalRest ยังไม่แปลง (นอก scope) และรับ gin's *Context
+		// แต่มันเป็นแค่เปลือก JSON ห่อ CheckAutoApproval(gormx, req, user) ที่ไม่แตะ gormx เลย
+		// (_ = gormx) — เรียก CheckAutoApproval ตรงๆ แบบเดียวกับ sale-service/create-sale.go
+		// ตัดรอบ JSON marshal/unmarshal ทิ้งไปด้วย ผล/ประเภทคืนค่าเดิมทุกอย่าง
+		checkAutoApprovalReq := approvalService.CheckAutoApprovalRequest{
+			RequestUserCode: userID,
+			ModuleCode:      "CUSTOMIZE",
+			TopicCode:       "CUSTOMIZE",
+			MdItemCode:      "CTM-CTM7",
+			CondRangeMin:    req[0].Amount,
 		}
 
-		jsonDataCheckAutoApprovalRest, err := json.Marshal(requestDataCheckAutoApprovalRest)
-		if err != nil {
-			errors.New("Error marshalling data :")
-		}
-
-		checkAutoApprovalRest, errCheckAutoApprovalRest := approvalService.CheckAutoApprovalRest(ctx, string(jsonDataCheckAutoApprovalRest))
+		resultCheckAutoApprovalRest, errCheckAutoApprovalRest := approvalService.CheckAutoApproval(nil, checkAutoApprovalReq, userID)
 		if errCheckAutoApprovalRest != nil {
 			return nil, errCheckAutoApprovalRest
 		}
-		resultCheckAutoApprovalRest := checkAutoApprovalRest.(*approvalService.CheckAutoApprovalResponse)
 		//mapResultCreateApproval := resultCreateApproval.(map[string]interface{})
 		//ids := mapResultCreateApproval["id"].([]uuid.UUID)
 		if resultCheckAutoApprovalRest.IsAutoApproved {

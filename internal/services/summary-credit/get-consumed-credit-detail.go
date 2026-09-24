@@ -1,6 +1,7 @@
 package summaryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -8,8 +9,6 @@ import (
 	repositorySale "prime-erp-core/internal/repositories/sale"
 	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetPaidInvoiceRequest struct {
@@ -39,7 +38,7 @@ type ResultGetPaidInvoices struct {
 	PaidInvoice             float64 `json:"paid_invoice"`
 }
 
-func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetConsumend(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
 
@@ -71,7 +70,9 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			return nil, err
 		}
 
-		paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+		// paymentService.GetPayment ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+		// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+		paymentle, errGetPayment := paymentService.GetPayment(nil, string(jsonBytesPayment))
 		if errGetPayment != nil {
 			return nil, errGetPayment
 		}

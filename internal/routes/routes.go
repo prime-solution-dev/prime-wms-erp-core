@@ -265,54 +265,54 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//credit
 	credit := ctx.Group("/credit")
 	credit.POST("/GetCreditCurrent", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetCreditCurrentAPI)
+		utils.ProcessContextRequest(c, creditService.GetCreditCurrentAPI)
 	})
 	credit.POST("/GetCreditRequest", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetCreditRequests)
+		utils.ProcessContextRequest(c, creditService.GetCreditRequests)
 	})
 	credit.POST("/GetCreditRequestCronjob", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetCreditRequestCronjob)
+		utils.ProcessContextRequest(c, creditService.GetCreditRequestCronjob)
 	})
 	credit.POST("/GetCustomerCredit", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetCustomerCreditRest)
+		utils.ProcessContextRequest(c, creditService.GetCustomerCreditRest)
 	})
 
 	credit.POST("/CreateCreditRequest", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.CreateCreditRequest)
+		utils.ProcessContextRequest(c, creditService.CreateCreditRequest)
 	})
 	credit.POST("/UpdateCreditRequest", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.UpdateCreditRequest)
+		utils.ProcessContextRequest(c, creditService.UpdateCreditRequest)
 	})
 	credit.POST("/GetCredit", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetCredit)
+		utils.ProcessContextRequest(c, creditService.GetCredit)
 	})
 	credit.POST("/CreateCredit", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.CreateCredit)
+		utils.ProcessContextRequest(c, creditService.CreateCredit)
 	})
 	credit.POST("/GetHistory", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetHistory)
+		utils.ProcessContextRequest(c, creditService.GetHistory)
 	})
 	credit.POST("/GetSummaryCredit", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetSummaryCredit)
+		utils.ProcessContextRequest(c, creditService.GetSummaryCredit)
 	})
 	credit.POST("/GetTransaction", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.GetTransaction)
+		utils.ProcessContextRequest(c, creditService.GetTransaction)
 	})
 	credit.POST("/CreateCreditTransaction", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.CreateCreditTransaction)
+		utils.ProcessContextRequest(c, creditService.CreateCreditTransaction)
 	})
 	credit.POST("/DeleteCreditExtra", func(c *gin.Context) {
-		utils.ProcessRequest(c, creditService.DeleteCreditExtra)
+		utils.ProcessContextRequest(c, creditService.DeleteCreditExtra)
 	})
 
 	//summaryService
 	summary := ctx.Group("/summary")
 	summary.POST("/GetConsumend", func(c *gin.Context) {
-		utils.ProcessRequest(c, summaryService.GetConsumend)
+		utils.ProcessContextRequest(c, summaryService.GetConsumend)
 	})
 
 	summary.POST("/GetOutStandingSo", func(c *gin.Context) {
-		utils.ProcessRequest(c, summaryService.GetOutStandingSo)
+		utils.ProcessContextRequest(c, summaryService.GetOutStandingSo)
 	})
 
 	//unit
