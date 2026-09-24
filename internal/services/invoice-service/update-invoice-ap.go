@@ -10,6 +10,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	xService "prime-erp-core/internal/services/x-service"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -173,19 +174,22 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			hasProduct = true
 			break
 		}
+		// Keep hook-only product substitutions separate from the persisted request.
+		hookReq := slices.Clone(req)
 		if hasProduct {
-			for r := range req {
-				if req[r].DocumentRefType == "FABRICATION" {
-					for it := range req[r].InvoiceItem {
-						req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
-						req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+			for r := range hookReq {
+				if hookReq[r].DocumentRefType == "FABRICATION" {
+					hookReq[r].InvoiceItem = slices.Clone(hookReq[r].InvoiceItem)
+					for it := range hookReq[r].InvoiceItem {
+						hookReq[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						hookReq[r].InvoiceItem[it].ProductName = firstProduct.ProductName
 					}
 				}
 			}
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: hookReq,
 			UrlHook:     urlProduct,
 		}
 		_, err := interfaceService.HookInterface(requestDataCreateHook)
