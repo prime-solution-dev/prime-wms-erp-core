@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -296,7 +297,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Call external packing service
-	externalPackingResponse, err := callPackingService(res, req)
+	externalPackingResponse, err := callPackingService(ctx.Request.Context(), res, req)
 	if err != nil {
 		fmt.Printf("Error calling external packing service: %v\n", err)
 		// Return empty result if external service fails
@@ -319,7 +320,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 }
 
 // callPackingService รวบรวม delivery codes และ excluded pack codes จาก sales ทั้งหมด แล้วเรียก external packing service
-func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (externalService.ResultPackingResponse, error) {
+func callPackingService(ctx context.Context, sales []GetSalePackResponse, req GetSalePackRequest) (externalService.ResultPackingResponse, error) {
 	allDeliveryCodes := make(map[string]bool)
 	allExcludedPackCodes := make(map[string]bool)
 
@@ -362,7 +363,7 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 		PageSize:         req.PageSize,
 	}
 
-	packingResponse, err := externalService.GetPackSo(packingRequest)
+	packingResponse, err := externalService.GetPackSo(ctx, packingRequest)
 	if err != nil {
 		return externalService.ResultPackingResponse{}, errors.New("Error calling packing service: " + err.Error())
 	}

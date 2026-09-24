@@ -168,7 +168,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	reqInboundFilter := goodsReceiveService.InboundFilter{
 		InboundItemDocumentRefItem: purchaseItemCodes,
 	}
-	inbounds, err := goodsReceiveService.GetInbounds(reqInboundFilter)
+	inbounds, err := goodsReceiveService.GetInbounds(ctx.Request.Context(), reqInboundFilter)
 	if err != nil {
 		return nil, errors.New("failed to get used qty from inbound: " + err.Error())
 	}
@@ -193,7 +193,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		reqGoodsReceiveFilter := goodsReceiveService.GoodsReceiveFilter{
 			ReferenceNo: inboundCodes,
 		}
-		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(reqGoodsReceiveFilter)
+		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(ctx.Request.Context(), reqGoodsReceiveFilter)
 		if err != nil {
 			return nil, errors.New("failed to get goods receive: " + err.Error())
 		}

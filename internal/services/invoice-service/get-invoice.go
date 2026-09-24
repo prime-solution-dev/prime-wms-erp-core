@@ -104,7 +104,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		getCustomerByNameRequest := externalService.GetCustomerRequest{
 			Customers: customerCode,
 		}
-		customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+		customerByNameData, err := externalService.GetCustomer(ctx.Request.Context(), getCustomerByNameRequest)
 		if err != nil {
 			fmt.Println("failed to fetch customers by name:", err)
 			return nil, errors.New("failed to fetch customers by name: " + err.Error())

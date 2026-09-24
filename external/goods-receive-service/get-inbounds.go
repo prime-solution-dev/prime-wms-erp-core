@@ -2,12 +2,14 @@ package goodsReceiveService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"prime-erp-core/config"
+	"prime-erp-core/internal/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -125,18 +127,18 @@ type InboundItemSerial struct {
 	ExpiryDate    *time.Time `json:"expiry_date"`
 }
 
-func GetInbounds(jsonPayload InboundFilter) (ResultInbound, error) {
+func GetInbounds(ctx context.Context, jsonPayload InboundFilter) (ResultInbound, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
 		return ResultInbound{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_INBOUND_ENDPOINT, bytes.NewBuffer(jsonData))
+	// utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้ ปลายทางจะได้รู้ว่าใครสั่ง
+	req, err := utils.NewRequest(ctx, "POST", config.GET_INBOUND_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return ResultInbound{}, errors.New("Error creating request: " + err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
 	client := &http.Client{Timeout: 60 * time.Second}
