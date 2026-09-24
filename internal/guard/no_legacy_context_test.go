@@ -8,24 +8,12 @@ import (
 )
 
 // bannedPattern is one legacy pattern this migration removed, plus what to use instead.
+// exemptFileSuffixes is an explicit, narrowly-scoped allow-list for that one pattern only —
+// a file listed here is still banned from every other pattern in this test.
 type bannedPattern struct {
-	pattern string
-	reason  string
-}
-
-// httpNewRequestExempt lists the only files allowed to keep http.NewRequest( in
-// production code, with the reason written out so nobody "fixes" it by accident.
-//
-// get-deposit.go and get-deposits.go post form-urlencoded bodies to
-// https://tmi.trcloud.co/... (get-deposit.go) and to a caller-supplied URL
-// (get-deposits.go). Routing those through utils.NewRequest(ctx, ...) would
-// forward the calling employee's JWT to an external, non-organization host,
-// and utils.NewRequest sets a JSON Content-Type instead of the
-// application/x-www-form-urlencoded these endpoints require. Keep them on the
-// raw net/http client.
-var httpNewRequestExempt = map[string]bool{
-	"interface-service/get-deposit.go":  true,
-	"interface-service/get-deposits.go": true,
+	pattern            string
+	reason             string
+	exemptFileSuffixes []string
 }
 
 // ห้ามกลับไปใช้ของเดิมที่ทำให้ user หายระหว่างทาง หรือ token ไม่ถูกส่งต่อ
@@ -34,6 +22,15 @@ func TestNoLegacyContextUsage(t *testing.T) {
 		{
 			pattern: `http.NewRequest(`,
 			reason:  "ใช้ utils.NewRequest(ctx, ...) แทน ไม่งั้น token ไม่ถูกส่งต่อ",
+			// get-deposit.go และ get-deposits.go ยิง form-urlencoded body ไปที่
+			// https://tmi.trcloud.co/... (get-deposit.go) และไป URL ที่ผู้เรียกส่งมาเอง
+			// (get-deposits.go) ถ้าเปลี่ยนไปใช้ utils.NewRequest(ctx, ...) จะพ่วง JWT ของ
+			// พนักงานออกไปนอกองค์กร แถม Content-Type ก็ผิด (utils.NewRequest ตั้ง JSON แต่
+			// สองเส้นนี้ต้อง application/x-www-form-urlencoded) อย่า "แก้ให้เหมือนที่อื่น" ตรงนี้
+			exemptFileSuffixes: []string{
+				"interface-service/get-deposit.go",
+				"interface-service/get-deposits.go",
+			},
 		},
 		{
 			pattern: `ctx.GetString("user")`,
@@ -42,6 +39,17 @@ func TestNoLegacyContextUsage(t *testing.T) {
 		{
 			pattern: `c.GetString("user")`,
 			reason:  "ใช้ requestcontext.GetUserOrDefault(ctx) แทน",
+			// request-handler-gin.go: buildContext() คือจุดเดียวในระบบที่ค่าข้ามจาก gin
+			// เข้า context.Context — เป็นสะพาน gin→context ตัวเดียวที่มีสิทธิ์อ่านที่เก็บของ gin
+			// เอง (c.GetString) และอ่านเฉพาะตอนที่ context ยังไม่มี user เลย (กันไว้เผื่อมี
+			// middleware ที่ยังทำแค่ c.Set ไม่ได้ยัดลง context) พฤติกรรมนี้ถูกพินไว้ด้วย
+			// TestProcessContextRequestBridgesLegacyGinUser แล้ว โค้ดที่เหลือทั้งหมดที่อยาก
+			// ได้ user ให้เรียก requestcontext.GetUserOrDefault(ctx) — ยกเว้นให้แค่ pattern
+			// นี้ pattern เดียว ไฟล์นี้ยังห้าม c.Get("user")/ctx.Get("user")/ctx.GetString("user")
+			// เหมือนที่อื่นทุกประการ
+			exemptFileSuffixes: []string{
+				"utils/request-handler-gin.go",
+			},
 		},
 		{
 			pattern: `ctx.Get("user")`,
@@ -61,9 +69,10 @@ func TestNoLegacyContextUsage(t *testing.T) {
 		},
 	}
 
-	// roots ต้องเป็น production code ของ services กับ external เท่านั้น — ไม่รวม cmd/routes/utils
-	// ที่ยังต้องแตะ gin.Context ตรงๆ เพื่อทำสะพานให้ service ชั้นในไม่ต้องรู้จัก gin
-	roots := []string{"../services", "../../external"}
+	// roots คือทุกอย่างใต้ internal กับ external — ไม่ใช่แค่ services เพราะรั้วที่มีรู
+	// (เช่น เว้น routes/middleware/utils) สอนคนว่ารูนั้นใช้ได้ ยกเว้น internal/guard เอง
+	// ที่ต้องข้ามไม่งั้นสตริง pattern ในไฟล์นี้จะทำให้เทสฟ้องตัวเอง
+	roots := []string{"..", "../../external"}
 
 	for _, root := range roots {
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -71,7 +80,16 @@ func TestNoLegacyContextUsage(t *testing.T) {
 				return err
 			}
 
-			if info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			if info.IsDir() {
+				return nil
+			}
+
+			slashPathForSkip := filepath.ToSlash(path)
+			if strings.HasPrefix(slashPathForSkip, "../guard/") || slashPathForSkip == "../guard" {
+				return nil
+			}
+
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
 
@@ -83,7 +101,7 @@ func TestNoLegacyContextUsage(t *testing.T) {
 			slashPath := filepath.ToSlash(path)
 
 			for _, bp := range banned {
-				if bp.pattern == `http.NewRequest(` && isHTTPNewRequestExempt(slashPath) {
+				if isExempt(slashPath, bp.exemptFileSuffixes) {
 					continue
 				}
 
@@ -100,8 +118,11 @@ func TestNoLegacyContextUsage(t *testing.T) {
 	}
 }
 
-func isHTTPNewRequestExempt(slashPath string) bool {
-	for suffix := range httpNewRequestExempt {
+// isExempt checks a file against one pattern's own allow-list only — never a blanket
+// per-file exemption. A file exempted for one pattern is still checked against every
+// other pattern in the list.
+func isExempt(slashPath string, exemptFileSuffixes []string) bool {
+	for _, suffix := range exemptFileSuffixes {
 		if strings.HasSuffix(slashPath, suffix) {
 			return true
 		}
