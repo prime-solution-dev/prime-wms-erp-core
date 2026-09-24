@@ -63,8 +63,8 @@ func TestProcessContextRequestCarriesUserAndTokenToService(t *testing.T) {
 	}
 }
 
-// ไม่มี token เลย ต้องไม่พัง แต่ตกไปใช้ SYSTEM
-func TestProcessContextRequestFallsBackToSystemUser(t *testing.T) {
+// ไม่มี token เลย ต้องไม่พัง แต่ได้ user เป็นค่าว่าง
+func TestProcessContextRequestFallsBackToEmptyUser(t *testing.T) {
 	gotUser := ""
 
 	router := newTestRouter()
@@ -79,8 +79,8 @@ func TestProcessContextRequestFallsBackToSystemUser(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`)))
 
-	if gotUser != requestcontext.DefaultUser {
-		t.Fatalf("user = %q, ต้องการ %s", gotUser, requestcontext.DefaultUser)
+	if gotUser != "" {
+		t.Fatalf("user = %q, ต้องการค่าว่าง", gotUser)
 	}
 }
 

@@ -26,7 +26,7 @@
 
 ## Review Focus
 
-- **เส้นที่ถูกเรียกโดยไม่มี token** (hook จาก wms-order-service, cron, เครื่องมือภายใน) ต้องได้ `SYSTEM` และทำงานต่อ ไม่ใช่ error — ทดสอบใน Task 13
+- **เส้นที่ถูกเรียกโดยไม่มี token** (hook จาก wms-order-service, cron, เครื่องมือภายใน) ต้องได้ user เป็น **ค่าว่าง** และทำงานต่อ ไม่ใช่ error — ทดสอบใน Task 13
 - **งานหลัง commit ถูกยกเลิกตาม caller** เมื่อ caller timeout: ต้องยังทำงานจนจบด้วย `WithoutCancel` — ทดสอบใน Task 4
 - **goroutine ที่ยังทำงานอยู่ตอน handler คืนค่าแล้ว** ctx ถูกยกเลิก งานในนั้นจะตายเงียบ — ทดสอบใน Task 12
 - **รูป response ของ error** ที่เปลี่ยนจาก `{"error":...}` เป็น `{"code":...,"error":...}` ต้องยังมี key `error` เดิมอยู่เสมอ — ทดสอบใน Task 9

@@ -22,7 +22,10 @@ const (
 )
 
 // DefaultUser ใช้เมื่อหา user ใน context ไม่เจอ เช่นถูกเรียกจากระบบที่ไม่มี token
-const DefaultUser = "SYSTEM"
+//
+// เป็นค่าว่าง ไม่ใช่ชื่อสมมติ เพราะ "ไม่รู้ว่าใคร" กับ "ระบบเป็นคนทำ" คนละเรื่องกัน
+// เส้นที่ระบบเป็นคนทำจริง เช่น cron ต้องใส่ชื่อของตัวเองลง context เอง (ดู CronUser)
+const DefaultUser = ""
 
 // User
 
@@ -35,14 +38,16 @@ func GetUser(ctx context.Context) (string, bool) {
 	return user, ok
 }
 
-// GetUserOrDefault อ่านชื่อ user จาก context ถ้าไม่มีจะคืน DefaultUser พร้อม log เตือน
+// GetUserOrDefault อ่านชื่อ user จาก context ถ้าไม่มีจะคืนค่าว่าง พร้อม log เตือนหนึ่งบรรทัด
 // ใช้ตัวนี้กับทุกจุดที่เขียน create_by / update_by
+//
+// log ไว้ไล่หาเส้นที่ยังส่ง token ต่อไม่ครบระหว่างที่ทยอยแปลงทีละ service
 func GetUserOrDefault(ctx context.Context) string {
 	if user, ok := GetUser(ctx); ok && user != "" {
 		return user
 	}
 
-	log.Printf("[WARN] requestcontext: no user in context, fallback to %s", DefaultUser)
+	log.Printf("[WARN] requestcontext: no user in context, writing empty user")
 
 	return DefaultUser
 }
