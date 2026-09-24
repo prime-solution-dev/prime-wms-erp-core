@@ -3,8 +3,12 @@ package invoiceService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
+	interfaceService "prime-erp-core/internal/services/interface-service"
+	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"slices"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,13 +42,26 @@ func CreateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	prefix := "DN"
 	configCodeValue := "RUNNING_DN"
-	count := len(req)
-	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
-	if err != nil {
-		return nil, errors.New("failed to generate invoice codes: " + err.Error())
-	}
+	count := 0
 	for i := range req {
-		req[i].InvoiceCode = invoiceCodes[i]
+		if req[i].InvoiceCode == "" {
+			count++
+		}
+	}
+	var invoiceCodes []string
+	if count > 0 {
+		invoiceCodes, err = GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+		if err != nil {
+			return nil, errors.New("failed to generate invoice codes: " + err.Error())
+		}
+	}
+	codeIndex := 0
+	productCodes := []string{}
+	for i := range req {
+		if req[i].InvoiceCode == "" {
+			req[i].InvoiceCode = invoiceCodes[codeIndex]
+			codeIndex++
+		}
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
@@ -57,24 +74,14 @@ func CreateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 		}
-
+		for it := range req[i].InvoiceItem {
+			productCodes = append(productCodes, req[i].InvoiceItem[it].ProductCode)
+		}
 	}
 
-	jsonBytesCreateInvoice, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-
-	/* invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
-	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
-		"topic":     []string{"AP"},
+		"topic":     []string{"DN"},
 		"sub_topic": []string{"CREATE"},
 	}
 
@@ -82,36 +89,83 @@ func CreateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err != nil {
 		return nil, err
 	}
-	if len(hookConfig) > 0 {
+	if len(hookConfig) > 0 && req[0].Status != "TEMP" {
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
 		}
 
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    []string{req[0].SiteCode},
+			CompanyCode: []string{req[0].CompanyCode},
+		}
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		if errGetProductInterface != nil {
+			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+		}
+		reqHook := slices.Clone(req)
+		for i := range reqHook {
+			reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
+			for it := range reqHook[i].InvoiceItem {
+				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+				if exists {
+					priceUnit, _ := calculateAPPriceUnit(
+						reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+					)
+					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
+				}
+			}
+		}
+
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
 		if err != nil {
+			if req[0].Status == "COMPLETED" {
+				req[0].Status = "TEMP"
+				jsonBytesCreateInvoice, err := json.Marshal(req)
+				if err != nil {
+					return nil, err
+				}
+				_, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+				if errCreateInvoice != nil {
+					return nil, errCreateInvoice
+				}
+			}
 			return nil, err
 		}
 		if HookInterfaceValue != nil {
-			str, _ := HookInterfaceValue.(string)
-
-			invoiceValue := []models.Invoice{}
-			invoiceValue = append(invoiceValue, models.Invoice{
-				ID:         idInvoice[0],
-				ExternalID: str,
-			})
-
-			_, errCreateApproval := repositoryInvoice.UpdateInvoice(invoiceValue, []models.InvoiceItem{})
-			if errCreateApproval != nil {
-				return nil, errCreateApproval
+			externalID := HookInterfaceValue.(map[string]interface{})
+			str, _ := externalID["id"].(string)
+			req[0].ExternalID = str
+			jsonBytesCreateInvoice, err := json.Marshal(req)
+			if err != nil {
+				return nil, err
 			}
+
+			createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+			if errCreateInvoice != nil {
+				return nil, errCreateInvoice
+			}
+
+			return createInvoiceReturn, nil
 		}
-	} */
+	} else {
+		jsonBytesCreateInvoice, err := json.Marshal(req)
+		if err != nil {
+			return nil, err
+		}
 
-	return createInvoiceReturn, nil
-
+		createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+		if errCreateInvoice != nil {
+			return nil, errCreateInvoice
+		}
+		return createInvoiceReturn, nil
+	}
+	return nil, nil
 }

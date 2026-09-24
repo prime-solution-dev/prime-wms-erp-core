@@ -140,24 +140,6 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 	}
 
-	jsonBytesCreateInvoice, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-
-	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
-	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
-	// The invoice is already saved here; a reconcile failure must NOT fail the request
-	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
-	// next GRA on this PO, or a manual reconcile, self-heals.
-	if err := reconcilePOAfterAPSave(req); err != nil {
-		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
-	}
-
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
 		"topic":     []string{"AP"},
@@ -208,6 +190,24 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	jsonBytesCreateInvoice, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
+	}
+
+	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+	// The invoice is already saved here; a reconcile failure must NOT fail the request
+	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+	// next GRA on this PO, or a manual reconcile, self-heals.
+	if err := reconcilePOAfterAPSave(req); err != nil {
+		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 	}
 
 	return createInvoiceReturn, nil
