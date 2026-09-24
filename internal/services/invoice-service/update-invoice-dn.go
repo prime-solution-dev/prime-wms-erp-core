@@ -1,14 +1,13 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 

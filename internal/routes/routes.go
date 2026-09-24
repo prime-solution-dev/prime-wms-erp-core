@@ -126,37 +126,37 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//invoice
 	invoice := ctx.Group("/invoice")
 	invoice.POST("/GetInvoice", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.GetInvoice)
+		utils.ProcessContextRequest(c, invoiceService.GetInvoice)
 	})
 	invoice.POST("/CreateInvoice", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.CreateInvoice)
+		utils.ProcessContextRequest(c, invoiceService.CreateInvoice)
 	})
 	invoice.POST("/UpdateInvoice", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.UpdateInvoice)
+		utils.ProcessContextRequest(c, invoiceService.UpdateInvoice)
 	})
 	invoice.POST("/CreateInvoiceAP", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.CreateInvoiceAP)
+		utils.ProcessContextRequest(c, invoiceService.CreateInvoiceAP)
 	})
 	invoice.POST("/UpdateInvoiceAP", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.UpdateInvoiceAP)
+		utils.ProcessContextRequest(c, invoiceService.UpdateInvoiceAP)
 	})
 	invoice.POST("/CreateInvoiceAR", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.CreateInvoiceAR)
+		utils.ProcessContextRequest(c, invoiceService.CreateInvoiceAR)
 	})
 	invoice.POST("/UpdateInvoiceAR", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.UpdateInvoiceAR)
+		utils.ProcessContextRequest(c, invoiceService.UpdateInvoiceAR)
 	})
 	invoice.POST("/CreateInvoiceCN", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.CreateInvoiceCN)
+		utils.ProcessContextRequest(c, invoiceService.CreateInvoiceCN)
 	})
 	invoice.POST("/UpdateInvoiceCN", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.UpdateInvoiceCN)
+		utils.ProcessContextRequest(c, invoiceService.UpdateInvoiceCN)
 	})
 	invoice.POST("/CreateInvoiceDN", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.CreateInvoiceDN)
+		utils.ProcessContextRequest(c, invoiceService.CreateInvoiceDN)
 	})
 	invoice.POST("/UpdateInvoiceDN", func(c *gin.Context) {
-		utils.ProcessRequest(c, invoiceService.UpdateInvoiceDN)
+		utils.ProcessContextRequest(c, invoiceService.UpdateInvoiceDN)
 	})
 	//payment
 	payment := ctx.Group("/payment")

@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -12,11 +13,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 

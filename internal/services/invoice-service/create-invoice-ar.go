@@ -1,21 +1,21 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
+	"prime-erp-core/internal/db"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"slices"
-
-	"github.com/gin-gonic/gin"
 )
 
-func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -226,48 +226,37 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	return nil, nil
 }
-func GenerateInvoiceCodes(ctx *gin.Context, count int, prefix string, configCodeValue string) ([]string, error) {
+// GenerateInvoiceCodes จองเลขที่เอกสารแบบ atomic ให้ invoice (AR/AP/CN/DN)
+//
+// เดิมเรียก systemConfigService.GetRunningSystemConfigInvoice (SELECT เฉยๆ ไม่มี lock)
+// แล้วค่อยเรียก UpdateRunningSystemConfigInvoice ทีหลัง คนละ transaction — สองคนกดพร้อมกัน
+// ได้เลขซ้ำ ทั้งสองฟังก์ชันนั้นยังรับ gin's *Context (ไม่ได้แปลงและอยู่นอก scope งานนี้)
+// จึงย้ายมาใช้ ReserveRunningCodes + InvoiceRunningPeriod ที่ระบบมีอยู่แล้ว
+// (system-config/reserve-running-code.go) ซึ่ง sale/delivery/quotation-service ใช้
+// แบบเดียวกันนี้มาก่อนแล้วสำหรับ RUNNING_SO/RUNNING_DBS/RUNNING_QU — ล็อกแถว config ด้วย
+// SELECT ... FOR UPDATE จนกว่าจะเขียน current_running เสร็จ ปิดช่องเลขซ้ำไปในตัว
+// InvoiceRunningPeriod คำนวณปี พ.ศ. 2 หลัก (ยกเว้น RUNNING_AP ที่ใช้ ค.ศ.) ตรงกับ
+// GetRunningSystemConfigInvoice/UpdateRunningSystemConfigInvoice เดิมทุกประการ
+func GenerateInvoiceCodes(ctx context.Context, count int, prefix string, configCodeValue string) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No purchases to generate codes for
 	}
 
-	configCode := configCodeValue
-
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-		Prefix:     prefix,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
+	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+		return nil, err
 	}
+	defer db.CloseGORM(gormx)
 
-	purchaseCodeResponse, err := systemConfigService.GetRunningSystemConfigInvoice(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, configCodeValue, count, prefix, systemConfigService.InvoiceRunningPeriod(configCodeValue))
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate purchase order codes: %v", err)
+		return nil, fmt.Errorf("failed to generate invoice codes: %v", err)
 	}
 
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-	}
-
-	reqUpdateJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfigInvoice(ctx, string(reqUpdateJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	purchaseCodeResult, ok := purchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(purchaseCodeResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of purchase order codes from system config")
 	}
 
-	return purchaseCodeResult.Data, nil
+	return codes, nil
 }

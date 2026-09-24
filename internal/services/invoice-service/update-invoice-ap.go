@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,12 +11,11 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	xService "prime-erp-core/internal/services/x-service"
+	"prime-erp-core/internal/utils"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -44,7 +44,9 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
+	// purchaseService.GetPO ยังไม่แปลง แต่ใช้แค่ ctx.Request.Context() ไล่ลงไปถึง
+	// GetPOApproval — ห่อกลับด้วย utils.ToGinContext ได้อย่างปลอดภัย (ดู create-invoice-ap.go)
+	po, errGetPO := purchaseService.GetPO(utils.ToGinContext(ctx), string(jsonBytesGetPO))
 	if errGetPO != nil {
 		return nil, errGetPO
 	}
@@ -91,7 +93,9 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
 		}
 		fmt.Println(string(validatePayload))
-		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
+		// xService.ValidateAPOverPurchaseRest actively เรียก ctx.Request.Context() ต่อ
+		// ห้ามส่ง nil ตรงๆ (ดู create-invoice-ap.go)
+		validateResult, err := xService.ValidateAPOverPurchaseRest(utils.ToGinContext(ctx), string(validatePayload))
 		if err != nil {
 			return nil, err
 		}
