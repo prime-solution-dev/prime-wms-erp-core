@@ -152,3 +152,60 @@ func TestProcessContextRequestPlainErrorStays500(t *testing.T) {
 		t.Fatalf("status = %d, ต้องการ 500", rec.Code)
 	}
 }
+
+// หน้าเว็บเดิมอ่าน key "error" รูปนี้ต้องไม่หายไปแม้จะเพิ่ม code เข้ามา
+func TestAppErrorResponseKeepsErrorKey(t *testing.T) {
+	router := newTestRouter()
+	router.POST("/x", func(c *gin.Context) {
+		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+			return nil, apperr.NotFound("pricelist not found")
+		})
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`)))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d", rec.Code)
+	}
+
+	body := map[string]string{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("อ่าน body ไม่ได้: %v", err)
+	}
+
+	if body["error"] != "pricelist not found" {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}
+
+// price-service ยังคืน *BindingError จาก 3 endpoint ที่เดิมใช้ ProcessRequestWithBinding
+// (ตอนนี้ validate เองแทน ctx.ShouldBindJSON) รูป response ต้องเหมือนเดิมทุก byte:
+// {"error":"Validation failed","details":...} สถานะ 400 — หน้าเว็บเดิมอ่าน body["details"]
+func TestBindingErrorResponseKeepsValidationFailedShape(t *testing.T) {
+	router := newTestRouter()
+	router.POST("/x", func(c *gin.Context) {
+		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+			return nil, &BindingError{Message: "subgroup_ids is required when update_type is 'subgroup'"}
+		})
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`)))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, ต้องการ 400", rec.Code)
+	}
+
+	body := map[string]string{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("อ่าน body ไม่ได้: %v", err)
+	}
+
+	if body["error"] != "Validation failed" {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+	if body["details"] != "subgroup_ids is required when update_type is 'subgroup'" {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}

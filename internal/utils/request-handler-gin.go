@@ -49,6 +49,18 @@ func writeError(c *gin.Context, err error) {
 		return
 	}
 
+	// price-service ยังคืน *BindingError จาก 3 endpoint ที่เดิมใช้ ProcessRequestWithBinding
+	// (ตอนนี้ validate เองด้วย validator.New().SetTagName("binding") แทน ctx.ShouldBindJSON)
+	// รูป response ต้องเหมือนเดิมทุก byte ไม่งั้นหน้าเว็บที่อ่าน body["details"] จะพัง
+	var bindingErr *BindingError
+	if errors.As(err, &bindingErr) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Validation failed",
+			"details": bindingErr.Message,
+		})
+		return
+	}
+
 	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 }
 
