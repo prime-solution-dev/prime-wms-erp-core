@@ -1,6 +1,7 @@
 package CronjobService
 
 import (
+	"context"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 	"strings"
 	"time"
 
@@ -18,16 +20,15 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreditExtra() (interface{}, error) {
+func CreditExtra(ctx context.Context) (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCredit"
 	bodyNewRequest := strings.NewReader(`{}`)
-	reqHttp, err := http.NewRequest("POST", url, bodyNewRequest)
+	reqHttp, err := utils.NewRequest(ctx, "POST", url, bodyNewRequest)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}
@@ -83,12 +84,11 @@ func CreditExtra() (interface{}, error) {
 			return nil, err
 		}
 		urlCreateDeleteCreditExtra := os.Getenv("base_url_erp") + "/credit/DeleteCreditExtra"
-		reqCreateDeleteCreditExtra, err := http.NewRequest("POST", urlCreateDeleteCreditExtra, bytes.NewBuffer(jsonBytesDeleteCreditExtra))
+		reqCreateDeleteCreditExtra, err := utils.NewRequest(ctx, "POST", urlCreateDeleteCreditExtra, bytes.NewBuffer(jsonBytesDeleteCreditExtra))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqCreateDeleteCreditExtra.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
 		clientCreateDeleteCreditExtra := &http.Client{}
@@ -116,12 +116,11 @@ func CreditExtra() (interface{}, error) {
 			return nil, err
 		}
 		urlCreateCreditTransaction := os.Getenv("base_url_erp") + "/credit/CreateCreditTransaction"
-		reqCreateCreditTransaction, err := http.NewRequest("POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
+		reqCreateCreditTransaction, err := utils.NewRequest(ctx, "POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqCreateCreditTransaction.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
 		clientCreateCreditTransaction := &http.Client{}

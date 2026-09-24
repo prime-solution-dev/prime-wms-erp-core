@@ -210,7 +210,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(gormx, bookingLines, editingDeliveryCodes); err != nil {
+	if err := ValidateBookingQty(ctx.Request.Context(), gormx, bookingLines, editingDeliveryCodes); err != nil {
 		return nil, err
 	}
 

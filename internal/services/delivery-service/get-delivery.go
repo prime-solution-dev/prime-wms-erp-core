@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -303,7 +304,7 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 }
 
 // GetOrderDeliveryForDelivery ฟังก์ชันสำหรับเรียก GetOrdersDelivery สำหรับ GetDeliveryResponse
-func GetOrderDeliveryForDelivery(allDeliveries []GetDeliveryResponse) (orderExternalService.ResultOrderDeliveryResponse, error) {
+func GetOrderDeliveryForDelivery(ctx context.Context, allDeliveries []GetDeliveryResponse) (orderExternalService.ResultOrderDeliveryResponse, error) {
 	getOrderRequest := orderExternalService.GetOrderDeliveryRequest{}
 	for _, row := range allDeliveries {
 		getOrderRequest.DeliveryCode = append(getOrderRequest.DeliveryCode, row.DeliveryCode)
@@ -313,7 +314,7 @@ func GetOrderDeliveryForDelivery(allDeliveries []GetDeliveryResponse) (orderExte
 		}
 	}
 
-	getOrderResponse, err := orderExternalService.GetOrdersDelivery(getOrderRequest)
+	getOrderResponse, err := orderExternalService.GetOrdersDelivery(ctx, getOrderRequest)
 	if err != nil {
 		return orderExternalService.ResultOrderDeliveryResponse{}, errors.New("Error get orders delivery : " + err.Error())
 	}
@@ -501,7 +502,7 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		// GetOrderDelivery สำหรับทั้งชุดที่ตีกรอบไว้ (ไม่ใช่แค่หน้าเดียว) เพราะต้องคำนวณ
 		// pick_pack_status ให้ครบก่อนถึงจะกรอง+แบ่งหน้าในหน่วยความจำได้
-		orderDeliveryResponse, err := GetOrderDeliveryForDelivery(allRows)
+		orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx.Request.Context(), allRows)
 		if err != nil {
 			fmt.Println("Error in GetOrderDelivery:", err)
 			// ต่างจาก path ไม่กรอง (ด้านล่าง) ที่ปล่อยผ่านได้เพราะข้อมูล order เป็นแค่ของตกแต่งหน้าจอ
@@ -686,7 +687,7 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// GetOrderDelivery
-	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(res)
+	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx.Request.Context(), res)
 	if err != nil {
 		fmt.Println("Error in GetOrderDelivery:", err)
 		// path นี้ (ไม่มี pick_pack_filter) ไม่ทำให้ request ทั้งก้อนล้มเมื่อ order-service เรียกไม่สำเร็จ

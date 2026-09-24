@@ -1,16 +1,18 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	orderExternalService "prime-erp-core/external/order-service"
+	"prime-erp-core/internal/apperr"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -25,7 +27,7 @@ type UpdateStatusDeliveryResponse struct {
 	Message      string `json:"message"`
 }
 
-func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateStatusDeliveryRequest{}
 	res := []UpdateStatusDeliveryResponse{}
 
@@ -35,7 +37,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 
 	// Validate request
 	if len(req.DeliveryCodes) == 0 {
-		return nil, errors.New("delivery_codes is required")
+		return nil, apperr.BadRequest("delivery_codes is required")
 	}
 
 	if req.Status == "" {
@@ -48,10 +50,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -83,7 +82,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		// ไม่มีใบไหนต้องอัปเดต แต่ยังต้องลองปิด SO ของใบที่อยู่ COMPLETED อยู่แล้ว
 		// (hook ตัวที่สองของ outbound เดียวกันมาถึงตรงนี้ และเป็นรอบที่ข้อมูลครบ)
 		if req.Status == "COMPLETED" {
-			closeSalesOfDeliveries(gormx, deliveryOf, alreadyAtStatus, user)
+			closeSalesOfDeliveries(ctx, gormx, deliveryOf, alreadyAtStatus, user)
 		}
 
 		return res, nil
@@ -92,7 +91,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	// ห้ามยกเลิกใบที่คลังหยิบไปทำงานแล้ว หน้าจอปิดปุ่มด้วย isCreateOutbound อยู่แล้ว
 	// แต่ฝั่ง server ไม่เคยบังคับ ยิง API ตรงหรือแข่งจังหวะกันก็ผ่าน
 	if req.Status == "CANCELED" {
-		started, err := deliveriesWithOutbound(toUpdate)
+		started, err := deliveriesWithOutbound(ctx, toUpdate)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +111,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	// ทำให้พังตรงไหนก็ตาม ERP ยังไม่ถูกแตะเลย ผู้ใช้กดยกเลิกซ้ำได้
 	if req.Status == "CANCELED" {
 		for _, deliveryCode := range toUpdate {
-			if _, err := CancelOrder(deliveryOf[deliveryCode]); err != nil {
+			if _, err := CancelOrder(ctx, deliveryOf[deliveryCode]); err != nil {
 				return nil, fmt.Errorf("failed to cancel order for delivery %s: %v", deliveryCode, err)
 			}
 		}
@@ -183,7 +182,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		completed = append(completed, toUpdate...)
 		completed = append(completed, alreadyAtStatus...)
 
-		closeSalesOfDeliveries(gormx, deliveryOf, completed, user)
+		closeSalesOfDeliveries(ctx, gormx, deliveryOf, completed, user)
 	}
 
 	return res, nil
@@ -232,27 +231,32 @@ func partitionDeliveriesByStatus(deliveryCodes []string, deliveryOf map[string]m
 // ต้องทำหลัง commit และ "log ทิ้งถ้าพัง" ห้ามคืน error — hook ORDER/DELIVERY/UPDATE
 // ยิงเข้ามาระหว่างที่ wms-order-service ยังไม่ commit ถ้าเราคืน error ฝั่งนั้นจะ rollback
 // แล้วยืนยัน pack ล้มทั้งใบ ทั้งที่สต็อกกับ GI ตัดไปแล้ว
-func closeSalesOfDeliveries(gormx *gorm.DB, deliveryOf map[string]models.Delivery, deliveryCodes []string, user string) {
+func closeSalesOfDeliveries(ctx context.Context, gormx *gorm.DB, deliveryOf map[string]models.Delivery, deliveryCodes []string, user string) {
 	if len(deliveryCodes) == 0 {
 		return
 	}
+
+	// เส้นนี้ทำงานหลัง commit และห้ามล้มตาม caller
+	// WithoutCancel เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ hook ฝั่ง
+	// wms-order-service หมดเวลาแล้วตัดสาย ctx จะถูกยกเลิกและการปิด SO จะไม่เกิดขึ้นเลย
+	ctx = context.WithoutCancel(ctx)
 
 	saleCodes := []string{}
 	for _, deliveryCode := range deliveryCodes {
 		saleCodes = append(saleCodes, deliveryOf[deliveryCode].DocumentRef)
 	}
 
-	if err := CloseSalesFullyDelivered(gormx, saleCodes, user); err != nil {
+	if err := CloseSalesFullyDelivered(ctx, gormx, saleCodes, user); err != nil {
 		fmt.Printf("UpdateStatusDelivery: cannot close sales of %v: %v\n", deliveryCodes, err)
 	}
 }
 
-func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
+func CancelOrder(ctx context.Context, delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
 	cancelOrderRequest := orderExternalService.CancelOrderRequest{
 		DocumentRef: []string{delivery.DeliveryCode},
 	}
 
-	cancelOrderResponse, err := orderExternalService.CancelOrder(cancelOrderRequest)
+	cancelOrderResponse, err := orderExternalService.CancelOrder(ctx, cancelOrderRequest)
 	if err != nil {
 		return orderExternalService.CancelOrderResponse{}, errors.New("Error cancel order : " + err.Error())
 	}
@@ -262,10 +266,10 @@ func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResp
 
 // deliveriesWithOutbound ถาม WMS ว่าใบไหนถูกสร้าง outbound ไปแล้วบ้าง
 // ใช้กันไม่ให้ยกเลิกใบที่คลังเริ่มทำงานไปแล้ว
-func deliveriesWithOutbound(deliveryCodes []string) (map[string]bool, error) {
+func deliveriesWithOutbound(ctx context.Context, deliveryCodes []string) (map[string]bool, error) {
 	started := map[string]bool{}
 
-	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+	orderRes, err := orderExternalService.GetOrdersDelivery(ctx, orderExternalService.GetOrderDeliveryRequest{
 		DeliveryCode: deliveryCodes,
 	})
 	if err != nil {

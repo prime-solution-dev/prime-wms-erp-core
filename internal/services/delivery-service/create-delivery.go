@@ -92,7 +92,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(gormx, bookingLines, nil); err != nil {
+	if err := ValidateBookingQty(ctx.Request.Context(), gormx, bookingLines, nil); err != nil {
 		return nil, err
 	}
 

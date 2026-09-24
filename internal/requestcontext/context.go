@@ -1,0 +1,70 @@
+// Package requestcontext เก็บข้อมูลของคนที่ยิง request เข้ามา (user, token, trace id)
+// ไว้ใน context.Context เพื่อให้ service ชั้นในและเส้นที่ยิงต่อไป service อื่นหยิบไปใช้ได้
+// โดยไม่ต้องพึ่ง *gin.Context
+//
+// ของที่ middleware เก็บด้วย c.Set() จะอยู่ใน map ของ gin ซึ่ง c.Request.Context()
+// มองไม่เห็น การเก็บผ่าน package นี้จึงเป็นทางเดียวที่ service แบบ context.Context จะอ่านเจอ
+//
+// ไฟล์นี้ต้องเหมือนกันทุก repo
+package requestcontext
+
+import (
+	"context"
+	"log"
+)
+
+type contextKey string
+
+const (
+	userKey    contextKey = "user"
+	tokenKey   contextKey = "authorization"
+	traceIDKey contextKey = "trace_id"
+)
+
+// DefaultUser ใช้เมื่อหา user ใน context ไม่เจอ เช่นถูกเรียกจากระบบที่ไม่มี token
+const DefaultUser = "SYSTEM"
+
+// User
+
+func WithUser(ctx context.Context, user string) context.Context {
+	return context.WithValue(ctx, userKey, user)
+}
+
+func GetUser(ctx context.Context) (string, bool) {
+	user, ok := ctx.Value(userKey).(string)
+	return user, ok
+}
+
+// GetUserOrDefault อ่านชื่อ user จาก context ถ้าไม่มีจะคืน DefaultUser พร้อม log เตือน
+// ใช้ตัวนี้กับทุกจุดที่เขียน create_by / update_by
+func GetUserOrDefault(ctx context.Context) string {
+	if user, ok := GetUser(ctx); ok && user != "" {
+		return user
+	}
+
+	log.Printf("[WARN] requestcontext: no user in context, fallback to %s", DefaultUser)
+
+	return DefaultUser
+}
+
+// Token — เก็บค่า Authorization header ดิบ (รวมคำว่า "Bearer ") ไว้ส่งต่อให้ service ปลายทาง
+
+func WithToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, tokenKey, token)
+}
+
+func GetToken(ctx context.Context) (string, bool) {
+	token, ok := ctx.Value(tokenKey).(string)
+	return token, ok
+}
+
+// Trace ID
+
+func WithTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, traceIDKey, traceID)
+}
+
+func GetTraceID(ctx context.Context) (string, bool) {
+	traceID, ok := ctx.Value(traceIDKey).(string)
+	return traceID, ok
+}

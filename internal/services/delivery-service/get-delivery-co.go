@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -183,7 +184,7 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		// GetOrderDelivery
-		orderDeliveryResponse, err := GetOrderDelivery(allDeliveries)
+		orderDeliveryResponse, err := GetOrderDelivery(ctx.Request.Context(), allDeliveries)
 		if err != nil {
 			fmt.Println("Error in GetOrderDelivery:", err)
 			return res, nil
@@ -250,7 +251,7 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-func GetOrderDelivery(allDeliveries []GetDeliverySOResponse) (externalService.ResultOrderDeliveryResponse, error) {
+func GetOrderDelivery(ctx context.Context, allDeliveries []GetDeliverySOResponse) (externalService.ResultOrderDeliveryResponse, error) {
 	getOrderRequest := externalService.GetOrderDeliveryRequest{}
 	for _, row := range allDeliveries {
 		getOrderRequest.DeliveryCode = append(getOrderRequest.DeliveryCode, row.DeliveryCode)
@@ -260,7 +261,7 @@ func GetOrderDelivery(allDeliveries []GetDeliverySOResponse) (externalService.Re
 		}
 	}
 
-	getOrderResponse, err := externalService.GetOrdersDelivery(getOrderRequest)
+	getOrderResponse, err := externalService.GetOrdersDelivery(ctx, getOrderRequest)
 	if err != nil {
 		return externalService.ResultOrderDeliveryResponse{}, errors.New("Error get outbound : " + err.Error())
 	}

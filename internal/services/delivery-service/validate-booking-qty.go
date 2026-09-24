@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -43,7 +44,7 @@ type bookingLine struct {
 //   - บรรทัดใน CO ยังทำงานอยู่ หรือยังไม่มี CO -> นับจำนวนที่จองไว้เต็ม เพราะของยังถูกกันอยู่
 //
 // excludeDeliveryCodes ใช้ตอนแก้ใบเดิม จะได้ไม่นับจำนวนของตัวเองซ้ำ
-func ValidateBookingQty(gormx *gorm.DB, lines []bookingLine, excludeDeliveryCodes []string) error {
+func ValidateBookingQty(ctx context.Context, gormx *gorm.DB, lines []bookingLine, excludeDeliveryCodes []string) error {
 	if len(lines) == 0 {
 		return nil
 	}
@@ -77,7 +78,7 @@ func ValidateBookingQty(gormx *gorm.DB, lines []bookingLine, excludeDeliveryCode
 		return err
 	}
 
-	usedQty, err := loadBookedQty(gormx, saleCodes, excludeDeliveryCodes)
+	usedQty, err := loadBookedQty(ctx, gormx, saleCodes, excludeDeliveryCodes)
 	if err != nil {
 		return err
 	}
@@ -169,7 +170,7 @@ func loadCurrentBookedQty(gormx *gorm.DB, deliveryCodes []string) (map[string]fl
 }
 
 // loadBookedQty คืน map ของ sale_item -> จำนวนที่ใบจองอื่นใช้ไปแล้ว
-func loadBookedQty(gormx *gorm.DB, saleCodes []string, excludeDeliveryCodes []string) (map[string]float64, error) {
+func loadBookedQty(ctx context.Context, gormx *gorm.DB, saleCodes []string, excludeDeliveryCodes []string) (map[string]float64, error) {
 	var deliveries []models.Delivery
 
 	query := gormx.Model(&models.Delivery{}).
@@ -209,7 +210,7 @@ func loadBookedQty(gormx *gorm.DB, saleCodes []string, excludeDeliveryCodes []st
 		return usedQty, nil
 	}
 
-	issuedQty, closed := loadWmsProgress(deliveryCodes)
+	issuedQty, closed := loadWmsProgress(ctx, deliveryCodes)
 
 	for _, item := range bookedItems {
 		if item.DocumentRefItem == "" {
@@ -233,8 +234,8 @@ func loadBookedQty(gormx *gorm.DB, saleCodes []string, excludeDeliveryCodes []st
 //
 // ถ้าถาม WMS ไม่ได้จะคืน map ว่าง ซึ่งทำให้ทุกบรรทัดถูกนับเป็น "ยังจองค้าง" เต็มจำนวน
 // คือเข้มกว่าความจริง ยอมให้จองไม่ได้ ดีกว่าปล่อยให้จองเกินตอน WMS ล่ม
-func loadWmsProgress(deliveryCodes []string) (map[string]float64, map[string]bool) {
-	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+func loadWmsProgress(ctx context.Context, deliveryCodes []string) (map[string]float64, map[string]bool) {
+	orderRes, err := orderExternalService.GetOrdersDelivery(ctx, orderExternalService.GetOrderDeliveryRequest{
 		DeliveryCode: deliveryCodes,
 	})
 	if err != nil {

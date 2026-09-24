@@ -221,7 +221,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, deliveryService.UpdateDelivery)
 	})
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.UpdateStatusDelivery)
+		utils.ProcessContextRequest(c, deliveryService.UpdateStatusDelivery)
 	})
 	delivery.POST("/GetDeliveryCO", func(c *gin.Context) {
 		utils.ProcessRequest(c, deliveryService.GetDeliveryCO)
@@ -380,7 +380,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	///cronjob
 	cronjob := ctx.Group("/cronjob")
 	cronjob.POST("/credit-request", func(c *gin.Context) {
-		utils.ProcessRequest(c, CronjobService.GetKernalManual)
+		utils.ProcessContextRequest(c, CronjobService.GetKernalManual)
 	})
 	//email alert
 	emailAlert := ctx.Group("/emailAlert")
