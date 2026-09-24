@@ -150,7 +150,7 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx.Request.Context(), companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)

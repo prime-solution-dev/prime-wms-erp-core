@@ -150,7 +150,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Verification
 	if req.IsVerifyPrice || req.IsVerifyCredit || req.IsVerifyInventory {
 		for _, verifyReq := range verifyReqMap {
-			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+			verifyRes, err := verifyService.VerifyApproveLogic(ctx.Request.Context(), gormx, sqlx, verifyReq)
 			if err != nil {
 				return nil, err
 			}

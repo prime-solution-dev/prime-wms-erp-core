@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -72,14 +73,14 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 	// touched above. Recalculate them here so the new base price is stamped as the
 	// "after" price (and the previous "after" moves to "before") right away,
 	// instead of only when someone happens to hit /price/SubGroup/UpdateLatest.
-	if err := cascadeBasePriceToSubGroups(priceListGroup); err != nil {
+	if err := cascadeBasePriceToSubGroups(ctx.Request.Context(), priceListGroup); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
 }
 
-func cascadeBasePriceToSubGroups(priceListGroup []models.PriceListGroup) error {
+func cascadeBasePriceToSubGroups(ctx context.Context, priceListGroup []models.PriceListGroup) error {
 	ids := make([]uuid.UUID, 0, len(priceListGroup))
 	for _, group := range priceListGroup {
 		ids = append(ids, group.ID)
@@ -93,7 +94,7 @@ func cascadeBasePriceToSubGroups(priceListGroup []models.PriceListGroup) error {
 		return nil
 	}
 
-	if _, err := runUpdateLatestSubGroupFunc(models.UpdateLatestPriceListSubGroupRequest{
+	if _, err := runUpdateLatestSubGroupFunc(ctx, models.UpdateLatestPriceListSubGroupRequest{
 		UpdateType: "group",
 		GroupCodes: groupCodes,
 	}); err != nil {

@@ -234,7 +234,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 			if !shouldSkipVerification {
-				verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+				verifyRes, err := verifyService.VerifyApproveLogic(ctx.Request.Context(), gormx, sqlx, verifyReq)
 				if err != nil {
 					return nil, err
 				}

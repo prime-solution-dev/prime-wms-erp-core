@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -41,13 +42,13 @@ func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
 	}
 
-	return RunUpdateLatestPriceListSubGroup(req)
+	return RunUpdateLatestPriceListSubGroup(ctx.Request.Context(), req)
 }
 
 // RunUpdateLatestPriceListSubGroup recalculates and persists the latest sub group
 // prices. Split out of the HTTP handler so other services (notably the base price
 // update) can cascade into it without going through gin.
-func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
 	updateType := req.UpdateType
@@ -202,7 +203,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)

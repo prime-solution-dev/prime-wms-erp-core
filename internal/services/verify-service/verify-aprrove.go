@@ -1,6 +1,7 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -92,10 +93,10 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	return VerifyApproveLogic(gormx, sqlx, req)
+	return VerifyApproveLogic(ctx.Request.Context(), gormx, sqlx, req)
 }
 
-func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
+func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
 		CreditDetails:         []VerifyCreditCustomer{},
 		ProductAtps:           []VerifyInventoryProductAtp{},
@@ -320,7 +321,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	if req.IsVerifyInventory {
 		res.IsPassInventory = true
 
-		invenRes, err := VerifyInventoryLogic(inventoryReq)
+		invenRes, err := VerifyInventoryLogic(ctx, inventoryReq)
 		if err != nil {
 			return nil, err
 		}
