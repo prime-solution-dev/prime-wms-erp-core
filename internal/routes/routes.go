@@ -327,7 +327,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, prePurchaseService.CreatePOBigLot)
 	})
 	purchase.POST("/GetPOBigLot", func(c *gin.Context) {
-		utils.ProcessRequest(c, prePurchaseService.GetPOBigLot)
+		utils.ProcessContextRequest(c, prePurchaseService.GetPOBigLot)
 	})
 	purchase.POST("/UpdatePOBigLot", func(c *gin.Context) {
 		utils.ProcessRequest(c, prePurchaseService.UpdatePOBigLot)
@@ -345,7 +345,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
 	})
 	purchase.POST("/ValidateAPOverPurchase", func(c *gin.Context) {
-		utils.ProcessRequest(c, xService.ValidateAPOverPurchaseRest)
+		utils.ProcessContextRequest(c, xService.ValidateAPOverPurchaseRest)
 	})
 
 	//purchase
@@ -353,7 +353,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, purchaseService.CreatePO)
 	})
 	purchase.POST("/GetPO", func(c *gin.Context) {
-		utils.ProcessRequest(c, purchaseService.GetPO)
+		utils.ProcessContextRequest(c, purchaseService.GetPO)
 	})
 	purchase.POST("/GetPOItemForGR", func(c *gin.Context) {
 		utils.ProcessRequest(c, purchaseService.GetPOItem)

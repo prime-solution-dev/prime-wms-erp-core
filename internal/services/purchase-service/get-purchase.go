@@ -1,6 +1,7 @@
 package purchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	goodsReceiveService "prime-erp-core/external/goods-receive-service"
@@ -12,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -319,7 +320,9 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Get Approvals
-	approvalsResp, err := prePurchaseService.GetPOApproval(ctx, purchaseCodes)
+	// GetPOApproval รับ context.Context แล้ว แต่ GetPOItem เองยังไม่แปลง ต้องส่ง
+	// ctx.Request.Context() ไม่ใช่ ctx ตรงๆ (ดู eaa539a)
+	approvalsResp, err := prePurchaseService.GetPOApproval(ctx.Request.Context(), purchaseCodes)
 	if err != nil {
 		return nil, errors.New("failed to get purchase approvals: " + err.Error())
 	}
@@ -338,7 +341,8 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		PageSize:         len(prePurchaseCodes),
 	}
 
-	mapPrePurchase, err := GetRelatedPrePurchase(ctx, prePurchaseReq)
+	// GetRelatedPrePurchase รับ context.Context แล้ว เช่นกัน
+	mapPrePurchase, err := GetRelatedPrePurchase(ctx.Request.Context(), prePurchaseReq)
 	if err != nil {
 		return nil, errors.New("failed to get pre purchase list: " + err.Error())
 	}

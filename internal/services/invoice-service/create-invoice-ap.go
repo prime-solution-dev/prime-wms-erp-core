@@ -14,7 +14,6 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	xService "prime-erp-core/internal/services/x-service"
-	"prime-erp-core/internal/utils"
 	"strconv"
 	"strings"
 
@@ -139,10 +138,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	// purchaseService.GetPO ยังไม่แปลงเป็น context.Context (นอก scope งานนี้) แต่ในเชิง
-	// พฤติกรรมใช้แค่ ctx.Request.Context() ไล่ลงไปถึง GetPOApproval — ตรวจโค้ดแล้วว่าไม่แตะ
-	// ctx.Get/ctx.JSON เลย จึงห่อกลับเป็น gin's *Context ด้วย utils.ToGinContext ได้อย่างปลอดภัย
-	po, errGetPO := purchaseService.GetPO(utils.ToGinContext(ctx), string(jsonBytesGetPO))
+	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
 	if errGetPO != nil {
 		return nil, errGetPO
 	}
@@ -185,10 +181,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
 		}
-		// xService.ValidateAPOverPurchaseRest ก็ยังไม่แปลง และ *actively* เรียก
-		// ctx.Request.Context() ต่อ (ไม่ใช่ dead param) — ต้องห่อด้วย utils.ToGinContext
-		// ห้ามส่ง nil ตรงๆ เพราะจะ panic ตรง ctx.Request.Context()
-		validateResult, err := xService.ValidateAPOverPurchaseRest(utils.ToGinContext(ctx), string(validatePayload))
+		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
 		if err != nil {
 			return nil, err
 		}

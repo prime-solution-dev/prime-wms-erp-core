@@ -34,7 +34,9 @@ func GetCustomerCreditRest(ctx context.Context, jsonPayload string) (interface{}
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		// ข้อความเดิมของ ctx.JSON(500, {"error": "failed to connect to database"}) ห้ามพก
+		// driver error ต่อท้าย — client เห็นข้อความเดิมเป๊ะ และไม่หลุด internal DB error ออกไป
+		return nil, errors.New("failed to connect to database")
 	}
 	defer db.CloseGORM(gormx)
 

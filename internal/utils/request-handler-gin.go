@@ -36,21 +36,6 @@ func buildContext(c *gin.Context) context.Context {
 	return ctx
 }
 
-// ToGinContext ห่อ context.Context กลับเป็น *gin.Context แบบขั้นต่ำ สำหรับเรียก
-// service ที่ "ยังไม่ถูกแปลง" เป็น context.Context และ "รับประกันแล้ว" ว่าใช้แค่
-// ctx.Request.Context() เท่านั้น (ไล่ตรวจโค้ดจริงก่อนใช้ทุกครั้ง)
-//
-// นี่คือสะพานย้อนทาง (context.Context -> *gin.Context) ของ buildContext ด้านบน
-// ใช้เมื่อ caller ถูกแปลงเป็น context.Context แล้ว แต่ callee ที่อยู่นอก scope ของงานนี้
-// ยังต้องรับ *gin.Context — เพราะแปลง callee นั้นไม่ได้ (นอก 3 package ที่งานนี้อนุญาตให้แก้)
-// แต่ก็ห้ามส่ง nil ตรงๆ เพราะ callee เรียก ctx.Request.Context() ซึ่ง panic ถ้า Request เป็น nil
-//
-// ข้อจำกัด: Keys เป็น nil (c.Get/c.GetString คืนค่าว่างเงียบๆ ไม่ panic) และ Writer เป็น nil
-// (c.JSON จะ panic) ห้ามใช้กับ callee ที่อ่าน user จาก c.Get("user") หรือเขียน response เอง
-func ToGinContext(ctx context.Context) *gin.Context {
-	return &gin.Context{Request: (&http.Request{}).WithContext(ctx)}
-}
-
 // writeError ตอบ error ตาม status ที่ error พกมา
 func writeError(c *gin.Context, err error) {
 	// service เขียน response ไปเองแล้ว ไม่ต้องเขียนซ้ำ

@@ -2,6 +2,7 @@ package purchaseService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -476,7 +477,7 @@ func GetMovingAvgCost(productReq models.GetProductRequest) (map[string]models.Mo
 }
 
 // PrePurchase actions
-func GetRelatedPrePurchase(ctx *gin.Context, req models.GetPOBigLotListRequest) (map[string]models.GetPOBigLotResponse, error) {
+func GetRelatedPrePurchase(ctx context.Context, req models.GetPOBigLotListRequest) (map[string]models.GetPOBigLotResponse, error) {
 	prePurchaseReqJson, err := json.Marshal(req)
 	if err != nil {
 		return nil, errors.New("failed to marshal pre purchase request to JSON: " + err.Error())

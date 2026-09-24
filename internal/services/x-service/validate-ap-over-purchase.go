@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -59,7 +58,7 @@ type apOverPurchaseTolerance struct {
 
 const apOverPurchaseEpsilon = 0.0000001
 
-func ValidateAPOverPurchaseRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func ValidateAPOverPurchaseRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := ValidateAPOverPurchaseRequest{}
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, fmt.Errorf("invalid JSON payload: %w", err)
@@ -74,7 +73,7 @@ func ValidateAPOverPurchaseRest(ctx *gin.Context, jsonPayload string) (interface
 	return ValidateAPOverPurchase(ctx, gormx, req)
 }
 
-func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOverPurchaseRequest) (*ValidateAPOverPurchaseResponse, error) {
+func ValidateAPOverPurchase(ctx context.Context, gormx *gorm.DB, req ValidateAPOverPurchaseRequest) (*ValidateAPOverPurchaseResponse, error) {
 	res := &ValidateAPOverPurchaseResponse{
 		ResponseCode: "200",
 		Message:      "success",
@@ -95,7 +94,7 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 		return nil, err
 	}
 
-	tolerances, err := loadAPOverPurchaseTolerances(ctx.Request.Context(), poMap)
+	tolerances, err := loadAPOverPurchaseTolerances(ctx, poMap)
 	if err != nil {
 		return nil, err
 	}

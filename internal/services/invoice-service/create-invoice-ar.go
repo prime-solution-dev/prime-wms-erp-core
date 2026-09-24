@@ -231,12 +231,15 @@ func CreateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, erro
 // เดิมเรียก systemConfigService.GetRunningSystemConfigInvoice (SELECT เฉยๆ ไม่มี lock)
 // แล้วค่อยเรียก UpdateRunningSystemConfigInvoice ทีหลัง คนละ transaction — สองคนกดพร้อมกัน
 // ได้เลขซ้ำ ทั้งสองฟังก์ชันนั้นยังรับ gin's *Context (ไม่ได้แปลงและอยู่นอก scope งานนี้)
-// จึงย้ายมาใช้ ReserveRunningCodes + InvoiceRunningPeriod ที่ระบบมีอยู่แล้ว
-// (system-config/reserve-running-code.go) ซึ่ง sale/delivery/quotation-service ใช้
-// แบบเดียวกันนี้มาก่อนแล้วสำหรับ RUNNING_SO/RUNNING_DBS/RUNNING_QU — ล็อกแถว config ด้วย
-// SELECT ... FOR UPDATE จนกว่าจะเขียน current_running เสร็จ ปิดช่องเลขซ้ำไปในตัว
-// InvoiceRunningPeriod คำนวณปี พ.ศ. 2 หลัก (ยกเว้น RUNNING_AP ที่ใช้ ค.ศ.) ตรงกับ
-// GetRunningSystemConfigInvoice/UpdateRunningSystemConfigInvoice เดิมทุกประการ
+// ตอนนี้ลบทั้งคู่ทิ้งแล้ว (ไม่มี caller/route เหลือ) — ย้ายมาใช้ ReserveRunningCodes +
+// InvoiceRunningPeriod ที่ระบบมีอยู่แล้ว (system-config/reserve-running-code.go) ซึ่ง
+// sale/delivery/quotation-service ใช้แบบเดียวกันนี้มาก่อนแล้วสำหรับ RUNNING_SO/RUNNING_DBS/
+// RUNNING_QU — ล็อกแถว config ด้วย SELECT ... FOR UPDATE จนกว่าจะเขียน current_running เสร็จ
+// ปิดช่องเลขซ้ำไปในตัว InvoiceRunningPeriod คำนวณปี พ.ศ. 2 หลัก (ยกเว้น RUNNING_AP ที่ใช้
+// ค.ศ.) ตรงกับ GetRunningSystemConfigInvoice/UpdateRunningSystemConfigInvoice เดิมทุกประการ
+//
+// prefix ที่ส่งเข้ามา (เช่น "IV"/"CS" สลับกันตาม payment_method) ใช้ประกอบเลขของรอบนี้
+// เท่านั้น — ReserveRunningCodes ไม่เขียน prefix นี้ทับค่าที่เก็บอยู่ใน system_config row
 func GenerateInvoiceCodes(ctx context.Context, count int, prefix string, configCodeValue string) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No purchases to generate codes for
@@ -244,7 +247,10 @@ func GenerateInvoiceCodes(ctx context.Context, count int, prefix string, configC
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return nil, err
+		// ข้อความเดิมของ GetRunningSystemConfigInvoice ตอน ConnectGORM ล้มเหลว คือสตริงตายตัว
+		// "failed to connect to database" (เขียนผ่าน ctx.JSON ตรงๆ) ไม่ใช่ err ดิบ — คง
+		// ข้อความเดิมไว้ ไม่ต่อท้าย driver error กันข้อมูลภายในหลุดออกไปหา client
+		return nil, errors.New("failed to connect to database")
 	}
 	defer db.CloseGORM(gormx)
 

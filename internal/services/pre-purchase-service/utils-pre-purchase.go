@@ -2,6 +2,7 @@ package prePurchaseService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -301,7 +302,7 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 	return nil
 }
 
-func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error) {
+func GetPOApproval(ctx context.Context, POcodes []string) ([]models.Approval, error) {
 	approvalReq := approvalService.GetApprovalRequest{
 		DocumentCode: POcodes,
 		Page:         1,
@@ -315,8 +316,7 @@ func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error
 
 	approvalReqString := string(approvalReqJson)
 
-	// approvalService.GetApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context()
-	resp, err := approvalService.GetApproval(ctx.Request.Context(), approvalReqString)
+	resp, err := approvalService.GetApproval(ctx, approvalReqString)
 	if err != nil {
 		return nil, errors.New("failed to get approval list: " + err.Error())
 	}
@@ -330,7 +330,9 @@ func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error
 }
 
 func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map[string]models.Approval) error {
-	approvalList, err := GetPOApproval(ctx, docCodes)
+	// GetPOApproval รับ context.Context แล้ว แต่ UpdatePOApproval เองยังไม่แปลง ต้องส่ง
+	// ctx.Request.Context() ไม่ใช่ ctx ตรงๆ (ดู eaa539a)
+	approvalList, err := GetPOApproval(ctx.Request.Context(), docCodes)
 	if err != nil {
 		return errors.New("failed get approvals: " + err.Error())
 	}
