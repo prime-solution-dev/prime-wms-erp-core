@@ -50,14 +50,23 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		prefix = "IV"
 	}
 	configCodeValue := "RUNNING_AR"
-	count := len(req)
-	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
-	if err != nil {
-		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	count := 0
+	for i := range req {
+		if req[i].InvoiceCode == "" {
+			count++
+		}
+	}
+	var purchaseCodes []string
+	if count > 0 {
+		purchaseCodes, err = GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+		if err != nil {
+			return nil, errors.New("failed to generate invoice codes: " + err.Error())
+		}
 	}
 
 	//depositCut := []models.Deposit{}
 	productCodes := []string{}
+	codeIndex := 0
 	for i := range req {
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
@@ -71,7 +80,10 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 		}
-		req[i].InvoiceCode = purchaseCodes[i]
+		if req[i].InvoiceCode == "" {
+			req[i].InvoiceCode = purchaseCodes[codeIndex]
+			codeIndex++
+		}
 		/* for it := range req[i].InvoiceItem {
 			if req[i].InvoiceItem[it].ArticleType == "DEPOSIT" {
 				depositCut = append(depositCut, models.Deposit{
