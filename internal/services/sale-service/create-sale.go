@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -43,7 +43,7 @@ type CreateSaleResponse struct {
 	Message          string `json:"message"` // ข้อความแจ้งผลลัพธ์
 }
 
-func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CreateSaleRequest{}
 	res := []CreateSaleResponse{}
 
@@ -269,7 +269,12 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// ถ้า status เป็น WAIT_FOR_APPROVED ให้ส่ง sale id ไปสร้าง RequestApproveSale
+	//
+	// ทำงานหลัง tx.Commit() แล้ว และเป็น best-effort (พังแล้ว log ทิ้ง ไม่ทำให้ CreateSale ทั้งก้อนพัง)
+	// ต้องใช้ postCommitContext ไม่งั้น caller ตัดสายกลางทาง (เช่น timeout ฝั่งเว็บ) จะทำให้
+	// approval request ไม่ถูกสร้างเงียบๆ ทั้งที่ sale ถูกสร้างไปแล้วจริง
 	if req.Status == "WAIT_FOR_APPROVED" {
+		postCommitCtx := postCommitContext(ctx)
 		for _, sale := range createSales {
 			requestApproveReq := RequestApproveSaleRequest{
 				ID: sale.ID,
@@ -280,7 +285,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				continue
 			}
 
-			_, err = RequestApproveSale(ctx, string(approvePayload))
+			_, err = RequestApproveSale(postCommitCtx, string(approvePayload))
 			if err != nil {
 				fmt.Printf("Warning: failed to create approval request for sale %s: %v\n", sale.SaleCode, err)
 			}
@@ -288,6 +293,13 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return res, nil
+}
+
+// postCommitContext คืน context สำหรับงานที่ทำหลัง commit
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย
+// งานที่เหลือจะไม่เกิดขึ้นเลยและเงียบด้วย
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 // generateSaleCodes จองเลขที่เอกสารแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)

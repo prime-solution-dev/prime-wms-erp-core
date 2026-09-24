@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -140,7 +138,7 @@ type DeliveryItemResponse struct {
 	UnitCode         string  `json:"unit_code"`
 }
 
-func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSalePack(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var res []GetSalePackResponse
 	var req GetSalePackRequest
 
@@ -197,8 +195,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var sales []models.Sale
 	if err := query.Find(&sales).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve sales"})
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve sales: %v", err)
 	}
 
 	// Process each sale
@@ -297,7 +294,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Call external packing service
-	externalPackingResponse, err := callPackingService(ctx.Request.Context(), res, req)
+	externalPackingResponse, err := callPackingService(ctx, res, req)
 	if err != nil {
 		fmt.Printf("Error calling external packing service: %v\n", err)
 		// Return empty result if external service fails

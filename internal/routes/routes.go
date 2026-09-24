@@ -173,41 +173,41 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//sale
 	sale := ctx.Group("/sale")
 	sale.POST("/CreateSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.CreateSale)
+		utils.ProcessContextRequest(c, saleService.CreateSale)
 	})
 	sale.POST("/UpdateSaleStatusPayment", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.UpdateSaleStatusPayment)
+		utils.ProcessContextRequest(c, saleService.UpdateSaleStatusPayment)
 	})
 	sale.POST("/UpdateStatusSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.UpdateStatusSale)
+		utils.ProcessContextRequest(c, saleService.UpdateStatusSale)
 	})
 
 	sale.POST("/EditSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.EditSale)
+		utils.ProcessContextRequest(c, saleService.EditSale)
 	})
 	sale.POST("/GetSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.GetSale)
+		utils.ProcessContextRequest(c, saleService.GetSale)
 	})
 	sale.POST("/UpdateSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.UpdateSale)
+		utils.ProcessContextRequest(c, saleService.UpdateSale)
 	})
 	sale.POST("/RequestApproveSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.RequestApproveSale)
+		utils.ProcessContextRequest(c, saleService.RequestApproveSale)
 	})
 	sale.POST("/UpdateStatusApproveSale", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.UpdateStatusApproveSale)
+		utils.ProcessContextRequest(c, saleService.UpdateStatusApproveSale)
 	})
 
 	sale.POST("/GetSalePack", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.GetSalePack)
+		utils.ProcessContextRequest(c, saleService.GetSalePack)
 	})
 
 	sale.POST("/ValidateSaleOrder", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.ValidateSale)
+		utils.ProcessContextRequest(c, saleService.ValidateSale)
 	})
 
 	sale.POST("/UpdateSaleItemStatus", func(c *gin.Context) {
-		utils.ProcessRequest(c, saleService.UpdateSaleItemStatus)
+		utils.ProcessContextRequest(c, saleService.UpdateSaleItemStatus)
 	})
 	//delivery
 	delivery := ctx.Group("/delivery")
@@ -250,13 +250,13 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessRequest(c, verifyService.VerifyApprove)
 	})
 	approval.POST("/GetApproval", func(c *gin.Context) {
-		utils.ProcessRequest(c, approvalService.GetApproval)
+		utils.ProcessContextRequest(c, approvalService.GetApproval)
 	})
 	approval.POST("/CreateApproval", func(c *gin.Context) {
-		utils.ProcessRequest(c, approvalService.CreateApproval)
+		utils.ProcessContextRequest(c, approvalService.CreateApproval)
 	})
 	approval.POST("/UpdateApproval", func(c *gin.Context) {
-		utils.ProcessRequest(c, approvalService.UpdateApproval)
+		utils.ProcessContextRequest(c, approvalService.UpdateApproval)
 	})
 	approval.POST("/CheckAutoApprovalRest", func(c *gin.Context) {
 		utils.ProcessRequest(c, approvalService.CheckAutoApprovalRest)

@@ -1,6 +1,7 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
@@ -8,7 +9,6 @@ import (
 	authenticationService "prime-erp-core/internal/services/authentication-service"
 	"sort"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -29,7 +29,11 @@ type ResultApproval struct {
 	ApprovalRes []models.Approval `json:"approval"`
 }
 
-func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// GetApproval รับ context.Context เพื่อให้ sale-service/quotation-service (แปลงแล้ว) เรียกได้ตรงๆ
+// ตัวฟังก์ชันเองไม่ได้ใช้ ctx เลย (ยังไม่แปลง route/apperr ของ package นี้ ปล่อยให้ task ที่แปลง
+// approval-service เต็มรูปแบบทำต่อ) — ctx ยังรับ *gin.Context ได้เหมือนเดิมเพราะมันสอดคล้องกับ
+// interface context.Context อยู่แล้ว
+func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest
 
