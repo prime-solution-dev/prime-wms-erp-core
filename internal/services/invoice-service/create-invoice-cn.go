@@ -34,7 +34,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestDataGetCustomers)
+	customers, err := customerService.GetCustomers(ctx, requestDataGetCustomers)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 		"sub_topic": []string{"CREATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 			SiteCode:    []string{req[0].SiteCode},
 			CompanyCode: []string{req[0].CompanyCode},
 		}
-		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
@@ -143,7 +143,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

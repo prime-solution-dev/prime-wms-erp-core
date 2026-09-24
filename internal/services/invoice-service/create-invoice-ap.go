@@ -226,7 +226,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		tolerance = floatVal
 	}
 
-	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
@@ -237,15 +237,15 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		CompanyCode: []string{companyCode},
 	}
 
-	mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+	mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 	if errmapProduct != nil {
 		return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 	}
-	mapMovingAvgCost, errGetMovingAvgCost := purchaseService.GetMovingAvgCost(productReq)
+	mapMovingAvgCost, errGetMovingAvgCost := purchaseService.GetMovingAvgCost(ctx, productReq)
 	if errGetMovingAvgCost != nil {
 		return nil, errors.New("failed to get moving avg cost: " + errGetMovingAvgCost.Error())
 	}
-	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 	if errGetProductInterface != nil {
 		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
@@ -395,7 +395,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		// The invoice is already saved here; a reconcile failure must NOT fail the request
 		// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
 		// next GRA on this PO, or a manual reconcile, self-heals.
-		if err := reconcilePOAfterAPSave(req); err != nil {
+		if err := reconcilePOAfterAPSave(ctx, req); err != nil {
 			log.Printf("CreateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 		}
 
@@ -407,7 +407,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			"sub_topic": []string{"CREATE"},
 		}
 
-		hookConfig, err := interfaceService.GetHookConfig(requestData)
+		hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -422,7 +422,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 				CompanyCode: []string{companyCode},
 			}
 
-			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+			mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 			if errmapProduct != nil {
 				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 			}
@@ -446,7 +446,7 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 				RequestData: req,
 				UrlHook:     urlHook,
 			}
-			HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
+			HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 			if err != nil {
 				return nil, err
 			}

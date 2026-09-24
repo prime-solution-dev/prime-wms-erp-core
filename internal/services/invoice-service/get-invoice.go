@@ -92,7 +92,7 @@ func GetInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 	}
 	var mapSupplier map[string]models.Supplier
 	if len(supplierReq.SupplierCodes) > 0 {
-		mapSuppliers, err := prePurchaseService.GetSupplierByCode(supplierReq)
+		mapSuppliers, err := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 		if err != nil {
 			return nil, errors.New("failed to get supplier list: " + err.Error())
 		}
@@ -122,7 +122,7 @@ func GetInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 			CompanyCode: companyCode,
 		}
 
-		mapProducts, err := purchaseService.GetProductByCode(productReq)
+		mapProducts, err := purchaseService.GetProductByCode(ctx, productReq)
 		if err != nil {
 			return nil, errors.New("failed to get product list: " + err.Error())
 		}

@@ -117,7 +117,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 		"sub_topic": []string{"CREATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 			RequestData: hookReq,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, hookErr := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, hookErr := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if hookErr != nil {
 			// hook เป็นข้อมูลเสริม (external id) ไม่ควรทำให้สร้างใบไม่ได้ แต่ต้องเห็นใน log
 			fmt.Printf("CreateDelivery: delivery hook failed, continuing without external id: %v\n", hookErr)

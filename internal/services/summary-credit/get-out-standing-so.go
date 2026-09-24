@@ -82,7 +82,7 @@ func GetOutStandingSo(ctx context.Context, jsonPayload string) (interface{}, err
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestData)
+	customers, err := customerService.GetCustomers(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}

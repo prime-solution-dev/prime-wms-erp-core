@@ -117,7 +117,7 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 				CondRangeMin:    saleReq.TotalAmount,
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, user)
 			if err != nil {
 				return nil, err
 			}

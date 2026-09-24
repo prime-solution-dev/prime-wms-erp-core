@@ -14,6 +14,7 @@ import (
 	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
+	"prime-erp-core/internal/utils"
 	"strconv"
 	"strings"
 	"time"
@@ -419,18 +420,16 @@ func GeneratePrePurchaseCodes(ctx context.Context, count int) ([]string, error) 
 }
 
 // Supplier actions
-func GetSupplierByCode(supplierReq models.GetSupplierListRequest) (map[string]models.Supplier, error) {
+func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRequest) (map[string]models.Supplier, error) {
 	jsonData, err := json.Marshal(supplierReq)
 	if err != nil {
 		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
 	}
 
-	getSuppliers, err := http.NewRequest("POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
+	getSuppliers, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
-
-	getSuppliers.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}

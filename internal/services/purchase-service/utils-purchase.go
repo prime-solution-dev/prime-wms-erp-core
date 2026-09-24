@@ -16,6 +16,7 @@ import (
 	approvalService "prime-erp-core/internal/services/approval-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
+	"prime-erp-core/internal/utils"
 	"strconv"
 	"strings"
 	"time"
@@ -329,19 +330,17 @@ func UpdatePOToApproval(ctx context.Context, updateReqs []models.UpdateStatusApp
 }
 
 // Product actions
-func GetProductByCode(productReq models.GetProductRequest) (map[string]models.GetProductsDetailComponent, error) {
+func GetProductByCode(ctx context.Context, productReq models.GetProductRequest) (map[string]models.GetProductsDetailComponent, error) {
 	jsonData, err := json.Marshal(productReq)
 	if err != nil {
 		return nil, errors.New("failed to marshal product data to JSON: " + err.Error())
 	}
 	fmt.Println(string(jsonData))
 
-	getProducts, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/GetProductDetail", bytes.NewBuffer(jsonData))
+	getProducts, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_product")+"/Product/GetProductDetail", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
-
-	getProducts.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}
@@ -381,18 +380,16 @@ func GetProductByCode(productReq models.GetProductRequest) (map[string]models.Ge
 
 	return mapProduct, nil
 }
-func GetProductInterface(productReq models.GetProductRequest) (map[string]models.ProductInterface, error) {
+func GetProductInterface(ctx context.Context, productReq models.GetProductRequest) (map[string]models.ProductInterface, error) {
 	jsonData, err := json.Marshal(productReq)
 	if err != nil {
 		return nil, errors.New("failed to marshal product data to JSON: " + err.Error())
 	}
 
-	getProducts, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/get-product-interface", bytes.NewBuffer(jsonData))
+	getProducts, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_product")+"/Product/get-product-interface", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
-
-	getProducts.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}
@@ -424,18 +421,16 @@ func GetProductInterface(productReq models.GetProductRequest) (map[string]models
 
 	return mapProduct, nil
 }
-func GetMovingAvgCost(productReq models.GetProductRequest) (map[string]models.MovingAvgCost, error) {
+func GetMovingAvgCost(ctx context.Context, productReq models.GetProductRequest) (map[string]models.MovingAvgCost, error) {
 	jsonData, err := json.Marshal(productReq)
 	if err != nil {
 		return nil, errors.New("failed to marshal product data to JSON: " + err.Error())
 	}
 
-	getProducts, err := http.NewRequest("POST", os.Getenv("base_url_product")+"/Product/get-moving-avg-cost", bytes.NewBuffer(jsonData))
+	getProducts, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_product")+"/Product/get-moving-avg-cost", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
-
-	getProducts.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}

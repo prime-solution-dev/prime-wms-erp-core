@@ -2,12 +2,15 @@ package authenticationService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	"prime-erp-core/internal/utils"
 )
 
 type GetUserApprovalRequest struct {
@@ -46,19 +49,17 @@ type GetUserApprovalResponse struct {
 	Data         []UserApprovalDataResult `json:"data"`
 }
 
-func GetUserApproval(requestData map[string]interface{}) (GetUserApprovalResponse, error) {
+func GetUserApproval(ctx context.Context, requestData map[string]interface{}) (GetUserApprovalResponse, error) {
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
 
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_authorization")+"/author/get-user-approval", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_authorization")+"/author/get-user-approval", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GetUserApprovalResponse{}, errors.New("Error parsing DateTo: " + err.Error())
 	}
-
-	reqHttp.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
 	client := &http.Client{}

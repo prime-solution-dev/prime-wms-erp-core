@@ -116,7 +116,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			return toleranceErrorResponse, nil
 		}
 	}
-	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
@@ -153,7 +153,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 	// The invoice is already saved here; a reconcile failure must NOT fail the request
 	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
 	// next GRA on this PO, or a manual reconcile, self-heals.
-	if err := reconcilePOAfterAPSave(req); err != nil {
+	if err := reconcilePOAfterAPSave(ctx, req); err != nil {
 		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 	}
 
@@ -163,7 +163,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			CompanyCode: []string{companyCode},
 		}
 
-		mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 		if errmapProduct != nil {
 			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 		}
@@ -203,7 +203,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			RequestData: req,
 			UrlHook:     urlProduct,
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

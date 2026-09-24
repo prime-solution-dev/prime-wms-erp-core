@@ -1,13 +1,12 @@
 package timeService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"prime-erp-core/internal/db"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -28,7 +27,7 @@ type GetTimeResponse struct {
 	EndTime   string    `gorm:"type:varchar(20)" json:"end_time"`
 }
 
-func GetTime(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetTime(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var res []GetTimeResponse
 	var req GetTimeRequest
 
@@ -41,8 +40,7 @@ func GetTime(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
-		return nil, err
+		return nil, errors.New("failed to connect to database")
 	}
 	defer db.CloseGORM(gormx)
 
@@ -62,8 +60,7 @@ func GetTime(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
-		return nil, err
+		return nil, errors.New("failed to retrieve data")
 	}
 
 	return res, nil

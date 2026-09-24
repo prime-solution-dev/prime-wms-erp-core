@@ -1,15 +1,13 @@
 package systemConfigService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 type UpdateRunningSystemConfigRequest struct {
@@ -23,7 +21,7 @@ type UpdateRunningSystemConfigResponse struct {
 	Message        string `json:"message"`
 }
 
-func UpdateRunningSystemConfig(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateRunningSystemConfig(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req UpdateRunningSystemConfigRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -41,8 +39,7 @@ func UpdateRunningSystemConfig(ctx *gin.Context, jsonPayload string) (interface{
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
-		return nil, err
+		return nil, errors.New("failed to connect to database")
 	}
 	defer db.CloseGORM(gormx)
 

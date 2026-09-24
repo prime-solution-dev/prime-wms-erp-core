@@ -14,7 +14,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -119,7 +118,7 @@ type documentData struct {
 	UnitCode           string
 }
 
-func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPurchaseItemRemainRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetPurchaseItemRemainRequest{}
 	if strings.TrimSpace(jsonPayload) != "" {
 		if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -136,7 +135,7 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 	return GetPurchaseItemRemain(ctx, gormx, req)
 }
 
-func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
+func GetPurchaseItemRemain(ctx context.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
 	selectedQty, err := preparePurchaseRemainRequest(&req)
 	if err != nil {
 		return nil, err
@@ -161,7 +160,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	poItems := []string{}
 	poItemsCheck := map[string]bool{}
 
-	poMap, err := getPurchase(ctx.Request.Context(), gormx, req)
+	poMap, err := getPurchase(ctx, gormx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +208,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
-	ibDocMap, err := getInbound(ctx.Request.Context(), req, poCodes, poItems)
+	ibDocMap, err := getInbound(ctx, req, poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +255,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 			return nil, err
 		}
 
-		grDocMap, err = getGoodsReceive(ctx.Request.Context(), ibCodes, ibItems)
+		grDocMap, err = getGoodsReceive(ctx, ibCodes, ibItems)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +296,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	})
 
 	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
-	productMasterMap, err := getProductMasterMap(ctx.Request.Context(), req, paged)
+	productMasterMap, err := getProductMasterMap(ctx, req, paged)
 	if err != nil {
 		return nil, err
 	}

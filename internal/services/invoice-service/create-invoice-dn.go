@@ -26,7 +26,7 @@ func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, erro
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestDataGetCustomers)
+	customers, err := customerService.GetCustomers(ctx, requestDataGetCustomers)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, erro
 		"sub_topic": []string{"CREATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, erro
 			RequestData: req,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

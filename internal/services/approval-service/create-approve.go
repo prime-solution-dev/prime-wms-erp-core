@@ -38,7 +38,7 @@ func CreateApproval(ctx context.Context, jsonPayload string) (interface{}, error
 		"md_item_code": mdiItemCode,
 		"action_code":  []string{"APPROVE"},
 	}
-	requester, errGetRequester := authenticationService.GetRequester(requestData)
+	requester, errGetRequester := authenticationService.GetRequester(ctx, requestData)
 	if errGetRequester != nil {
 		return nil, errGetRequester
 	} */

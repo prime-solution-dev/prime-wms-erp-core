@@ -84,7 +84,7 @@ func UpdateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, erro
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func UpdateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, erro
 			SiteCode:    []string{req[0].SiteCode},
 			CompanyCode: []string{req[0].CompanyCode},
 		}
-		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
@@ -128,7 +128,7 @@ func UpdateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, erro
 			RequestData: req,
 			UrlHook:     urlHook,
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

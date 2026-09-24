@@ -36,7 +36,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessContextRequest(c, groupService.GetGroup)
 	})
 	group.POST("/SyncGroupMaster", func(c *gin.Context) {
-		utils.ProcessRequest(c, groupService.SyncGroupMaster)
+		utils.ProcessContextRequest(c, groupService.SyncGroupMaster)
 	})
 
 	//price
@@ -92,7 +92,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 
 	config := ctx.Group("/config")
 	config.POST("/GetSystemConfig", func(c *gin.Context) {
-		utils.ProcessRequest(c, systemConfigService.GetSystemConfig)
+		utils.ProcessContextRequest(c, systemConfigService.GetSystemConfig)
 	})
 
 	//quotation
@@ -233,7 +233,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//time
 	time := ctx.Group("/time")
 	time.POST("/GetTime", func(c *gin.Context) {
-		utils.ProcessRequest(c, timeService.GetTime)
+		utils.ProcessContextRequest(c, timeService.GetTime)
 	})
 	//deposit
 	deposit := ctx.Group("/deposit")
@@ -247,7 +247,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//approval
 	approval := ctx.Group("/approval")
 	approval.POST("/VerifyApprove", func(c *gin.Context) {
-		utils.ProcessRequest(c, verifyService.VerifyApprove)
+		utils.ProcessContextRequest(c, verifyService.VerifyApprove)
 	})
 	approval.POST("/GetApproval", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, approvalService.GetApproval)
@@ -318,7 +318,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//unit
 	unit := ctx.Group("/unit")
 	unit.POST("/GetAllUnit", func(c *gin.Context) {
-		utils.ProcessRequest(c, unitService.GetAllUnit)
+		utils.ProcessContextRequest(c, unitService.GetAllUnit)
 	})
 
 	purchase := ctx.Group("/purchase")
@@ -342,7 +342,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessContextRequest(c, prePurchaseService.CancelPOBigLot)
 	})
 	purchase.POST("/GetPurchaseItemRemain", func(c *gin.Context) {
-		utils.ProcessRequest(c, xService.GetPurchaseItemRemainRest)
+		utils.ProcessContextRequest(c, xService.GetPurchaseItemRemainRest)
 	})
 	purchase.POST("/ValidateAPOverPurchase", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, xService.ValidateAPOverPurchaseRest)
@@ -385,7 +385,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//email alert
 	emailAlert := ctx.Group("/emailAlert")
 	emailAlert.POST("/SendEmailAlertForNewBrand", func(c *gin.Context) {
-		utils.ProcessRequest(c, emailservice.SendEmailAlertForNewBrand)
+		utils.ProcessContextRequest(c, emailservice.SendEmailAlertForNewBrand)
 	})
 
 }

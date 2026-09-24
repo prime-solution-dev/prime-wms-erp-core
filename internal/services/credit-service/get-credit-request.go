@@ -59,7 +59,7 @@ func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, er
 			"customer_name_like": req.CustomerNameLike,
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +72,7 @@ func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, er
 			"active_flg": []bool{*req.CustomerStatus},
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, er
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestData)
+	customers, err := customerService.GetCustomers(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}

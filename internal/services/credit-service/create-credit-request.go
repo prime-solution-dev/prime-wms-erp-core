@@ -70,10 +70,10 @@ func CreateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, 
 	}
 	if len(approvalValue) > 0 {
 
-		// approvalService.CheckAutoApprovalRest ยังไม่แปลง (นอก scope) และรับ gin's *Context
-		// แต่มันเป็นแค่เปลือก JSON ห่อ CheckAutoApproval(gormx, req, user) ที่ไม่แตะ gormx เลย
-		// (_ = gormx) — เรียก CheckAutoApproval ตรงๆ แบบเดียวกับ sale-service/create-sale.go
-		// ตัดรอบ JSON marshal/unmarshal ทิ้งไปด้วย ผล/ประเภทคืนค่าเดิมทุกอย่าง
+		// approvalService.CheckAutoApprovalRest เป็นแค่เปลือก JSON ห่อ
+		// CheckAutoApproval(ctx, gormx, req, user) ที่ไม่แตะ gormx เลย (_ = gormx) — เรียก
+		// CheckAutoApproval ตรงๆ แบบเดียวกับ sale-service/create-sale.go ตัดรอบ JSON
+		// marshal/unmarshal ทิ้งไปด้วย ผล/ประเภทคืนค่าเดิมทุกอย่าง
 		checkAutoApprovalReq := approvalService.CheckAutoApprovalRequest{
 			RequestUserCode: userID,
 			ModuleCode:      "CUSTOMIZE",
@@ -82,7 +82,7 @@ func CreateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, 
 			CondRangeMin:    req[0].Amount,
 		}
 
-		resultCheckAutoApprovalRest, errCheckAutoApprovalRest := approvalService.CheckAutoApproval(nil, checkAutoApprovalReq, userID)
+		resultCheckAutoApprovalRest, errCheckAutoApprovalRest := approvalService.CheckAutoApproval(ctx, nil, checkAutoApprovalReq, userID)
 		if errCheckAutoApprovalRest != nil {
 			return nil, errCheckAutoApprovalRest
 		}

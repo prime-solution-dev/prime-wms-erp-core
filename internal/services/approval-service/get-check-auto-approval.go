@@ -48,10 +48,10 @@ func CheckAutoApprovalRest(ctx context.Context, jsonPayload string) (interface{}
 
 	user := ""
 
-	return CheckAutoApproval(gormx, req, user)
+	return CheckAutoApproval(ctx, gormx, req, user)
 }
 
-func CheckAutoApproval(gormx *gorm.DB, req CheckAutoApprovalRequest, user string) (*CheckAutoApprovalResponse, error) {
+func CheckAutoApproval(ctx context.Context, gormx *gorm.DB, req CheckAutoApprovalRequest, user string) (*CheckAutoApprovalResponse, error) {
 	_ = gormx
 
 	res := &CheckAutoApprovalResponse{
@@ -102,7 +102,7 @@ func CheckAutoApproval(gormx *gorm.DB, req CheckAutoApprovalRequest, user string
 		"is_not_expired":    isNotExpired,
 	}
 
-	userApproval, err := authenticationService.GetUserApproval(requestData)
+	userApproval, err := authenticationService.GetUserApproval(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}

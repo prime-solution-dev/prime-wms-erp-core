@@ -125,7 +125,7 @@ func CreateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, user)
 			if err != nil {
 				return nil, err
 			}
