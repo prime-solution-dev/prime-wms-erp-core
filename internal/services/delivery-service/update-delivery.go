@@ -10,6 +10,7 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -228,6 +229,10 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			updateOrderDeliveries = append(updateOrderDeliveries, deliveryReq)
 		}
 	}
+
+	// แจ้งปลายทางว่าใบจองถูกแก้ ล้อเส้น create-delivery ต่างกันที่ sub_topic เป็น UPDATE
+	// hook เป็นการแจ้งอย่างเดียว ไม่ได้อ่านค่าที่ตอบกลับมา ใบที่แก้มี external_id ของตัวเองอยู่แล้ว
+	fireUpdateDeliveryHook(req.Deliveries)
 
 	tx := gormx.Begin()
 	if tx.Error != nil {
@@ -492,4 +497,73 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	return nil
+}
+
+// fireUpdateDeliveryHook แจ้งปลายทาง (TRCloud) ว่าใบจองถูกแก้
+//
+// ล้อ CreateDelivery ทุกข้อ ต่างกัน 2 อย่าง: sub_topic เป็น UPDATE และไม่อ่านค่าที่ hook ตอบกลับ
+// เพราะใบที่ถูกแก้มี external_id จากตอนสร้างอยู่แล้ว
+//
+// hook เป็นข้อมูลเสริม พังแล้วต้องไม่ทำให้แก้ใบไม่ได้ แต่ต้องเห็นใน log
+func fireUpdateDeliveryHook(deliveries []DeliveryDocumentUpdate) {
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"UPDATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	if err != nil {
+		fmt.Printf("UpdateDelivery: cannot read hook config, skipping hook: %v\n", err)
+		return
+	}
+
+	hookReq := buildUpdateHookRequest(deliveries)
+	if len(hookConfig) == 0 || len(hookReq) == 0 {
+		return
+	}
+
+	urlHook := ""
+	for _, hookConfigValue := range hookConfig {
+		urlHook = hookConfigValue.HookUrl
+	}
+
+	if _, hookErr := interfaceService.HookInterface(interfaceService.HookInterfaceRequest{
+		RequestData: hookReq,
+		UrlHook:     urlHook,
+	}); hookErr != nil {
+		fmt.Printf("UpdateDelivery: delivery hook failed, continuing: %v\n", hookErr)
+	}
+}
+
+// buildUpdateHookRequest ตัดใบร่างและบรรทัดที่ qty <= 0 ออกจาก payload ที่จะยิงเข้า hook
+//
+// ใบร่างยังไม่ผูกของจริง ปลายทางไม่ต้องรู้ และ TRCloud ไม่เอาบรรทัดที่จอง 0 ชิ้น
+// ใบที่กรองแล้วไม่เหลือ item เลย ตัดทั้งใบทิ้ง ไม่ส่งหัวใบเปล่าไปให้ปลายทาง
+func buildUpdateHookRequest(deliveries []DeliveryDocumentUpdate) []DeliveryDocumentUpdate {
+	hookReq := make([]DeliveryDocumentUpdate, 0, len(deliveries))
+
+	// deliveryReq เป็น copy จาก range อยู่แล้ว เขียนทับ Items ไม่กระทบ req ตัวจริง
+	for _, deliveryReq := range deliveries {
+		if deliveryReq.IsDraft {
+			continue
+		}
+
+		items := make([]DeliveryItemDocumentUpdate, 0, len(deliveryReq.Items))
+		for _, item := range deliveryReq.Items {
+			if item.DeliveryItem.Qty <= 0 {
+				continue
+			}
+			items = append(items, item)
+		}
+
+		if len(items) == 0 {
+			continue
+		}
+
+		deliveryReq.Items = items
+		hookReq = append(hookReq, deliveryReq)
+	}
+
+	return hookReq
 }
