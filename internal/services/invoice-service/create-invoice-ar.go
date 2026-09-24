@@ -172,55 +172,6 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				return nil, errCreateInvoice
 			}
 
-			/* 	if req[0].ExternalID != "" && req[0].Status == "COMPLETED" {
-				depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
-				if err != nil {
-					return nil, err
-				}
-				if len(depositMapResult) > 0 {
-					var deposit []models.Deposit
-
-					for _, v := range depositMapResult {
-						depMap, _ := v.(map[string]interface{})
-
-						totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
-						if err != nil {
-							totalFloat = 0
-						}
-						drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
-						if err != nil {
-							drFloat = 0
-						}
-						crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
-						if err != nil {
-							crFloat = 0
-						}
-
-						deposit = append(deposit, models.Deposit{
-							DepositCode:   depMap["anchor"].(string),
-							CustomerCode:  req[0].PartyCode,
-							AmountTotal:   totalFloat,
-							AmountUsed:    drFloat,
-							AmountRemain:  crFloat,
-							Status:        "PENDING",
-							CompanyFormat: "IV",
-						})
-					}
-					if len(deposit) > 0 {
-						jsonBytesCreateDeposit, err := json.Marshal(deposit)
-						if err != nil {
-							return nil, err
-						}
-
-						_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
-						if errDeposit != nil {
-							return nil, errDeposit
-						}
-					}
-
-				}
-			} */
-
 			return createInvoiceReturn, nil
 		}
 	} else {
