@@ -33,7 +33,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 	group := ctx.Group("/group")
 
 	group.POST("/GetGroupMaster", func(c *gin.Context) {
-		utils.ProcessRequest(c, groupService.GetGroup)
+		utils.ProcessContextRequest(c, groupService.GetGroup)
 	})
 	group.POST("/SyncGroupMaster", func(c *gin.Context) {
 		utils.ProcessRequest(c, groupService.SyncGroupMaster)
@@ -43,49 +43,49 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price := ctx.Group("/price")
 
 	price.POST("/GetPriceListGroup", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetPriceListGroup)
+		utils.ProcessContextRequest(c, priceService.GetPriceListGroup)
 	})
 	price.POST("/GetPaymentTerm", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetPaymentTerm)
+		utils.ProcessContextRequest(c, priceService.GetPaymentTerm)
 	})
 	price.POST("/GetComparePrice", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetComparePrice)
+		utils.ProcessContextRequest(c, priceService.GetComparePrice)
 	})
 	price.POST("/GetPriceList", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetPriceList)
+		utils.ProcessContextRequest(c, priceService.GetPriceList)
 	}) // for Base Price and price list feature
 	price.POST("/CreatePriceListGroupBase", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.CreatePriceListBase)
+		utils.ProcessContextRequest(c, priceService.CreatePriceListBase)
 	})
 	price.POST("/UpdatePriceListGroupBase", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.UpdatePriceListBase)
+		utils.ProcessContextRequest(c, priceService.UpdatePriceListBase)
 	})
 	price.POST("/UpdatePriceListSubGroup", func(c *gin.Context) {
-		utils.ProcessRequestWithBinding(c, priceService.UpdatePriceListSubGroup)
+		utils.ProcessContextRequest(c, priceService.UpdatePriceListSubGroup)
 	})
 	price.POST("/DeletePriceListGroupBase", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.DeletePriceListBase)
+		utils.ProcessContextRequest(c, priceService.DeletePriceListBase)
 	})
 	price.POST("/GetPriceDetail", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetPriceDetail)
+		utils.ProcessContextRequest(c, priceService.GetPriceDetail)
 	})
 	price.POST("/GetPriceExportTable", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.GetPriceExportTable)
+		utils.ProcessContextRequest(c, priceService.GetPriceExportTable)
 	})
 	price.POST("/SubGroup/UpdateLatest", func(c *gin.Context) {
-		utils.ProcessRequestWithBinding(c, priceService.UpdateLatestPriceListSubGroup)
+		utils.ProcessContextRequest(c, priceService.UpdateLatestPriceListSubGroup)
 	})
 	price.POST("/SubGroup/GetCalculated", func(c *gin.Context) {
-		utils.ProcessRequestWithBinding(c, priceService.GetCalculatedPriceListSubGroup)
+		utils.ProcessContextRequest(c, priceService.GetCalculatedPriceListSubGroup)
 	})
 	price.POST("/UpdatePriceListExtra", func(c *gin.Context) {
-		utils.ProcessRequest(c, priceService.UpdateExtras)
+		utils.ProcessContextRequest(c, priceService.UpdateExtras)
 	})
 	price.POST("/UploadPriceList", func(c *gin.Context) {
-		utils.ProcessRequestMultiPart(c, priceService.UploadPricelistMultipart)
+		utils.ProcessContextRequestMultipart(c, priceService.UploadPricelistMultipart)
 	})
 	price.POST("/UploadPriceListTemplate", func(c *gin.Context) {
-		utils.ProcessRequestMultiPart(c, priceService.UploadPricelistTemplateMultipart)
+		utils.ProcessContextRequestMultipart(c, priceService.UploadPricelistTemplateMultipart)
 	})
 	// config extra get[3] create[2] update delete
 	// extra create update delete [4]

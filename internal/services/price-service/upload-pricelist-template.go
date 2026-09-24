@@ -1,14 +1,16 @@
 package priceService
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
@@ -34,25 +36,30 @@ const (
 //   - sheet           (default "Pricelist"; falls back to first sheet if absent)
 //   - create_by       (default "system")
 //   - include_formulas ("true"/"1"/"yes" to also write formulas_map; default off)
-func UploadPricelistTemplateMultipart(ctx *gin.Context) (interface{}, error) {
+func UploadPricelistTemplateMultipart(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
-	file, _, err := ctx.Request.FormFile("files")
+	files := input.Files["files"]
+	if len(files) == 0 {
+		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: files): %v", http.ErrMissingFile)}, nil
+	}
+
+	file, err := files[0].Open()
 	if err != nil {
 		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: files): %v", err)}, nil
 	}
 	defer file.Close()
 
 	opts := templateParseOptions{
-		CompanyCode:     firstNonEmpty(ctx.PostForm("company_code"), defaultTemplateCompanyCode),
-		SiteCode:        firstNonEmpty(ctx.PostForm("site_code"), defaultTemplateSiteCode),
-		Sheet:           strings.TrimSpace(ctx.PostForm("sheet")),
-		CreateBy:        firstNonEmpty(ctx.PostForm("create_by"), "system"),
-		IncludeFormulas: parseBoolLoose(ctx.PostForm("include_formulas")),
+		CompanyCode:     firstNonEmpty(formValue(input.Form, "company_code"), defaultTemplateCompanyCode),
+		SiteCode:        firstNonEmpty(formValue(input.Form, "site_code"), defaultTemplateSiteCode),
+		Sheet:           strings.TrimSpace(formValue(input.Form, "sheet")),
+		CreateBy:        firstNonEmpty(formValue(input.Form, "create_by"), "system"),
+		IncludeFormulas: parseBoolLoose(formValue(input.Form, "include_formulas")),
 	}
 
 	req, err := buildCreatePricelistRequestFromTemplate(file, opts)

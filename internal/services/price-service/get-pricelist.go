@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,6 @@ import (
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
 	groupService "prime-erp-core/internal/services/group-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -115,7 +115,7 @@ type SubGroup struct {
 	BatchNo                   string                           `json:"batch_no,omitempty"`
 }
 
-func GetPriceListGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPriceListGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req GetPriceListGroupRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -596,7 +596,7 @@ func toJsonRawMessage(v interface{}) json.RawMessage {
 	return nil
 }
 
-func GetPriceList(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPriceList(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPriceListRequest{}
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, err

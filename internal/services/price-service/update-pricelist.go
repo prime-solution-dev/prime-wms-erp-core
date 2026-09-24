@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"math"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
 	"prime-erp-core/internal/utils"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +19,13 @@ import (
 var getPriceListGroupCodesByIDsFunc = priceListRepository.GetPriceListGroupCodesByIDs
 var runUpdateLatestSubGroupFunc = RunUpdateLatestPriceListSubGroup
 
-func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// seam for unit testing: allow stubbing UpdateExtras' repository write so a test can
+// capture what CreateBy/UpdateBy landed in the model without touching the database
+var updateExtraFunc = priceListRepository.UpdateExtra
+
+func UpdatePriceListBase(ctx context.Context, jsonPayload string) (interface{}, error) {
+	user := requestcontext.GetUserOrDefault(ctx)
+
 	req := []models.UpdatePriceListBaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -45,7 +51,7 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 					DuePercent:       term.DuePercent,
 					CreateBy:         term.CreateBy,
 					CreateDtm:        term.CreateDtm,
-					UpdateBy:         "system", // TODO: get user from auth
+					UpdateBy:         user,
 					UpdateDtm:        &termNow,
 				})
 			}
@@ -58,7 +64,7 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			Currency:            r.Currency,
 			EffectiveDate:       r.EffectiveDate,
 			Remark:              r.Remark,
-			UpdateBy:            "system", // TODO: get user from auth
+			UpdateBy:            user,
 			UpdateDtm:           now,
 			PriceListGroupTerms: priceListGroupTerm,
 		})
@@ -75,14 +81,21 @@ func UpdatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 	// instead of only when someone happens to hit /price/SubGroup/UpdateLatest.
 	//
 	// The base price write above already committed. If the caller disconnects while
-	// this cascade is still running, cancelling ctx.Request.Context() would abandon
-	// it mid-way and leave price_list_sub_group stale relative to the base price
-	// that already landed — so this part must outlive the request.
-	if err := cascadeBasePriceToSubGroups(context.WithoutCancel(ctx.Request.Context()), priceListGroup); err != nil {
+	// this cascade is still running, cancelling ctx would abandon it mid-way and
+	// leave price_list_sub_group stale relative to the base price that already
+	// landed — so this part must outlive the request.
+	if err := cascadeBasePriceToSubGroups(postCommitContext(ctx), priceListGroup); err != nil {
 		return nil, err
 	}
 
 	return nil, nil
+}
+
+// postCommitContext คืน context สำหรับงานที่ทำหลังเขียนฐานข้อมูลเสร็จ (เช่น cascade ต่อ)
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย งานที่เหลือ
+// จะไม่เกิดขึ้นเลยและเงียบด้วย — รูปแบบเดียวกับ sale-service/create-sale.go
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 func cascadeBasePriceToSubGroups(ctx context.Context, priceListGroup []models.PriceListGroup) error {
@@ -301,7 +314,9 @@ func validateExtras(extras []models.UpdatePriceListExtraRequest) error {
 	return nil
 }
 
-func UpdateExtras(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateExtras(ctx context.Context, jsonPayload string) (interface{}, error) {
+	user := requestcontext.GetUserOrDefault(ctx)
+
 	req := []models.UpdatePriceListExtraRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -358,13 +373,13 @@ func UpdateExtras(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			CondRangeMax:            r.CondRangeMax,
 			CreateBy:                r.CreateBy,
 			CreateDtm:               &r.CreateDtm,
-			UpdateBy:                "system", // TODO: get user from auth
+			UpdateBy:                user,
 			UpdateDtm:               &now,
 			PriceListGroupExtraKeys: extraKeys,
 		})
 	}
 
-	if err := priceListRepository.UpdateExtra(extras); err != nil {
+	if err := updateExtraFunc(extras); err != nil {
 		return nil, err
 	}
 

@@ -14,7 +14,6 @@ import (
 
 	externalService "prime-erp-core/external/warehouse-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -34,8 +33,8 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 
 	groupReqString := string(groupReqJson)
 
-	// Note: We need a gin.Context for this call, but we're in a helper function
-	// Let's create a minimal context or use nil if the function supports it
+	// groupService.GetGroup now takes context.Context and never reads it, so nil is safe
+	// here too (this helper has no request-scoped context to pass through anyway).
 	resp, err := groupService.GetGroup(nil, groupReqString)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get groups: %w", err)
@@ -358,7 +357,7 @@ func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceLi
 	return result, nil
 }
 
-func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error) {
 	// Parse request
 	var req priceDomain.GetPriceDetailRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -406,7 +405,7 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	defer sqlx.Close()
 
 	// Load price data
-	priceListData, err := loadPriceData(ctx.Request.Context(), sqlx, req)
+	priceListData, err := loadPriceData(ctx, sqlx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load price data: %w", err)
 	}

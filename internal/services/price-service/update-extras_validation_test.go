@@ -1,16 +1,13 @@
 package priceService
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"prime-erp-core/internal/models"
 	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -32,8 +29,6 @@ func validExtraPayload() map[string]interface{} {
 }
 
 func TestUpdateExtras_RejectsEmptyFields(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
 	tests := []struct {
 		name   string
 		mutate func(m map[string]interface{})
@@ -72,11 +67,7 @@ func TestUpdateExtras_RejectsEmptyFields(t *testing.T) {
 			tt.mutate(payload)
 			body, _ := json.Marshal([]map[string]interface{}{payload})
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodPost, "/price/UpdatePriceListExtra", bytes.NewReader(body))
-
-			_, err := UpdateExtras(c, string(body))
+			_, err := UpdateExtras(context.Background(), string(body))
 			if err == nil {
 				t.Fatal("ต้องได้ error แต่ผ่าน validation ไปได้")
 			}
@@ -143,13 +134,7 @@ func TestValidateExtras_MinGreaterThanMaxOnlyRejectedForBetween(t *testing.T) {
 
 // payload ที่ไม่ใช่ JSON ต้องได้ BindingError ไม่ใช่ 500
 func TestUpdateExtras_RejectsMalformedJSON(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodPost, "/price/UpdatePriceListExtra", bytes.NewBufferString("{oops"))
-
-	_, err := UpdateExtras(c, "{oops")
+	_, err := UpdateExtras(context.Background(), "{oops")
 	if err == nil {
 		t.Fatal("ต้องได้ error")
 	}
@@ -160,13 +145,7 @@ func TestUpdateExtras_RejectsMalformedJSON(t *testing.T) {
 
 // ไม่ส่งรายการมาเลยต้องถูกปฏิเสธ
 func TestUpdateExtras_RejectsEmptyList(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodPost, "/price/UpdatePriceListExtra", bytes.NewBufferString("[]"))
-
-	_, err := UpdateExtras(c, "[]")
+	_, err := UpdateExtras(context.Background(), "[]")
 	if err == nil {
 		t.Fatal("ต้องได้ error")
 	}
