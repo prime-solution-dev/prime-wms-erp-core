@@ -303,7 +303,10 @@ func CreatePurchaseApproval(ctx *gin.Context, purchases []models.Purchase) error
 
 	approvalReqString := string(approvalReqJson)
 
-	approvalIDs, err := approvalService.CreateApproval(ctx, approvalReqString)
+	// approvalService.CreateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context() ไม่ใช่
+	// ctx ตรงๆ ไม่งั้น requestcontext อ่าน user จาก gin.Context ไม่เจอ (gin.Context.Value() เช็คแค่
+	// string key แล้ว fallback ไป hasRequestContext() ที่ repo นี้ไม่ได้เปิดไว้ เลยคืน nil เงียบๆ)
+	approvalIDs, err := approvalService.CreateApproval(ctx.Request.Context(), approvalReqString)
 	if err != nil {
 		return err
 	}

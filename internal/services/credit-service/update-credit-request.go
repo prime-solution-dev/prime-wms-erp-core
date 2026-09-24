@@ -192,7 +192,10 @@ func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	}
 	if len(updateApproval) > 0 {
 		updateApprovalPayload, _ := json.Marshal(updateApproval)
-		_, err := approvalService.UpdateApproval(ctx, string(updateApprovalPayload))
+		// approvalService.UpdateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context()
+		// ไม่ใช่ ctx ตรงๆ ไม่งั้น requestcontext อ่าน user จาก gin.Context ไม่เจอ (ดู comment ที่
+		// create-credit-request.go)
+		_, err := approvalService.UpdateApproval(ctx.Request.Context(), string(updateApprovalPayload))
 		if err != nil {
 			return nil, fmt.Errorf("failed to update approval: %v", err)
 		}

@@ -62,7 +62,11 @@ func CreateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, err
 	if err != nil {
 		return nil, err
 	}
-	resultCreateApproval, errApproval := approvalService.CreateApproval(ctx, string(jsonBytesCreateApproval))
+	// approvalService.CreateApproval รับ context.Context แล้ว (แปลงในงาน context-user-propagation)
+	// แต่ package นี้ยังไม่แปลง ต้องส่ง ctx.Request.Context() ไม่ใช่ ctx ตรงๆ — ของ gin เก็บ user
+	// ด้วย typed key (contextKey) ซึ่ง gin.Context.Value() เช็คแค่ string key แล้ว fallback ไป
+	// hasRequestContext() ที่ repo นี้ไม่ได้เปิด engine.ContextWithFallback เลยคืน nil เงียบๆ
+	resultCreateApproval, errApproval := approvalService.CreateApproval(ctx.Request.Context(), string(jsonBytesCreateApproval))
 	if errApproval != nil {
 		return nil, errApproval
 	}

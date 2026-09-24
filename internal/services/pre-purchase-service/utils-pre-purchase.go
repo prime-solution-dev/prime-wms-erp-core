@@ -289,7 +289,10 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 
 	approvalReqString := string(approvalReqJson)
 
-	approvalIDs, err := approvalService.CreateApproval(ctx, approvalReqString)
+	// approvalService.CreateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context() ไม่ใช่
+	// ctx ตรงๆ ไม่งั้น requestcontext อ่าน user จาก gin.Context ไม่เจอ (ดู comment เดียวกันที่
+	// purchase-service/utils-purchase.go)
+	approvalIDs, err := approvalService.CreateApproval(ctx.Request.Context(), approvalReqString)
 	if err != nil {
 		return err
 	}
@@ -312,7 +315,8 @@ func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error
 
 	approvalReqString := string(approvalReqJson)
 
-	resp, err := approvalService.GetApproval(ctx, approvalReqString)
+	// approvalService.GetApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context()
+	resp, err := approvalService.GetApproval(ctx.Request.Context(), approvalReqString)
 	if err != nil {
 		return nil, errors.New("failed to get approval list: " + err.Error())
 	}
@@ -349,7 +353,8 @@ func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map
 		return errors.New("failed to marshal JSON from struct: " + err.Error())
 	}
 
-	resp, err := approvalService.UpdateApproval(ctx, string(approvalReqJson))
+	// approvalService.UpdateApproval รับ context.Context แล้ว ต้องส่ง ctx.Request.Context()
+	resp, err := approvalService.UpdateApproval(ctx.Request.Context(), string(approvalReqJson))
 	if err != nil {
 		return errors.New("failed to update approval: " + err.Error())
 	}
