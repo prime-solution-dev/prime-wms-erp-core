@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -279,7 +280,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
 	if len(newOrderDeliveries) > 0 {
-		orderRes, err := CreateOrderForUpdate(newOrderDeliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(ctx.Request.Context(), newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
@@ -290,7 +291,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, deliveryReq := range updateOrderDeliveries {
-		if err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries); err != nil {
+		if err := UpdateOrderByDeliveryForUpdate(ctx.Request.Context(), deliveryReq, updateDeliveries); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
@@ -311,7 +312,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 
@@ -420,7 +421,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(ctx, createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
@@ -428,7 +429,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	return createOrderResponse, nil
 }
 
-func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
 	// Find the corresponding delivery from updateDeliveries
 	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
@@ -486,7 +487,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	_, err := externalService.UpdateOrderByDelivery(ctx, updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}

@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -270,7 +271,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var orderRes orderExternalService.CreateOrderResponse
 	// Only call external service if there are non-draft deliveries
 	if hasNonDraftDelivery {
-		orderRes, err = CreateOrder(req, deliveryToAdd, deliveryItemToAdd)
+		orderRes, err = CreateOrder(ctx.Request.Context(), req, deliveryToAdd, deliveryItemToAdd)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +297,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return response, nil
 }
 
-func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrder(ctx context.Context, req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 	// deliveryToAdd เรียงตรงกับ req ทีละใบ (สร้างมาจากลูปเดียวกัน) ส่วน deliveryItemToAdd
@@ -409,7 +410,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(ctx, createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
