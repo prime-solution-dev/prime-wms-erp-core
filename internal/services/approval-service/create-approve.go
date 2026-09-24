@@ -15,7 +15,7 @@ import (
 )
 
 // CreateApproval รับ context.Context เพื่อให้ sale-service/quotation-service (แปลงแล้ว) เรียกได้ตรงๆ
-// ดู comment เดียวกันที่ GetApproval — ctx.Get("user") เดิมเปลี่ยนเป็น requestcontext.GetUserOrDefault
+// ดู comment เดียวกันที่ GetApproval — เดิมอ่าน user ผ่าน ctx.Get ด้วยคีย์ "user" เปลี่ยนเป็น requestcontext.GetUserOrDefault
 func CreateApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Approval
