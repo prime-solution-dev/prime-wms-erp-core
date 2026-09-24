@@ -36,6 +36,15 @@ func buildContext(c *gin.Context) context.Context {
 	return ctx
 }
 
+// BindingError represents a binding/validation error
+type BindingError struct {
+	Message string
+}
+
+func (e *BindingError) Error() string {
+	return e.Message
+}
+
 // writeError ตอบ error ตาม status ที่ error พกมา
 func writeError(c *gin.Context, err error) {
 	// service เขียน response ไปเองแล้ว ไม่ต้องเขียนซ้ำ
