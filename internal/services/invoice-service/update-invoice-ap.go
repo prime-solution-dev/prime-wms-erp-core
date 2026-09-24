@@ -41,7 +41,7 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 
 	jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
 	if errGetPO != nil {
