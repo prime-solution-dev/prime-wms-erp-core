@@ -20,6 +20,24 @@ type bannedPattern struct {
 func TestNoLegacyContextUsage(t *testing.T) {
 	banned := []bannedPattern{
 		{
+			pattern: `http.NewRequestWithContext(`,
+			reason:  "ใช้ utils.NewRequest(ctx, ...) แทน — คอมไพล์ผ่านและพก context ไปด้วยก็จริง แต่ไม่แปะ Authorization header ให้ (utils.NewRequest เท่านั้นที่หยิบ token จาก context มาแปะ) เรียกตรงๆ แบบนี้จะดูเหมือนพก context ถูกต้องแต่ user/token หายเงียบๆ",
+			// utils/http-client.go คือจุดที่ utils.NewRequest เรียก http.NewRequestWithContext
+			// เอง (แล้วแปะ Authorization ต่อ) เป็นจุดเดียวในระบบที่มีสิทธิ์เรียกตรงๆ
+			exemptFileSuffixes: []string{
+				"utils/http-client.go",
+			},
+		},
+		{
+			pattern: `Header.Set("Authorization"`,
+			reason:  "ห้ามปั้น Authorization header เอง — ใช้ utils.NewRequest(ctx, ...) เพื่อส่งต่อ token ของคนเรียกแทนการมโนขึ้นมาเอง",
+			// utils/http-client.go คือจุดเดียวที่มีสิทธิ์แปะ Authorization เอง เพราะเป็น
+			// จุดที่หยิบ token จาก context (ของคนเรียกจริง) มาแปะ ไม่ใช่การมโนค่าขึ้นมาเอง
+			exemptFileSuffixes: []string{
+				"utils/http-client.go",
+			},
+		},
+		{
 			pattern: `http.NewRequest(`,
 			reason:  "ใช้ utils.NewRequest(ctx, ...) แทน ไม่งั้น token ไม่ถูกส่งต่อ",
 			// get-deposit.go และ get-deposits.go ยิง form-urlencoded body ไปที่
@@ -69,10 +87,11 @@ func TestNoLegacyContextUsage(t *testing.T) {
 		},
 	}
 
-	// roots คือทุกอย่างใต้ internal กับ external — ไม่ใช่แค่ services เพราะรั้วที่มีรู
-	// (เช่น เว้น routes/middleware/utils) สอนคนว่ารูนั้นใช้ได้ ยกเว้น internal/guard เอง
-	// ที่ต้องข้ามไม่งั้นสตริง pattern ในไฟล์นี้จะทำให้เทสฟ้องตัวเอง
-	roots := []string{"..", "../../external"}
+	// roots คือทุกอย่างใต้ internal, external, cmd และ config — ไม่ใช่แค่ services
+	// เพราะรั้วที่มีรู (เช่น เว้น routes/middleware/utils หรือ cmd/config) สอนคนว่ารูนั้น
+	// ใช้ได้ ยกเว้น internal/guard เอง ที่ต้องข้ามไม่งั้นสตริง pattern ในไฟล์นี้จะทำให้
+	// เทสฟ้องตัวเอง
+	roots := []string{"..", "../../external", "../../cmd", "../../config"}
 
 	for _, root := range roots {
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
