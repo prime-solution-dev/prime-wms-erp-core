@@ -29,10 +29,11 @@ type ResultApproval struct {
 	ApprovalRes []models.Approval `json:"approval"`
 }
 
-// GetApproval รับ context.Context เพื่อให้ sale-service/quotation-service (แปลงแล้ว) เรียกได้ตรงๆ
-// ตัวฟังก์ชันเองไม่ได้ใช้ ctx เลย (ยังไม่แปลง route/apperr ของ package นี้ ปล่อยให้ task ที่แปลง
-// approval-service เต็มรูปแบบทำต่อ) — ctx ยังรับ *gin.Context ได้เหมือนเดิมเพราะมันสอดคล้องกับ
-// interface context.Context อยู่แล้ว
+// GetApproval รับ context.Context เพื่อให้ caller ที่แปลงแล้วเรียกได้ตรงๆ ตัวฟังก์ชันเองไม่ได้ใช้
+// ctx เลย — แต่ห้ามส่ง gin's Context ดิบเข้ามาที่พารามิเตอร์นี้ ต่อให้มันขึ้นรูปตรงกับ interface
+// context.Context ได้ก็ตาม เพราะ repo นี้ไม่ได้เปิด gin's ContextWithFallback ไว้ ตัว Value() ของมัน
+// จะมองไม่เห็นค่าที่ requestcontext เก็บ (Task 5-6 Finding A) ผู้ที่ยังไม่แปลงต้องส่ง
+// ctx.Request.Context() เท่านั้น
 func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest

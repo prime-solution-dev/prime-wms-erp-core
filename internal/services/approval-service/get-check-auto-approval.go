@@ -1,6 +1,7 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
@@ -8,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +26,14 @@ type CheckAutoApprovalResponse struct {
 	Message        string `json:"message"`
 }
 
-func CheckAutoApprovalRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// CheckAutoApprovalRest แปลงเป็น context.Context ตามรูปแบบ phase B ของงานนี้ แต่ตัวแปร user
+// ที่ส่งต่อให้ CheckAutoApproval ยังคงเป็น "" เหมือนเดิมโดยตั้งใจ — ของเดิมอ่าน
+// ctx.GetString("user_code") ซึ่งไม่มี middleware ตัวไหนเคย c.Set มาก่อนเลย (มีแต่ "user")
+// จึงได้ค่าว่างเสมอมาตั้งแต่ก่อนแปลง ถ้าสลับไปอ่าน user จริงจาก requestcontext ตอนนี้
+// จะทำให้ request ที่ไม่ส่ง request_user_code (เดิม 400 เสมอ) เปลี่ยนไป auto-approve ด้วยตัวตนของ
+// ผู้ login แทน ซึ่งเป็นการเปลี่ยน workflow สิทธิ์อนุมัติ ไม่ใช่แค่ ctx-plumbing — พักไว้ให้เจ้าของ
+// ตัดสินใจ เหมือน Ruling 7 ของ create-sale.go (docs/superpowers/sdd/.../progress.md)
+func CheckAutoApprovalRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CheckAutoApprovalRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -40,9 +47,6 @@ func CheckAutoApprovalRest(ctx *gin.Context, jsonPayload string) (interface{}, e
 	defer db.CloseGORM(gormx)
 
 	user := ""
-	if ctx != nil {
-		user = strings.TrimSpace(ctx.GetString("user_code"))
-	}
 
 	return CheckAutoApproval(gormx, req, user)
 }

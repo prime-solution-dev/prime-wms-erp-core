@@ -161,13 +161,13 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//payment
 	payment := ctx.Group("/payment")
 	payment.POST("/GetPayment", func(c *gin.Context) {
-		utils.ProcessRequest(c, paymentService.GetPayment)
+		utils.ProcessContextRequest(c, paymentService.GetPayment)
 	})
 	payment.POST("/CreatePayment", func(c *gin.Context) {
-		utils.ProcessRequest(c, paymentService.CreatePayment)
+		utils.ProcessContextRequest(c, paymentService.CreatePayment)
 	})
 	payment.POST("/DeletePayment", func(c *gin.Context) {
-		utils.ProcessRequest(c, paymentService.DeletePayment)
+		utils.ProcessContextRequest(c, paymentService.DeletePayment)
 	})
 
 	//sale
@@ -238,10 +238,10 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//deposit
 	deposit := ctx.Group("/deposit")
 	deposit.POST("/GetDeposit", func(c *gin.Context) {
-		utils.ProcessRequest(c, depositService.GetDeposit)
+		utils.ProcessContextRequest(c, depositService.GetDeposit)
 	})
 	deposit.POST("/CreateDepost", func(c *gin.Context) {
-		utils.ProcessRequest(c, depositService.CreateDepost)
+		utils.ProcessContextRequest(c, depositService.CreateDepost)
 	})
 
 	//approval
@@ -259,7 +259,7 @@ func RegisterRoutes(ctx *gin.Engine) {
 		utils.ProcessContextRequest(c, approvalService.UpdateApproval)
 	})
 	approval.POST("/CheckAutoApprovalRest", func(c *gin.Context) {
-		utils.ProcessRequest(c, approvalService.CheckAutoApprovalRest)
+		utils.ProcessContextRequest(c, approvalService.CheckAutoApprovalRest)
 	})
 
 	//credit
