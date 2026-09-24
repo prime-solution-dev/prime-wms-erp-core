@@ -49,8 +49,12 @@ func writeError(c *gin.Context, err error) {
 		return
 	}
 
-	// price-service ยังคืน *BindingError จาก 3 endpoint ที่เดิมใช้ ProcessRequestWithBinding
-	// (ตอนนี้ validate เองด้วย validator.New().SetTagName("binding") แทน ctx.ShouldBindJSON)
+	// price-service ยังคืน *BindingError จาก 4 endpoint: 3 ตัวที่เดิมใช้ ProcessRequestWithBinding
+	// (UpdatePriceListSubGroup, UpdateLatestPriceListSubGroup, GetCalculatedPriceListSubGroup —
+	// ตอนนี้ validate เองด้วย validator.New().SetTagName("binding") แทน ctx.ShouldBindJSON) และ
+	// UpdateExtras (/price/UpdatePriceListExtra ซึ่งเป็น ProcessRequest ธรรมดา) ที่คืน
+	// *utils.BindingError ตรงๆ จาก validateExtras โดยไม่เคยผ่าน ShouldBindJSON มาก่อนเลย
+	// ตัดสาขานี้ทิ้งเมื่อไหร่ทั้ง 4 endpoint จะกลายเป็น 500 ทันที
 	// รูป response ต้องเหมือนเดิมทุก byte ไม่งั้นหน้าเว็บที่อ่าน body["details"] จะพัง
 	var bindingErr *BindingError
 	if errors.As(err, &bindingErr) {

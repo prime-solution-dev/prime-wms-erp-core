@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/requestcontext"
 	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
@@ -34,7 +35,9 @@ const (
 //   - company_code    (default 09dcb573-...)
 //   - site_code       (default TMI_WH)
 //   - sheet           (default "Pricelist"; falls back to first sheet if absent)
-//   - create_by       (default "system")
+//   - create_by       (default: the caller from context, requestcontext.GetUserOrDefault —
+//     "system" was a hardcoded fallback before this task; every create_by/update_by now comes
+//     from the context, the form field just stays the primary source since callers already send it)
 //   - include_formulas ("true"/"1"/"yes" to also write formulas_map; default off)
 func UploadPricelistTemplateMultipart(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
@@ -58,7 +61,7 @@ func UploadPricelistTemplateMultipart(ctx context.Context, input utils.Multipart
 		CompanyCode:     firstNonEmpty(formValue(input.Form, "company_code"), defaultTemplateCompanyCode),
 		SiteCode:        firstNonEmpty(formValue(input.Form, "site_code"), defaultTemplateSiteCode),
 		Sheet:           strings.TrimSpace(formValue(input.Form, "sheet")),
-		CreateBy:        firstNonEmpty(formValue(input.Form, "create_by"), "system"),
+		CreateBy:        resolveTemplateCreateBy(ctx, input.Form),
 		IncludeFormulas: parseBoolLoose(formValue(input.Form, "include_formulas")),
 	}
 
@@ -88,6 +91,17 @@ func UploadPricelistTemplateMultipart(ctx context.Context, input utils.Multipart
 		return &CreatePricelistResponse{ResponseCode: 1, Message: txErr.Error()}, nil
 	}
 	return &CreatePricelistResponse{ResponseCode: 0, Message: "success"}, nil
+}
+
+// resolveTemplateCreateBy picks create_by for every row this upload writes.
+//
+// The form field stays the primary source (callers already send it, and the request
+// shape is frozen) — but the FALLBACK must be the caller from context, not a hardcoded
+// "system" literal, same as every other create_by/update_by touched by this task.
+// requestcontext.GetUserOrDefault returns the empty string when nobody is known, not a
+// fabricated name.
+func resolveTemplateCreateBy(ctx context.Context, form map[string][]string) string {
+	return firstNonEmpty(formValue(form, "create_by"), requestcontext.GetUserOrDefault(ctx))
 }
 
 // deleteExistingSubgroupsByGroupKey removes price_list_sub_group rows (and their

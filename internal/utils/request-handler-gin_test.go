@@ -179,8 +179,9 @@ func TestAppErrorResponseKeepsErrorKey(t *testing.T) {
 	}
 }
 
-// price-service ยังคืน *BindingError จาก 3 endpoint ที่เดิมใช้ ProcessRequestWithBinding
-// (ตอนนี้ validate เองแทน ctx.ShouldBindJSON) รูป response ต้องเหมือนเดิมทุก byte:
+// price-service ยังคืน *BindingError จาก 4 endpoint: 3 ตัวที่เดิมใช้ ProcessRequestWithBinding
+// (ตอนนี้ validate เองแทน ctx.ShouldBindJSON) และ UpdateExtras ซึ่งคืน *utils.BindingError ตรงๆ
+// จาก validateExtras โดยไม่เคยผ่าน ShouldBindJSON เลย รูป response ต้องเหมือนเดิมทุก byte:
 // {"error":"Validation failed","details":...} สถานะ 400 — หน้าเว็บเดิมอ่าน body["details"]
 func TestBindingErrorResponseKeepsValidationFailedShape(t *testing.T) {
 	router := newTestRouter()
