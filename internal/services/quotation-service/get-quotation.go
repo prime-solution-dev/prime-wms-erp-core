@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	externalService "prime-erp-core/external/customer-service"
 	"prime-erp-core/internal/db"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -265,7 +263,7 @@ func getCustomerCodesByName(ctx context.Context, customerNameLike string) ([]str
 	return customerCodes, nil
 }
 
-func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetQuotationResponse
 	var req GetQuotationRequest
@@ -277,15 +275,13 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	defer db.CloseGORM(gormx)
 
 	// ถ้ามี CustomerNameLike ให้ไปค้นหา customerCode จาก customer service ก่อน
-	customerCodesFromName, err := getCustomerCodesByName(ctx.Request.Context(), req.CustomerNameLike)
+	customerCodesFromName, err := getCustomerCodesByName(ctx, req.CustomerNameLike)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return nil, err
 	}
 
@@ -466,8 +462,7 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve data: %v", err)
 	}
 
 	// เติมวันที่อนุมัติ (ดึงจากตาราง approval เพราะ quotation ไม่มีคอลัมน์นี้) เป็น batch เดียว

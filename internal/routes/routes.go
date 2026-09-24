@@ -99,29 +99,29 @@ func RegisterRoutes(ctx *gin.Engine) {
 	quotation := ctx.Group("/quotation")
 
 	quotation.POST("/GetQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.GetQuotation)
+		utils.ProcessContextRequest(c, quotationService.GetQuotation)
 	})
 	quotation.POST("/CreateQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.CreateQuotation)
+		utils.ProcessContextRequest(c, quotationService.CreateQuotation)
 	})
 	quotation.POST("/UpdateQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.UpdateQuotation)
+		utils.ProcessContextRequest(c, quotationService.UpdateQuotation)
 	})
 	quotation.POST("/EditQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.EditQuotation)
+		utils.ProcessContextRequest(c, quotationService.EditQuotation)
 	})
 	quotation.POST("/CancelQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.CancelQuotation)
+		utils.ProcessContextRequest(c, quotationService.CancelQuotation)
 	})
 	quotation.POST("/ReviseQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.ReviseQuotation)
+		utils.ProcessContextRequest(c, quotationService.ReviseQuotation)
 	})
 
 	quotation.POST("/RequestApproveQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.RequestApproveQuotation)
+		utils.ProcessContextRequest(c, quotationService.RequestApproveQuotation)
 	})
 	quotation.POST("/UpdateStatusApproveQuotation", func(c *gin.Context) {
-		utils.ProcessRequest(c, quotationService.UpdateStatusApproveQuotation)
+		utils.ProcessContextRequest(c, quotationService.UpdateStatusApproveQuotation)
 	})
 	//invoice
 	invoice := ctx.Group("/invoice")
