@@ -73,11 +73,6 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return CreateInvoiceDN(ctx, jsonPayload)
 	}
 
-	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-
 	requestData := map[string]interface{}{
 		"module":    []string{"INVOICE"},
 		"topic":     []string{"DN"},
@@ -132,6 +127,11 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
 	}
 
 	return createInvoiceReturn, nil
