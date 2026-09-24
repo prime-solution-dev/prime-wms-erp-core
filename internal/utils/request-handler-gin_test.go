@@ -110,6 +110,37 @@ func TestProcessContextRequestBridgesLegacyGinUser(t *testing.T) {
 	}
 }
 
+// payload ต้องถึง service ตรงๆ ไม่ถูกแก้ระหว่างทาง (assertion นี้เดิมอยู่ใน
+// ProcessRequest ที่ถูกลบไปแล้ว ย้ายมา pin ไว้ที่ ProcessContextRequest แทน)
+func TestProcessContextRequestPassesPayloadUnchanged(t *testing.T) {
+	gotPayload := ""
+
+	router := newTestRouter()
+	router.POST("/x", func(c *gin.Context) {
+		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+			gotPayload = payload
+
+			return gin.H{"echo": payload}, nil
+		})
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{"a":1}`)))
+
+	if gotPayload != `{"a":1}` {
+		t.Fatalf("payload ที่ service เห็น = %q, ต้องการ %q", gotPayload, `{"a":1}`)
+	}
+
+	body := map[string]string{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("อ่าน body ไม่ได้: %v", err)
+	}
+
+	if body["echo"] != `{"a":1}` {
+		t.Fatalf("response ต้องมี payload เดิมส่งกลับมาด้วย: %s", rec.Body.String())
+	}
+}
+
 // error ที่เป็น apperr ต้องได้ status ตามที่กำหนด ไม่ใช่ 500 ทั้งหมด
 func TestProcessContextRequestMapsAppErrorStatus(t *testing.T) {
 	router := newTestRouter()
