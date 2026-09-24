@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	externalService "prime-erp-core/external/customer-service"
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
@@ -14,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -322,7 +320,7 @@ func GetOrderDeliveryForDelivery(ctx context.Context, allDeliveries []GetDeliver
 	return getOrderResponse, nil
 }
 
-func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetDeliveryResponse
 	var req GetDeliveryRequest
@@ -335,15 +333,13 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
 	// ถ้ามี CustomerNameLike ให้ไปค้นหา customerCode จาก customer service ก่อน
-	customerCodesFromName, err := getCustomerCodesByName(ctx.Request.Context(), req.CustomerNameLike)
+	customerCodesFromName, err := getCustomerCodesByName(ctx, req.CustomerNameLike)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return nil, err
 	}
 
@@ -496,13 +492,12 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		var allRows []GetDeliveryResponse
 		if err := query.Find(&allRows).Error; err != nil {
 			fmt.Println(err)
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 			return nil, err
 		}
 
 		// GetOrderDelivery สำหรับทั้งชุดที่ตีกรอบไว้ (ไม่ใช่แค่หน้าเดียว) เพราะต้องคำนวณ
 		// pick_pack_status ให้ครบก่อนถึงจะกรอง+แบ่งหน้าในหน่วยความจำได้
-		orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx.Request.Context(), allRows)
+		orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx, allRows)
 		if err != nil {
 			fmt.Println("Error in GetOrderDelivery:", err)
 			// ต่างจาก path ไม่กรอง (ด้านล่าง) ที่ปล่อยผ่านได้เพราะข้อมูล order เป็นแค่ของตกแต่งหน้าจอ
@@ -511,7 +506,6 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			// 4/6) ทำให้คนกรองหา pending-pick/pending-pack เห็นรายการว่างหรือขาดหายไปแบบเงียบๆ พร้อม
 			// 200 OK ทั้งที่ order-service กำลังล่มอยู่ ต้องคืน error ให้ request ทั้งก้อนล้มแทนที่จะตอบ
 			// ข้อมูลที่คำนวณมาจากข้อมูล order ที่หายไป
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve order data for pick/pack filter: " + err.Error()})
 			return nil, err
 		}
 
@@ -682,12 +676,11 @@ func GetDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 		return nil, err
 	}
 
 	// GetOrderDelivery
-	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx.Request.Context(), res)
+	orderDeliveryResponse, err := GetOrderDeliveryForDelivery(ctx, res)
 	if err != nil {
 		fmt.Println("Error in GetOrderDelivery:", err)
 		// path นี้ (ไม่มี pick_pack_filter) ไม่ทำให้ request ทั้งก้อนล้มเมื่อ order-service เรียกไม่สำเร็จ

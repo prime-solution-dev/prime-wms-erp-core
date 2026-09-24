@@ -212,22 +212,22 @@ func RegisterRoutes(ctx *gin.Engine) {
 	//delivery
 	delivery := ctx.Group("/delivery")
 	delivery.POST("/CreateDelivery", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.CreateDelivery)
+		utils.ProcessContextRequest(c, deliveryService.CreateDelivery)
 	})
 	delivery.POST("/GetDelivery", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.GetDelivery)
+		utils.ProcessContextRequest(c, deliveryService.GetDelivery)
 	})
 	delivery.POST("/UpdateDelivery", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.UpdateDelivery)
+		utils.ProcessContextRequest(c, deliveryService.UpdateDelivery)
 	})
 	delivery.POST("/UpdateStatusDelivery", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, deliveryService.UpdateStatusDelivery)
 	})
 	delivery.POST("/GetDeliveryCO", func(c *gin.Context) {
-		utils.ProcessRequest(c, deliveryService.GetDeliveryCO)
+		utils.ProcessContextRequest(c, deliveryService.GetDeliveryCO)
 	})
 	/* 	delivery.POST("/GetDeliverySO", func(c *gin.Context) {
-	   		utils.ProcessRequest(c, deliveryService.GetDeliverySO)
+	   		utils.ProcessContextRequest(c, deliveryService.GetDeliverySO)
 	   	})
 	*/
 	//time

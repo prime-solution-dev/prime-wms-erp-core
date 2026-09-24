@@ -11,8 +11,8 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +54,7 @@ type UpdateDeliveryResponse struct {
 	OrderCode    string `json:"order_code,omitempty"`
 }
 
-func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateDeliveryRequest{}
 	res := []UpdateDeliveryResponse{}
 
@@ -68,10 +68,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -211,7 +208,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(ctx.Request.Context(), gormx, bookingLines, editingDeliveryCodes); err != nil {
+	if err := ValidateBookingQty(ctx, gormx, bookingLines, editingDeliveryCodes); err != nil {
 		return nil, err
 	}
 
@@ -280,7 +277,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
 	if len(newOrderDeliveries) > 0 {
-		orderRes, err := CreateOrderForUpdate(ctx.Request.Context(), newOrderDeliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(ctx, newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
@@ -291,7 +288,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, deliveryReq := range updateOrderDeliveries {
-		if err := UpdateOrderByDeliveryForUpdate(ctx.Request.Context(), deliveryReq, updateDeliveries); err != nil {
+		if err := UpdateOrderByDeliveryForUpdate(ctx, deliveryReq, updateDeliveries); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}

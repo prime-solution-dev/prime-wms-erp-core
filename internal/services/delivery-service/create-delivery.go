@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
@@ -59,7 +59,7 @@ type CreateDeliveryItemsRequest struct {
 	Remark          string  `json:"remark"`
 }
 
-func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req []CreateDeliveryRequest
 
 	// Bind JSON payload
@@ -71,7 +71,6 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// defer ต้องอยู่หลังเช็ค err ไม่งั้นต่อ DB ไม่ได้แล้ว gormx = nil และ CloseGORM จะ panic
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
@@ -93,7 +92,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(ctx.Request.Context(), gormx, bookingLines, nil); err != nil {
+	if err := ValidateBookingQty(ctx, gormx, bookingLines, nil); err != nil {
 		return nil, err
 	}
 
@@ -158,10 +157,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -271,7 +267,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var orderRes orderExternalService.CreateOrderResponse
 	// Only call external service if there are non-draft deliveries
 	if hasNonDraftDelivery {
-		orderRes, err = CreateOrder(ctx.Request.Context(), req, deliveryToAdd, deliveryItemToAdd)
+		orderRes, err = CreateOrder(ctx, req, deliveryToAdd, deliveryItemToAdd)
 		if err != nil {
 			return nil, err
 		}

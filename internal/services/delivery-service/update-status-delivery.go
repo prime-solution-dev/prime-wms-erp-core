@@ -237,9 +237,9 @@ func closeSalesOfDeliveries(ctx context.Context, gormx *gorm.DB, deliveryOf map[
 	}
 
 	// เส้นนี้ทำงานหลัง commit และห้ามล้มตาม caller
-	// WithoutCancel เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ hook ฝั่ง
+	// postCommitContext เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ hook ฝั่ง
 	// wms-order-service หมดเวลาแล้วตัดสาย ctx จะถูกยกเลิกและการปิด SO จะไม่เกิดขึ้นเลย
-	ctx = context.WithoutCancel(ctx)
+	ctx = postCommitContext(ctx)
 
 	saleCodes := []string{}
 	for _, deliveryCode := range deliveryCodes {
@@ -249,6 +249,13 @@ func closeSalesOfDeliveries(ctx context.Context, gormx *gorm.DB, deliveryOf map[
 	if err := CloseSalesFullyDelivered(ctx, gormx, saleCodes, user); err != nil {
 		fmt.Printf("UpdateStatusDelivery: cannot close sales of %v: %v\n", deliveryCodes, err)
 	}
+}
+
+// postCommitContext คืน context สำหรับงานที่ทำหลัง commit
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย
+// งานที่เหลือจะไม่เกิดขึ้นเลยและเงียบด้วย
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 func CancelOrder(ctx context.Context, delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
