@@ -17,20 +17,20 @@ func TestProductKey_SortsBySeqAndDropsInactive(t *testing.T) {
 		},
 	}
 	got := productKey(p)
-	want := "PG01|PG02#PG01_3|PG02_19"
+	want := "PG01|PG02\x00PG01_3|PG02_19"
 	if got != want {
 		t.Fatalf("productKey = %q, want %q", got, want)
 	}
 }
 
-func TestSubGroupKey_SortsBySeqAndSkipsEmptyCode(t *testing.T) {
+func TestSubGroupKey_SortsBySeqAndKeepsAllKeys(t *testing.T) {
 	sg := SubGroup{GroupKeys: []GroupKey{
 		{Code: "PG02", Value: "PG02_19", Seq: 2},
 		{Code: "", Value: "junk", Seq: 0},
 		{Code: "PG01", Value: "PG01_3", Seq: 1},
 	}}
 	got := subGroupKey(sg)
-	want := "PG01|PG02#PG01_3|PG02_19"
+	want := "|PG01|PG02\x00junk|PG01_3|PG02_19"
 	if got != want {
 		t.Fatalf("subGroupKey = %q, want %q", got, want)
 	}
@@ -39,6 +39,35 @@ func TestSubGroupKey_SortsBySeqAndSkipsEmptyCode(t *testing.T) {
 func TestProductKey_EmptyWhenNoActiveGroups(t *testing.T) {
 	if got := productKey(externalProductService.GetProductsComponent{}); got != "" {
 		t.Fatalf("want empty key, got %q", got)
+	}
+}
+
+func TestProductKeyMatchesSubGroupKey(t *testing.T) {
+	p := externalProductService.GetProductsComponent{
+		ProductGroup: []models.ProductGroup{
+			{GroupCode: "PG02", GroupValue: "PG02_19", Seq: 2, ActiveFlg: true},
+			{GroupCode: "PG01", GroupValue: "PG01_3", Seq: 1, ActiveFlg: true},
+		},
+	}
+	sg := SubGroup{GroupKeys: []GroupKey{
+		{Code: "PG01", Value: "PG01_3", Seq: 1},
+		{Code: "PG02", Value: "PG02_19", Seq: 2},
+	}}
+	if productKey(p) != subGroupKey(sg) {
+		t.Fatalf("productKey(%q) != subGroupKey(%q)", productKey(p), subGroupKey(sg))
+	}
+
+	p.ProductGroup[0].GroupValue = "PG02_20"
+	if productKey(p) == subGroupKey(sg) {
+		t.Fatalf("productKey(%q) should not equal subGroupKey(%q)", productKey(p), subGroupKey(sg))
+	}
+}
+
+func TestJoinKey_NoSeparatorCollision(t *testing.T) {
+	a := joinKey([]keyPart{{code: "A", value: "B#C", seq: 1}})
+	b := joinKey([]keyPart{{code: "A#B", value: "C", seq: 1}})
+	if a == b {
+		t.Fatalf("joinKey collision: %q == %q", a, b)
 	}
 }
 

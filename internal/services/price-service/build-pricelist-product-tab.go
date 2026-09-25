@@ -19,10 +19,13 @@ type keyPart struct {
 
 // joinKey สร้าง key ตามกติกาเดียวกับ warehouse-core GetInventoryWeightByKey:
 // เรียงตาม seq แล้วต่อ code ด้วย "|" และ value ด้วย "|" — ต้องตรงกันทุกตัว (ไม่มี wildcard)
+// ใช้ "\x00" คั่นระหว่างส่วน codes กับส่วน values เพราะเป็นไบต์ที่ไม่มีทางปรากฏใน code/value
+// จริง ๆ จึงไม่ชนกัน (ต่างจาก "#" ที่ codes=[A] values=[B#C] จะชนกับ codes=[A#B] values=[C])
 func joinKey(parts []keyPart) string {
 	if len(parts) == 0 {
 		return ""
 	}
+	// ถือว่า seq ไม่ซ้ำภายใน key ชุดเดียวกัน (warehouse-core ใช้ sort.Slice ซึ่งไม่ stable จึงเลียนแบบกรณี seq ซ้ำไม่ได้)
 	sort.SliceStable(parts, func(i, j int) bool { return parts[i].seq < parts[j].seq })
 	codes := make([]string, len(parts))
 	values := make([]string, len(parts))
@@ -30,7 +33,7 @@ func joinKey(parts []keyPart) string {
 		codes[i] = p.code
 		values[i] = p.value
 	}
-	return strings.Join(codes, "|") + "#" + strings.Join(values, "|")
+	return strings.Join(codes, "|") + "\x00" + strings.Join(values, "|")
 }
 
 // productKey ใช้เฉพาะ product_group ที่ active เหมือนฝั่ง warehouse-core
@@ -45,12 +48,10 @@ func productKey(p externalProductService.GetProductsComponent) string {
 	return joinKey(parts)
 }
 
+// subGroupKey ต้องไม่กรอง key ใด ๆ ออก เพื่อให้ตรงกับ buildKeyValueGroups ของ warehouse-core
 func subGroupKey(sg SubGroup) string {
 	parts := make([]keyPart, 0, len(sg.GroupKeys))
 	for _, k := range sg.GroupKeys {
-		if k.Code == "" {
-			continue
-		}
 		parts = append(parts, keyPart{code: k.Code, value: k.Value, seq: k.Seq})
 	}
 	return joinKey(parts)
