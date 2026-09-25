@@ -4,7 +4,6 @@ package priceService
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -112,32 +111,6 @@ func TestIntegration_PricelistProductTab_FromDB(t *testing.T) {
 	}
 }
 
-// ensureGroupServiceSchema creates the "group" / "group_item" / "payment_term" tables that
-// getGroupAndItemMappings (called from GetPriceExportTable) reads. Despite living under
-// external/warehouse-service naming conventions elsewhere, group-service and payment-term
-// resolution in THIS repo are plain GORM/sqlx queries against prime_erp, not HTTP calls —
-// so the fixture here is schema, not an httptest server.
-func ensureGroupServiceSchema(t *testing.T, gormx *gorm.DB) {
-	t.Helper()
-	stmts := []string{
-		`CREATE TABLE IF NOT EXISTS "group" (
-			id uuid PRIMARY KEY, group_code text, group_name text, value text, value_int double precision,
-			seq integer, create_dtm timestamp, update_by text, update_dtm timestamp, create_by text
-		);`,
-		`CREATE TABLE IF NOT EXISTS group_item (
-			id uuid PRIMARY KEY, item_code text, group_id uuid REFERENCES "group"(id), item_name text, value text,
-			parent_group_code text NULL, parent_group_item_code text NULL, value_int double precision,
-			create_dtm timestamp, update_by text, update_dtm timestamp, create_by text
-		);`,
-		`CREATE TABLE IF NOT EXISTS payment_term (term_code text, term_type text, term_name text);`,
-	}
-	for _, s := range stmts {
-		if err := gormx.Exec(s).Error; err != nil {
-			t.Fatalf("%s: %v", s, err)
-		}
-	}
-}
-
 // TestIntegration_GetPriceExportTable_PricelistProduct drives the Product Pricelist Report
 // end to end through the public entrypoint (GetPriceExportTable), not just buildPricelistProductTab:
 // DB (price list group/subgroup/keys, group/group_item/payment_term) + stubbed product master +
@@ -146,7 +119,11 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 	gormx := openTestDB(t)
 	truncateAll(t, gormx)
 	t.Cleanup(func() { truncateAll(t, gormx) })
-	ensureGroupServiceSchema(t, gormx)
+	// ensureGroupPaymentTablesForTest มาจาก weight_spec_integration_test.go — สร้างตาราง
+	// group/group_item/payment_term ที่ getGroupAndItemMappings ต้องใช้ (query DB ตรง ๆ ไม่ใช่ HTTP)
+	// และเรียก ensureSqlxEnvForTest ให้ด้วย ซึ่งเป็นสาเหตุที่เทสนี้ล้มเมื่อรันเดี่ยว: GetPriceExportTable
+	// เรียก db.ConnectSqlx ซึ่งอ่านคนละ env var จาก GORM ที่ TestMain ตั้งไว้ ต้อง map เองก่อนใช้
+	ensureGroupPaymentTablesForTest(t)
 
 	seedProductPricelistGroup(t, gormx, "GRP_IT", "SG_IT")
 
@@ -168,7 +145,7 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 		{ProductCode: "AA", ProductName: "SS", ProductGroup: []models.ProductGroup{
 			{GroupCode: "PG01", GroupValue: "PG01_3", Seq: 1, ActiveFlg: true},
 			{GroupCode: "PG02", GroupValue: "PG02_19", Seq: 2, ActiveFlg: true},
-		}},
+		}, Units: unitsWithBaseWeight(10)},
 		{ProductCode: "ZZ", ProductName: "No match", ProductGroup: []models.ProductGroup{
 			{GroupCode: "PG01", GroupValue: "PG01_5", Seq: 1, ActiveFlg: true},
 		}},
@@ -178,7 +155,12 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 	}
 
 	t.Run("All", func(t *testing.T) {
-		getProducts = stubProducts
+		getProducts = func(req externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+			if req.CompanyCode[0] != "CPP" || req.SiteCode[0] != "S1" {
+				t.Fatalf("unexpected product request: %+v", req)
+			}
+			return externalProductService.GetProductsResponse{Products: products}, nil
+		}
 		payload := `{"company_code":"CPP","site_codes":["S1"],"report_type":"PRICELIST_PRODUCT"}`
 
 		res, err := GetPriceExportTable(nil, payload)
@@ -193,12 +175,15 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 		if tab.Name != "Template" || tab.Headers.Report != "Pricelist Detail By Product" {
 			t.Fatalf("unexpected tab shape: %+v", tab.Headers)
 		}
-		codes := map[string]bool{}
-		for _, row := range tab.Rows {
-			codes[fmt.Sprintf("%v", row["product_code"])] = true
+		if len(tab.Rows) != 2 {
+			t.Fatalf("rows = %d, want 2 (AA matched + ZZ unmatched): %+v", len(tab.Rows), tab.Rows)
 		}
-		if !codes["AA"] || !codes["ZZ"] {
-			t.Fatalf("want AA (matched) and ZZ (unmatched) rows, got %+v", tab.Rows)
+		aa := tab.Rows[0]
+		if aa["product_code"] != "AA" || aa["total_weight"] != float64(10) || aa["pricelist_group_code"] != "GRP_IT" {
+			t.Fatalf("AA row wrong: %+v", aa)
+		}
+		if tab.Rows[1]["product_code"] != "ZZ" {
+			t.Fatalf("want ZZ unmatched row second, got %+v", tab.Rows[1])
 		}
 	})
 
