@@ -34,6 +34,10 @@ type GetPriceListGroupRequest struct {
 // คืน tab "Template" ตัวเดียวตามรูปแบบ Pricelist Detail Report
 const ReportTypePricelistDetail = "PRICELIST_DETAIL"
 
+// ReportTypePricelistProduct คือค่า report_type ของ Product Pricelist Report
+// — แถวต่อ product แทนแถวต่อ subgroup
+const ReportTypePricelistProduct = "PRICELIST_PRODUCT"
+
 type GetPriceListGroupResponse struct {
 	PriceListGroup
 }

@@ -353,7 +353,7 @@ func GetCreditRequestPreload(
 
 	if createDateStart != nil && createDateEnd != nil {
 		query = query.Where(
-			"create_date BETWEEN ? AND ?",
+			"create_dtm BETWEEN ? AND ?",
 			createDateStart,
 			createDateEnd,
 		)
