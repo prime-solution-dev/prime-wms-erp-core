@@ -60,36 +60,31 @@ func subGroupKey(sg SubGroup) string {
 // getProducts เป็น var เพื่อให้ test แทนที่ได้โดยไม่ต้องยิง HTTP จริง
 var getProducts = externalProductService.GetProduct
 
-const productPageSize = 1000
-
-// fetchAllProducts ดึง product master ที่ active ทั้งหมดทีละหน้า
-// ponytail: ดึงทุกหน้าผ่าน HTTP, ถ้า catalog ใหญ่จนช้าค่อยเพิ่ม bulk endpoint ใน product-core
+// fetchAllProducts ดึง product master ที่ active ทั้งหมดในคำขอเดียว
+// product-core เรียง paging ตาม update_dtm อย่างเดียว (ไม่มี tie-breaker คงที่) การแบ่งหน้า
+// จึงข้ามแถวได้เงียบ ๆ เมื่อมีหลาย record update_dtm ชนกันคาบเกี่ยวรอยต่อหน้า — ส่ง Page/PageSize
+// เป็นค่าว่าง (0) ให้ normalizePaging คืนทุกแถวในคำขอเดียว เหมือนที่ warehouse-core ทำ
 func fetchAllProducts(companyCode string, siteCodes []string) ([]externalProductService.GetProductsComponent, error) {
-	seen := map[string]bool{}
-	out := []externalProductService.GetProductsComponent{}
-	for page := 1; ; page++ {
-		res, err := getProducts(externalProductService.GetProductRequest{
-			CompanyCode: []string{companyCode},
-			SiteCode:    siteCodes,
-			ActiveFlg:   []bool{true},
-			Page:        page,
-			PageSize:    productPageSize,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("get products page %d: %w", page, err)
-		}
-		for _, p := range res.Products {
-			// product ตัวเดียวกันอาจกลับมาหลายครั้งตามจำนวน site
-			if seen[p.ProductCode] {
-				continue
-			}
-			seen[p.ProductCode] = true
-			out = append(out, p)
-		}
-		if len(res.Products) == 0 || page >= res.TotalPages {
-			return out, nil
-		}
+	res, err := getProducts(externalProductService.GetProductRequest{
+		CompanyCode: []string{companyCode},
+		SiteCode:    siteCodes,
+		ActiveFlg:   []bool{true},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get products: %w", err)
 	}
+
+	seen := map[string]bool{}
+	out := make([]externalProductService.GetProductsComponent, 0, len(res.Products))
+	for _, p := range res.Products {
+		// product ตัวเดียวกันอาจกลับมาหลายครั้งตามจำนวน site
+		if seen[p.ProductCode] {
+			continue
+		}
+		seen[p.ProductCode] = true
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 type matchedSubGroup struct {
