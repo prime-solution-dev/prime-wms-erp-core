@@ -435,9 +435,11 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 			if hasProduct {
 				for r := range req {
-					for it := range req[r].InvoiceItem {
-						req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
-						req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+					if req[r].DocumentRefType == "FABRICATION" {
+						for it := range req[r].InvoiceItem {
+							req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+							req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+						}
 					}
 				}
 			}

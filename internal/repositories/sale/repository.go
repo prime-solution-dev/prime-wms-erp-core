@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 // getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
@@ -78,8 +79,17 @@ func buildStatusFilterConditions(statusFilters []string) string {
 	return ""
 }
 
+// sale_person_code มาจาก user ที่พิมพ์ชื่อหาใน modal เลือก SO ของ Delivery Slot
+// ต้องใช้ placeholder ไม่ต่อ string แบบ filter ตัวอื่นในไฟล์นี้
+func applySalePersonFilter(q *gorm.DB, salePersonCode []string) *gorm.DB {
+	if len(salePersonCode) == 0 {
+		return q
+	}
+	return q.Where("sale.sale_person_code IN ?", salePersonCode)
+}
+
 // Create
-func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, salePersonCode []string, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -250,12 +260,12 @@ func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, sal
 	statusFilterCondition := buildStatusFilterConditions(statusFilter)
 
 	var saleID []uuid.UUID
-	gormx.Table("sale").Select("sale.id").
+	idQuery := gormx.Table("sale").Select("sale.id").
 		Joins("inner join sale_item on sale.id = sale_item.sale_id").
 		Joins("left join sale_deposit on sale.id = sale_deposit.sale_id").
 		Joins("left join delivery_booking_item on sale_item.sale_item = delivery_booking_item.document_ref_item").
-		Where("1=1 " + searchCompanyCode + searchSiteCode + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "").
-		Group("sale.id").Scan(&saleID)
+		Where("1=1 " + searchCompanyCode + searchSiteCode + searchID + "" + searchSaleCode + "" + searchCustomerCode + "" + searchProductCode + "" + searchIsStatus + "" + searchStatusApprove + "" + searchStatusPayment + "" + searchIsApproved + "" + searchSaleCodeLike + "" + searchCustomerCodeLike + "" + searchDocumentRefLike + "" + searchProductCodeLike + "" + searchCustomerByName + "" + searchCompletedDate + "" + searchCreateDate + "" + searchExpirePriceDate + "" + searchDeliveryDate + "" + statusFilterCondition + "")
+	applySalePersonFilter(idQuery, salePersonCode).Group("sale.id").Scan(&saleID)
 
 	if len(saleID) > 0 {
 
