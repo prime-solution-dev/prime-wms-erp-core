@@ -183,10 +183,10 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 		}
 	}
 
-	// สูตรราคาและชุดคอลัมน์คงที่ใช้เฉพาะ Pricelist Detail Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
+	// สูตรราคาและชุดคอลัมน์คงที่ใช้เฉพาะ Pricelist Detail Report และ Product Pricelist Report — ไม่ยิงคิวรีเพิ่มให้ report เดิม
 	var formulas map[string][]priceListRepository.SubgroupFormula
 	var fixedColumns []priceListRepository.SubGroupKeyColumn
-	if req.ReportType == ReportTypePricelistDetail {
+	if req.ReportType == ReportTypePricelistDetail || req.ReportType == ReportTypePricelistProduct {
 		// ดึงชุดคอลัมน์จากทั้ง price list โดยไม่ใส่ groupCodes เพื่อให้ไฟล์ที่กรองแล้ว
 		// มีคอลัมน์เท่ากับไฟล์เต็มเสมอ
 		fixedColumns, err = priceListRepository.GetSubGroupKeyColumns(req.CompanyCode, req.SiteCodes)
@@ -210,6 +210,18 @@ func GetPriceExportTable(ctx *gin.Context, jsonPayload string) (interface{}, err
 			fmt.Printf("Warning: failed to get subgroup formulas: %v\n", err)
 			formulas = nil
 		}
+	}
+
+	// Product Pricelist Report ต้องใช้ product master เป็นแกน — ดึงไม่ได้ให้ error ไม่ส่งไฟล์ครึ่ง ๆ
+	if req.ReportType == ReportTypePricelistProduct {
+		products, err := fetchAllProducts(req.CompanyCode, req.SiteCodes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get products: %w", err)
+		}
+		return GetPriceExportTableResponse{Tabs: []ExportTab{
+			buildPricelistProductTab(res, products, groupNameByCode, itemNameByCode,
+				fixedColumns, formulas, lastUpdated, len(req.GroupCodes) > 0),
+		}}, nil
 	}
 
 	response := GetPriceExportTableResponse{
