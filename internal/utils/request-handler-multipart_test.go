@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"prime-erp-core/internal/requestcontext"
+	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,7 +26,7 @@ func TestProcessContextRequestMultipartPassesFileAndUser(t *testing.T) {
 		c.Next()
 	})
 	router.POST("/upload", func(c *gin.Context) {
-		ProcessContextRequestMultipart(c, func(ctx context.Context, input MultipartInput) (interface{}, error) {
+		utils.ProcessContextRequestMultipart(c, func(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 			gotUser = requestcontext.GetUserOrDefault(ctx)
 			if files := input.Files["file"]; len(files) > 0 {
 				gotFileName = files[0].Filename

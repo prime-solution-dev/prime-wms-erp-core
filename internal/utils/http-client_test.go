@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"prime-erp-core/internal/requestcontext"
+	"prime-erp-core/internal/utils"
 )
 
 // ปลายทางรู้ว่าใครเรียกได้จาก header เท่านั้น เทสนี้จึงยิงของจริงไปหา httptest server
@@ -23,7 +24,7 @@ func TestNewRequestForwardsTokenFromContext(t *testing.T) {
 
 	ctx := requestcontext.WithToken(context.Background(), "Bearer jwt-ของสมชาย")
 
-	req, err := NewRequest(ctx, http.MethodPost, server.URL, strings.NewReader(`{}`))
+	req, err := utils.NewRequest(ctx, http.MethodPost, server.URL, strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -43,7 +44,7 @@ func TestNewRequestForwardsTokenFromContext(t *testing.T) {
 func TestNewRequestWithoutTokenSendsNoAuthHeader(t *testing.T) {
 	t.Setenv("SERVICE_TOKEN", "")
 
-	req, err := NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
+	req, err := utils.NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -62,7 +63,7 @@ func TestNewRequestWithoutTokenSendsNoAuthHeader(t *testing.T) {
 func TestNewRequestIgnoresServiceTokenEnv(t *testing.T) {
 	t.Setenv("SERVICE_TOKEN", "service-token-abc")
 
-	req, err := NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
+	req, err := utils.NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -76,7 +77,7 @@ func TestNewRequestIgnoresServiceTokenEnv(t *testing.T) {
 func TestNewRequestUsesTokenFromContextAsIs(t *testing.T) {
 	ctx := requestcontext.WithToken(context.Background(), "Bearer user-token")
 
-	req, err := NewRequest(ctx, http.MethodPost, "http://example.local", nil)
+	req, err := utils.NewRequest(ctx, http.MethodPost, "http://example.local", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}

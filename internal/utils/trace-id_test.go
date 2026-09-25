@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"bytes"
@@ -10,26 +10,39 @@ import (
 	"testing"
 
 	"prime-erp-core/internal/requestcontext"
+	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
-// service ต้นทางส่ง trace id มา ต้องใช้เลขเดิม ไม่ออกเลขใหม่
-// ไม่งั้นไล่ดูเส้นทางของ request เดียวกันข้าม service ไม่ได้
-func TestProcessContextRequestKeepsIncomingTraceID(t *testing.T) {
+// buildContext ต้องไม่ทับ trace id ที่ถูกใส่ไว้ใน context มาก่อนแล้ว (RequestLogMiddleware
+// เป็นคนใส่ให้จริงตอน production) ไม่งั้นทุก service ในเส้นเดียวกันจะเห็นคนละเลข
+//
+// เทสสองตัวที่เคยยืนอยู่ตรงนี้ (เดิมชื่อ TestProcessContextRequestKeepsIncomingTraceID กับ
+// TestProcessContextRequestGeneratesTraceIDWhenMissing) ย้ายไปอยู่
+// internal/middleware/request-log-middleware_test.go แล้ว เพราะพฤติกรรม "อ่าน X-Trace-ID เดิม /
+// ออกเลขใหม่เมื่อไม่มี" ย้ายไปทำที่ RequestLogMiddleware ก่อน buildContext แล้ว เพื่อให้ทุก route
+// มี trace id แม้ AuthMiddleware จะปฏิเสธ request ก็ตาม ที่เหลือให้ buildContext ทำหน้าที่แค่
+// ตาข่ายรองเหมือนที่ทำกับ user/token อยู่แล้ว: ถ้า context มี trace id อยู่แล้วห้ามทับ
+func TestProcessContextRequestPreservesTraceIDAlreadyInContext(t *testing.T) {
 	gotTraceID := ""
 
-	router := newTestRouter()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Request = c.Request.WithContext(requestcontext.WithTraceID(c.Request.Context(), "trace-จาก-middleware-ก่อนหน้า"))
+		c.Next()
+	})
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			gotTraceID, _ = requestcontext.GetTraceID(ctx)
 
 			return gin.H{"ok": true}, nil
 		})
 	})
 
+	// ไม่ส่ง X-Trace-ID header มาเลย แต่ context มี trace id อยู่แล้วจาก middleware ก่อนหน้า
 	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`))
-	req.Header.Set(TraceIDHeader, "trace-จากต้นทาง")
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -38,41 +51,8 @@ func TestProcessContextRequestKeepsIncomingTraceID(t *testing.T) {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
 	}
 
-	if gotTraceID != "trace-จากต้นทาง" {
-		t.Fatalf("trace id = %q, ต้องเป็นเลขเดิมที่ต้นทางส่งมา", gotTraceID)
-	}
-}
-
-// ไม่มี trace id มาด้วย แปลว่าเราเป็นต้นทาง ต้องออกเลขใหม่ให้ ไม่ปล่อยว่าง
-func TestProcessContextRequestGeneratesTraceIDWhenMissing(t *testing.T) {
-	first := ""
-	second := ""
-
-	router := newTestRouter()
-	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
-			traceID, _ := requestcontext.GetTraceID(ctx)
-			if first == "" {
-				first = traceID
-			} else {
-				second = traceID
-			}
-
-			return gin.H{"ok": true}, nil
-		})
-	})
-
-	for i := 0; i < 2; i++ {
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(`{}`)))
-	}
-
-	if first == "" || second == "" {
-		t.Fatalf("trace id ว่าง: first=%q second=%q", first, second)
-	}
-
-	if first == second {
-		t.Fatalf("สอง request คนละครั้งต้องได้คนละ trace id แต่ได้ %q ทั้งคู่", first)
+	if gotTraceID != "trace-จาก-middleware-ก่อนหน้า" {
+		t.Fatalf("trace id = %q, buildContext ต้องไม่ทับเลขที่มีอยู่แล้วใน context", gotTraceID)
 	}
 }
 
@@ -82,14 +62,14 @@ func TestNewRequestForwardsTraceID(t *testing.T) {
 	gotHeader := ""
 
 	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotHeader = r.Header.Get(TraceIDHeader)
+		gotHeader = r.Header.Get(utils.TraceIDHeader)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer downstream.Close()
 
 	ctx := requestcontext.WithTraceID(context.Background(), "trace-ของเส้นนี้")
 
-	req, err := NewRequest(ctx, http.MethodPost, downstream.URL, strings.NewReader(`{}`))
+	req, err := utils.NewRequest(ctx, http.MethodPost, downstream.URL, strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
@@ -101,19 +81,19 @@ func TestNewRequestForwardsTraceID(t *testing.T) {
 	defer resp.Body.Close()
 
 	if gotHeader != "trace-ของเส้นนี้" {
-		t.Fatalf("ปลายทางได้ %s = %q", TraceIDHeader, gotHeader)
+		t.Fatalf("ปลายทางได้ %s = %q", utils.TraceIDHeader, gotHeader)
 	}
 }
 
 // ไม่มี trace id ใน context ก็ไม่ต้องแปะ header เปล่าๆ ให้ปลายทางออกเลขเอง
 func TestNewRequestWithoutTraceIDSendsNoHeader(t *testing.T) {
-	req, err := NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
+	req, err := utils.NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
 	if err != nil {
 		t.Fatalf("NewRequest: %v", err)
 	}
 
-	if got := req.Header.Get(TraceIDHeader); got != "" {
-		t.Fatalf("%s = %q, ต้องว่าง", TraceIDHeader, got)
+	if got := req.Header.Get(utils.TraceIDHeader); got != "" {
+		t.Fatalf("%s = %q, ต้องว่าง", utils.TraceIDHeader, got)
 	}
 }
 
@@ -123,7 +103,7 @@ func TestProcessContextRequestMultipartCarriesTraceID(t *testing.T) {
 
 	router := newTestRouter()
 	router.POST("/upload", func(c *gin.Context) {
-		ProcessContextRequestMultipart(c, func(ctx context.Context, input MultipartInput) (interface{}, error) {
+		utils.ProcessContextRequestMultipart(c, func(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 			gotTraceID, _ = requestcontext.GetTraceID(ctx)
 
 			return gin.H{"ok": true}, nil
@@ -138,7 +118,7 @@ func TestProcessContextRequestMultipartCarriesTraceID(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/upload", body)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set(TraceIDHeader, "trace-อัปโหลด")
+	req.Header.Set(utils.TraceIDHeader, "trace-อัปโหลด")
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)

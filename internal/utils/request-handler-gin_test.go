@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"prime-erp-core/internal/apperr"
 	"prime-erp-core/internal/middleware"
 	"prime-erp-core/internal/requestcontext"
+	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,7 +37,7 @@ func TestProcessContextRequestCarriesUserAndTokenToService(t *testing.T) {
 
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			gotUser = requestcontext.GetUserOrDefault(ctx)
 			gotToken, _ = requestcontext.GetToken(ctx)
 
@@ -69,7 +70,7 @@ func TestProcessContextRequestFallsBackToEmptyUser(t *testing.T) {
 
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			gotUser = requestcontext.GetUserOrDefault(ctx)
 
 			return gin.H{"ok": true}, nil
@@ -95,7 +96,7 @@ func TestProcessContextRequestBridgesLegacyGinUser(t *testing.T) {
 		c.Next()
 	})
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			gotUser = requestcontext.GetUserOrDefault(ctx)
 
 			return gin.H{"ok": true}, nil
@@ -117,7 +118,7 @@ func TestProcessContextRequestPassesPayloadUnchanged(t *testing.T) {
 
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			gotPayload = payload
 
 			return gin.H{"echo": payload}, nil
@@ -145,7 +146,7 @@ func TestProcessContextRequestPassesPayloadUnchanged(t *testing.T) {
 func TestProcessContextRequestMapsAppErrorStatus(t *testing.T) {
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			return nil, apperr.BadRequest("delivery_codes is required")
 		})
 	})
@@ -171,7 +172,7 @@ func TestProcessContextRequestMapsAppErrorStatus(t *testing.T) {
 func TestProcessContextRequestPlainErrorStays500(t *testing.T) {
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			return nil, context.DeadlineExceeded
 		})
 	})
@@ -188,7 +189,7 @@ func TestProcessContextRequestPlainErrorStays500(t *testing.T) {
 func TestAppErrorResponseKeepsErrorKey(t *testing.T) {
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
 			return nil, apperr.NotFound("pricelist not found")
 		})
 	})
@@ -217,8 +218,8 @@ func TestAppErrorResponseKeepsErrorKey(t *testing.T) {
 func TestBindingErrorResponseKeepsValidationFailedShape(t *testing.T) {
 	router := newTestRouter()
 	router.POST("/x", func(c *gin.Context) {
-		ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
-			return nil, &BindingError{Message: "subgroup_ids is required when update_type is 'subgroup'"}
+		utils.ProcessContextRequest(c, func(ctx context.Context, payload string) (interface{}, error) {
+			return nil, &utils.BindingError{Message: "subgroup_ids is required when update_type is 'subgroup'"}
 		})
 	})
 

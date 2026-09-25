@@ -35,7 +35,13 @@ func buildContext(c *gin.Context) context.Context {
 		}
 	}
 
-	ctx = requestcontext.WithTraceID(ctx, traceIDOf(c))
+	// middleware.RequestLogMiddleware ใส่ trace id ให้ทุก route อยู่แล้ว (รวมเส้นที่
+	// AuthMiddleware ปฏิเสธด้วย) จุดนี้จึงเป็นแค่ตาข่ายรองเหมือน user/token ด้านบน: ถ้า context
+	// มี trace id อยู่แล้วห้ามทับ ถ้าไม่มีเลย (เช่น route ที่ไม่ได้ผ่าน RequestLogMiddleware) ค่อย
+	// ออกเลขจาก header หรือสร้างใหม่
+	if _, ok := requestcontext.GetTraceID(ctx); !ok {
+		ctx = requestcontext.WithTraceID(ctx, traceIDOf(c))
+	}
 
 	return ctx
 }
