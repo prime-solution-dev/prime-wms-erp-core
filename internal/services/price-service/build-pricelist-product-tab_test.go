@@ -221,3 +221,40 @@ func TestFetchAllProducts_ReturnsError(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestBuildPricelistProductTab_SubGroupWithoutKeysNeverMatches(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{PriceListGroup{GroupCode: "G", SubGroups: []SubGroup{{SubgroupCode: "SG_EMPTY"}}}},
+	}
+	products := []externalProductService.GetProductsComponent{{ProductCode: "P0"}}
+
+	tab := buildPricelistProductTab(groups, products, testGroupName, testItemName, nil, nil, nil, false)
+	if len(tab.Rows) != 1 || tab.Rows[0]["product_code"] != "P0" || tab.Rows[0]["subgroup_code"] != "" {
+		t.Fatalf("unmatched rows wrong: %+v", tab.Rows)
+	}
+
+	tabMatched := buildPricelistProductTab(groups, products, testGroupName, testItemName, nil, nil, nil, true)
+	if len(tabMatched.Rows) != 0 {
+		t.Fatalf("onlyMatched rows = %d, want 0: %+v", len(tabMatched.Rows), tabMatched.Rows)
+	}
+}
+
+func TestFetchAllProducts_StopsWhenTotalPagesZero(t *testing.T) {
+	orig := getProducts
+	defer func() { getProducts = orig }()
+	calls := 0
+	getProducts = func(externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+		calls++
+		return externalProductService.GetProductsResponse{
+			TotalPages: 0,
+			Products:   []externalProductService.GetProductsComponent{{ProductCode: "A"}},
+		}, nil
+	}
+	got, err := fetchAllProducts("C1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || len(got) != 1 {
+		t.Fatalf("calls=%d products=%d, want 1/1", calls, len(got))
+	}
+}
