@@ -27,11 +27,13 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	companyCode := ""
 	siteCode := ""
 	supplierReq := models.GetSupplierListRequest{}
+	productCodes := []string{}
 	for _, invoice := range req {
+		companyCode = invoice.CompanyCode
+		siteCode = invoice.SiteCode
 		for _, invoiceItem := range invoice.InvoiceItem {
 			poNumber = append(poNumber, invoiceItem.DocumentRef)
-			companyCode = invoice.CompanyCode
-			siteCode = invoice.SiteCode
+			productCodes = append(productCodes, invoiceItem.ProductCode)
 		}
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoice.PartyCode)
 	}
@@ -123,6 +125,16 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
 
+	productReq := models.GetProductRequest{
+		ProductCode: productCodes,
+		SiteCode:    []string{siteCode},
+		CompanyCode: []string{companyCode},
+	}
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+	if errGetProductInterface != nil {
+		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+	}
+
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -134,6 +146,9 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyExternalID = supplier.ExternalID
 		}
 		for it := range invoice.InvoiceItem {
+			if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
+				req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
+			}
 			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
