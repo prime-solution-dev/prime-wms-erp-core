@@ -119,6 +119,8 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
+                    env.IMAGE_TAG = "${env.GIT_COMMIT_SHORT}-${env.BUILD_NUMBER}"
+
                     echo """
 ==========================================
 Git Information
@@ -134,7 +136,7 @@ Commit Tag:
 ${GIT_COMMIT_SHORT}
 
 Harbor Image:
-${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+${HARBOR_IMAGE}:${IMAGE_TAG}
 
 ==========================================
 """
@@ -186,7 +188,7 @@ ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
             steps {
 
                 echo '=========================================='
-                echo "Build: ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}"
+                echo "Build: ${HARBOR_IMAGE}:${IMAGE_TAG}"
                 echo '=========================================='
 
                 sh '''
@@ -194,7 +196,7 @@ ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
 
                     docker build \
                         -f "$K8S_CONFIG_DIR/Dockerfile" \
-                        -t "$HARBOR_IMAGE:$GIT_COMMIT_SHORT" \
+                        -t "$HARBOR_IMAGE:$IMAGE_TAG" \
                         .
                 '''
             }
@@ -244,14 +246,14 @@ ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
 
                 echo '=========================================='
                 echo "Push Harbor Image"
-                echo "${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}"
+                echo "${HARBOR_IMAGE}:${IMAGE_TAG}"
                 echo '=========================================='
 
                 sh '''
                     set -e
 
                     docker push \
-                        "$HARBOR_IMAGE:$GIT_COMMIT_SHORT"
+                        "$HARBOR_IMAGE:$IMAGE_TAG"
                 '''
             }
         }
@@ -471,7 +473,7 @@ echo "Render Deployment Image"
 echo "=========================================="
 
 sed \
-    "s|IMAGE_TAG|${GIT_COMMIT_SHORT}|g" \
+    "s|IMAGE_TAG|${IMAGE_TAG}|g" \
     "${REMOTE_APP_DIR}/k8s/deployment.yaml" \
     > "${REMOTE_APP_DIR}/k8s/deployment.rendered.yaml"
 
@@ -643,7 +645,7 @@ Commit:
 ${GIT_COMMIT_SHORT}
 
 Harbor Image:
-${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+${HARBOR_IMAGE}:${IMAGE_TAG}
 
 Remote Server:
 ${REMOTE_USER}@${REMOTE_HOST}
@@ -676,7 +678,7 @@ Commit:
 ${GIT_COMMIT_SHORT}
 
 Harbor Image:
-${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
+${HARBOR_IMAGE}:${IMAGE_TAG}
 
 Remote Server:
 ${REMOTE_USER}@${REMOTE_HOST}
