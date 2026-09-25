@@ -6,11 +6,13 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"prime-erp-core/internal/apperr"
 	"prime-erp-core/internal/requestcontext"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // buildContext ย้ายข้อมูลจากฝั่ง gin มาใส่ context ก่อนส่งให้ service
@@ -33,7 +35,24 @@ func buildContext(c *gin.Context) context.Context {
 		}
 	}
 
+	ctx = requestcontext.WithTraceID(ctx, traceIDOf(c))
+
 	return ctx
+}
+
+// TraceIDHeader คือ header ที่ใช้ส่งต่อ trace id ข้าม service ทุก repo ต้องใช้ชื่อเดียวกัน
+const TraceIDHeader = "X-Trace-ID"
+
+// traceIDOf ใช้ trace id ที่ service ต้นทางส่งมา ถ้าไม่มีแปลว่าเราเป็นต้นทาง จึงออกเลขใหม่
+//
+// เลขนี้ไว้ไล่ดูว่า request เดียวของผู้ใช้วิ่งผ่าน service ไหนบ้าง utils.NewRequest
+// จะแปะมันกลับเป็น header ให้เองตอนยิงออก
+func traceIDOf(c *gin.Context) string {
+	if traceID := strings.TrimSpace(c.GetHeader(TraceIDHeader)); traceID != "" {
+		return traceID
+	}
+
+	return uuid.NewString()
 }
 
 // BindingError represents a binding/validation error

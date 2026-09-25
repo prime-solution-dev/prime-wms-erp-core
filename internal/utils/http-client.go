@@ -29,5 +29,11 @@ func NewRequest(ctx context.Context, method string, url string, body io.Reader) 
 		req.Header.Set("Authorization", token)
 	}
 
+	// trace id ไม่ได้บอกว่าใครกด แต่บอกว่า request เดียวกันวิ่งผ่าน service ไหนมาบ้าง
+	// ส่งต่อไปด้วยเสมอ ปลายทางจะได้ใช้เลขเดิมแทนการออกเลขใหม่
+	if traceID, ok := requestcontext.GetTraceID(ctx); ok && strings.TrimSpace(traceID) != "" {
+		req.Header.Set(TraceIDHeader, traceID)
+	}
+
 	return req, nil
 }
