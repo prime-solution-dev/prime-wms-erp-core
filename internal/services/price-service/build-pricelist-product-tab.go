@@ -1,10 +1,13 @@
 package priceService
 
 import (
+	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	externalProductService "prime-erp-core/external/product-service"
+	priceListRepository "prime-erp-core/internal/repositories/priceList"
 )
 
 // keyPart คือ code/value/seq ของ key หนึ่งตัว ใช้ร่วมกันทั้งฝั่ง product และ subgroup
@@ -51,4 +54,144 @@ func subGroupKey(sg SubGroup) string {
 		parts = append(parts, keyPart{code: k.Code, value: k.Value, seq: k.Seq})
 	}
 	return joinKey(parts)
+}
+
+// getProducts เป็น var เพื่อให้ test แทนที่ได้โดยไม่ต้องยิง HTTP จริง
+var getProducts = externalProductService.GetProduct
+
+const productPageSize = 1000
+
+// fetchAllProducts ดึง product master ที่ active ทั้งหมดทีละหน้า
+// ponytail: ดึงทุกหน้าผ่าน HTTP, ถ้า catalog ใหญ่จนช้าค่อยเพิ่ม bulk endpoint ใน product-core
+func fetchAllProducts(companyCode string, siteCodes []string) ([]externalProductService.GetProductsComponent, error) {
+	seen := map[string]bool{}
+	out := []externalProductService.GetProductsComponent{}
+	for page := 1; ; page++ {
+		res, err := getProducts(externalProductService.GetProductRequest{
+			CompanyCode: []string{companyCode},
+			SiteCode:    siteCodes,
+			ActiveFlg:   []bool{true},
+			Page:        page,
+			PageSize:    productPageSize,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("get products page %d: %w", page, err)
+		}
+		for _, p := range res.Products {
+			// product ตัวเดียวกันอาจกลับมาหลายครั้งตามจำนวน site
+			if seen[p.ProductCode] {
+				continue
+			}
+			seen[p.ProductCode] = true
+			out = append(out, p)
+		}
+		if len(res.Products) == 0 || page >= res.TotalPages {
+			return out, nil
+		}
+	}
+}
+
+type matchedSubGroup struct {
+	group GetPriceListGroupResponse
+	sg    SubGroup
+}
+
+// buildPricelistProductTab ประกอบ tab "Template" ของ Product Pricelist Report
+// แถวต่อ (product × subgroup ที่ key ตรงกัน) นำหน้าด้วย Product Code / Product Name
+// ส่วนที่เหลือเหมือน Pricelist Detail Report ทุกคอลัมน์
+//
+// onlyMatched = true เมื่อผู้ใช้กรอง Pricelist group — product ที่ไม่ตรงจะไม่ออก
+// ถ้า false product ที่ไม่ตรงจะออก 1 แถว ช่อง pricelist ว่าง แต่คอลัมน์กลุ่มสินค้า
+// เติมจาก product_groups ของสินค้าเอง
+func buildPricelistProductTab(
+	groups []GetPriceListGroupResponse,
+	products []externalProductService.GetProductsComponent,
+	groupNameByCode func(code string) string,
+	itemNameByCode func(code string) (string, bool),
+	fixedColumns []priceListRepository.SubGroupKeyColumn,
+	formulas map[string][]priceListRepository.SubgroupFormula,
+	lastUpdated *time.Time,
+	onlyMatched bool,
+) ExportTab {
+	cols := collectGroupColumns(groups, groupNameByCode, fixedColumns)
+	colSet := map[string]bool{}
+	for _, c := range cols {
+		colSet[c.code] = true
+	}
+
+	byKey := map[string][]matchedSubGroup{}
+	for _, g := range groups {
+		for _, sg := range g.SubGroups {
+			if isInactiveSubGroup(sg.UdfJson) {
+				continue
+			}
+			k := subGroupKey(sg)
+			if k == "" {
+				continue
+			}
+			byKey[k] = append(byKey[k], matchedSubGroup{group: g, sg: sg})
+		}
+	}
+
+	sorted := make([]externalProductService.GetProductsComponent, len(products))
+	copy(sorted, products)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].ProductCode < sorted[j].ProductCode })
+
+	rows := make([]map[string]interface{}, 0, len(sorted))
+	for _, p := range sorted {
+		matches := byKey[productKey(p)]
+		for _, m := range matches {
+			row := pricelistDetailRow(m.group, m.sg, cols, itemNameByCode, formulas)
+			row["product_code"] = p.ProductCode
+			row["product_name"] = p.ProductName
+			rows = append(rows, row)
+		}
+		if len(matches) > 0 || onlyMatched {
+			continue
+		}
+		rows = append(rows, unmatchedProductRow(p, cols, colSet, itemNameByCode))
+	}
+
+	columns := append([]ExportColumn{
+		{Field: "product_code", HeaderName: "Product Code"},
+		{Field: "product_name", HeaderName: "Product Name"},
+	}, pricelistDetailColumns(cols)...)
+
+	return ExportTab{
+		Name: "Template",
+		Headers: ExportTabHeaders{
+			Report:      "Pricelist Detail By Product",
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
+		},
+		Columns: columns,
+		Rows:    rows,
+	}
+}
+
+// unmatchedProductRow ทุกช่อง pricelist เป็นค่าว่าง — ใช้ "" แทน 0 เพื่อไม่ให้ดูเหมือนราคา 0
+func unmatchedProductRow(
+	p externalProductService.GetProductsComponent,
+	cols []groupColumn,
+	colSet map[string]bool,
+	itemNameByCode func(code string) (string, bool),
+) map[string]interface{} {
+	row := map[string]interface{}{"product_code": p.ProductCode, "product_name": p.ProductName}
+	for _, c := range pricelistDetailColumns(cols) {
+		if _, ok := row[c.Field]; !ok {
+			row[c.Field] = ""
+		}
+	}
+	for _, g := range p.ProductGroup {
+		if !g.ActiveFlg || !colSet[g.GroupCode] {
+			continue
+		}
+		name, found := itemNameByCode(g.GroupValue)
+		if !found {
+			name = g.GroupValue
+		}
+		row[g.GroupCode] = name
+		row[g.GroupCode+groupCodeColumnSuffix] = g.GroupValue
+	}
+	return row
 }
