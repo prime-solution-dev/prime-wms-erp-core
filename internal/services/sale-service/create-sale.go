@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
@@ -63,7 +64,15 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
+	// user คือชื่อที่ client ส่งมาใน body ใช้ได้เฉพาะด่านอนุมัติ (RequestUserCode / CheckAutoApproval)
+	// ซึ่งเป็นเรื่องสิทธิ์ที่เจ้าของงานเป็นคนกำหนด ไม่ใช่เรื่องของ refactor นี้
+	//
+	// ส่วนชื่อที่บันทึกลง DB ต้องมาจาก token ของคนที่กดจริง ไม่ใช่จาก body
+	// ไม่งั้นใครยิง API ตรงๆ ก็เขียนชื่อคนอื่นลง create_by ได้ (กติกาข้อ 3 ของ spec)
+	// ถ้าไม่มี token มาด้วยจริงๆ ค่อยใช้ค่าจาก body เป็นตัวสำรอง จะได้ไม่เขียนค่าว่างทับของเดิม
 	user := req.User
+
+	auditUser := auditUserFrom(ctx, user)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -99,9 +108,9 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		tempSale.CreateDate = &nowDateOnly
-		tempSale.CreateBy = user
+		tempSale.CreateBy = auditUser
 		tempSale.UpdateDate = &nowDateOnly
-		tempSale.UpdateBy = user
+		tempSale.UpdateBy = auditUser
 		// ใช้ status จากหน้าบ้าน
 		tempSale.Status = status
 		tempSale.StatusApprove = statusApprove
@@ -151,9 +160,9 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			item.CreateDate = &nowDateOnly
-			item.CreateBy = user
+			item.CreateBy = auditUser
 			item.UpdateDate = &nowDateOnly
-			item.UpdateBy = user
+			item.UpdateBy = auditUser
 
 			createSaleItems = append(createSaleItems, item)
 		}
@@ -245,7 +254,7 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 			Updates(map[string]interface{}{
 				"status":      "COMPLETED",
 				"update_date": &nowDateOnly,
-				"update_by":   user,
+				"update_by":   auditUser,
 			}).Error; err != nil {
 			tx.Rollback()
 			return nil, errors.New("failed to update quotation status: " + err.Error())
@@ -257,7 +266,7 @@ func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 			Updates(map[string]interface{}{
 				"status":      "COMPLETED",
 				"update_date": &nowDateOnly,
-				"update_by":   user,
+				"update_by":   auditUser,
 			}).Error; err != nil {
 			tx.Rollback()
 			return nil, errors.New("failed to update quotation items status: " + err.Error())
@@ -320,4 +329,15 @@ func generateSaleCodes(gormx *gorm.DB, count int) ([]string, error) {
 	}
 
 	return codes, nil
+}
+
+// auditUserFrom เลือกชื่อที่จะเขียนลง create_by / update_by
+//
+// token ของคนที่กดมาก่อนเสมอ ค่าจาก body เป็นแค่ตัวสำรองของเส้นที่ยังไม่ส่ง token มา
+func auditUserFrom(ctx context.Context, bodyUser string) string {
+	if user := requestcontext.GetUserOrDefault(ctx); user != "" {
+		return user
+	}
+
+	return bodyUser
 }
