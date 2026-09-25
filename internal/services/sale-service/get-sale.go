@@ -38,6 +38,7 @@ type GetSaleRequest struct {
 	DeliveryDateStart    string      `json:"delivery_date_start"`
 	DeliveryDateEnd      string      `json:"delivery_date_end"`
 	StatusFilter         []string    `json:"status_filter"`
+	SalePersonCode       []string    `json:"sale_person_code"`
 	Page                 int         `json:"page"`
 	PageSize             int         `json:"page_size"`
 }
@@ -89,6 +90,7 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		req.DeliveryDateStart,
 		req.DeliveryDateEnd,
 		req.StatusFilter,
+		req.SalePersonCode,
 		req.Page,
 		req.PageSize)
 	if errApproval != nil {
@@ -133,6 +135,7 @@ func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
 		req.DeliveryDateStart,
 		req.DeliveryDateEnd,
 		req.StatusFilter,
+		req.SalePersonCode,
 		1, 0) // pageSize=0 means get all
 	if errApproval != nil {
 		return nil, errApproval
