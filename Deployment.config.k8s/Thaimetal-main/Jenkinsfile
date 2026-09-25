@@ -183,6 +183,36 @@ ${HARBOR_IMAGE}:${IMAGE_TAG}
         // 4. Build Docker Image
         // =========================================================
 
+stage('Prepare .env from Vault') {
+    steps {
+        script {
+            withVault([
+                vaultSecrets: [
+                    [
+                        path: "${VAULT_PATH}",
+                        engineVersion: 2,
+                        secretValues: [
+                            [
+                                envVar: 'APP_ENV',
+                                vaultKey: "${ENV_FILE_KEY}"
+                            ]
+                        ]
+                    ]
+                ]
+            ]) {
+                sh '''
+                    set +x
+
+                    echo "Preparing cmd/.env from Vault"
+
+                    printf '%s\n' "$APP_ENV" > ./cmd/.env
+
+                    chmod 600 ./cmd/.env
+                '''
+            }
+        }
+    }
+}
         stage('Build Docker Image') {
 
             steps {
