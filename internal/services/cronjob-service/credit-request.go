@@ -36,7 +36,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -72,7 +72,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 	// Create a client and execute the request
-	clientGetCredit := &http.Client{}
+	clientGetCredit := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	respGetCredit, errGetCredit := clientGetCredit.Do(reqHttpGetCredit)
 	if errGetCredit != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -205,7 +205,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientUpdateCreditRequest := &http.Client{}
+		clientUpdateCreditRequest := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respUpdateCreditRequest, errUpdateCreditRequest := clientUpdateCreditRequest.Do(reqUpdateCreditRequest)
 		if errUpdateCreditRequest != nil {
 			return nil, errors.New("Error parsing DateTo: " + errUpdateCreditRequest.Error())
@@ -247,7 +247,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientCreateCredit := &http.Client{}
+		clientCreateCredit := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCredit, errCreateCredit := clientCreateCredit.Do(reqCreateCredit)
 		if errCreateCredit != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCredit.Error())
@@ -277,7 +277,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientEmailAlert := &http.Client{}
+		clientEmailAlert := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respEmailAlert, errEmailAlert := clientEmailAlert.Do(reqEmailAlert)
 		if errEmailAlert != nil {
 			return nil, errors.New("Error parsing DateTo: " + errEmailAlert.Error())
@@ -308,7 +308,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientCreateCreditTransaction := &http.Client{}
+		clientCreateCreditTransaction := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
 		if errCreateCreditTransaction != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())

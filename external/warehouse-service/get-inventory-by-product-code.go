@@ -66,7 +66,8 @@ func GetInventoryWeightByKey(ctx context.Context, companyCode string, siteCodes 
 
 	// Execute request
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout:   60 * time.Second,
+		Transport: utils.NewOutboundLogTransport("warehouse"),
 	}
 	resp, err := client.Do(req)
 	if err != nil {

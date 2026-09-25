@@ -31,7 +31,7 @@ func CreditExtra(ctx context.Context) (interface{}, error) {
 
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -91,7 +91,7 @@ func CreditExtra(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientCreateDeleteCreditExtra := &http.Client{}
+		clientCreateDeleteCreditExtra := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateDeleteCreditExtra, errCreateDeleteCreditExtra := clientCreateDeleteCreditExtra.Do(reqCreateDeleteCreditExtra)
 		if errCreateDeleteCreditExtra != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateDeleteCreditExtra.Error())
@@ -123,7 +123,7 @@ func CreditExtra(ctx context.Context) (interface{}, error) {
 
 
 		// Create a client and execute the request
-		clientCreateCreditTransaction := &http.Client{}
+		clientCreateCreditTransaction := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
 		if errCreateCreditTransaction != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())

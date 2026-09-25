@@ -17,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prime-solution-dev/prime-service-x/apilog"
 	"github.com/prime-solution-dev/prime-service-x/servicelog"
 )
 
@@ -67,7 +68,37 @@ func RequestLogMiddleware() gin.HandlerFunc {
 		enabled = false
 	}
 
-	excludedPrefixes := parseAPILogExcludePrefixes(
+	// =========================================================
+	// INITIALIZE OUTBOUND API LOG (prime-service-x/apilog)
+	//
+	// ทำครั้งเดียวตอน Register Middleware เหมือน servicelog ด้านบน — อ่าน API_LOG_* ชุดเดียวกัน
+	// (ServiceName/MongoDBURI/Database) จึงต่อ MongoDB ปลายทางเดียวกันโดยอัตโนมัติ ไม่ต้องตั้งค่า
+	// แยก ผลของ Init ตัวนี้คือ apilog.NewLoggingTransport (ที่ utils.NewOutboundLogTransport ห่อไว้
+	// อีกชั้น — ดู internal/utils/outbound-log-transport.go) เริ่มเขียน log ได้จริง
+	//
+	// ใส่ default ServiceName แบบเดียวกับ servicelog ด้านบน — ไม่งั้นถ้า Vault ไม่ได้ตั้ง
+	// API_LOG_SERVICE ไว้ (เช่น .env ที่ยังไม่ได้เติมค่าจริง) servicelog จะใช้ default แล้วทำงานได้
+	// แต่ apilog จะ Init ล้มเหลวเงียบๆ (เพราะ apilog.LoadFromEnv() ไม่มี fallback ของตัวเอง) ทำให้
+	// inbound log ทำงานแต่ outbound log ไม่ทำงาน ทั้งที่ Mongo ปลายทางเดียวกันและตั้งใจให้ทำงานคู่กัน
+	//
+	// Init ล้มเหลว (เช่นไม่ได้ตั้ง Vault ไว้) ต้อง log แล้วปล่อยผ่าน ห้ามทำให้ service เริ่มไม่ได้
+	// เหมือน servicelog ด้านบน
+	// =========================================================
+
+	apilogCfg := apilog.LoadFromEnv()
+
+	if apilogCfg.ServiceName == "" {
+		apilogCfg.ServiceName = defaultServiceLogServiceName
+	}
+
+	if err := utils.InitAPILog(apilogCfg); err != nil {
+		log.Printf(
+			"[API LOG] DISABLED: %v",
+			err,
+		)
+	}
+
+	excludedPrefixes := utils.ParseAPILogExcludePrefixes(
 		os.Getenv(apiLogExcludeEnv),
 	)
 
@@ -146,7 +177,7 @@ func RequestLogMiddleware() gin.HandlerFunc {
 		// Request ID / Trace ID ยังคงถูกส่งผ่าน Context ตามปกติ
 		// =========================================================
 
-		if !enabled || isExcludedPath(c.Request.URL.Path, excludedPrefixes) {
+		if !enabled || utils.IsExcludedPath(c.Request.URL.Path, excludedPrefixes) {
 			c.Next()
 			return
 		}
@@ -322,43 +353,10 @@ func RequestLogMiddleware() gin.HandlerFunc {
 //
 // รายการ path prefix (คั่นด้วย comma) ที่ไม่ต้องบันทึก log เช่น "/cronjob/,/health"
 // erp-core เป็นคนเพิ่มเอง — ไม่มีใน servicelog library และ reference ก็ไม่ได้ทำไว้
-// =========================================================
-func parseAPILogExcludePrefixes(raw string) []string {
-
-	if raw == "" {
-		return nil
-	}
-
-	parts := strings.Split(raw, ",")
-
-	prefixes := make([]string, 0, len(parts))
-
-	for _, part := range parts {
-
-		prefix := strings.TrimSpace(part)
-
-		if prefix == "" {
-			continue
-		}
-
-		prefixes = append(prefixes, prefix)
-	}
-
-	return prefixes
-}
-
-func isExcludedPath(path string, prefixes []string) bool {
-
-	for _, prefix := range prefixes {
-
-		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
+//
+// parseAPILogExcludePrefixes/isExcludedPath ย้ายไปเป็น utils.ParseAPILogExcludePrefixes /
+// utils.IsExcludedPath แล้ว (internal/utils/outbound-log-transport.go) เพื่อให้ inbound (ที่นี่)
+// กับ outbound (utils.NewOutboundLogTransport) อ่าน API_LOG_EXCLUDE ด้วยตรรกะเดียวกันจุดเดียว
 // =========================================================
 // OUTBOUND LOG
 //

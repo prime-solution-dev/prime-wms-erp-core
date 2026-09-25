@@ -39,7 +39,7 @@ func GetHookConfig(ctx context.Context, requestData map[string]interface{}) ([]H
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("document")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())

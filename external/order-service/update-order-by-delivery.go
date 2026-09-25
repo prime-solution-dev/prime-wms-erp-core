@@ -73,7 +73,7 @@ func UpdateOrderByDelivery(ctx context.Context, jsonPayload UpdateOrderByDeliver
 	}
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("order")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return UpdateOrderByDeliveryResponse{}, errors.New("Error sending request: " + err.Error())

@@ -12,8 +12,20 @@ import (
 	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prime-solution-dev/prime-service-x/apilog"
 	"github.com/prime-solution-dev/prime-service-x/servicelog"
 )
+
+// fakeAPILogInitiator ปลอม apilog.Init ให้เทสที่ไม่ได้ตั้งใจทดสอบ apilog โดยเฉพาะไม่ต้องไปรอ/ล้ม
+// เพราะ apilog พยายามต่อ MONGODB_URI ปลอมที่ setFakeServiceLogSink ตั้งไว้สำหรับ servicelog (คนละ
+// package กัน คนละ Init กัน — servicelog มี seam ของตัวเองอยู่แล้วผ่าน utils.SetServiceLogSinkForTest
+// แต่ apilog ยังไม่มีใครปลอมให้ ถ้าไม่ทำตรงนี้ RequestLogMiddleware() จะเรียก apilog.Init จริงแล้ว
+// พยายามต่อ MongoDB ที่ไม่มีอยู่จริงทุกครั้งที่เทสในไฟล์นี้ตั้ง API_LOG_MONGODB_URI)
+type fakeAPILogInitiator struct{}
+
+func (fakeAPILogInitiator) Init(cfg apilog.Config) error {
+	return nil
+}
 
 // fakeServiceLogSink จับ Create/Update ที่ RequestLogMiddleware ยิงเข้ามา ไว้เทสได้โดยไม่ต้อง
 // พึ่ง MongoDB จริง — Init คืน nil เสมอ (ไม่ต่อ network) ปลอดภัยกับการรันเทสหลายตัวในไฟล์นี้
@@ -63,6 +75,9 @@ func setFakeServiceLogSink(t *testing.T) *fakeServiceLogSink {
 	fake := &fakeServiceLogSink{}
 	restore := utils.SetServiceLogSinkForTest(fake)
 	t.Cleanup(restore)
+
+	restoreAPILog := utils.SetAPILogInitiatorForTest(fakeAPILogInitiator{})
+	t.Cleanup(restoreAPILog)
 
 	t.Setenv("API_LOG_ENABLED", "true")
 	t.Setenv("API_LOG_SERVICE", "erp-core-test")

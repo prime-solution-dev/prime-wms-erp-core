@@ -432,7 +432,7 @@ func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRe
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("supplier")}
 	resp, err := client.Do(getSuppliers)
 	if err != nil {
 		return nil, errors.New("failed to execute HTTP request: " + err.Error())

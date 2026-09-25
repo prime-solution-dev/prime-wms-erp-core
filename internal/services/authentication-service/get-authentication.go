@@ -37,7 +37,7 @@ func GetRequester(ctx context.Context, requestData map[string]interface{}) ([]Re
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("authentication")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())

@@ -86,7 +86,7 @@ func GetInventoryATP(ctx context.Context, jsonPayload GetInventoryAtpRequest) (G
 	}
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("warehouse")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return GetInventoryAtpResponse{}, errors.New("Error sending request: " + err.Error())

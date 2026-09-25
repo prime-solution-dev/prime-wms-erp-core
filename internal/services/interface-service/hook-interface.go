@@ -27,7 +27,7 @@ func HookInterface(ctx context.Context, requestData HookInterfaceRequest) (inter
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: create request: %w", err)
 	}
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("document")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: send request: %w", err)

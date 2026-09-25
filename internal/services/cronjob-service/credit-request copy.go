@@ -35,7 +35,7 @@ func CreditRequestEffectiveDtmPending(ctx context.Context) (interface{}, error) 
 
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -109,7 +109,7 @@ func CreditRequestEffectiveDtmPending(ctx context.Context) (interface{}, error) 
 
 
 		// Create a client and execute the request
-		clientUpdateCreditRequest := &http.Client{}
+		clientUpdateCreditRequest := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respUpdateCreditRequest, errUpdateCreditRequest := clientUpdateCreditRequest.Do(reqUpdateCreditRequest)
 		if errUpdateCreditRequest != nil {
 			return nil, errors.New("Error parsing DateTo: " + errUpdateCreditRequest.Error())
@@ -141,7 +141,7 @@ func CreditRequestEffectiveDtmPending(ctx context.Context) (interface{}, error) 
 
 
 		// Create a client and execute the request
-		clientCreateCreditTransaction := &http.Client{}
+		clientCreateCreditTransaction := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
 		if errCreateCreditTransaction != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())

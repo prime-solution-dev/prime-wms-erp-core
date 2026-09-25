@@ -154,7 +154,7 @@ func GetCustomers(ctx context.Context, requestData map[string]interface{}) (Resu
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("customer")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error parsing DateTo : " + err.Error())

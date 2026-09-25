@@ -343,7 +343,7 @@ func GetProductByCode(ctx context.Context, productReq models.GetProductRequest) 
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("product")}
 	resp, err := client.Do(getProducts)
 	if err != nil {
 		return nil, errors.New("failed to execute HTTP request: " + err.Error())
@@ -392,7 +392,7 @@ func GetProductInterface(ctx context.Context, productReq models.GetProductReques
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("product")}
 	resp, err := client.Do(getProducts)
 	if err != nil {
 		return nil, errors.New("failed to execute HTTP request: " + err.Error())
@@ -433,7 +433,7 @@ func GetMovingAvgCost(ctx context.Context, productReq models.GetProductRequest) 
 	}
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("product")}
 	resp, err := client.Do(getProducts)
 	if err != nil {
 		return nil, errors.New("failed to execute HTTP request: " + err.Error())
