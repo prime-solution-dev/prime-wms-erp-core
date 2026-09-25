@@ -8,6 +8,8 @@ import (
 
 	"prime-erp-core/internal/cronjob"
 	"prime-erp-core/internal/requestcontext"
+
+	"github.com/google/uuid"
 )
 
 // CronUser คือชื่อที่ถูกเขียนลง create_by / update_by ของงานที่ cron เป็นคนสั่ง
@@ -24,6 +26,12 @@ func init() {
 // เส้นไหนไม่ใส่ token ลง context ก็จะยิงออกไปแบบไม่มี Authorization
 func cronContext() context.Context {
 	ctx := requestcontext.WithUser(context.Background(), CronUser)
+
+	// cron ไม่ได้มาทาง HTTP จึงไม่ผ่าน RequestLogMiddleware ที่ออก trace id ให้
+	// ต้องออกเองที่นี่ ไม่งั้น utils.NewRequest จะยิงออกแบบไม่มี X-Trace-ID
+	// แล้วปลายทางจะออกเลขใหม่ เส้นทางของงาน cron รอบนั้นจะขาดตอน ตามต่อไม่ได้
+	// เลขใหม่ทุกครั้งที่ cron ตื่น = หนึ่งรอบทำงาน หนึ่ง trace id
+	ctx = requestcontext.WithTraceID(ctx, uuid.NewString())
 
 	if serviceToken := strings.TrimSpace(os.Getenv("SERVICE_TOKEN")); serviceToken != "" {
 		if !strings.HasPrefix(serviceToken, "Bearer ") {

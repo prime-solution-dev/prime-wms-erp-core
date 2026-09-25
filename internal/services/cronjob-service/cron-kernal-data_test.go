@@ -50,3 +50,24 @@ func TestGetKernalManualUsesUncancellableContext(t *testing.T) {
 		t.Fatalf("token หาย: %q", token)
 	}
 }
+
+// cron ไม่ได้ผ่าน middleware จึงต้องออก trace id ของตัวเอง
+// ไม่งั้นงานที่ cron ยิงออกไปจะตามเส้นทางต่อไม่ได้
+func TestCronContextHasFreshTraceID(t *testing.T) {
+	first, ok := requestcontext.GetTraceID(cronContext())
+	if !ok || first == "" {
+		t.Fatal("cron context ไม่มี trace id")
+	}
+
+	second, _ := requestcontext.GetTraceID(cronContext())
+	if first == second {
+		t.Fatalf("cron สองรอบต้องได้คนละ trace id แต่ได้ %q ทั้งคู่", first)
+	}
+}
+
+// cron ต้องยังประกาศตัวเป็น CRON เหมือนเดิม การเติม trace id ต้องไม่ไปทับ user
+func TestCronContextStillCarriesCronUser(t *testing.T) {
+	if user := requestcontext.GetUserOrDefault(cronContext()); user != CronUser {
+		t.Fatalf("user = %q, ต้องเป็น %s", user, CronUser)
+	}
+}
