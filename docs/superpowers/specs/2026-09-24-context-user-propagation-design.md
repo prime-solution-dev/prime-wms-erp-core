@@ -82,10 +82,10 @@ AuthMiddleware ─ แกะ JWT ─ c.Set("user")                 (ให้ se
                          └ WithUser(ctx, "somchai")      (ให้ service ที่แปลงแล้ว)
                          └ WithToken(ctx, authHeader)    (ไว้ส่งต่อ)
  ▼
-ProcessContextRequest ─ อ่าน body ─▶ service(ctx, payload)
+ProcessContextRequest ─ อ่าน body + trace id ─▶ service(ctx, payload)
  │                                      │
  │                                      ├ requestcontext.GetUserOrDefault(ctx) → create_by/update_by
- │                                      └ utils.NewRequest(ctx, ...) ─ แปะ Authorization ─▶ Kong ─▶ service ปลายทาง
+ │                                      └ utils.NewRequest(ctx, ...) ─ แปะ Authorization + X-Trace-ID ─▶ Kong ─▶ service ปลายทาง
  ▼
 ตอบ: AppError → status ตามที่กำหนด / TypedError → body ของ error นั้น / อื่นๆ → 500
 ```
@@ -101,6 +101,11 @@ ProcessContextRequest ─ อ่าน body ─▶ service(ctx, payload)
 5. `ctx.JSON(4xx, ...)` ใน service เปลี่ยนเป็น `return nil, apperr.BadRequest(...)` ตาม status เดิม
 6. service ที่ยังไม่แปลง เรียกฟังก์ชันที่ต้องการ ctx ได้โดยส่ง `ctx.Request.Context()` ต่อไป
    (ใช้ร่วมกันได้ระหว่างที่ยังแปลงไม่ครบ)
+7. **trace id**: ตัวจัดการ request อ่าน header `X-Trace-ID` ถ้ามีให้ใช้เลขเดิม ถ้าไม่มีแปลว่า
+   เราเป็นต้นทางให้ออกเลขใหม่ แล้วเก็บลง ctx ด้วย `requestcontext.WithTraceID`
+   ตอนยิงออก `utils.NewRequest` แปะกลับเป็น header ชื่อเดียวกันให้เอง
+   ชื่อ header ประกาศเป็นค่าคงที่ `utils.TraceIDHeader` ตัวเดียว ทุก repo ต้องใช้ชื่อนี้
+   trace id ไม่ได้บอกว่าใครกด แต่บอกว่า request เดียวกันวิ่งผ่าน service ไหนมาบ้าง
 
 ### ค่า default เมื่อไม่มี user
 
