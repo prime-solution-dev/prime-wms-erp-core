@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -86,6 +87,98 @@ func TestOutboundLogTransportRoutesNonExcludedPathThroughLogged(t *testing.T) {
 	}
 	if directHit {
 		t.Fatalf("path ที่ไม่ถูก exclude ต้องไม่ยิงผ่าน direct transport")
+	}
+}
+
+// =========================================================
+// OUTBOUND LOGGING GATE (API_LOG_OUTBOUND_ENABLED)
+//
+// Code review พบ Critical 2 ข้อที่อยู่ใน library เอง (prime-service-x/apilog v0.1.3,
+// ดูคอมเมนต์เต็มบน OutboundLogEnabled ใน outbound-log-transport.go):
+//   1. transport.go เก็บ request/response body เป็น string ดิบ ไม่ redact เลย (มีแค่ truncate)
+//   2. transport.go เรียก store.Write(req.Context(), entry) โดยไม่มี timeout ของตัวเอง และทิ้ง
+//      error ที่ได้กลับมา
+// ตราบใดที่สองข้อนี้ยังไม่ถูกแก้ที่ library ต้นทาง outbound logging (apilog) ต้องปิดอยู่โดย
+// default เสมอ ห้ามเปิดเองจาก API_LOG_ENABLED (ตัวนั้นฝั่ง inbound/servicelog ใช้คนละตัว) — เทส
+// ด้านล่างพิสูจน์ผ่าน seam (SetNewLoggingTransportForTest) ว่า apilog ไม่ถูกแตะเลยตอนปิด และถูก
+// ใช้จริงตอนเปิด ไม่ใช่เช็คจากการอ่าน source
+// =========================================================
+
+// ไม่ได้ตั้ง API_LOG_OUTBOUND_ENABLED ไว้เลย (ค่า default) → NewOutboundLogTransport ต้องไม่แตะ
+// apilog เลย (seam ต้องไม่ถูกเรียก) แต่ request ยังต้องสำเร็จตามปกติผ่าน direct transport — ใช้
+// httptest server จริง (ไม่ใช่ host ปลอม) เพราะตอนปิด transport ที่ได้คือ http.DefaultTransport
+// ตรงๆ ซึ่งจะยิงเครือข่ายจริง
+func TestNewOutboundLogTransportDisabledByDefaultNeverTouchesApilog(t *testing.T) {
+	t.Setenv("API_LOG_OUTBOUND_ENABLED", "")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	seamCalled := false
+	restore := SetNewLoggingTransportForTest(func(source string) http.RoundTripper {
+		seamCalled = true
+		return roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			return fakeOutboundResponse(), nil
+		})
+	})
+	defer restore()
+
+	transport := NewOutboundLogTransport("test-source")
+
+	req, err := http.NewRequest(http.MethodPost, server.URL, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, ต้องการ %d", resp.StatusCode, http.StatusOK)
+	}
+
+	if seamCalled {
+		t.Fatalf("apilog seam ถูกเรียกทั้งที่ API_LOG_OUTBOUND_ENABLED ปิดอยู่ (default) — ต้องไม่แตะ apilog เลย")
+	}
+}
+
+// ตั้ง API_LOG_OUTBOUND_ENABLED=true ชัดเจน → NewOutboundLogTransport ต้องกลับไปใช้เส้นทาง apilog
+// เหมือนเดิม (ผ่าน seam) ไม่งั้น flag นี้จะกลายเป็น dead code ที่เปิดยังไงก็ไม่มีผล
+func TestNewOutboundLogTransportExplicitlyEnabledUsesApilogSeam(t *testing.T) {
+	t.Setenv("API_LOG_OUTBOUND_ENABLED", "true")
+
+	seamCalled := false
+	restore := SetNewLoggingTransportForTest(func(source string) http.RoundTripper {
+		seamCalled = true
+		if source != "test-source" {
+			t.Fatalf("seam ได้ source = %q, ต้องการ test-source", source)
+		}
+		return roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			return fakeOutboundResponse(), nil
+		})
+	})
+	defer restore()
+
+	transport := NewOutboundLogTransport("test-source")
+
+	req, err := http.NewRequest(http.MethodPost, "https://example.local/order/Order/CreateOrders", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if !seamCalled {
+		t.Fatalf("apilog seam ต้องถูกเรียกตอน API_LOG_OUTBOUND_ENABLED=true")
 	}
 }
 

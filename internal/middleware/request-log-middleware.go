@@ -69,32 +69,50 @@ func RequestLogMiddleware() gin.HandlerFunc {
 	}
 
 	// =========================================================
-	// INITIALIZE OUTBOUND API LOG (prime-service-x/apilog)
+	// INITIALIZE OUTBOUND API LOG (prime-service-x/apilog) — GATED, OFF BY DEFAULT
 	//
-	// ทำครั้งเดียวตอน Register Middleware เหมือน servicelog ด้านบน — อ่าน API_LOG_* ชุดเดียวกัน
-	// (ServiceName/MongoDBURI/Database) จึงต่อ MongoDB ปลายทางเดียวกันโดยอัตโนมัติ ไม่ต้องตั้งค่า
-	// แยก ผลของ Init ตัวนี้คือ apilog.NewLoggingTransport (ที่ utils.NewOutboundLogTransport ห่อไว้
-	// อีกชั้น — ดู internal/utils/outbound-log-transport.go) เริ่มเขียน log ได้จริง
+	// ต่างจาก servicelog (inbound) ด้านบน apilog.Init ที่นี่ "ไม่" ถูกเรียกเสมอ — ถูกเรียกก็ต่อเมื่อ
+	// utils.OutboundLogEnabled() คืน true (env: API_LOG_OUTBOUND_ENABLED=true) เท่านั้น ค่า default
+	// (unset) คือข้าม block นี้ไปทั้งหมด ไม่มีการต่อ MongoDB สำหรับ apilog เลย
 	//
-	// ใส่ default ServiceName แบบเดียวกับ servicelog ด้านบน — ไม่งั้นถ้า Vault ไม่ได้ตั้ง
-	// API_LOG_SERVICE ไว้ (เช่น .env ที่ยังไม่ได้เติมค่าจริง) servicelog จะใช้ default แล้วทำงานได้
-	// แต่ apilog จะ Init ล้มเหลวเงียบๆ (เพราะ apilog.LoadFromEnv() ไม่มี fallback ของตัวเอง) ทำให้
-	// inbound log ทำงานแต่ outbound log ไม่ทำงาน ทั้งที่ Mongo ปลายทางเดียวกันและตั้งใจให้ทำงานคู่กัน
+	// เหตุผล — code review เจอ Critical 2 ข้อใน apilog ที่แก้จาก erp-core ไม่ได้ (รายละเอียดเต็มอยู่
+	// ที่คอมเมนต์บน utils.OutboundLogEnabled / apiLogOutboundEnabledEnv ใน
+	// internal/utils/outbound-log-transport.go — อย่าลบคอมเมนต์นี้ทิ้งโดยไม่ก็อปเหตุผลไปด้วย):
+	//   1. apilog เก็บ request/response body เป็น string ดิบ ไม่ redact เลย (มีแค่ truncate) —
+	//      erp-core เรียก service อื่นด้วยชื่อ/เบอร์โทร/ที่อยู่/เลขผู้เสียภาษีลูกค้าแทบทุกเส้น
+	//   2. apilog เขียน Mongo ด้วย context ของผู้เรียกตรงๆ ไม่มี timeout ของตัวเอง และทิ้ง error
+	//      ที่ได้กลับมา — Mongo ช้า/ต่อไม่ได้ = request ค้างรอ server-selection (~30s) เงียบๆ
+	// ห้ามเปิด API_LOG_OUTBOUND_ENABLED ใน Vault จนกว่า library จะแก้สองข้อนี้ — สำคัญที่สุดคือ
+	// API_LOG_ENABLED=true (inbound) ต้อง "ไม่" ทำให้ outbound เปิดตามไปด้วยโดยไม่ได้ตั้งใจ สอง flag
+	// เป็นคนละตัวกันโดยเจตนา
+	//
+	// เมื่อเปิดจริง อ่าน API_LOG_* ชุดเดียวกับ servicelog ด้านบน (ServiceName/MongoDBURI/Database)
+	// จึงต่อ MongoDB ปลายทางเดียวกันโดยอัตโนมัติ ไม่ต้องตั้งค่าแยก ผลของ Init ตัวนี้คือ
+	// apilog.NewLoggingTransport (ที่ utils.NewOutboundLogTransport ห่อไว้อีกชั้น — ดู
+	// internal/utils/outbound-log-transport.go) เริ่มเขียน log ได้จริง ใส่ default ServiceName แบบ
+	// เดียวกับ servicelog ด้านบน (apilog.LoadFromEnv() ไม่มี fallback ของตัวเอง)
 	//
 	// Init ล้มเหลว (เช่นไม่ได้ตั้ง Vault ไว้) ต้อง log แล้วปล่อยผ่าน ห้ามทำให้ service เริ่มไม่ได้
 	// เหมือน servicelog ด้านบน
 	// =========================================================
 
-	apilogCfg := apilog.LoadFromEnv()
+	if utils.OutboundLogEnabled() {
 
-	if apilogCfg.ServiceName == "" {
-		apilogCfg.ServiceName = defaultServiceLogServiceName
-	}
+		apilogCfg := apilog.LoadFromEnv()
 
-	if err := utils.InitAPILog(apilogCfg); err != nil {
+		if apilogCfg.ServiceName == "" {
+			apilogCfg.ServiceName = defaultServiceLogServiceName
+		}
+
+		if err := utils.InitAPILog(apilogCfg); err != nil {
+			log.Printf(
+				"[API LOG] DISABLED: %v",
+				err,
+			)
+		}
+	} else {
 		log.Printf(
-			"[API LOG] DISABLED: %v",
-			err,
+			"[API LOG] OUTBOUND LOGGING OFF (API_LOG_OUTBOUND_ENABLED not set to \"true\") — apilog.Init skipped, no Mongo connection made for it",
 		)
 	}
 
