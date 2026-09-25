@@ -149,10 +149,62 @@ func TestBuildPricelistProductTab_UnmatchedRowUsesProductGroups(t *testing.T) {
 	if zz["PG01"] != "หมวดท่อ" || zz["PG01__code"] != "PG01_5" {
 		t.Fatalf("unmatched PG cols wrong: %+v", zz)
 	}
+	// ZZ ไม่มี Units ในฟิกซ์เจอร์ → ไม่มี base unit → Weight-spec = 0, Avg. kg stock = 0 เสมอ
+	if zz["total_weight"] != float64(0) || zz["avg_weight"] != float64(0) {
+		t.Fatalf("unmatched weight cols wrong: total_weight=%v avg_weight=%v", zz["total_weight"], zz["avg_weight"])
+	}
 	for _, f := range []string{"pricelist_group_name", "pricelist_group_code", "price_per_kg", "PG02", "formula_kg_code"} {
 		if zz[f] != "" {
 			t.Fatalf("unmatched %s = %v, want empty", f, zz[f])
 		}
+	}
+}
+
+func unitsWithBaseWeight(w float64) []externalProductService.GetUnitsComponent {
+	return []externalProductService.GetUnitsComponent{{FlagBase: true, Weight: w}}
+}
+
+func TestProductWeightSpec(t *testing.T) {
+	cases := []struct {
+		name  string
+		units []externalProductService.GetUnitsComponent
+		want  float64
+	}{
+		{"base unit wins over non-base", []externalProductService.GetUnitsComponent{{FlagBase: false, Weight: 5}, {FlagBase: true, Weight: 12.5}}, 12.5},
+		{"no base unit", []externalProductService.GetUnitsComponent{{FlagBase: false, Weight: 5}}, 0},
+		{"no units", nil, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := externalProductService.GetProductsComponent{Units: c.units}
+			if got := productWeightSpec(p); got != c.want {
+				t.Fatalf("productWeightSpec = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestBuildPricelistProductTab_MatchedRowsUseEachProductsOwnWeight(t *testing.T) {
+	groups := []GetPriceListGroupResponse{
+		{PriceListGroup{GroupCode: "G", SubGroups: []SubGroup{{
+			SubgroupCode: "SG1",
+			GroupKeys:    []GroupKey{{Code: "PG01", Value: "PG01_3", Seq: 1}},
+		}}}},
+	}
+	products := []externalProductService.GetProductsComponent{
+		{ProductCode: "P1", ProductGroup: []models.ProductGroup{pg("PG01", "PG01_3", 1)}, Units: unitsWithBaseWeight(10)},
+		{ProductCode: "P2", ProductGroup: []models.ProductGroup{pg("PG01", "PG01_3", 1)}, Units: unitsWithBaseWeight(25)},
+	}
+
+	tab := buildPricelistProductTab(groups, products, testGroupName, testItemName, nil, nil, nil, false)
+	if len(tab.Rows) != 2 {
+		t.Fatalf("rows = %d, want 2: %+v", len(tab.Rows), tab.Rows)
+	}
+	if tab.Rows[0]["product_code"] != "P1" || tab.Rows[0]["total_weight"] != float64(10) {
+		t.Fatalf("P1 row wrong: %+v", tab.Rows[0])
+	}
+	if tab.Rows[1]["product_code"] != "P2" || tab.Rows[1]["total_weight"] != float64(25) {
+		t.Fatalf("P2 row wrong: %+v", tab.Rows[1])
 	}
 }
 

@@ -92,6 +92,18 @@ type matchedSubGroup struct {
 	sg    SubGroup
 }
 
+// productWeightSpec คืนน้ำหนักของ base unit (flag_base = true) จาก product master —
+// นิยามเดียวกับ WeightSpecFromUnits ของ warehouse-core (get-inventory-weight-by-key.go)
+// คืน 0 เมื่อไม่มี unit ไหนเป็น base unit
+func productWeightSpec(p externalProductService.GetProductsComponent) float64 {
+	for _, u := range p.Units {
+		if u.FlagBase {
+			return u.Weight
+		}
+	}
+	return 0
+}
+
 // buildPricelistProductTab ประกอบ tab "Template" ของ Product Pricelist Report
 // แถวต่อ (product × subgroup ที่ key ตรงกัน) นำหน้าด้วย Product Code / Product Name
 // ส่วนที่เหลือเหมือน Pricelist Detail Report ทุกคอลัมน์
@@ -140,6 +152,9 @@ func buildPricelistProductTab(
 			row := pricelistDetailRow(m.group, m.sg, cols, itemNameByCode, formulas)
 			row["product_code"] = p.ProductCode
 			row["product_name"] = p.ProductName
+			// Weight-spec ต้องเป็นน้ำหนักของสินค้าแถวนั้นเอง ไม่ใช่ของ subgroup —
+			// สินค้าสองตัวที่จับคู่ subgroup เดียวกันมีน้ำหนักต่างกันได้
+			row["total_weight"] = productWeightSpec(p)
 			rows = append(rows, row)
 		}
 		if len(matches) > 0 || onlyMatched {
@@ -172,7 +187,12 @@ func unmatchedProductRow(
 	colSet map[string]bool,
 	itemNameByCode func(code string) (string, bool),
 ) map[string]interface{} {
-	row := map[string]interface{}{"product_code": p.ProductCode, "product_name": p.ProductName}
+	row := map[string]interface{}{
+		"product_code": p.ProductCode,
+		"product_name": p.ProductName,
+		"total_weight": productWeightSpec(p),
+		"avg_weight":   float64(0),
+	}
 	for _, c := range pricelistDetailColumns(cols) {
 		if _, ok := row[c.Field]; !ok {
 			row[c.Field] = ""
