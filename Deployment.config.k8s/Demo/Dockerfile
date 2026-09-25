@@ -18,7 +18,7 @@ RUN set -e; \
     done
 
 COPY . .
-
+COPY ./cmd/.env .env
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
@@ -33,7 +33,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates nano
 
 COPY --from=builder /app/prime-wms-erp-core .
-
+COPY --from=builder /app/.env .
 
 EXPOSE 9115
 
