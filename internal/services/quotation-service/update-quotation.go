@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UpdateQuotationRequest struct {
@@ -23,6 +24,13 @@ type UpdateQuotationRequest struct {
 type UpdateQuotationResponse struct {
 	IsPass        bool   `json:"is_pass"`
 	QuotationCode string `json:"quotation_code"`
+}
+
+// updateQuotationSalePerson writes sale_person_code with Update (not Updates
+// with a struct), so an empty string is written too instead of being skipped
+// as a zero value.
+func updateQuotationSalePerson(tx *gorm.DB, id uuid.UUID, code string) error {
+	return tx.Model(&models.Quotation{}).Where("id = ?", id).Update("sale_person_code", code).Error
 }
 
 func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
@@ -225,6 +233,14 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if err := tx.Model(&models.Quotation{}).
 			Where("id = ?", quotation.ID).
 			Updates(quotation).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
+		}
+
+		// GORM's struct Updates() skips zero-value fields, so it never clears
+		// sale_person_code back to "" (allow-clear, or switching the customer
+		// clears the sales person). Write it explicitly, every time.
+		if err := updateQuotationSalePerson(tx, quotation.ID, quotation.SalePersonCode); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
 		}
