@@ -189,14 +189,20 @@ ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}
                 echo "Build: ${HARBOR_IMAGE}:${GIT_COMMIT_SHORT}"
                 echo '=========================================='
 
-                sh '''
-                    set -e
+                withCredentials([
+                    string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
 
-                    docker build \
-                        -f "$K8S_CONFIG_DIR/Dockerfile" \
-                        -t "$HARBOR_IMAGE:$GIT_COMMIT_SHORT" \
-                        .
-                '''
+                        docker build \
+                            -f "$K8S_CONFIG_DIR/Dockerfile" \
+                            --build-arg GIT_TOKEN="$GIT_TOKEN" \
+                            -t "$HARBOR_IMAGE:$GIT_COMMIT_SHORT" \
+                            .
+                    '''
+                }
             }
         }
 

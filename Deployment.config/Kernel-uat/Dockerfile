@@ -10,6 +10,16 @@ ENV CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64
 
+# GOPRIVATE makes the go tool skip the public proxy for this module path and
+# fetch it straight from GitHub over git, which is why the token has to be here.
+# The token stays in this builder stage only: the final alpine stage copies just
+# the compiled binary and the .env, so nothing lands in the shipped image.
+ARG GIT_TOKEN
+ENV GOPRIVATE=github.com/prime-solution-dev/*
+RUN if [ -n "$GIT_TOKEN" ]; then \
+        git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
+
 COPY go.mod go.sum ./
 
 RUN set -e; \
