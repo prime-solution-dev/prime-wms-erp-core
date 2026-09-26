@@ -26,13 +26,17 @@ type CheckAutoApprovalResponse struct {
 	Message        string `json:"message"`
 }
 
-// CheckAutoApprovalRest แปลงเป็น context.Context ตามรูปแบบ phase B ของงานนี้ แต่ตัวแปร user
-// ที่ส่งต่อให้ CheckAutoApproval ยังคงเป็น "" เหมือนเดิมโดยตั้งใจ — ของเดิมอ่าน
-// ctx.GetString("user_code") ซึ่งไม่มี middleware ตัวไหนเคย c.Set มาก่อนเลย (มีแต่ "user")
-// จึงได้ค่าว่างเสมอมาตั้งแต่ก่อนแปลง ถ้าสลับไปอ่าน user จริงจาก requestcontext ตอนนี้
-// จะทำให้ request ที่ไม่ส่ง request_user_code (เดิม 400 เสมอ) เปลี่ยนไป auto-approve ด้วยตัวตนของ
-// ผู้ login แทน ซึ่งเป็นการเปลี่ยน workflow สิทธิ์อนุมัติ ไม่ใช่แค่ ctx-plumbing — พักไว้ให้เจ้าของ
-// ตัดสินใจ เหมือน Ruling 7 ของ create-sale.go (docs/superpowers/sdd/.../progress.md)
+// CheckAutoApprovalRest เป็นเส้นที่ไม่มีตัวตนฝั่ง server ส่งเข้า CheckAutoApproval เลย
+// ตัวตนมาจาก request_user_code ใน body เท่านั้น ไม่ส่งมา = ตอบ 400 ตามเดิม
+//
+// ของเดิมประกาศตัวแปร user แล้วอ่าน ctx.GetString("user_code") ซึ่งไม่มี middleware ตัวไหน
+// เคย c.Set คีย์นั้นเลย (มีแต่ "user") จึงได้ค่าว่างเสมอมาตั้งแต่ต้น — เป็น fallback ที่หลอกคนอ่าน
+// ว่ามีอยู่จริง จึงลบทิ้ง ไม่ได้เปลี่ยนพฤติกรรมอะไร
+//
+// เจตนาที่ไม่เอา user จาก token มาเป็น fallback: เส้นนี้เป็นด่านสิทธิ์ ถ้าให้มันเดาตัวตนจากคนที่
+// login อยู่ request ที่ลืมส่ง request_user_code จะเปลี่ยนจากถูกปฏิเสธ ไปเป็นอนุมัติผ่านเงียบๆ
+// (เจ้าของตัดสินใจไว้ 2026-09-26) ส่วนผู้เรียกภายในทั้ง 7 จุด — sale, quotation, purchase,
+// pre-purchase, credit — เรียก CheckAutoApproval ตรงๆ พร้อมส่ง user ของตัวเองมาให้อยู่แล้ว
 func CheckAutoApprovalRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CheckAutoApprovalRequest{}
 
@@ -46,9 +50,8 @@ func CheckAutoApprovalRest(ctx context.Context, jsonPayload string) (interface{}
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ""
-
-	return CheckAutoApproval(ctx, gormx, req, user)
+	// "" คือ "ไม่มีตัวตนจากฝั่ง server" — ดูเหตุผลใน doc comment ด้านบน
+	return CheckAutoApproval(ctx, gormx, req, "")
 }
 
 func CheckAutoApproval(ctx context.Context, gormx *gorm.DB, req CheckAutoApprovalRequest, user string) (*CheckAutoApprovalResponse, error) {
