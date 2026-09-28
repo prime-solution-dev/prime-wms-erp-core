@@ -88,7 +88,10 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
 		}
-		reqHook := req
+		var reqHook []models.Invoice
+		if err := json.Unmarshal(jsonBytesCreateInvoice, &reqHook); err != nil {
+			return nil, errors.New("failed to copy invoice request for hook: " + err.Error())
+		}
 		productCodes := []string{}
 		for i := range reqHook {
 			for it := range reqHook[i].InvoiceItem {
@@ -105,6 +108,25 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
+
+		productDebitReq := models.GetProductRequest{
+			ProductType: []string{"DEBIT_NOTE"},
+			SiteCode:    []string{req[0].SiteCode},
+			CompanyCode: []string{req[0].CompanyCode},
+		}
+
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(productDebitReq)
+		if errmapProduct != nil {
+			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+		}
+		firstProduct := models.GetProductsDetailComponent{}
+		hasProduct := false
+		for _, product := range mapProduct {
+			firstProduct = product
+			hasProduct = true
+			break
+		}
+
 		for i := range reqHook {
 			for it := range reqHook[i].InvoiceItem {
 				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
@@ -116,11 +138,15 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
 					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
 				}
+				if hasProduct {
+					reqHook[i].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+					reqHook[i].InvoiceItem[it].ProductName = firstProduct.ProductName
+				}
 			}
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
 		_, err := interfaceService.HookInterface(requestDataCreateHook)

@@ -88,7 +88,11 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
 		}
-		reqHook := req
+
+		var reqHook []models.Invoice
+		if err := json.Unmarshal(jsonBytesCreateInvoice, &reqHook); err != nil {
+			return nil, errors.New("failed to copy invoice request for hook: " + err.Error())
+		}
 		productCodes := []string{}
 		for i := range reqHook {
 			for it := range reqHook[i].InvoiceItem {
@@ -120,7 +124,7 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
 		_, err := interfaceService.HookInterface(requestDataCreateHook)
