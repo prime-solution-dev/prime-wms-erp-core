@@ -2,9 +2,16 @@
 # Stage 1: Builder
 # =========================================================
 
-FROM golang:1.25.0 AS builder
+FROM golang:1.25 AS builder
+
+ARG GIT_TOKEN
 
 WORKDIR /app
+
+ENV GOPRIVATE=github.com/prime-solution-dev/*
+ENV GOPROXY=https://proxy.golang.org,direct
+
+RUN git config --global url."https://${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
