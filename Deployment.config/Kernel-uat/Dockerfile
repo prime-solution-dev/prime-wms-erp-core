@@ -12,7 +12,6 @@ ENV GOPRIVATE=github.com/prime-solution-dev/*
 ENV GOPROXY=https://proxy.golang.org,direct
 
 RUN git config --global url."https://${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
-
 ENV CGO_ENABLED=0 \
     GOOS=linux \
     GOARCH=amd64
