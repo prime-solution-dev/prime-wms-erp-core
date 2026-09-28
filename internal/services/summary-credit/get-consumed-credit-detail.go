@@ -53,8 +53,13 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	resultConsumend := []ConsumedCreditDetail{}
 	invoiceCode := []string{}
+	invoiceCodeSet := make(map[string]struct{})
 	for _, resultValue := range result {
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
+			if _, exists := invoiceCodeSet[invoiceItemsValue.InvoiceCode]; exists {
+				continue
+			}
+			invoiceCodeSet[invoiceItemsValue.InvoiceCode] = struct{}{}
 			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 		}
 	}
@@ -125,13 +130,8 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, resultValue := range result {
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
 		consumedInvoiceItems := 0.0
+		seenInvoiceCodes := make(map[string]struct{})
 		for _, invoiceItemsValue := range resultValue.InvoiceItems {
-			invoicePaidAmount := 0.00
-			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
-			if exist {
-				invoicePaidAmount = paymentItemMap
-			}
-			invoiceCode = append(invoiceCode, invoiceItemsValue.InvoiceCode)
 			if invoiceItemsValue.InvoiceType == "AR" {
 				sumInvoiceTotalAmountAR += invoiceItemsValue.TotalAmount
 				//sumPaymentTotalAmountAR += invoicePaidAmount
@@ -139,6 +139,17 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if invoiceItemsValue.InvoiceType == "DN" {
 				sumInvoiceTotalAmountDN += invoiceItemsValue.TotalAmount
 				//sumPaymentTotalAmountDN += invoicePaidAmount
+			}
+
+			if _, exists := seenInvoiceCodes[invoiceItemsValue.InvoiceCode]; exists {
+				continue
+			}
+			seenInvoiceCodes[invoiceItemsValue.InvoiceCode] = struct{}{}
+
+			invoicePaidAmount := 0.00
+			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
+			if exist {
+				invoicePaidAmount = paymentItemMap
 			}
 			//invoiceAmount := invoiceItemsValue.TotalAmount
 			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
