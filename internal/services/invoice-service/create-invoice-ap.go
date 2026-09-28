@@ -187,7 +187,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
 		if !ok {
-			return nil, errors.New("invalid AP over-purchase validation response")
+			return nil, errors.New("invalid AP over-purchase validation response ")
 		}
 
 		for _, validation := range validateResponse.Datas {
