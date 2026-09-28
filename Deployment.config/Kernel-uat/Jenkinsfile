@@ -11,6 +11,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/kernal-uat.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.kernaluatWMS'
         ENV_FILE_KEY = 'kernaluat.env.document' 
+        DOCKERFILEPATH = 'Deployment.config/Kernel-uat/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -114,15 +115,27 @@ pipeline {
                 }
             }
         }
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    echo 'Building Docker image on remote server...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
-                }
+stage('Build Docker Image') {
+    steps {
+        script {
+            echo 'Building Docker image on remote server...'
+
+            withCredentials([
+                string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+            ]) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no -i '${SSH_KEY_PATH}' \
+                    '${REMOTE_USER}@${REMOTE_HOST}' \
+                    'cd ${REPO_NAME} && \
+                    docker build --no-cache \
+                    -f ${DOCKERFILEPATH} \
+                    --build-arg GIT_TOKEN="${GIT_TOKEN}" \
+                    -t ${IMAGE_NAME}:latest .'
+                """
             }
         }
+    }
+}
                 stage('Stop and Remove Old Container') {
             steps {
                 script {
