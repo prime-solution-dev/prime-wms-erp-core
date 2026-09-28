@@ -127,6 +127,7 @@ stage('Build Docker Image') {
                     '${REMOTE_USER}@${REMOTE_HOST}' \
                     'cd ${REPO_NAME} && \
                     docker build --no-cache \
+                    -f Deployment.config/Kernel-uat/Dockerfile \
                     --build-arg GIT_TOKEN="${GIT_TOKEN}" \
                     -t ${IMAGE_NAME}:latest .'
                 """
