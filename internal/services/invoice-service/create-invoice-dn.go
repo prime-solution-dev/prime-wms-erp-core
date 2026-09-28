@@ -137,8 +137,10 @@ func CreateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
 				}
 				if hasProduct {
-					reqHook[i].InvoiceItem[it].ProductCode = firstProduct.ProductCode
-					reqHook[i].InvoiceItem[it].ProductName = firstProduct.ProductName
+					if reqHook[i].InvoiceItem[it].ProductCode != "Transportation" && reqHook[i].InvoiceItem[it].ProductCode != "ADJUST" {
+						reqHook[i].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						reqHook[i].InvoiceItem[it].ProductName = firstProduct.ProductName
+					}
 				}
 			}
 		}
