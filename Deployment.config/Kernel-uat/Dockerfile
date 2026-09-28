@@ -2,7 +2,9 @@
 # Stage 1: Builder
 # =========================================================
 
-FROM golang:1.25.0 AS builder
+FROM golang:1.25 AS builder
+
+ARG GIT_TOKEN
 
 ARG GIT_TOKEN
 

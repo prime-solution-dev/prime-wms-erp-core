@@ -486,15 +486,17 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 						},
 						InventoryWeight: []models.InventoryWeightResponse{
 							{
-								ProductCode:  "0012345",
-								BatchNo:      "B-9",
-								SupplierName: "โรงงานเหล็ก",
-								SiteCode:     "S1",
-								SumQty:       3,
-								TotalQty:     7,
-								AvgWeight:    1.5,
-								WeightSpec:   2.5,
-								TotalWeight:  10.5,
+								ProductCode:   "0012345",
+								BatchNo:       "B-9",
+								SupplierName:  "โรงงานเหล็ก",
+								SiteCode:      "S1",
+								WarehouseCode: "07",
+								WarehouseName: "คลังสินค้าสำเร็จรูป",
+								SumQty:        3,
+								TotalQty:      7,
+								AvgWeight:     1.5,
+								WeightSpec:    2.5,
+								TotalWeight:   10.5,
 							},
 						},
 					},
@@ -557,13 +559,19 @@ func TestBuildExportTableTyped_MergesKeysSkipsInactiveAndFillsInventory(t *testi
 	if inv["code"] != "0012345" {
 		t.Fatalf("expected product code to stay a string, got %#v", inv["code"])
 	}
-	if inv["stock"] != float64(3) || inv["quantity"] != float64(3) {
-		t.Fatalf("expected stock and quantity to come from SumQty, got %#v / %#v", inv["stock"], inv["quantity"])
+	// คอลัมน์ "Stock" และ "โกดัง" แสดงคลังที่ของตั้งอยู่เหมือนกัน ไม่ใช่จำนวน
+	// (จำนวนอยู่ที่ quantity / stock_quantity)
+	if inv["stock"] != "คลังสินค้าสำเร็จรูป" {
+		t.Fatalf("expected stock to be the warehouse name, got %#v", inv["stock"])
+	}
+	if inv["quantity"] != float64(3) {
+		t.Fatalf("expected quantity to come from SumQty, got %#v", inv["quantity"])
 	}
 	if inv["stock_quantity"] != float64(7) {
 		t.Fatalf("expected stock_quantity to come from TotalQty, got %#v", inv["stock_quantity"])
 	}
-	if inv["warehouse"] != "S1" || inv["batch_no"] != "B-9" {
+	// เดิมคอลัมน์นี้ใส่ SiteCode ("S1") ซึ่งเป็นรหัส site ไม่ใช่คลัง
+	if inv["warehouse"] != "คลังสินค้าสำเร็จรูป" || inv["batch_no"] != "B-9" {
 		t.Fatalf("expected warehouse/batch_no from inventory, got %#v / %#v", inv["warehouse"], inv["batch_no"])
 	}
 	if inv["DYN_B"] != "แปลงแล้ว" {

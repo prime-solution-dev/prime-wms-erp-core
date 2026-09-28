@@ -51,14 +51,26 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		prefix = "CN"
 	}
 	configCodeValue := "RUNNING_CN"
-	count := len(req)
-	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
-	if err != nil {
-		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	count := 0
+	for i := range req {
+		if req[i].InvoiceCode == "" {
+			count++
+		}
 	}
+	var invoiceCodes []string
+	if count > 0 {
+		invoiceCodes, err = GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+		if err != nil {
+			return nil, errors.New("failed to generate invoice codes: " + err.Error())
+		}
+	}
+	codeIndex := 0
 	productCodes := []string{}
 	for i := range req {
-		req[i].InvoiceCode = invoiceCodes[i]
+		if req[i].InvoiceCode == "" {
+			req[i].InvoiceCode = invoiceCodes[codeIndex]
+			codeIndex++
+		}
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName

@@ -142,6 +142,20 @@ func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
+func CancelPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CancelPO(req.PurchaseCodes); err != nil {
+		return nil, errors.New("failed to cancel PO: " + err.Error())
+	}
+
+	return nil, nil
+}
+
 func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseItemRequest{}
 
@@ -154,4 +168,15 @@ func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+// ReconcilePOFromAP recomputes each PO's completion from persisted COMPLETED-AP
+// state (product-master tolerance, per-unit) and closes lines / headers.
+// Called after an AP invoice (GRA) is saved with status COMPLETED. productMap is
+// keyed by product_code and carries the gr_tolerance / gr_weight_tolerance master.
+func ReconcilePOFromAP(purchaseCodes []string, productMap map[string]models.GetProductsDetailComponent) error {
+	if err := purchaseRepository.ReconcilePOFromAP(purchaseCodes, productMap); err != nil {
+		return errors.New("failed to reconcile PO from AP: " + err.Error())
+	}
+	return nil
 }

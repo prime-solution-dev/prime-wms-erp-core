@@ -3,6 +3,7 @@ package creditService
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
@@ -68,7 +69,8 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	}
 	getDeposit := getDepositRes.(depositService.ResultDeposit).Deposit
 	for _, depositValue := range getDeposit {
-		remainDeposit += depositValue.AmountRemain
+		amountRemainVat := math.Round((depositValue.AmountRemain*1.07)*100) / 100
+		remainDeposit += amountRemainVat
 	}
 
 	requestDataGetConsumend := map[string]interface{}{

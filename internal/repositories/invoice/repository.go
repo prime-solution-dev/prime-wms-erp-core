@@ -13,7 +13,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time, invoiceNotGrReturn *bool) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time, invoiceNotGrReturn *bool, startCreateDate *time.Time, endCreateDate *time.Time, startDocumentDate *time.Time, endDocumentDate *time.Time, startLastSubmitDate *time.Time, endLastSubmitDate *time.Time) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -124,6 +124,25 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 	}
 	if lastSubmitDate != nil {
 		searchDocRef += fmt.Sprintf(" and DATE(invoice.submit_date) = DATE('%s') ", lastSubmitDate.Format("2006-01-02"))
+	}
+
+	if startCreateDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.create_dtm) >= DATE('%s') ", startCreateDate.Format("2006-01-02"))
+	}
+	if endCreateDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.create_dtm) <= DATE('%s') ", endCreateDate.Format("2006-01-02"))
+	}
+	if startDocumentDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.document_date) >= DATE('%s') ", startDocumentDate.Format("2006-01-02"))
+	}
+	if endDocumentDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.document_date) <= DATE('%s') ", endDocumentDate.Format("2006-01-02"))
+	}
+	if startLastSubmitDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.submit_date) >= DATE('%s') ", startLastSubmitDate.Format("2006-01-02"))
+	}
+	if endLastSubmitDate != nil {
+		searchDocRef += fmt.Sprintf(" and DATE(invoice.submit_date) <= DATE('%s') ", endLastSubmitDate.Format("2006-01-02"))
 	}
 
 	var invoiceID []uuid.UUID

@@ -252,12 +252,10 @@ func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResp
 		DocumentRef: []string{delivery.DeliveryCode},
 	}
 
-	fmt.Println("cancelOrderRequest : ", cancelOrderRequest)
 	cancelOrderResponse, err := orderExternalService.CancelOrder(cancelOrderRequest)
 	if err != nil {
 		return orderExternalService.CancelOrderResponse{}, errors.New("Error cancel order : " + err.Error())
 	}
-	fmt.Println("cancelOrderResponse : ", cancelOrderResponse)
 
 	return cancelOrderResponse, nil
 }

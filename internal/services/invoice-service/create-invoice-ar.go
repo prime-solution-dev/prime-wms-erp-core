@@ -7,12 +7,10 @@ import (
 	"math"
 	models "prime-erp-core/internal/models"
 	customerService "prime-erp-core/internal/services/customer-service"
-	depositService "prime-erp-core/internal/services/deposit-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"slices"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -52,14 +50,23 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		prefix = "IV"
 	}
 	configCodeValue := "RUNNING_AR"
-	count := len(req)
-	purchaseCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
-	if err != nil {
-		return nil, errors.New("failed to generate invoice codes: " + err.Error())
+	count := 0
+	for i := range req {
+		if req[i].InvoiceCode == "" {
+			count++
+		}
+	}
+	var purchaseCodes []string
+	if count > 0 {
+		purchaseCodes, err = GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+		if err != nil {
+			return nil, errors.New("failed to generate invoice codes: " + err.Error())
+		}
 	}
 
 	//depositCut := []models.Deposit{}
 	productCodes := []string{}
+	codeIndex := 0
 	for i := range req {
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
@@ -73,7 +80,10 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = conMapCustomer.TaxID
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 		}
-		req[i].InvoiceCode = purchaseCodes[i]
+		if req[i].InvoiceCode == "" {
+			req[i].InvoiceCode = purchaseCodes[codeIndex]
+			codeIndex++
+		}
 		/* for it := range req[i].InvoiceItem {
 			if req[i].InvoiceItem[it].ArticleType == "DEPOSIT" {
 				depositCut = append(depositCut, models.Deposit{
@@ -135,6 +145,17 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
 		if err != nil {
+			if req[0].Status == "COMPLETED" {
+				req[0].Status = "TEMP"
+				jsonBytesCreateInvoice, err := json.Marshal(req)
+				if err != nil {
+					return nil, err
+				}
+				_, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+				if errCreateInvoice != nil {
+					return nil, errCreateInvoice
+				}
+			}
 			return nil, err
 		}
 		if HookInterfaceValue != nil {
@@ -149,54 +170,6 @@ func CreateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			createInvoiceReturn, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
 			if errCreateInvoice != nil {
 				return nil, errCreateInvoice
-			}
-
-			if req[0].ExternalID != "" && req[0].Status == "COMPLETED" {
-				depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
-				if err != nil {
-					return nil, err
-				}
-				if len(depositMapResult) > 0 {
-					var deposit []models.Deposit
-
-					for _, v := range depositMapResult {
-						depMap, _ := v.(map[string]interface{})
-
-						totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
-						if err != nil {
-							totalFloat = 0
-						}
-						drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
-						if err != nil {
-							drFloat = 0
-						}
-						crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
-						if err != nil {
-							crFloat = 0
-						}
-
-						deposit = append(deposit, models.Deposit{
-							DepositCode:  depMap["anchor"].(string),
-							CustomerCode: req[0].PartyCode,
-							AmountTotal:  totalFloat,
-							AmountUsed:   drFloat,
-							AmountRemain: crFloat,
-							Status:       "PENDING",
-						})
-					}
-					if len(deposit) > 0 {
-						jsonBytesCreateDeposit, err := json.Marshal(deposit)
-						if err != nil {
-							return nil, err
-						}
-
-						_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
-						if errDeposit != nil {
-							return nil, errDeposit
-						}
-					}
-
-				}
 			}
 
 			return createInvoiceReturn, nil

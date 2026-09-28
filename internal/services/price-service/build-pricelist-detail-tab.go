@@ -114,7 +114,31 @@ func buildPricelistDetailTab(
 ) ExportTab {
 	cols := collectGroupColumns(groups, groupNameByCode, fixedColumns)
 
-	// ลำดับคอลัมน์ตามชีท Template ของไฟล์ตัวอย่าง
+	rows := make([]map[string]interface{}, 0)
+	for _, g := range groups {
+		for _, sg := range g.SubGroups {
+			if isInactiveSubGroup(sg.UdfJson) {
+				continue
+			}
+			rows = append(rows, pricelistDetailRow(g, sg, cols, itemNameByCode, formulas))
+		}
+	}
+
+	return ExportTab{
+		Name: "Template",
+		Headers: ExportTabHeaders{
+			Report:      "Pricelist Detail",
+			LastUpdated: formatOptionalTimestamp(lastUpdated),
+			Download:    formatTimestamp(time.Now()),
+		},
+		Columns: pricelistDetailColumns(cols),
+		Rows:    rows,
+	}
+}
+
+// pricelistDetailColumns คือลำดับคอลัมน์ตามชีท Template ของไฟล์ตัวอย่าง
+// ใช้ร่วมกันระหว่าง Pricelist Detail Report และ Product Pricelist Report
+func pricelistDetailColumns(cols []groupColumn) []ExportColumn {
 	columns := []ExportColumn{
 		{Field: "pricelist_group_name", HeaderName: "Pricelist group name"},
 	}
@@ -146,89 +170,79 @@ func buildPricelistDetailTab(
 		ExportColumn{Field: "formula_unit_code", HeaderName: "Price per unit formula code"},
 		ExportColumn{Field: "subgroup_code", HeaderName: "subgroup_code"},
 	)
+	return columns
+}
 
-	rows := make([]map[string]interface{}, 0)
-	for _, g := range groups {
-		// ชื่อกลุ่มมาจาก price_list_group.group_name ตรง ๆ — group_code ของ price list
-		// (เช่น GROUP_1_ITEM_1) ไม่มีอยู่ในตาราง group_item จึง resolve ทางนั้นไม่ได้
-		groupName := strings.TrimSpace(g.GroupName)
-		if groupName == "" {
-			groupName = g.GroupCode
+// pricelistDetailRow ประกอบแถวของ subgroup หนึ่งตัว — ผู้เรียกต้องกรอง inactive เอง
+func pricelistDetailRow(
+	g GetPriceListGroupResponse,
+	sg SubGroup,
+	cols []groupColumn,
+	itemNameByCode func(code string) (string, bool),
+	formulas map[string][]priceListRepository.SubgroupFormula,
+) map[string]interface{} {
+	// ชื่อกลุ่มมาจาก price_list_group.group_name ตรง ๆ — group_code ของ price list
+	// (เช่น GROUP_1_ITEM_1) ไม่มีอยู่ในตาราง group_item จึง resolve ทางนั้นไม่ได้
+	groupName := strings.TrimSpace(g.GroupName)
+	if groupName == "" {
+		groupName = g.GroupCode
+	}
+
+	row := map[string]interface{}{
+		"pricelist_group_name": groupName,
+		"pricelist_group_code": g.GroupCode,
+		"subgroup_code":        sg.SubgroupCode,
+		"price_per_kg":         sg.TotalNetPriceWeight,
+		"price_per_unit":       sg.TotalNetPriceUnit,
+		"extra_price":          sg.ExtraPriceWeight,
+		"avg_weight":           float64(0),
+		"formula_kg_name":      "",
+		"formula_kg_code":      "",
+		"formula_unit_name":    "",
+		"formula_unit_code":    "",
+	}
+
+	// เติมเซลล์ว่างให้ทุกคอลัมน์กลุ่มก่อน เพื่อไม่ให้แถวที่ไม่มีกลุ่มนั้น
+	// เหลือ key ขาดหายจนอ่านค่าไม่ได้ตอนเขียนไฟล์
+	for _, c := range cols {
+		row[c.code] = ""
+		row[c.code+groupCodeColumnSuffix] = ""
+	}
+	for _, k := range sg.GroupKeys {
+		if k.Code == "" {
+			continue
 		}
+		name, found := itemNameByCode(k.Value)
+		if !found {
+			name = k.Value
+		}
+		row[k.Code] = name
+		row[k.Code+groupCodeColumnSuffix] = k.Value
+	}
 
-		for _, sg := range g.SubGroups {
-			if isInactiveSubGroup(sg.UdfJson) {
-				continue
-			}
+	// total_weight คือคอลัมน์ที่ผู้ใช้เห็นชื่อ "Weight-spec" ค่าที่ถูกต้องคือน้ำหนัก
+	// ของ base unit จาก product master ไม่ใช่ inv.TotalWeight ซึ่งเป็นน้ำหนักรวม
+	// ของสต็อก และต้อง set นอกเงื่อนไข len(InventoryWeight) > 0 เพราะสินค้าที่
+	// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
+	row["total_weight"] = sg.WeightSpec
 
-			row := map[string]interface{}{
-				"pricelist_group_name": groupName,
-				"pricelist_group_code": g.GroupCode,
-				"subgroup_code":        sg.SubgroupCode,
-				"price_per_kg":         sg.TotalNetPriceWeight,
-				"price_per_unit":       sg.TotalNetPriceUnit,
-				"extra_price":          sg.ExtraPriceWeight,
-				"avg_weight":           float64(0),
-				"formula_kg_name":      "",
-				"formula_kg_code":      "",
-				"formula_unit_name":    "",
-				"formula_unit_code":    "",
-			}
+	// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
+	if len(sg.InventoryWeight) > 0 {
+		row["avg_weight"] = sg.InventoryWeight[0].AvgProduct
+	}
 
-			// เติมเซลล์ว่างให้ทุกคอลัมน์กลุ่มก่อน เพื่อไม่ให้แถวที่ไม่มีกลุ่มนั้น
-			// เหลือ key ขาดหายจนอ่านค่าไม่ได้ตอนเขียนไฟล์
-			for _, c := range cols {
-				row[c.code] = ""
-				row[c.code+groupCodeColumnSuffix] = ""
-			}
-			for _, k := range sg.GroupKeys {
-				if k.Code == "" {
-					continue
-				}
-				name, found := itemNameByCode(k.Value)
-				if !found {
-					name = k.Value
-				}
-				row[k.Code] = name
-				row[k.Code+groupCodeColumnSuffix] = k.Value
-			}
-
-			// total_weight คือคอลัมน์ที่ผู้ใช้เห็นชื่อ "Weight-spec" ค่าที่ถูกต้องคือน้ำหนัก
-			// ของ base unit จาก product master ไม่ใช่ inv.TotalWeight ซึ่งเป็นน้ำหนักรวม
-			// ของสต็อก และต้อง set นอกเงื่อนไข len(InventoryWeight) > 0 เพราะสินค้าที่
-			// ไม่มีสต็อกก็ต้องแสดง Weight-spec ได้
-			row["total_weight"] = sg.WeightSpec
-
-			// AvgProduct คือค่าเฉลี่ยระดับ site ตรงตามนิยาม "Avg. kg stock"
-			if len(sg.InventoryWeight) > 0 {
-				row["avg_weight"] = sg.InventoryWeight[0].AvgProduct
-			}
-
-			for _, f := range formulas[sg.SubgroupCode] {
-				switch f.Uom {
-				case "kg":
-					row["formula_kg_name"] = f.Name
-					row["formula_kg_code"] = f.FormulaCode
-				case "pcs":
-					row["formula_unit_name"] = f.Name
-					row["formula_unit_code"] = f.FormulaCode
-				}
-			}
-
-			rows = append(rows, row)
+	for _, f := range formulas[sg.SubgroupCode] {
+		switch f.Uom {
+		case "kg":
+			row["formula_kg_name"] = f.Name
+			row["formula_kg_code"] = f.FormulaCode
+		case "pcs":
+			row["formula_unit_name"] = f.Name
+			row["formula_unit_code"] = f.FormulaCode
 		}
 	}
 
-	return ExportTab{
-		Name: "Template",
-		Headers: ExportTabHeaders{
-			Report:      "Pricelist Detail",
-			LastUpdated: formatOptionalTimestamp(lastUpdated),
-			Download:    formatTimestamp(time.Now()),
-		},
-		Columns: columns,
-		Rows:    rows,
-	}
+	return row
 }
 
 // isInactiveSubGroup อ่าน flag inactive จาก udf_json — แถวที่ inactive ไม่ถูก export

@@ -689,4 +689,3 @@ func TestGetGroupCodeFromConfig(t *testing.T) {
 	result = getGroupCodeFromConfig(emptyConfig, nil, "productGroup2", "PRODUCT_GROUP2")
 	assert.Equal(t, "PRODUCT_GROUP2", result)
 }
-

@@ -91,7 +91,7 @@
           "cellStyle": {
             "textAlign": "center"
           },
-          "dataMapping": "stock"
+          "dataMapping": "warehouse"
         },
         {
           "field": "is_highlight",

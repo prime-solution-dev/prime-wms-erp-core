@@ -112,7 +112,7 @@
           "field": "stock",
           "headerName": "Stock",
           "width": 110,
-          "dataMapping": "stock"
+          "dataMapping": "warehouse"
         },
         {
           "field": "total_weight",

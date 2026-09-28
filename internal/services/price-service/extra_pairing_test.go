@@ -18,10 +18,7 @@ func TestCalculateExtraForSubGroupReturnsWeightThenUnit(t *testing.T) {
 		ExtraPriceUnit:   10.0,
 	}
 
-	extraWeight, extraUnit, err := calculateExtraForSubGroup(subGroup)
-	if err != nil {
-		t.Fatalf("คำนวณ extra ล้มเหลว: %v", err)
-	}
+	extraWeight, extraUnit := calculateExtraForSubGroup(subGroup, groupItemValueInts{})
 
 	if extraWeight != 5.0 {
 		t.Errorf("ค่าที่คืนตัวแรก = %v ต้องเป็น 5.0 (ExtraPriceWeight)", extraWeight)

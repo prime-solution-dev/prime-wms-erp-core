@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	externalProductService "prime-erp-core/external/product-service"
 	"prime-erp-core/internal/db"
-	"prime-erp-core/internal/models"
 	"strconv"
 	"strings"
 
@@ -23,7 +23,7 @@ type ValidateAPOverPurchaseRequestData struct {
 	PurchaseItem string  `json:"purchase_item"`
 	Qty          float64 `json:"qty"`
 	TotalWeight  float64 `json:"total_weight"`
-	ValidateUnit string  `json:"validate_unit"` //WEIGHT, UNIT
+	ValidateUnit string  `json:"validate_unit"` // Deprecated: validation uses purchase_item.purchase_unit.
 }
 
 type ValidateAPOverPurchaseResponse struct {
@@ -43,8 +43,17 @@ type ValidateAPOverPurchaseResponseData struct {
 }
 
 type apOverPurchaseAmount struct {
-	Qty         float64
-	TotalWeight float64
+	PurchaseUnit string
+	ProductCode  string
+	CompanyCode  string
+	SiteCode     string
+	Qty          float64
+	TotalWeight  float64
+}
+
+type apOverPurchaseTolerance struct {
+	Qty    float64
+	Weight float64
 }
 
 const apOverPurchaseEpsilon = 0.0000001
@@ -74,11 +83,6 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 		return res, nil
 	}
 
-	tolerance, err := getAPOverPurchaseTolerance(gormx)
-	if err != nil {
-		return nil, err
-	}
-
 	purchaseCodes := uniquePurchaseCodes(req.Datas)
 	purchaseItems := uniquePurchaseItems(req.Datas)
 	poMap, err := loadPurchaseAmounts(gormx, purchaseCodes, purchaseItems)
@@ -90,7 +94,12 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 		return nil, err
 	}
 
-	res.Datas = validateAPOverPurchaseLines(req.Datas, poMap, usedMap, tolerance)
+	tolerances, err := loadAPOverPurchaseTolerances(poMap)
+	if err != nil {
+		return nil, err
+	}
+
+	res.Datas = validateAPOverPurchaseLines(req.Datas, poMap, usedMap, tolerances)
 	for _, data := range res.Datas {
 		if data.Status == "ERROR" {
 			res.Message = "validation failed"
@@ -102,12 +111,12 @@ func ValidateAPOverPurchase(ctx *gin.Context, gormx *gorm.DB, req ValidateAPOver
 }
 
 // validateAPOverPurchaseLines checks all request lines after grouping duplicate PO items.
-// UNIT compares quantity; WEIGHT compares total weight.
-func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMap map[string]apOverPurchaseAmount, usedMap map[string]apOverPurchaseAmount, tolerance float64) []ValidateAPOverPurchaseResponseData {
+// The PO purchase unit selects quantity (PC) or total weight (KG).
+func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMap map[string]apOverPurchaseAmount, usedMap map[string]apOverPurchaseAmount, tolerances map[string]apOverPurchaseTolerance) []ValidateAPOverPurchaseResponseData {
 	requested := map[string]float64{}
 	for _, line := range lines {
 		key := purchaseItemKey(line.PurchaseCode, line.PurchaseItem)
-		unit := strings.ToUpper(strings.TrimSpace(line.ValidateUnit))
+		unit := apValidationUnit(poMap[key].PurchaseUnit)
 		amount := requestedAmount(line, unit)
 		if key == "|" || (unit != "UNIT" && unit != "WEIGHT") || amount < 0 {
 			continue
@@ -119,7 +128,9 @@ func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMa
 	for index, line := range lines {
 		purchaseCode := strings.TrimSpace(line.PurchaseCode)
 		purchaseItem := strings.TrimSpace(line.PurchaseItem)
-		unit := strings.ToUpper(strings.TrimSpace(line.ValidateUnit))
+		key := purchaseItemKey(purchaseCode, purchaseItem)
+		poAmount, exists := poMap[key]
+		unit := apValidationUnit(poAmount.PurchaseUnit)
 		response := ValidateAPOverPurchaseResponseData{
 			PurchaseCode: purchaseCode,
 			PurchaseItem: purchaseItem,
@@ -133,8 +144,13 @@ func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMa
 			responses = append(responses, response)
 			continue
 		}
+		if !exists {
+			response.Message = "purchase item was not found"
+			responses = append(responses, response)
+			continue
+		}
 		if unit != "UNIT" && unit != "WEIGHT" {
-			response.Message = "validate_unit must be UNIT or WEIGHT"
+			response.Message = "purchase_unit must be PC or KG"
 			responses = append(responses, response)
 			continue
 		}
@@ -146,15 +162,11 @@ func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMa
 			continue
 		}
 
-		key := purchaseItemKey(purchaseCode, purchaseItem)
-		poAmount, exists := poMap[key]
-		if !exists {
-			response.Message = "purchase item was not found"
-			responses = append(responses, response)
-			continue
-		}
-
 		base, used := validationAmounts(unit, poAmount, usedMap[key])
+		tolerance := tolerances[key].Qty
+		if unit == "WEIGHT" {
+			tolerance = tolerances[key].Weight
+		}
 		allowed := base * (1 + tolerance/100)
 		requestedTotal := requested[key+"|"+unit]
 		remain := allowed - used - requestedTotal
@@ -181,24 +193,55 @@ func validateAPOverPurchaseLines(lines []ValidateAPOverPurchaseRequestData, poMa
 	return responses
 }
 
-func getAPOverPurchaseTolerance(gormx *gorm.DB) (float64, error) {
-	var config models.SystemConfig
-	result := gormx.Where("topic_code = ? AND config_code = ?", "INVOICE", "AP").Limit(1).Find(&config)
-	if result.Error != nil {
-		return 0, fmt.Errorf("failed to load INVOICE/AP tolerance config: %w", result.Error)
+// Missing products or unset numeric fields keep the zero tolerance default.
+func loadAPOverPurchaseTolerances(poMap map[string]apOverPurchaseAmount) (map[string]apOverPurchaseTolerance, error) {
+	type scope struct{ company, site string }
+	groups := map[scope]map[string]bool{}
+	for _, po := range poMap {
+		if strings.TrimSpace(po.ProductCode) == "" {
+			continue
+		}
+		key := scope{po.CompanyCode, po.SiteCode}
+		if groups[key] == nil {
+			groups[key] = map[string]bool{}
+		}
+		groups[key][po.ProductCode] = true
 	}
-	if result.RowsAffected == 0 {
-		return 0, fmt.Errorf("INVOICE/AP tolerance config was not found")
+	tolerances := map[string]apOverPurchaseTolerance{}
+	for group, codes := range groups {
+		productCodes := make([]string, 0, len(codes))
+		for code := range codes {
+			productCodes = append(productCodes, code)
+		}
+		products := map[string]apOverPurchaseTolerance{}
+		totalPages := 1
+		for page := 1; page <= totalPages; page++ {
+			res, err := externalProductService.GetProduct(externalProductService.GetProductRequest{
+				CompanyCode: []string{group.company}, SiteCode: []string{group.site},
+				ProductCode: productCodes, Page: page, PageSize: 1000,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to load product tolerance: %w", err)
+			}
+			if res.TotalPages > totalPages {
+				totalPages = res.TotalPages
+			}
+			for _, product := range res.Products {
+				if product.GRTolerance < 0 || product.GRWeightTolerance < 0 {
+					return nil, fmt.Errorf("product %s tolerance must not be negative", product.ProductCode)
+				}
+				products[strings.ToUpper(strings.TrimSpace(product.ProductCode))] = apOverPurchaseTolerance{
+					Qty: product.GRTolerance, Weight: product.GRWeightTolerance,
+				}
+			}
+		}
+		for key, po := range poMap {
+			if po.CompanyCode == group.company && po.SiteCode == group.site {
+				tolerances[key] = products[strings.ToUpper(strings.TrimSpace(po.ProductCode))]
+			}
+		}
 	}
-
-	tolerance, err := strconv.ParseFloat(strings.TrimSpace(config.Value), 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid INVOICE/AP tolerance value %q: %w", config.Value, err)
-	}
-	if tolerance < 0 {
-		return 0, fmt.Errorf("INVOICE/AP tolerance must not be negative")
-	}
-	return tolerance, nil
+	return tolerances, nil
 }
 
 func loadPurchaseAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) (map[string]apOverPurchaseAmount, error) {
@@ -208,6 +251,10 @@ func loadPurchaseAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) 
 	}
 
 	type purchaseRow struct {
+		PurchaseUnit string  `gorm:"column:purchase_unit"`
+		ProductCode  string  `gorm:"column:product_code"`
+		CompanyCode  string  `gorm:"column:company_code"`
+		SiteCode     string  `gorm:"column:site_code"`
 		PurchaseCode string  `gorm:"column:purchase_code"`
 		PurchaseItem string  `gorm:"column:purchase_item"`
 		Qty          float64 `gorm:"column:qty"`
@@ -215,7 +262,7 @@ func loadPurchaseAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) 
 	}
 	rows := []purchaseRow{}
 	if err := gormx.Table("purchase p").
-		Select("p.purchase_code, pi.purchase_item, pi.qty, pi.total_weight").
+		Select("p.purchase_code, pi.purchase_item, pi.qty, pi.total_weight, pi.purchase_unit, pi.product_code, p.company_code, p.site_code").
 		Joins("JOIN purchase_item pi ON pi.purchase_id = p.id").
 		Where("p.purchase_code IN ?", purchaseCodes).
 		Where("pi.purchase_item IN ?", purchaseItems).
@@ -225,8 +272,12 @@ func loadPurchaseAmounts(gormx *gorm.DB, purchaseCodes, purchaseItems []string) 
 
 	for _, row := range rows {
 		amounts[purchaseItemKey(row.PurchaseCode, row.PurchaseItem)] = apOverPurchaseAmount{
-			Qty:         row.Qty,
-			TotalWeight: row.TotalWeight,
+			Qty:          row.Qty,
+			TotalWeight:  row.TotalWeight,
+			ProductCode:  row.ProductCode,
+			PurchaseUnit: row.PurchaseUnit,
+			CompanyCode:  row.CompanyCode,
+			SiteCode:     row.SiteCode,
 		}
 	}
 	return amounts, nil
@@ -304,6 +355,17 @@ func uniquePurchaseItems(lines []ValidateAPOverPurchaseRequestData) []string {
 
 func purchaseItemKey(purchaseCode, purchaseItem string) string {
 	return strings.ToUpper(strings.TrimSpace(purchaseCode)) + "|" + strings.ToUpper(strings.TrimSpace(purchaseItem))
+}
+
+func apValidationUnit(purchaseUnit string) string {
+	switch strings.ToUpper(strings.TrimSpace(purchaseUnit)) {
+	case "PC":
+		return "UNIT"
+	case "KG":
+		return "WEIGHT"
+	default:
+		return ""
+	}
 }
 
 func requestedAmount(line ValidateAPOverPurchaseRequestData, validateUnit string) float64 {
