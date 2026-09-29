@@ -108,6 +108,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for _, invoiceItem := range resultInvoiceDepositValue.InvoiceItem {
 				if invoiceItem.ArticleType == "DEPOSIT" {
 					resultInvoiceDepositMap[resultInvoiceDepositValue.InvoiceCode] += invoiceItem.TotalAmount
+					sumPaidInvoice += invoiceItem.TotalAmount
 				}
 			}
 		}
