@@ -52,14 +52,6 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		creditLimit += creditValue.Amount
 		for _, creditExtraValue := range creditValue.CreditExtra {
 			increaseCreditLimit += creditExtraValue.Amount
-			/* if creditValue.EffectiveDtm == nil {
-				increaseCreditLimit += creditExtraValue.Amount
-			} else {
-				if creditValue.EffectiveDtm.After(time.Now()) || creditValue.EffectiveDtm.Equal(time.Now()) {
-					increaseCreditLimit += creditExtraValue.Amount
-				}
-			} */
-
 		}
 	}
 
@@ -89,17 +81,14 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
 
 	totalCreditLimit := creditLimit + increaseCreditLimit
-	/* consumedCredit := (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-	resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR - resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit */
-	consumedCredit := resultGetPaidInvoice.TotalAmount - remainDeposit
+	consumedCredit := resultGetPaidInvoice.PaidInvoice - remainDeposit
 
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,
 		IncreaseCreditLimit: increaseCreditLimit,
 		TotalCreditLimit:    totalCreditLimit,
-		ConsumedCredit:      consumedCredit, /* math.Round(consumedCredit*100) / 100 */
-
-		BalanceCreditLimit: totalCreditLimit - consumedCredit,
+		ConsumedCredit:      consumedCredit,
+		BalanceCreditLimit:  totalCreditLimit - consumedCredit,
 	}
 
 	return resultSummaryCredit, nil
