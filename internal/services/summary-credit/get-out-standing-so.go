@@ -65,13 +65,13 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	for _, paymentValue := range resultPayment {
 		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
 
-			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
+			/* paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
 			if exist {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentValue.Amount
 			} else {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
-			}
-
+			} */
+			paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
 		}
 
 	}
@@ -96,7 +96,8 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
 			if exist {
-				paidSale += paymentItemMap
+				//paidSale += paymentItemMap
+				paidSale = paymentItemMap
 			}
 
 		}
