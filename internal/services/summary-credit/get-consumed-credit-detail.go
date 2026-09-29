@@ -67,6 +67,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	paymentValueMap := map[string]float64{}
 	sumPaidInvoice := 0.00
 	resultInvoiceMap := map[string][]models.Invoice{}
+	resultInvoiceDepositMap := map[string]float64{}
 	if len(invoiceCode) > 0 {
 		invoiceForPayment := slices.Clone(invoiceCode)
 
@@ -86,6 +87,27 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		for _, resultInvoiceValue := range resultInvoice {
 			invoiceForPayment = append(invoiceForPayment, resultInvoiceValue.InvoiceCode)
 			resultInvoiceMap[resultInvoiceValue.InvoiceRef] = append(resultInvoiceMap[resultInvoiceValue.InvoiceRef], resultInvoiceValue)
+		}
+
+		requestDataGetInvoiceDeposit := map[string]interface{}{
+			"invoice_code": invoiceCode,
+		}
+		jsonBytesGetInvoiceDeposit, err := json.Marshal(requestDataGetInvoiceDeposit)
+		if err != nil {
+			return nil, err
+		}
+		invoiceDeposit, errGetInvoiceDeposit := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoiceDeposit))
+		if errGetInvoiceDeposit != nil {
+			return nil, errGetInvoice
+		}
+		resultInvoiceDeposit := invoiceDeposit.(invoiceService.ResultInvoice).Invoice
+
+		for _, resultInvoiceDepositValue := range resultInvoiceDeposit {
+			for _, invoiceItem := range resultInvoiceDepositValue.InvoiceItem {
+				if invoiceItem.ArticleType == "DEPOSIT" {
+					resultInvoiceDepositMap[resultInvoiceDepositValue.InvoiceCode] += invoiceItem.TotalAmount
+				}
+			}
 		}
 
 		requestDataGetPayment := map[string]interface{}{
@@ -141,28 +163,38 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoicePaidAmount := 0.00
 			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
 			if exist {
-				invoicePaidAmount = paymentItemMap
+				invoicePaidAmount += paymentItemMap
 			}
+			paymentItemMapDeposit, existDeposit := resultInvoiceDepositMap[invoiceItemsValue.InvoiceCode]
+			if existDeposit {
+				invoicePaidAmount += paymentItemMapDeposit
+			}
+
+			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
+				InvoiceCode:       invoiceItemsValue.InvoiceCode,
+				InvoiceAmount:     invoiceAmount,
+				InvoicePaidAmount: invoicePaidAmount,
+				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
+			})
 
 			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
 			if existResultInvoiceMap {
 
 				for _, invoiceItemMapValue := range invoiceItemMap {
 					amount := invoiceItemMapValue.TotalAmount
+					paidAmount := 0.00
 					if invoiceItemMapValue.InvoiceType == "DN" {
-						//sumPaymentTotalAmountDN += invoicePaidAmount
-						amount = -math.Abs(invoiceItemMapValue.TotalAmount)
+						paymentItemMap, exist := paymentValueMap[invoiceItemMapValue.InvoiceCode]
+						if exist {
+							paidAmount = paymentItemMap
+							sumPaymentTotalAmountDN += paymentItemMap
+						}
 						sumInvoiceTotalAmountDN += invoiceItemMapValue.TotalAmount
 					}
 
 					if invoiceItemsValue.InvoiceType == "CN" {
+						amount = -math.Abs(invoiceItemMapValue.TotalAmount)
 						sumInvoiceTotalAmountCN += invoiceItemMapValue.TotalAmount
-					}
-
-					paidAmount := 0.00
-					paymentItemMap, exist := paymentValueMap[invoiceItemMapValue.InvoiceCode]
-					if exist {
-						paidAmount = paymentItemMap
 					}
 
 					consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
@@ -175,12 +207,6 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 			}
 
-			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
-				InvoiceCode:       invoiceItemsValue.InvoiceCode,
-				InvoiceAmount:     invoiceAmount,
-				InvoicePaidAmount: invoicePaidAmount,
-				ConsumedAmount:    invoiceAmount - invoicePaidAmount,
-			})
 			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 		}
 
