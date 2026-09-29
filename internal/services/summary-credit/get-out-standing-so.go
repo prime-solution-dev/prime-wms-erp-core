@@ -3,9 +3,12 @@ package summaryService
 import (
 	"encoding/json"
 	"errors"
+	"prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
 	customerService "prime-erp-core/internal/services/customer-service"
+	invoiceService "prime-erp-core/internal/services/invoice-service"
 	paymentService "prime-erp-core/internal/services/payment-service"
+	"slices"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -45,35 +48,74 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 			customerCode = append(customerCode, resultValue.Sale.CustomerCode)
 		}
 	}
-
-	requestDataGetPayment := map[string]interface{}{
-		"invoice_code": invoiceCode,
-	}
-
-	jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
-	if err != nil {
-		return nil, err
-	}
-
-	paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
-	if errGetPayment != nil {
-		return nil, errGetPayment
-	}
-	resultPayment := paymentle.(paymentService.ResultPayment).Payment
 	paymentValueMap := map[string]float64{}
+	resultInvoiceDepositMap := map[string]float64{}
+	resultInvoiceMap := map[string][]models.Invoice{}
+	if len(invoiceCode) > 0 {
 
-	for _, paymentValue := range resultPayment {
-		for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+		invoiceForPayment := slices.Clone(invoiceCode)
 
-			/* paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
-			if exist {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentValue.Amount
-			} else {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
-			} */
-			paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
+		requestDataGetInvoice := map[string]interface{}{
+			"invoice_ref": invoiceCode,
+			"status":      []string{"COMPLETED"},
+		}
+		jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
+		if err != nil {
+			return nil, err
+		}
+		invoice, errGetInvoice := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoice))
+		if errGetInvoice != nil {
+			return nil, errGetInvoice
+		}
+		resultInvoice := invoice.(invoiceService.ResultInvoice).Invoice
+
+		for _, resultInvoiceValue := range resultInvoice {
+			invoiceForPayment = append(invoiceForPayment, resultInvoiceValue.InvoiceCode)
+			resultInvoiceMap[resultInvoiceValue.InvoiceRef] = append(resultInvoiceMap[resultInvoiceValue.InvoiceRef], resultInvoiceValue)
 		}
 
+		requestDataGetPayment := map[string]interface{}{
+			"invoice_code": invoiceForPayment,
+		}
+
+		jsonBytesPayment, err := json.Marshal(requestDataGetPayment)
+		if err != nil {
+			return nil, err
+		}
+
+		paymentle, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+		if errGetPayment != nil {
+			return nil, errGetPayment
+		}
+		resultPayment := paymentle.(paymentService.ResultPayment).Payment
+
+		for _, paymentValue := range resultPayment {
+			for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
+			}
+		}
+
+		requestDataGetInvoiceDeposit := map[string]interface{}{
+			"invoice_code": invoiceCode,
+			"status":       []string{"COMPLETED"},
+		}
+		jsonBytesGetInvoiceDeposit, err := json.Marshal(requestDataGetInvoiceDeposit)
+		if err != nil {
+			return nil, err
+		}
+		invoiceDeposit, errGetInvoiceDeposit := invoiceService.GetInvoice(ctx, string(jsonBytesGetInvoiceDeposit))
+		if errGetInvoiceDeposit != nil {
+			return nil, errGetInvoiceDeposit
+		}
+		resultInvoiceDeposit := invoiceDeposit.(invoiceService.ResultInvoice).Invoice
+
+		for _, resultInvoiceDepositValue := range resultInvoiceDeposit {
+			for _, invoiceItem := range resultInvoiceDepositValue.InvoiceItem {
+				if invoiceItem.ArticleType == "DEPOSIT" {
+					resultInvoiceDepositMap[resultInvoiceDepositValue.InvoiceCode] += invoiceItem.TotalAmount
+				}
+			}
+		}
 	}
 
 	requestData := map[string]interface{}{
@@ -96,8 +138,22 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 			paymentItemMap, exist := paymentValueMap[invoiceItemsValue.InvoiceCode]
 			if exist {
-				//paidSale += paymentItemMap
-				paidSale = paymentItemMap
+				paidSale += paymentItemMap
+			}
+			paymentItemMapDeposit, existDeposit := resultInvoiceDepositMap[invoiceItemsValue.InvoiceCode]
+			if existDeposit {
+				paidSale += paymentItemMapDeposit
+			}
+			invoiceItemMap, existResultInvoiceMap := resultInvoiceMap[invoiceItemsValue.InvoiceCode]
+			if existResultInvoiceMap {
+				for _, invoiceItemMapValue := range invoiceItemMap {
+					if invoiceItemMapValue.InvoiceType == "DN" {
+						paymentItemMap, exist := paymentValueMap[invoiceItemMapValue.InvoiceCode]
+						if exist {
+							paidSale += paymentItemMap
+						}
+					}
+				}
 			}
 
 		}
@@ -117,7 +173,9 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 			OutStandingSo: resultValue.Sale.TotalAmount - paidSale,
 			StatusPayment: resultValue.Sale.StatusPayment,
 		}
-		resultOutStandingSoRes = append(resultOutStandingSoRes, detail)
+		if (resultValue.Sale.TotalAmount - paidSale) != 0 {
+			resultOutStandingSoRes = append(resultOutStandingSoRes, detail)
+		}
 	}
 
 	return resultOutStandingSoRes, nil

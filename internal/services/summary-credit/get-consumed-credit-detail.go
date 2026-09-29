@@ -65,7 +65,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 	paymentValueMap := map[string]float64{}
-	sumPaidInvoice := 0.00
+
 	resultInvoiceMap := map[string][]models.Invoice{}
 	resultInvoiceDepositMap := map[string]float64{}
 	if len(invoiceCode) > 0 {
@@ -131,7 +131,6 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
 			}
-			sumPaidInvoice += paymentValue.Amount
 		}
 	}
 
@@ -141,8 +140,11 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	sumInvoiceTotalAmountDN := 0.00
 	sumPaymentTotalAmountDN := 0.00
 	sumPaymentTotalAmountAR := 0.00
-
+	sumPaidInvoice := 0.00
 	for _, resultValue := range result {
+		sumInvoiceItemTotalAmountAR := 0.00
+		sumInvoiceItemTotalAmountCN := 0.00
+		sumInvoiceItemTotalAmountDN := 0.00
 		consumedCreditInvoice := []ConsumedCreditInvoice{}
 		consumedInvoiceItems := 0.0
 		seenInvoiceCodes := make(map[string]struct{})
@@ -150,14 +152,15 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceAmount := invoiceItemsValue.InvoiceTotalAmount
 
 			if invoiceItemsValue.InvoiceType == "AR" {
-				sumInvoiceTotalAmountAR = invoiceItemsValue.InvoiceTotalAmount
+				sumInvoiceItemTotalAmountAR = invoiceItemsValue.InvoiceTotalAmount
+
 			}
 			if invoiceItemsValue.InvoiceType == "DN" {
-				sumInvoiceTotalAmountDN = invoiceItemsValue.InvoiceTotalAmount
+				sumInvoiceItemTotalAmountDN = invoiceItemsValue.InvoiceTotalAmount
 			}
 			if invoiceItemsValue.InvoiceType == "CN" {
 				invoiceAmount = -math.Abs(invoiceItemsValue.InvoiceTotalAmount)
-				sumInvoiceTotalAmountCN = invoiceItemsValue.InvoiceTotalAmount
+				sumInvoiceItemTotalAmountCN = invoiceItemsValue.InvoiceTotalAmount
 			}
 
 			if _, exists := seenInvoiceCodes[invoiceItemsValue.InvoiceCode]; exists {
@@ -174,7 +177,14 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			if existDeposit {
 				invoicePaidAmount += paymentItemMapDeposit
 			}
+			if invoiceItemsValue.InvoiceType == "DN" {
+				sumPaymentTotalAmountDN += invoicePaidAmount
+			}
+			if invoiceItemsValue.InvoiceType == "AR" {
+				sumPaymentTotalAmountAR += invoicePaidAmount
+			}
 
+			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 			consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 				InvoiceCode:       invoiceItemsValue.InvoiceCode,
 				InvoiceAmount:     invoiceAmount,
@@ -194,14 +204,15 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 							paidAmount = paymentItemMap
 							sumPaymentTotalAmountDN += paymentItemMap
 						}
-						sumInvoiceTotalAmountDN += invoiceItemMapValue.TotalAmount
+						sumInvoiceItemTotalAmountDN += invoiceItemMapValue.TotalAmount
 					}
 
 					if invoiceItemMapValue.InvoiceType == "CN" {
 						amount = -math.Abs(invoiceItemMapValue.TotalAmount)
-						sumInvoiceTotalAmountCN += invoiceItemMapValue.TotalAmount
+						sumInvoiceItemTotalAmountCN += invoiceItemMapValue.TotalAmount
 					}
-
+					consumedInvoiceItems += (amount - paidAmount)
+					sumPaymentTotalAmountDN += paidAmount
 					consumedCreditInvoice = append(consumedCreditInvoice, ConsumedCreditInvoice{
 						InvoiceCode:       invoiceItemMapValue.InvoiceCode,
 						InvoiceAmount:     amount,
@@ -212,19 +223,25 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 			}
 
-			consumedInvoiceItems += (invoiceAmount - invoicePaidAmount)
 		}
 
+		sumPaidInvoice += consumedInvoiceItems
 		saleAmount += (resultValue.Sale.TotalAmount + consumedInvoiceItems)
 
 		detail := ConsumedCreditDetail{
 			SaleCode:       resultValue.Sale.SaleCode,
 			SoAmount:       resultValue.Sale.TotalAmount,
-			SoRemainAmount: (resultValue.Sale.TotalAmount) - ((sumInvoiceTotalAmountAR + sumInvoiceTotalAmountDN) - sumInvoiceTotalAmountCN),
-			ConsumedAmount: (resultValue.Sale.TotalAmount) - ((sumInvoiceTotalAmountAR + sumInvoiceTotalAmountDN) - sumInvoiceTotalAmountCN),
+			SoRemainAmount: (resultValue.Sale.TotalAmount) - ((sumInvoiceItemTotalAmountAR + sumInvoiceItemTotalAmountDN) - sumInvoiceItemTotalAmountCN),
+			ConsumedAmount: (resultValue.Sale.TotalAmount) - ((sumInvoiceItemTotalAmountAR + sumInvoiceItemTotalAmountDN) - sumInvoiceItemTotalAmountCN),
 			Invoice:        consumedCreditInvoice,
 		}
-		resultConsumend = append(resultConsumend, detail)
+		if consumedInvoiceItems != 0 || (resultValue.Sale.TotalAmount)-((sumInvoiceItemTotalAmountAR+sumInvoiceItemTotalAmountDN)-sumInvoiceItemTotalAmountCN) != 0 {
+			sumPaidInvoice += ((resultValue.Sale.TotalAmount) - ((sumInvoiceItemTotalAmountAR + sumInvoiceItemTotalAmountDN) - sumInvoiceItemTotalAmountCN))
+			resultConsumend = append(resultConsumend, detail)
+		}
+		sumInvoiceTotalAmountAR += sumInvoiceItemTotalAmountAR
+		sumInvoiceTotalAmountCN += sumInvoiceItemTotalAmountCN
+		sumInvoiceTotalAmountDN += sumInvoiceItemTotalAmountDN
 	}
 
 	resultGetPaidInvoices := ResultGetPaidInvoices{
