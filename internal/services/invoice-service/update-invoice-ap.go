@@ -11,6 +11,7 @@ import (
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	xService "prime-erp-core/internal/services/x-service"
+	"slices"
 	"strings"
 )
 
@@ -25,11 +26,13 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 	companyCode := ""
 	siteCode := ""
 	supplierReq := models.GetSupplierListRequest{}
+	productCodes := []string{}
 	for _, invoice := range req {
+		companyCode = invoice.CompanyCode
+		siteCode = invoice.SiteCode
 		for _, invoiceItem := range invoice.InvoiceItem {
 			poNumber = append(poNumber, invoiceItem.DocumentRef)
-			companyCode = invoice.CompanyCode
-			siteCode = invoice.SiteCode
+			productCodes = append(productCodes, invoiceItem.ProductCode)
 		}
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoice.PartyCode)
 	}
@@ -121,6 +124,16 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
 
+	productReq := models.GetProductRequest{
+		ProductCode: productCodes,
+		SiteCode:    []string{siteCode},
+		CompanyCode: []string{companyCode},
+	}
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
+	if errGetProductInterface != nil {
+		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+	}
+
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -132,29 +145,14 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			req[i].PartyExternalID = supplier.ExternalID
 		}
 		for it := range invoice.InvoiceItem {
+			if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
+				req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
+			}
 			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
 			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
 		}
-	}
-
-	jsonBytesCreateInvoice, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-
-	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
-	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
-	// The invoice is already saved here; a reconcile failure must NOT fail the request
-	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
-	// next GRA on this PO, or a manual reconcile, self-heals.
-	if err := reconcilePOAfterAPSave(ctx, req); err != nil {
-		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 	}
 
 	requestData := map[string]interface{}{
@@ -190,23 +188,46 @@ func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			hasProduct = true
 			break
 		}
+		// Keep hook-only product substitutions separate from the persisted request.
+		hookReq := slices.Clone(req)
 		if hasProduct {
-			for r := range req {
-				for it := range req[r].InvoiceItem {
-					req[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
-					req[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+			for r := range hookReq {
+				if hookReq[r].DocumentRefType == "FABRICATION" {
+					hookReq[r].InvoiceItem = slices.Clone(hookReq[r].InvoiceItem)
+					for it := range hookReq[r].InvoiceItem {
+						hookReq[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						hookReq[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+					}
 				}
 			}
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: hookReq,
 			UrlHook:     urlProduct,
 		}
 		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	jsonBytesCreateInvoice, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
+	}
+
+	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+	// The invoice is already saved here; a reconcile failure must NOT fail the request
+	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+	// next GRA on this PO, or a manual reconcile, self-heals.
+	if err := reconcilePOAfterAPSave(ctx, req); err != nil {
+		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 	}
 
 	return createInvoiceReturn, nil

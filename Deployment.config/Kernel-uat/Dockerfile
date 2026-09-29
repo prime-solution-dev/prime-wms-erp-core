@@ -2,9 +2,11 @@
 # Stage 1: Builder
 # =========================================================
 
-FROM golang:1.25.0 AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /app
+
+ENV GOPROXY=https://proxy.golang.org,direct
 
 ENV CGO_ENABLED=0 \
     GOOS=linux \
