@@ -65,7 +65,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 	paymentValueMap := map[string]float64{}
-	sumPaidInvoice := 0.00
+
 	resultInvoiceMap := map[string][]models.Invoice{}
 	resultInvoiceDepositMap := map[string]float64{}
 	if len(invoiceCode) > 0 {
@@ -108,7 +108,6 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for _, invoiceItem := range resultInvoiceDepositValue.InvoiceItem {
 				if invoiceItem.ArticleType == "DEPOSIT" {
 					resultInvoiceDepositMap[resultInvoiceDepositValue.InvoiceCode] += invoiceItem.TotalAmount
-					sumPaidInvoice += invoiceItem.TotalAmount
 				}
 			}
 		}
@@ -132,7 +131,6 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			for _, paymentInvoiceValue := range paymentValue.PaymentInvoice {
 				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
 			}
-			sumPaidInvoice += paymentValue.Amount
 		}
 	}
 
@@ -142,7 +140,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	sumInvoiceTotalAmountDN := 0.00
 	sumPaymentTotalAmountDN := 0.00
 	sumPaymentTotalAmountAR := 0.00
-
+	sumPaidInvoice := 0.00
 	for _, resultValue := range result {
 		sumInvoiceItemTotalAmountAR := 0.00
 		sumInvoiceItemTotalAmountCN := 0.00
@@ -227,6 +225,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		}
 
+		sumPaidInvoice += consumedInvoiceItems
 		saleAmount += (resultValue.Sale.TotalAmount + consumedInvoiceItems)
 
 		detail := ConsumedCreditDetail{
@@ -237,6 +236,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Invoice:        consumedCreditInvoice,
 		}
 		if consumedInvoiceItems != 0 || (resultValue.Sale.TotalAmount)-((sumInvoiceItemTotalAmountAR+sumInvoiceItemTotalAmountDN)-sumInvoiceItemTotalAmountCN) != 0 {
+			sumPaidInvoice += ((resultValue.Sale.TotalAmount) - ((sumInvoiceItemTotalAmountAR + sumInvoiceItemTotalAmountDN) - sumInvoiceItemTotalAmountCN))
 			resultConsumend = append(resultConsumend, detail)
 		}
 		sumInvoiceTotalAmountAR += sumInvoiceItemTotalAmountAR

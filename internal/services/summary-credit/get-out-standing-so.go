@@ -173,7 +173,7 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 			OutStandingSo: resultValue.Sale.TotalAmount - paidSale,
 			StatusPayment: resultValue.Sale.StatusPayment,
 		}
-		if paidSale != 0 {
+		if (resultValue.Sale.TotalAmount - paidSale) != 0 {
 			resultOutStandingSoRes = append(resultOutStandingSoRes, detail)
 		}
 	}
