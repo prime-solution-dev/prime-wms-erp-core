@@ -67,9 +67,9 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 
 			paymentItemMap, exist := paymentValueMap[paymentInvoiceValue.InvoiceCode]
 			if exist {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentInvoiceValue.Amount
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentItemMap + paymentValue.Amount
 			} else {
-				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentInvoiceValue.Amount
+				paymentValueMap[paymentInvoiceValue.InvoiceCode] = paymentValue.Amount
 			}
 
 		}
