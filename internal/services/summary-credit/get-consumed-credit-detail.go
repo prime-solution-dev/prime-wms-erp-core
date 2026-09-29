@@ -224,10 +224,10 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			ConsumedAmount: (resultValue.Sale.TotalAmount) - ((sumInvoiceTotalAmountAR + sumInvoiceTotalAmountDN) - sumInvoiceTotalAmountCN),
 			Invoice:        consumedCreditInvoice,
 		}
-		/* if consumedInvoiceItems != 0 && (resultValue.Sale.TotalAmount)-((sumInvoiceTotalAmountAR+sumInvoiceTotalAmountDN)-sumInvoiceTotalAmountCN) != 0 {
+		if consumedInvoiceItems != 0 || (resultValue.Sale.TotalAmount)-((sumInvoiceTotalAmountAR+sumInvoiceTotalAmountDN)-sumInvoiceTotalAmountCN) != 0 {
+			resultConsumend = append(resultConsumend, detail)
+		}
 
-		} */
-		resultConsumend = append(resultConsumend, detail)
 	}
 
 	resultGetPaidInvoices := ResultGetPaidInvoices{
