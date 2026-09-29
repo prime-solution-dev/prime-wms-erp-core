@@ -1,12 +1,12 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ type ResultCredit struct {
 	Credit     []models.Credit `json:"approval"`
 }
 
-func GetCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCredit(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest
 

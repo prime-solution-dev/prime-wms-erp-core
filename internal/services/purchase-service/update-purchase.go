@@ -1,29 +1,26 @@
 package purchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdatePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.PurchaseFormRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -71,7 +68,7 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -95,7 +92,7 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApprovePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdateStatusApprovePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -114,7 +111,7 @@ func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, e
 	return nil, nil
 }
 
-func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompleteStatusPaymentPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompleteStatusPaymentPurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -128,7 +125,7 @@ func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{},
 	return nil, nil
 }
 
-func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompletePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -142,7 +139,7 @@ func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func CancelPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CancelPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -156,7 +153,7 @@ func CancelPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompletePOItem(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseItemRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

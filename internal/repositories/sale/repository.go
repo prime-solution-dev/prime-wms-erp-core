@@ -1,6 +1,7 @@
 package saleRepository
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -15,7 +16,7 @@ import (
 )
 
 // getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
-func getCustomerCodesByName(customerNameLike string) ([]string, error) {
+func getCustomerCodesByName(ctx context.Context, customerNameLike string) ([]string, error) {
 	if len(customerNameLike) == 0 {
 		return nil, nil
 	}
@@ -26,7 +27,7 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 		PageSize:         1000, // เอาเยอะๆ เพื่อให้ได้ customerCode ทั้งหมดที่ match
 	}
 
-	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	customerByNameData, err := externalService.GetCustomer(ctx, getCustomerByNameRequest)
 	if err != nil {
 		fmt.Println("failed to fetch customers by name:", err)
 		return nil, errors.New("failed to fetch customers by name: " + err.Error())
@@ -89,7 +90,7 @@ func applySalePersonFilter(q *gorm.DB, salePersonCode []string) *gorm.DB {
 }
 
 // Create
-func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, salePersonCode []string, page int, pageSize int) ([]models.Sale, int, int, error) {
+func GetSalePreload(ctx context.Context, companyCode []string, siteCode []string, id []uuid.UUID, saleCode []string, customerCode []string, status []string, statusApprove []string, statusPayment []string, productCode []string, isApproved []bool, saleCodeLike string, documentRefLike string, CompletedDateStart string, CompletedDateEnd string, customerCodeLike string, customerNameLike string, createDateStart string, createDateEnd string, productCodeLike string, expirePriceDateStart string, expirePriceDateEnd string, deliveryDateStart string, deliveryDateEnd string, statusFilter []string, salePersonCode []string, page int, pageSize int) ([]models.Sale, int, int, error) {
 	credit := []models.Sale{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -218,7 +219,7 @@ func GetSalePreload(companyCode []string, siteCode []string, id []uuid.UUID, sal
 	// Handle customer name search
 	searchCustomerByName := ""
 	if len(customerNameLike) > 0 {
-		customerCodesFromName, err := getCustomerCodesByName(customerNameLike)
+		customerCodesFromName, err := getCustomerCodesByName(ctx, customerNameLike)
 		if err != nil {
 			return nil, 0, 0, err
 		}

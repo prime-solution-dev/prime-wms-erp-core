@@ -1,21 +1,32 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// formValue อ่านค่าแรกของฟิลด์ multipart form แทน ctx.PostForm เดิม
+// คืนค่าว่างถ้าไม่มีฟิลด์นั้น เหมือนพฤติกรรมของ ctx.PostForm
+func formValue(form map[string][]string, key string) string {
+	if vals := form[key]; len(vals) > 0 {
+		return vals[0]
+	}
+	return ""
+}
 
 var (
 	pgCols = []string{"PG01", "PG02", "PG03", "PG04", "PG05", "PG06", "PG07", "PG08", "PG09", "PG10"}
@@ -180,14 +191,19 @@ type CreatePricelistResponse struct {
 	Message      string `json:"message"`
 }
 
-func UploadPricelistMultipart(ctx *gin.Context) (interface{}, error) {
+func UploadPricelistMultipart(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
-	file, _, err := ctx.Request.FormFile("files")
+	files := input.Files["files"]
+	if len(files) == 0 {
+		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: file): %v", http.ErrMissingFile)}, nil
+	}
+
+	file, err := files[0].Open()
 	if err != nil {
 		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: file): %v", err)}, nil
 	}
@@ -199,7 +215,7 @@ func UploadPricelistMultipart(ctx *gin.Context) (interface{}, error) {
 	}
 	// replace_all=true wipes the existing price list of every (company_code,
 	// site_code) in the file before inserting, in the same transaction.
-	req.ReplaceAll = parseBoolLoose(ctx.PostForm("replace_all"))
+	req.ReplaceAll = parseBoolLoose(formValue(input.Form, "replace_all"))
 
 	return CreatePricelist(gormx, *req)
 }

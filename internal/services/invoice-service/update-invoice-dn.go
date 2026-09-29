@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -10,11 +11,10 @@ import (
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -79,7 +79,7 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			SiteCode:    []string{req[0].SiteCode},
 			CompanyCode: []string{req[0].CompanyCode},
 		}
-		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
@@ -115,7 +115,7 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			CompanyCode: []string{req[0].CompanyCode},
 		}
 
-		mapProduct, errmapProduct := purchaseService.GetProductByCode(productDebitReq)
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productDebitReq)
 		if errmapProduct != nil {
 			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 		}
@@ -151,7 +151,7 @@ func UpdateInvoiceDN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

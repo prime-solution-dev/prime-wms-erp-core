@@ -1,17 +1,17 @@
 package groupService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func GetGroup(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetGroupRequest{}
 	res := []models.GetGroupResponse{}
 

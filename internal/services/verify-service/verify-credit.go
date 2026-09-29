@@ -1,13 +1,13 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/db"
 	creditService "prime-erp-core/internal/services/credit-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -39,7 +39,7 @@ type VerifyCreditCalculation struct {
 	FinalCredit      float64 `json:"final_credit"`
 }
 
-func VerifyCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func VerifyCredit(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := VerifyCreditRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

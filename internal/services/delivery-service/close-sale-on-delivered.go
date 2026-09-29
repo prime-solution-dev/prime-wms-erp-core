@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -237,7 +238,7 @@ func toleranceSOPercent() float64 {
 // ห้ามคืน error ขึ้นไปให้ hook เพราะ hook ORDER/DELIVERY/UPDATE ถูกยิงระหว่างที่
 // wms-order-service ยังไม่ commit การคืน error จะทำให้ pack confirm ทั้งใบล้ม
 // ทั้งที่สต็อกกับ GI ตัดไปแล้ว (ดูคอมเมนต์ที่ confirm-order-outbound.go:205-208)
-func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) error {
+func CloseSalesFullyDelivered(ctx context.Context, gormx *gorm.DB, saleCodes []string, user string) error {
 	codes := []string{}
 	seen := map[string]bool{}
 	for _, saleCode := range saleCodes {
@@ -319,7 +320,7 @@ func CloseSalesFullyDelivered(gormx *gorm.DB, saleCodes []string, user string) e
 		})
 	}
 
-	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+	orderRes, err := orderExternalService.GetOrdersDelivery(ctx, orderExternalService.GetOrderDeliveryRequest{
 		DeliveryCode: deliveryCodes,
 	})
 	if err != nil {

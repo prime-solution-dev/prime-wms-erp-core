@@ -1,28 +1,25 @@
 package prePurchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdatePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdatePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -67,7 +64,7 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -91,7 +88,7 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApprovePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdateStatusApprovePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -110,7 +107,7 @@ func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interfac
 	return nil, nil
 }
 
-func CompletePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompletePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -124,7 +121,7 @@ func CompletePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	return nil, nil
 }
 
-func CancelPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CancelPOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

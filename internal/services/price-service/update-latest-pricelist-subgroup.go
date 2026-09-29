@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -13,8 +14,6 @@ import (
 	"prime-erp-core/internal/utils"
 
 	"github.com/expr-lang/expr"
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
@@ -25,29 +24,20 @@ var getPriceListSubGroupFormulasMapBySubGroupCodesFunc = priceListRepository.Get
 var getPriceListSubGroupsByGroupCodesFunc = priceListRepository.GetPriceListSubGroupsByGroupCodes
 
 // UpdateLatestPriceListSubGroup calculates and updates the price list sub group data in the database.
-func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
+func UpdateLatestPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req models.UpdateLatestPriceListSubGroupRequest
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			var errorMessages []string
-			for _, fieldError := range validationErrors {
-				errorMessages = append(errorMessages, getValidationErrorMessage(fieldError))
-			}
-			return nil, &utils.BindingError{
-				Message: fmt.Sprintf("Validation failed: %v", errorMessages),
-			}
-		}
-		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
+	if err := bindJSONRequest(jsonPayload, &req); err != nil {
+		return nil, err
 	}
 
-	return RunUpdateLatestPriceListSubGroup(req)
+	return RunUpdateLatestPriceListSubGroup(ctx, req)
 }
 
 // RunUpdateLatestPriceListSubGroup recalculates and persists the latest sub group
 // prices. Split out of the HTTP handler so other services (notably the base price
 // update) can cascade into it without going through gin.
-func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
 	updateType := req.UpdateType
@@ -202,7 +192,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)

@@ -1,6 +1,7 @@
 package summaryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/models"
@@ -11,7 +12,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -27,7 +27,7 @@ type OutStandingSoRes struct {
 	OutStandingSo float64    `json:"out_standing_so"`
 }
 
-func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetOutStandingSo(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
 
@@ -122,7 +122,7 @@ func GetOutStandingSo(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestData)
+	customers, err := customerService.GetCustomers(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}

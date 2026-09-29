@@ -2,12 +2,14 @@ package externalService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"prime-erp-core/config"
+	"prime-erp-core/internal/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,21 +67,21 @@ type ResultCustomerResponse struct {
 	Customers  []GetCustomerResponse `json:"customers"`
 }
 
-func GetCustomer(jsonPayload GetCustomerRequest) (ResultCustomerResponse, error) {
+func GetCustomer(ctx context.Context, jsonPayload GetCustomerRequest) (ResultCustomerResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
+	// utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้ ปลายทางจะได้รู้ว่าใครสั่ง
+	req, err := utils.NewRequest(ctx, "POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error creating request: " + err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("customer")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error sending request: " + err.Error())

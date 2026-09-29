@@ -1,28 +1,25 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
+	"prime-erp-core/internal/requestcontext"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
 	invoiceDepositValue := []models.InvoiceDeposit{}

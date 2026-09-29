@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -38,7 +38,7 @@ type ToleranceErrorResponse struct {
 	ToleranceError []ToleranceErrorItem `json:"tolerance_error"`
 }
 
-func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -136,7 +136,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
 	if errGetPO != nil {
@@ -226,7 +226,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		tolerance = floatVal
 	}
 
-	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
@@ -237,15 +237,15 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		CompanyCode: []string{companyCode},
 	}
 
-	mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+	mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 	if errmapProduct != nil {
 		return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 	}
-	mapMovingAvgCost, errGetMovingAvgCost := purchaseService.GetMovingAvgCost(productReq)
+	mapMovingAvgCost, errGetMovingAvgCost := purchaseService.GetMovingAvgCost(ctx, productReq)
 	if errGetMovingAvgCost != nil {
 		return nil, errors.New("failed to get moving avg cost: " + errGetMovingAvgCost.Error())
 	}
-	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 	if errGetProductInterface != nil {
 		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
@@ -395,7 +395,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		// The invoice is already saved here; a reconcile failure must NOT fail the request
 		// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
 		// next GRA on this PO, or a manual reconcile, self-heals.
-		if err := reconcilePOAfterAPSave(req); err != nil {
+		if err := reconcilePOAfterAPSave(ctx, req); err != nil {
 			log.Printf("CreateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 		}
 
@@ -407,7 +407,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			"sub_topic": []string{"CREATE"},
 		}
 
-		hookConfig, err := interfaceService.GetHookConfig(requestData)
+		hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -422,7 +422,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				CompanyCode: []string{companyCode},
 			}
 
-			mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+			mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 			if errmapProduct != nil {
 				return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 			}
@@ -448,7 +448,7 @@ func CreateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				RequestData: req,
 				UrlHook:     urlHook,
 			}
-			HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
+			HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 			if err != nil {
 				return nil, err
 			}

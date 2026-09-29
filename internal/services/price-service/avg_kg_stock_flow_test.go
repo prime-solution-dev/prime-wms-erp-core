@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -142,7 +143,7 @@ func runUpdateLatestForAvgKgStock(
 	}
 	defer func() { updateLatestSubGroupFunc = originalUpdate }()
 
-	if _, err := RunUpdateLatestPriceListSubGroup(models.UpdateLatestPriceListSubGroupRequest{
+	if _, err := RunUpdateLatestPriceListSubGroup(context.Background(), models.UpdateLatestPriceListSubGroupRequest{
 		SubGroupIDs: []string{subGroupID.String()},
 	}); err != nil {
 		t.Fatalf("RunUpdateLatestPriceListSubGroup: %v", err)

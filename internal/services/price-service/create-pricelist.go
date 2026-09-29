@@ -1,16 +1,19 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreatePriceListBase(ctx context.Context, jsonPayload string) (interface{}, error) {
+	user := requestcontext.GetUserOrDefault(ctx)
+
 	req := []models.CreatePriceListBaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -33,9 +36,9 @@ func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 			Currency:          r.Currency,
 			EffectiveDate:     r.EffectiveDate,
 			Remark:            r.Remark,
-			CreateBy:          "system", // TODO: get user from auth
+			CreateBy:          user,
 			CreateDtm:         now,
-			UpdateBy:          "system", // TODO: get user from auth
+			UpdateBy:          user,
 			UpdateDtm:         now,
 		}
 
@@ -49,9 +52,9 @@ func CreatePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, err
 				PdcPercent:       t.PdcPercent,
 				Due:              t.Due,
 				DuePercent:       t.DuePercent,
-				CreateBy:         "system", // TODO: get user from auth
+				CreateBy:         user,
 				CreateDtm:        &now,
-				UpdateBy:         "system", // TODO: get user from auth
+				UpdateBy:         user,
 				UpdateDtm:        &now,
 			}
 			terms = append(terms, term)

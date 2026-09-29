@@ -1,19 +1,18 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	repositorySale "prime-erp-core/internal/repositories/sale"
-
-	"github.com/gin-gonic/gin"
 )
 
 type SaleAutoStatusPaymentReq struct {
 	InvoiceCode []string `json:"invoice_code"`
 }
 
-func SaleAutoStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func SaleAutoStatusPayment(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req SaleAutoStatusPaymentReq
 

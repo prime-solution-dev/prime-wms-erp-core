@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,8 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -164,7 +165,7 @@ func markSaleItems(tx *gorm.DB, saleItemCodes []string, status string, user stri
 	return updatedSaleCodes, completedSaleCodes, nil
 }
 
-func UpdateSaleItemStatus(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateSaleItemStatus(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateSaleItemStatusRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -185,7 +186,7 @@ func UpdateSaleItemStatus(ctx *gin.Context, jsonPayload string) (interface{}, er
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 

@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,9 +9,9 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -22,7 +23,7 @@ type UpdateStatusApproveSaleRequest struct {
 	Remark     string    `json:"remark"`
 }
 
-func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApproveSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateStatusApproveSaleRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -105,10 +106,7 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		updateFields["is_approved"] = true
 	}
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system`
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 
 	// งานฝั่ง DB ทั้งหมดต้องอยู่ใน transaction เดียวกัน (spec 2026-09-10 ข้อ 2)
 	// ไม่งั้นถ้าพังคาระหว่างทาง ใบจะกลายเป็น "อนุมัติแล้วแต่ราคายังเป็นของเก่า"
