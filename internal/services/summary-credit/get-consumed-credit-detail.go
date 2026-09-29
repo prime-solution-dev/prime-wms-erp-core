@@ -73,6 +73,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		requestDataGetInvoice := map[string]interface{}{
 			"invoice_ref": invoiceCode,
+			"status":      []string{"COMPLETED"},
 		}
 		jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
 		if err != nil {
@@ -91,6 +92,7 @@ func GetConsumend(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 		requestDataGetInvoiceDeposit := map[string]interface{}{
 			"invoice_code": invoiceCode,
+			"status":       []string{"COMPLETED"},
 		}
 		jsonBytesGetInvoiceDeposit, err := json.Marshal(requestDataGetInvoiceDeposit)
 		if err != nil {
