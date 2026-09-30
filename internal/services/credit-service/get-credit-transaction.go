@@ -1,12 +1,12 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +25,7 @@ type ResultCreditTransaction struct {
 	CreditTransaction []models.CreditTransaction `json:"credit_transaction"`
 }
 
-func GetTransaction(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetTransaction(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req CreditTransactionRequest
 

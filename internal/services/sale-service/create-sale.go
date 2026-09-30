@@ -1,16 +1,17 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -43,7 +44,7 @@ type CreateSaleResponse struct {
 	Message          string `json:"message"` // ข้อความแจ้งผลลัพธ์
 }
 
-func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CreateSaleRequest{}
 	res := []CreateSaleResponse{}
 
@@ -63,7 +64,15 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
+	// user คือชื่อที่ client ส่งมาใน body ใช้ได้เฉพาะด่านอนุมัติ (RequestUserCode / CheckAutoApproval)
+	// ซึ่งเป็นเรื่องสิทธิ์ที่เจ้าของงานเป็นคนกำหนด ไม่ใช่เรื่องของ refactor นี้
+	//
+	// ส่วนชื่อที่บันทึกลง DB ต้องมาจาก token ของคนที่กดจริง ไม่ใช่จาก body
+	// ไม่งั้นใครยิง API ตรงๆ ก็เขียนชื่อคนอื่นลง create_by ได้ (กติกาข้อ 3 ของ spec)
+	// ถ้าไม่มี token มาด้วยจริงๆ ค่อยใช้ค่าจาก body เป็นตัวสำรอง จะได้ไม่เขียนค่าว่างทับของเดิม
 	user := req.User
+
+	auditUser := auditUserFrom(ctx, user)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -99,9 +108,9 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		tempSale.CreateDate = &nowDateOnly
-		tempSale.CreateBy = user
+		tempSale.CreateBy = auditUser
 		tempSale.UpdateDate = &nowDateOnly
-		tempSale.UpdateBy = user
+		tempSale.UpdateBy = auditUser
 		// ใช้ status จากหน้าบ้าน
 		tempSale.Status = status
 		tempSale.StatusApprove = statusApprove
@@ -117,7 +126,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				CondRangeMin:    saleReq.TotalAmount,
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, user)
 			if err != nil {
 				return nil, err
 			}
@@ -151,9 +160,9 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			}
 
 			item.CreateDate = &nowDateOnly
-			item.CreateBy = user
+			item.CreateBy = auditUser
 			item.UpdateDate = &nowDateOnly
-			item.UpdateBy = user
+			item.UpdateBy = auditUser
 
 			createSaleItems = append(createSaleItems, item)
 		}
@@ -245,7 +254,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Updates(map[string]interface{}{
 				"status":      "COMPLETED",
 				"update_date": &nowDateOnly,
-				"update_by":   user,
+				"update_by":   auditUser,
 			}).Error; err != nil {
 			tx.Rollback()
 			return nil, errors.New("failed to update quotation status: " + err.Error())
@@ -257,7 +266,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			Updates(map[string]interface{}{
 				"status":      "COMPLETED",
 				"update_date": &nowDateOnly,
-				"update_by":   user,
+				"update_by":   auditUser,
 			}).Error; err != nil {
 			tx.Rollback()
 			return nil, errors.New("failed to update quotation items status: " + err.Error())
@@ -269,7 +278,12 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// ถ้า status เป็น WAIT_FOR_APPROVED ให้ส่ง sale id ไปสร้าง RequestApproveSale
+	//
+	// ทำงานหลัง tx.Commit() แล้ว และเป็น best-effort (พังแล้ว log ทิ้ง ไม่ทำให้ CreateSale ทั้งก้อนพัง)
+	// ต้องใช้ postCommitContext ไม่งั้น caller ตัดสายกลางทาง (เช่น timeout ฝั่งเว็บ) จะทำให้
+	// approval request ไม่ถูกสร้างเงียบๆ ทั้งที่ sale ถูกสร้างไปแล้วจริง
 	if req.Status == "WAIT_FOR_APPROVED" {
+		postCommitCtx := postCommitContext(ctx)
 		for _, sale := range createSales {
 			requestApproveReq := RequestApproveSaleRequest{
 				ID: sale.ID,
@@ -280,7 +294,7 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				continue
 			}
 
-			_, err = RequestApproveSale(ctx, string(approvePayload))
+			_, err = RequestApproveSale(postCommitCtx, string(approvePayload))
 			if err != nil {
 				fmt.Printf("Warning: failed to create approval request for sale %s: %v\n", sale.SaleCode, err)
 			}
@@ -288,6 +302,13 @@ func CreateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return res, nil
+}
+
+// postCommitContext คืน context สำหรับงานที่ทำหลัง commit
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย
+// งานที่เหลือจะไม่เกิดขึ้นเลยและเงียบด้วย
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }
 
 // generateSaleCodes จองเลขที่เอกสารแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)
@@ -308,4 +329,15 @@ func generateSaleCodes(gormx *gorm.DB, count int) ([]string, error) {
 	}
 
 	return codes, nil
+}
+
+// auditUserFrom เลือกชื่อที่จะเขียนลง create_by / update_by
+//
+// token ของคนที่กดมาก่อนเสมอ ค่าจาก body เป็นแค่ตัวสำรองของเส้นที่ยังไม่ส่ง token มา
+func auditUserFrom(ctx context.Context, bodyUser string) string {
+	if user := requestcontext.GetUserOrDefault(ctx); user != "" {
+		return user
+	}
+
+	return bodyUser
 }

@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -230,7 +231,7 @@ func TestFetchAllProducts_SingleCallAllRowsAndDedupes(t *testing.T) {
 	orig := getProducts
 	defer func() { getProducts = orig }()
 	calls := 0
-	getProducts = func(req externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+	getProducts = func(_ context.Context, req externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
 		calls++
 		if req.Page != 0 || req.PageSize != 0 {
 			t.Fatalf("want no paging (page=0, page_size=0), got page=%d page_size=%d", req.Page, req.PageSize)
@@ -244,7 +245,7 @@ func TestFetchAllProducts_SingleCallAllRowsAndDedupes(t *testing.T) {
 			},
 		}, nil
 	}
-	got, err := fetchAllProducts("C1", []string{"S1"})
+	got, err := fetchAllProducts(context.Background(), "C1", []string{"S1"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,10 +257,10 @@ func TestFetchAllProducts_SingleCallAllRowsAndDedupes(t *testing.T) {
 func TestFetchAllProducts_ReturnsError(t *testing.T) {
 	orig := getProducts
 	defer func() { getProducts = orig }()
-	getProducts = func(externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+	getProducts = func(context.Context, externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
 		return externalProductService.GetProductsResponse{}, errors.New("boom")
 	}
-	if _, err := fetchAllProducts("C1", nil); err == nil {
+	if _, err := fetchAllProducts(context.Background(), "C1", nil); err == nil {
 		t.Fatal("want error")
 	}
 }

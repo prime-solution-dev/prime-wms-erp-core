@@ -1,6 +1,7 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,9 +10,9 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -41,7 +42,7 @@ type ReviseQuotationResponse struct {
 	Revision      float64 `json:"revision"`
 }
 
-func ReviseQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func ReviseQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := ReviseQuotationRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -58,10 +59,7 @@ func ReviseQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

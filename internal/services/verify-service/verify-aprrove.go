@@ -1,6 +1,7 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"prime-erp-core/internal/db"
 	priceService "prime-erp-core/internal/services/price-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
@@ -73,7 +73,7 @@ type VerifyApproveResponse struct {
 	Documents             []VerifyApproveDocument      `json:"documents"`
 }
 
-func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func VerifyApprove(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := VerifyApproveRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -92,10 +92,10 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	return VerifyApproveLogic(gormx, sqlx, req)
+	return VerifyApproveLogic(ctx, gormx, sqlx, req)
 }
 
-func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
+func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
 		CreditDetails:         []VerifyCreditCustomer{},
 		ProductAtps:           []VerifyInventoryProductAtp{},
@@ -320,7 +320,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	if req.IsVerifyInventory {
 		res.IsPassInventory = true
 
-		invenRes, err := VerifyInventoryLogic(inventoryReq)
+		invenRes, err := VerifyInventoryLogic(ctx, inventoryReq)
 		if err != nil {
 			return nil, err
 		}

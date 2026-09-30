@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	verifyService "prime-erp-core/internal/services/verify-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -62,7 +62,7 @@ type ValidateSaleResponse struct {
 }
 
 // ValidateSale - ตรวจสอบเงื่อนไขการสร้าง Sale Order โดยไม่สร้างข้อมูลจริง
-func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func ValidateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := ValidateSaleRequest{}
 	var responses []ValidateSaleResponse
 
@@ -131,7 +131,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// ตรวจสอบเงื่อนไขต่างๆ
 	for _, verifyReq := range verifyReqMap {
-		verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+		verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 		if err != nil {
 			return nil, err
 		}

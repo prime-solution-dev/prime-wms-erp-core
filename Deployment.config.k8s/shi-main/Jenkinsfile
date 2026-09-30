@@ -221,14 +221,20 @@ stage('Prepare .env from Vault') {
                 echo "Build: ${HARBOR_IMAGE}:${IMAGE_TAG}"
                 echo '=========================================='
 
-                sh '''
-                    set -e
+                withCredentials([
+                    string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
 
-                    docker build \
-                        -f "$K8S_CONFIG_DIR/Dockerfile" \
-                        -t "$HARBOR_IMAGE:$IMAGE_TAG" \
-                        .
-                '''
+                        docker build \
+                            -f "$K8S_CONFIG_DIR/Dockerfile" \
+                            --build-arg GIT_TOKEN="$GIT_TOKEN" \
+                            -t "$HARBOR_IMAGE:$IMAGE_TAG" \
+                            .
+                    '''
+                }
             }
         }
 

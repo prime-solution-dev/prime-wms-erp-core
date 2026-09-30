@@ -1,30 +1,27 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func UpdateCreditRequest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.CreditRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	creditRequestValue := []models.CreditRequest{}
 	creditTransaction := []models.CreditTransaction{}
 	credit := []models.Credit{}

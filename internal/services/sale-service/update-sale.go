@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,9 +9,9 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -38,7 +39,7 @@ type UpdateSaleResponse struct {
 	SaleCode         string `json:"sale_code"`
 }
 
-func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateSaleRequest{}
 	res := []UpdateSaleResponse{}
 
@@ -58,10 +59,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -150,7 +148,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Verification
 	if req.IsVerifyPrice || req.IsVerifyCredit || req.IsVerifyInventory {
 		for _, verifyReq := range verifyReqMap {
-			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+			verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 			if err != nil {
 				return nil, err
 			}

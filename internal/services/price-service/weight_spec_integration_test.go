@@ -3,6 +3,7 @@
 package priceService
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -143,7 +144,7 @@ func TestGetPriceDetailWeightSpecIntegration_WithStock(t *testing.T) {
 	defer srv.Close()
 	pointWarehouseEndpointAt(t, srv.URL)
 
-	result, err := transformToGetPriceListResponse(buildSingleSubGroupResponse(subGroupID))
+	result, err := transformToGetPriceListResponse(context.Background(), buildSingleSubGroupResponse(subGroupID))
 	if err != nil {
 		t.Fatalf("transformToGetPriceListResponse: %v", err)
 	}
@@ -174,7 +175,7 @@ func TestGetPriceDetailWeightSpecIntegration_NoStock(t *testing.T) {
 	defer srv.Close()
 	pointWarehouseEndpointAt(t, srv.URL)
 
-	result, err := transformToGetPriceListResponse(buildSingleSubGroupResponse(subGroupID))
+	result, err := transformToGetPriceListResponse(context.Background(), buildSingleSubGroupResponse(subGroupID))
 	if err != nil {
 		t.Fatalf("transformToGetPriceListResponse: %v", err)
 	}
@@ -204,7 +205,7 @@ func TestGetPriceDetailWeightSpecIntegration_NoMatch(t *testing.T) {
 	defer srv.Close()
 	pointWarehouseEndpointAt(t, srv.URL)
 
-	result, err := transformToGetPriceListResponse(buildSingleSubGroupResponse(subGroupID))
+	result, err := transformToGetPriceListResponse(context.Background(), buildSingleSubGroupResponse(subGroupID))
 	if err != nil {
 		t.Fatalf("transformToGetPriceListResponse: %v", err)
 	}

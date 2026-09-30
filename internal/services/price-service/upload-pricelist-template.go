@@ -1,14 +1,17 @@
 package priceService
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
 	"prime-erp-core/internal/db"
+	"prime-erp-core/internal/requestcontext"
+	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 	"gorm.io/gorm"
@@ -32,27 +35,34 @@ const (
 //   - company_code    (default 09dcb573-...)
 //   - site_code       (default TMI_WH)
 //   - sheet           (default "Pricelist"; falls back to first sheet if absent)
-//   - create_by       (default "system")
+//   - create_by       (default: the caller from context, requestcontext.GetUserOrDefault —
+//     "system" was a hardcoded fallback before this task; every create_by/update_by now comes
+//     from the context, the form field just stays the primary source since callers already send it)
 //   - include_formulas ("true"/"1"/"yes" to also write formulas_map; default off)
-func UploadPricelistTemplateMultipart(ctx *gin.Context) (interface{}, error) {
+func UploadPricelistTemplateMultipart(ctx context.Context, input utils.MultipartInput) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
-	file, _, err := ctx.Request.FormFile("files")
+	files := input.Files["files"]
+	if len(files) == 0 {
+		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: files): %v", http.ErrMissingFile)}, nil
+	}
+
+	file, err := files[0].Open()
 	if err != nil {
 		return &CreatePricelistResponse{ResponseCode: 1, Message: fmt.Sprintf("missing file (form-data key: files): %v", err)}, nil
 	}
 	defer file.Close()
 
 	opts := templateParseOptions{
-		CompanyCode:     firstNonEmpty(ctx.PostForm("company_code"), defaultTemplateCompanyCode),
-		SiteCode:        firstNonEmpty(ctx.PostForm("site_code"), defaultTemplateSiteCode),
-		Sheet:           strings.TrimSpace(ctx.PostForm("sheet")),
-		CreateBy:        firstNonEmpty(ctx.PostForm("create_by"), "system"),
-		IncludeFormulas: parseBoolLoose(ctx.PostForm("include_formulas")),
+		CompanyCode:     firstNonEmpty(formValue(input.Form, "company_code"), defaultTemplateCompanyCode),
+		SiteCode:        firstNonEmpty(formValue(input.Form, "site_code"), defaultTemplateSiteCode),
+		Sheet:           strings.TrimSpace(formValue(input.Form, "sheet")),
+		CreateBy:        resolveTemplateCreateBy(ctx, input.Form),
+		IncludeFormulas: parseBoolLoose(formValue(input.Form, "include_formulas")),
 	}
 
 	req, err := buildCreatePricelistRequestFromTemplate(file, opts)
@@ -81,6 +91,17 @@ func UploadPricelistTemplateMultipart(ctx *gin.Context) (interface{}, error) {
 		return &CreatePricelistResponse{ResponseCode: 1, Message: txErr.Error()}, nil
 	}
 	return &CreatePricelistResponse{ResponseCode: 0, Message: "success"}, nil
+}
+
+// resolveTemplateCreateBy picks create_by for every row this upload writes.
+//
+// The form field stays the primary source (callers already send it, and the request
+// shape is frozen) — but the FALLBACK must be the caller from context, not a hardcoded
+// "system" literal, same as every other create_by/update_by touched by this task.
+// requestcontext.GetUserOrDefault returns the empty string when nobody is known, not a
+// fabricated name.
+func resolveTemplateCreateBy(ctx context.Context, form map[string][]string) string {
+	return firstNonEmpty(formValue(form, "create_by"), requestcontext.GetUserOrDefault(ctx))
 }
 
 // deleteExistingSubgroupsByGroupKey removes price_list_sub_group rows (and their

@@ -1,11 +1,11 @@
 package paymentService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	repositorypayment "prime-erp-core/internal/repositories/payment"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -13,7 +13,7 @@ type DeletePaymentReq struct {
 	InvoiceCode []string `json:"invoice_code"`
 }
 
-func DeletePayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func DeletePayment(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req DeletePaymentReq
 

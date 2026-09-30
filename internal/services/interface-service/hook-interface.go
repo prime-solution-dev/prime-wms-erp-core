@@ -2,12 +2,15 @@ package interfaceService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
+
+	"prime-erp-core/internal/utils"
 )
 
 type HookInterfaceRequest struct {
@@ -15,17 +18,16 @@ type HookInterfaceRequest struct {
 	UrlHook     string      `json:"url_hook"`
 }
 
-func HookInterface(requestData HookInterfaceRequest) (interface{}, error) {
+func HookInterface(ctx context.Context, requestData HookInterfaceRequest) (interface{}, error) {
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: encode request: %w", err)
 	}
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_document")+"/interface/hook-interface", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_document")+"/interface/hook-interface", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: create request: %w", err)
 	}
-	reqHttp.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("document")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: send request: %w", err)

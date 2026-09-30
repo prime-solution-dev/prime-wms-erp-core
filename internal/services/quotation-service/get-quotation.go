@@ -1,17 +1,16 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"net/http"
 	externalService "prime-erp-core/external/customer-service"
 	"prime-erp-core/internal/db"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -238,7 +237,7 @@ func fillQuotationApproveDates(quotations []GetQuotationResponse, approveDateMap
 }
 
 // getCustomerCodesByName ค้นหา customer codes จาก customer service โดยใช้ customer name
-func getCustomerCodesByName(customerNameLike string) ([]string, error) {
+func getCustomerCodesByName(ctx context.Context, customerNameLike string) ([]string, error) {
 	if len(customerNameLike) == 0 {
 		return nil, nil
 	}
@@ -249,7 +248,7 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 		PageSize:         1000, // เอาเยอะๆ เพื่อให้ได้ customerCode ทั้งหมดที่ match
 	}
 
-	customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+	customerByNameData, err := externalService.GetCustomer(ctx, getCustomerByNameRequest)
 	if err != nil {
 		fmt.Println("failed to fetch customers by name:", err)
 		return nil, errors.New("failed to fetch customers by name: " + err.Error())
@@ -264,7 +263,7 @@ func getCustomerCodesByName(customerNameLike string) ([]string, error) {
 	return customerCodes, nil
 }
 
-func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetQuotationResponse
 	var req GetQuotationRequest
@@ -276,15 +275,13 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
 	}
 	defer db.CloseGORM(gormx)
 
 	// ถ้ามี CustomerNameLike ให้ไปค้นหา customerCode จาก customer service ก่อน
-	customerCodesFromName, err := getCustomerCodesByName(req.CustomerNameLike)
+	customerCodesFromName, err := getCustomerCodesByName(ctx, req.CustomerNameLike)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return nil, err
 	}
 
@@ -465,8 +462,7 @@ func GetQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve data: %v", err)
 	}
 
 	// เติมวันที่อนุมัติ (ดึงจากตาราง approval เพราะ quotation ไม่มีคอลัมน์นี้) เป็น batch เดียว

@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"prime-erp-core/internal/db"
@@ -13,7 +14,6 @@ import (
 
 	externalService "prime-erp-core/external/warehouse-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -33,8 +33,8 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 
 	groupReqString := string(groupReqJson)
 
-	// Note: We need a gin.Context for this call, but we're in a helper function
-	// Let's create a minimal context or use nil if the function supports it
+	// groupService.GetGroup now takes context.Context and never reads it, so nil is safe
+	// here too (this helper has no request-scoped context to pass through anyway).
 	resp, err := groupService.GetGroup(nil, groupReqString)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get groups: %w", err)
@@ -86,7 +86,7 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 }
 
 // loadPriceData loads price list data from database using GetPriceList
-func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
+func loadPriceData(ctx context.Context, sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
 	// Build GetPriceListGroupRequest from GetPriceDetailRequest
 	priceListReq := GetPriceListGroupRequest{
 		CompanyCode:       req.CompanyCode,
@@ -115,7 +115,7 @@ func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]mode
 	}
 
 	// Transform to GetPriceListResponse format (same as GetPriceList API)
-	result, err := transformToGetPriceListResponse(groupSubGroup)
+	result, err := transformToGetPriceListResponse(ctx, groupSubGroup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform response: %w", err)
 	}
@@ -135,7 +135,7 @@ func resolveGroupItemName(groupItemMap map[string]models.GetGroupItemResponse, c
 }
 
 // transformToGetPriceListResponse transforms internal response to API response format
-func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
+func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
 	// Get group and group item mappings
 	groupMap, groupItemMap, _, err := getGroupAndItemMappings()
 	if err != nil {
@@ -281,7 +281,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -357,7 +357,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	return result, nil
 }
 
-func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error) {
 	// Parse request
 	var req priceDomain.GetPriceDetailRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -405,7 +405,7 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	defer sqlx.Close()
 
 	// Load price data
-	priceListData, err := loadPriceData(sqlx, req)
+	priceListData, err := loadPriceData(ctx, sqlx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load price data: %w", err)
 	}
