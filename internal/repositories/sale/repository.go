@@ -331,6 +331,7 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
         s.sale_code, 
         s.customer_code, 
 		s.status_payment,
+		s.status,
         s.total_amount,
 		s.delivery_date,
         it.id as item_id, 
@@ -378,6 +379,7 @@ func GetSalesWithInvoiceItems(customerCode string, saleCode string) ([]SaleWithI
 			CustomerCode:  row["customer_code"].(string),
 			TotalAmount:   row["total_amount"].(float64),
 			StatusPayment: row["status_payment"].(string),
+			Status:        row["status"].(string),
 		}
 
 		// สร้าง InvoiceItem object
