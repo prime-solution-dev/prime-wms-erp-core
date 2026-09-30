@@ -1,12 +1,12 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -15,7 +15,7 @@ type UpdateSaleStatusPaymentReq struct {
 	StatusPayment string    `json:"status_payment"`
 }
 
-func UpdateSaleStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateSaleStatusPayment(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []UpdateSaleStatusPaymentReq
 

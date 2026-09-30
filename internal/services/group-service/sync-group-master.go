@@ -1,6 +1,7 @@
 package groupService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +26,7 @@ type SyncGroupMasterResponse struct {
 	Message          string `json:"message"`
 }
 
-func SyncGroupMaster(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func SyncGroupMaster(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req SyncGroupMasterRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

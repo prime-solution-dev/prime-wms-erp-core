@@ -3,6 +3,7 @@
 package priceService
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -150,12 +151,12 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 			{GroupCode: "PG01", GroupValue: "PG01_5", Seq: 1, ActiveFlg: true},
 		}},
 	}
-	stubProducts := func(externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+	stubProducts := func(context.Context, externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
 		return externalProductService.GetProductsResponse{Products: products}, nil
 	}
 
 	t.Run("All", func(t *testing.T) {
-		getProducts = func(req externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+		getProducts = func(_ context.Context, req externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
 			if req.CompanyCode[0] != "CPP" || req.SiteCode[0] != "S1" {
 				t.Fatalf("unexpected product request: %+v", req)
 			}
@@ -202,7 +203,7 @@ func TestIntegration_GetPriceExportTable_PricelistProduct(t *testing.T) {
 	})
 
 	t.Run("GetProductsError", func(t *testing.T) {
-		getProducts = func(externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
+		getProducts = func(context.Context, externalProductService.GetProductRequest) (externalProductService.GetProductsResponse, error) {
 			return externalProductService.GetProductsResponse{}, errors.New("boom")
 		}
 		payload := `{"company_code":"CPP","site_codes":["S1"],"report_type":"PRICELIST_PRODUCT"}`

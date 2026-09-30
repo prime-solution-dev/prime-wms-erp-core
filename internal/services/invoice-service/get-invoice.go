@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -57,7 +57,7 @@ type ResultInvoice struct {
 	Invoice    []models.Invoice `json:"invoice"`
 }
 
-func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetInvoiceRequest
 
@@ -92,7 +92,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	var mapSupplier map[string]models.Supplier
 	if len(supplierReq.SupplierCodes) > 0 {
-		mapSuppliers, err := prePurchaseService.GetSupplierByCode(supplierReq)
+		mapSuppliers, err := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 		if err != nil {
 			return nil, errors.New("failed to get supplier list: " + err.Error())
 		}
@@ -104,7 +104,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		getCustomerByNameRequest := externalService.GetCustomerRequest{
 			Customers: customerCode,
 		}
-		customerByNameData, err := externalService.GetCustomer(getCustomerByNameRequest)
+		customerByNameData, err := externalService.GetCustomer(ctx, getCustomerByNameRequest)
 		if err != nil {
 			fmt.Println("failed to fetch customers by name:", err)
 			return nil, errors.New("failed to fetch customers by name: " + err.Error())
@@ -122,7 +122,7 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			CompanyCode: companyCode,
 		}
 
-		mapProducts, err := purchaseService.GetProductByCode(productReq)
+		mapProducts, err := purchaseService.GetProductByCode(ctx, productReq)
 		if err != nil {
 			return nil, errors.New("failed to get product list: " + err.Error())
 		}
@@ -141,7 +141,9 @@ func GetInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			return nil, err
 		}
 
-		payment, errGetPayment := paymentService.GetPayment(ctx, string(jsonBytesPayment))
+		// paymentService.GetPayment ยังไม่แปลง (นอก scope) แต่ตรวจแล้วว่า ctx ไม่ถูกใช้ในตัวฟังก์ชัน
+		// เลยสักบรรทัด — ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+		payment, errGetPayment := paymentService.GetPayment(nil, string(jsonBytesPayment))
 		if errGetPayment != nil {
 			return nil, errGetPayment
 		}

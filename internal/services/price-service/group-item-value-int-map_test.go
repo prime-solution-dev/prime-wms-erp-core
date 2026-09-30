@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"testing"
 
 	"prime-erp-core/internal/models"
@@ -154,7 +155,7 @@ func TestUpdateLatestLoadsGroupItemValuesOnce(t *testing.T) {
 	}
 	t.Cleanup(func() { loadGroupItemValueIntsFunc = originalLoad })
 
-	if _, err := RunUpdateLatestPriceListSubGroup(models.UpdateLatestPriceListSubGroupRequest{
+	if _, err := RunUpdateLatestPriceListSubGroup(context.Background(), models.UpdateLatestPriceListSubGroupRequest{
 		SubGroupIDs: ids,
 	}); err != nil {
 		t.Fatalf("RunUpdateLatestPriceListSubGroup: %v", err)

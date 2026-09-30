@@ -1,6 +1,7 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,7 +9,6 @@ import (
 	"prime-erp-core/internal/db"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -30,7 +30,7 @@ type CreditCustomer struct {
 	Balance       float64 `json:"balance"`
 }
 
-func GetCreditCurrentAPI(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditCurrentAPI(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetCreditRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

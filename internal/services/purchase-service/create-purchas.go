@@ -1,19 +1,20 @@
 package purchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreatePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CreatePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -26,10 +27,7 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to generate purchase order codes: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -90,7 +88,7 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -112,8 +110,10 @@ func CreatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to create purchase: " + err.Error())
 	}
 
-	// Create purchase approval
-	if err := CreatePurchaseApproval(ctx, purchase); err != nil {
+	// Create purchase approval — purchaseRepository.CreatePurchase ข้างบน commit ไปแล้ว
+	// (gormx.Transaction ของมันเอง) ใช้ postCommitContext กัน caller ตัดสายกลางทางแล้ว
+	// approval ไม่ถูกสร้างเงียบๆ ทั้งที่ purchase สร้างไปแล้วจริง
+	if err := CreatePurchaseApproval(postCommitContext(ctx), purchase); err != nil {
 		return nil, errors.New("failed to create purchase approval: " + err.Error())
 	}
 

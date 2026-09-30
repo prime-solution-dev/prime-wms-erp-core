@@ -1,6 +1,7 @@
 package purchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	goodsReceiveService "prime-erp-core/external/goods-receive-service"
@@ -8,11 +9,9 @@ import (
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
-func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -128,7 +127,7 @@ func GetPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return result, nil
 }
 
-func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPOItem(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPurchaseItemRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -168,7 +167,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	reqInboundFilter := goodsReceiveService.InboundFilter{
 		InboundItemDocumentRefItem: purchaseItemCodes,
 	}
-	inbounds, err := goodsReceiveService.GetInbounds(reqInboundFilter)
+	inbounds, err := goodsReceiveService.GetInbounds(ctx, reqInboundFilter)
 	if err != nil {
 		return nil, errors.New("failed to get used qty from inbound: " + err.Error())
 	}
@@ -193,7 +192,7 @@ func GetPOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		reqGoodsReceiveFilter := goodsReceiveService.GoodsReceiveFilter{
 			ReferenceNo: inboundCodes,
 		}
-		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(reqGoodsReceiveFilter)
+		resGoodsReceive, err := goodsReceiveService.GetGoodsReceives(ctx, reqGoodsReceiveFilter)
 		if err != nil {
 			return nil, errors.New("failed to get goods receive: " + err.Error())
 		}

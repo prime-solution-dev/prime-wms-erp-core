@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -64,8 +65,8 @@ var getProducts = externalProductService.GetProduct
 // product-core เรียง paging ตาม update_dtm อย่างเดียว (ไม่มี tie-breaker คงที่) การแบ่งหน้า
 // จึงข้ามแถวได้เงียบ ๆ เมื่อมีหลาย record update_dtm ชนกันคาบเกี่ยวรอยต่อหน้า — ส่ง Page/PageSize
 // เป็นค่าว่าง (0) ให้ normalizePaging คืนทุกแถวในคำขอเดียว เหมือนที่ warehouse-core ทำ
-func fetchAllProducts(companyCode string, siteCodes []string) ([]externalProductService.GetProductsComponent, error) {
-	res, err := getProducts(externalProductService.GetProductRequest{
+func fetchAllProducts(ctx context.Context, companyCode string, siteCodes []string) ([]externalProductService.GetProductsComponent, error) {
+	res, err := getProducts(ctx, externalProductService.GetProductRequest{
 		CompanyCode: []string{companyCode},
 		SiteCode:    siteCodes,
 		ActiveFlg:   []bool{true},

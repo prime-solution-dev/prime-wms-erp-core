@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"fmt"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -8,27 +9,16 @@ import (
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
 // GetCalculatedPriceListSubGroup calculates price list sub group values using formulas
 // and returns them without persisting to the database.
-func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
+func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req models.UpdateLatestPriceListSubGroupRequest
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			var errorMessages []string
-			for _, fieldError := range validationErrors {
-				errorMessages = append(errorMessages, getValidationErrorMessage(fieldError))
-			}
-			return nil, &utils.BindingError{
-				Message: fmt.Sprintf("Validation failed: %v", errorMessages),
-			}
-		}
-		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
+	if err := bindJSONRequest(jsonPayload, &req); err != nil {
+		return nil, err
 	}
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
@@ -184,7 +174,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)

@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,9 @@ import (
 	xService "prime-erp-core/internal/services/x-service"
 	"slices"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -45,7 +44,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
 	if errGetPO != nil {
@@ -120,7 +119,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			return toleranceErrorResponse, nil
 		}
 	}
-	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
@@ -130,7 +129,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		SiteCode:    []string{siteCode},
 		CompanyCode: []string{companyCode},
 	}
-	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 	if errGetProductInterface != nil {
 		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
@@ -162,7 +161,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +177,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			CompanyCode: []string{companyCode},
 		}
 
-		mapProduct, errmapProduct := purchaseService.GetProductByCode(productReq)
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
 		if errmapProduct != nil {
 			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
 		}
@@ -207,7 +206,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			RequestData: hookReq,
 			UrlHook:     urlProduct,
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +226,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	// The invoice is already saved here; a reconcile failure must NOT fail the request
 	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
 	// next GRA on this PO, or a manual reconcile, self-heals.
-	if err := reconcilePOAfterAPSave(req); err != nil {
+	if err := reconcilePOAfterAPSave(ctx, req); err != nil {
 		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
 	}
 

@@ -1,6 +1,7 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -11,7 +12,6 @@ import (
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -46,7 +46,7 @@ type ResultCreditRequest struct {
 	CreditRequest []models.CreditRequest `json:"credit_request"`
 }
 
-func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetCreditReq
 
@@ -59,7 +59,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			"customer_name_like": req.CustomerNameLike,
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +72,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			"active_flg": []bool{*req.CustomerStatus},
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestData)
+	customers, err := customerService.GetCustomers(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,9 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	   		}
 	   	} */
 
-	getDepositRes, errGetDeposit := depositService.GetDeposit(ctx, string(jsonBytesGetCredit))
+	// depositService.GetDeposit ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+	// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+	getDepositRes, errGetDeposit := depositService.GetDeposit(nil, string(jsonBytesGetCredit))
 	if errGetDeposit != nil {
 		return nil, errGetDeposit
 	}
@@ -214,7 +216,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
-	consumedTotals, err := summaryService.GetConsumedCreditTotals(ctx.Request.Context(), customerCode)
+	consumedTotals, err := summaryService.GetConsumedCreditTotals(ctx, customerCode)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +248,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 	return resultApproval, nil
 }
-func GetCreditRequestCronjob(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditRequestCronjob(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetCreditReq
 

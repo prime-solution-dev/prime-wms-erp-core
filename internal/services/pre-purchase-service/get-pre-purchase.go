@@ -1,15 +1,14 @@
 package prePurchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/models"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
-
-	"github.com/gin-gonic/gin"
 )
 
-func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPOBigLotListRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

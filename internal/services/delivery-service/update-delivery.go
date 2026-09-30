@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,9 +11,9 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +55,7 @@ type UpdateDeliveryResponse struct {
 	OrderCode    string `json:"order_code,omitempty"`
 }
 
-func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateDeliveryRequest{}
 	res := []UpdateDeliveryResponse{}
 
@@ -68,10 +69,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -211,7 +209,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(gormx, bookingLines, editingDeliveryCodes); err != nil {
+	if err := ValidateBookingQty(ctx, gormx, bookingLines, editingDeliveryCodes); err != nil {
 		return nil, err
 	}
 
@@ -232,7 +230,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// แจ้งปลายทางว่าใบจองถูกแก้ ล้อเส้น create-delivery ต่างกันที่ sub_topic เป็น UPDATE
 	// hook เป็นการแจ้งอย่างเดียว ไม่ได้อ่านค่าที่ตอบกลับมา ใบที่แก้มี external_id ของตัวเองอยู่แล้ว
-	fireUpdateDeliveryHook(req.Deliveries)
+	fireUpdateDeliveryHook(ctx, req.Deliveries)
 
 	tx := gormx.Begin()
 	if tx.Error != nil {
@@ -284,7 +282,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
 	if len(newOrderDeliveries) > 0 {
-		orderRes, err := CreateOrderForUpdate(newOrderDeliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(ctx, newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
@@ -295,7 +293,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, deliveryReq := range updateOrderDeliveries {
-		if err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries); err != nil {
+		if err := UpdateOrderByDeliveryForUpdate(ctx, deliveryReq, updateDeliveries); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
@@ -316,7 +314,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 
@@ -425,7 +423,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(ctx, createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
@@ -433,7 +431,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	return createOrderResponse, nil
 }
 
-func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
 	// Find the corresponding delivery from updateDeliveries
 	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
@@ -491,7 +489,7 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	_, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	_, err := externalService.UpdateOrderByDelivery(ctx, updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}
@@ -505,14 +503,14 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 // เพราะใบที่ถูกแก้มี external_id จากตอนสร้างอยู่แล้ว
 //
 // hook เป็นข้อมูลเสริม พังแล้วต้องไม่ทำให้แก้ใบไม่ได้ แต่ต้องเห็นใน log
-func fireUpdateDeliveryHook(deliveries []DeliveryDocumentUpdate) {
+func fireUpdateDeliveryHook(ctx context.Context, deliveries []DeliveryDocumentUpdate) {
 	requestData := map[string]interface{}{
 		"module":    []string{"DELIVERY"},
 		"topic":     []string{"DELIVERY"},
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		fmt.Printf("UpdateDelivery: cannot read hook config, skipping hook: %v\n", err)
 		return
@@ -528,7 +526,7 @@ func fireUpdateDeliveryHook(deliveries []DeliveryDocumentUpdate) {
 		urlHook = hookConfigValue.HookUrl
 	}
 
-	if _, hookErr := interfaceService.HookInterface(interfaceService.HookInterfaceRequest{
+	if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
 		RequestData: hookReq,
 		UrlHook:     urlHook,
 	}); hookErr != nil {

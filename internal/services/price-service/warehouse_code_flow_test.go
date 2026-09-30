@@ -3,6 +3,7 @@
 package priceService
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -39,7 +40,7 @@ func TestGetPriceDetailCarriesWarehouseCodePerBatch(t *testing.T) {
 	defer srv.Close()
 	pointWarehouseEndpointAt(t, srv.URL)
 
-	result, err := transformToGetPriceListResponse(buildSingleSubGroupResponse(subGroupID))
+	result, err := transformToGetPriceListResponse(context.Background(), buildSingleSubGroupResponse(subGroupID))
 	if err != nil {
 		t.Fatalf("transformToGetPriceListResponse: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestGetPriceDetailKeepsRowWhenWarehouseUnknown(t *testing.T) {
 	defer srv.Close()
 	pointWarehouseEndpointAt(t, srv.URL)
 
-	result, err := transformToGetPriceListResponse(buildSingleSubGroupResponse(subGroupID))
+	result, err := transformToGetPriceListResponse(context.Background(), buildSingleSubGroupResponse(subGroupID))
 	if err != nil {
 		t.Fatalf("transformToGetPriceListResponse: %v", err)
 	}

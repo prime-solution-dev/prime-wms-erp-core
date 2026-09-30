@@ -1,6 +1,7 @@
 package emailservice
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"gopkg.in/gomail.v2"
 )
 
@@ -24,7 +24,7 @@ type ConfigEmailAlert struct {
 	Recipients []string `json:"recipients"`
 }
 
-func SendEmailAlertForNewBrand(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func SendEmailAlertForNewBrand(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.CreditRequest
 

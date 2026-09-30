@@ -1,6 +1,7 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,11 +10,11 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -33,7 +34,7 @@ type CreateQuotationResponse struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CreateQuotationRequest{}
 	res := []CreateQuotationResponse{}
 
@@ -53,10 +54,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -127,7 +125,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, user)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, user)
 			if err != nil {
 				return nil, err
 			}
@@ -234,7 +232,7 @@ func CreateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			}
 
 			if !shouldSkipVerification {
-				verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+				verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 				if err != nil {
 					return nil, err
 				}

@@ -2,12 +2,15 @@ package authenticationService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	"prime-erp-core/internal/utils"
 )
 
 type GetRequesterRequest struct {
@@ -21,22 +24,20 @@ type Requester struct {
 	RequesterCode string
 }
 
-func GetRequester(requestData map[string]interface{}) ([]Requester, error) {
+func GetRequester(ctx context.Context, requestData map[string]interface{}) ([]Requester, error) {
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
 
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_authorization")+"/author/get-requester", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_authorization")+"/author/get-requester", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
-
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("authentication")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())

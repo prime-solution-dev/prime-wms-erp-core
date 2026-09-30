@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -11,11 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -78,7 +78,7 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		"sub_topic": []string{"UPDATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			SiteCode:    []string{req[0].SiteCode},
 			CompanyCode: []string{req[0].CompanyCode},
 		}
-		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(productReq)
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 		if errGetProductInterface != nil {
 			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 		}
@@ -122,7 +122,7 @@ func UpdateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
 			return nil, err
 		}

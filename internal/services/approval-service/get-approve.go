@@ -1,6 +1,7 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
@@ -8,7 +9,6 @@ import (
 	authenticationService "prime-erp-core/internal/services/authentication-service"
 	"sort"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -29,7 +29,13 @@ type ResultApproval struct {
 	ApprovalRes []models.Approval `json:"approval"`
 }
 
-func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// GetApproval รับ context.Context เพื่อให้ caller ที่แปลงแล้วเรียกได้ตรงๆ และส่งต่อให้
+// authenticationService.GetRequester/GetUserApproval เพื่อแนบ token ไปกับ request ที่ยิงต่อ —
+// แต่ห้ามส่ง gin's Context ดิบเข้ามาที่พารามิเตอร์นี้ ต่อให้มันขึ้นรูปตรงกับ interface
+// context.Context ได้ก็ตาม เพราะ repo นี้ไม่ได้เปิด gin's ContextWithFallback ไว้ ตัว Value() ของมัน
+// จะมองไม่เห็นค่าที่ requestcontext เก็บ (Task 5-6 Finding A) ผู้ที่ยังไม่แปลงต้องส่ง
+// ctx.Request.Context() เท่านั้น
+func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest
 
@@ -51,7 +57,7 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"md_item_code": mdiItemCode,
 		"action_code":  []string{"APPROVE"},
 	}
-	requester, errGetRequester := authenticationService.GetRequester(requestData)
+	requester, errGetRequester := authenticationService.GetRequester(ctx, requestData)
 	if errGetRequester != nil {
 		return nil, errGetRequester
 	}
@@ -65,7 +71,7 @@ func GetApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"active":           true,
 		"is_not_expired":   true,
 	}
-	userApproval, errGetUserApproval := authenticationService.GetUserApproval(requestDataGetUserApproval)
+	userApproval, errGetUserApproval := authenticationService.GetUserApproval(ctx, requestDataGetUserApproval)
 	if errGetUserApproval != nil {
 		return nil, errGetUserApproval
 	}

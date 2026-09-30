@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 
@@ -8,7 +9,6 @@ import (
 	models "prime-erp-core/internal/models"
 	repositorySale "prime-erp-core/internal/repositories/sale"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -50,7 +50,7 @@ type ResultSale struct {
 	Sale       []models.Sale `json:"sale"`
 }
 
-func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetSaleRequest
 
@@ -61,11 +61,12 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	if req.IsAvailableQty {
 		// If filtering by available qty, get all data first (no pagination)
 		// then filter and apply pagination manually
-		return getSaleWithAvailableQtyFilter(req)
+		return getSaleWithAvailableQtyFilter(ctx, req)
 	}
 
 	// Normal flow without qty filtering - use repository
 	sale, totalPages, totalRecords, errApproval := repositorySale.GetSalePreload(
+		ctx,
 		req.CompanyCode,
 		req.SiteCode,
 		req.ID,
@@ -108,9 +109,10 @@ func GetSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return resultSale, nil
 }
 
-func getSaleWithAvailableQtyFilter(req GetSaleRequest) (interface{}, error) {
+func getSaleWithAvailableQtyFilter(ctx context.Context, req GetSaleRequest) (interface{}, error) {
 	// Get all sales without pagination first
 	sale, _, _, errApproval := repositorySale.GetSalePreload(
+		ctx,
 		req.CompanyCode,
 		req.SiteCode,
 		req.ID,

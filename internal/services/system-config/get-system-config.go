@@ -1,11 +1,10 @@
 package systemConfigService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetSystemConfigRequest struct {
@@ -24,7 +23,7 @@ type SystemConfigDto struct {
 	JSON       string `json:"json,omitempty"`
 }
 
-func GetSystemConfig(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSystemConfig(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req GetSystemConfigRequest
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
