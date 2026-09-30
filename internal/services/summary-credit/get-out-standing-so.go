@@ -23,6 +23,7 @@ type OutStandingSoRes struct {
 	SaleDate      *time.Time `json:"sale_date"`
 	SaleAmount    float64    `json:"sale_amount"`
 	StatusPayment string     `json:"status_payment"`
+	Status        string     `json:"status"`
 	Paid          float64    `json:"paid"`
 	OutStandingSo float64    `json:"out_standing_so"`
 }
@@ -172,6 +173,7 @@ func GetOutStandingSo(ctx context.Context, jsonPayload string) (interface{}, err
 			Paid:          paidSale,
 			OutStandingSo: resultValue.Sale.TotalAmount - paidSale,
 			StatusPayment: resultValue.Sale.StatusPayment,
+			Status:        resultValue.Sale.Status,
 		}
 		if (resultValue.Sale.TotalAmount - paidSale) != 0 {
 			resultOutStandingSoRes = append(resultOutStandingSoRes, detail)
