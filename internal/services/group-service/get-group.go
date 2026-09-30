@@ -54,18 +54,7 @@ func GetGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	itemMap := make(map[uuid.UUID][]models.GetGroupItemResponse)
 	for _, it := range items {
-		itemMap[it.GroupID] = append(itemMap[it.GroupID], models.GetGroupItemResponse{
-			ID:        it.ID.String(),
-			ItemCode:  it.ItemCode,
-			GroupID:   it.GroupID.String(),
-			ItemName:  it.ItemName,
-			Value:     it.Value,
-			ValueInt:  it.ValueInt,
-			CreateDtm: it.CreateDtm.String(),
-			UpdateBy:  it.UpdateBy,
-			UpdateDtm: it.UpdateDtm.String(),
-			CreateBy:  it.CreateBy,
-		})
+		itemMap[it.GroupID] = append(itemMap[it.GroupID], toGroupItemResponse(it))
 	}
 
 	for _, g := range groups {
@@ -85,4 +74,21 @@ func GetGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return res, nil
+}
+
+func toGroupItemResponse(it models.GroupItem) models.GetGroupItemResponse {
+	return models.GetGroupItemResponse{
+		ID:                  it.ID.String(),
+		ItemCode:            it.ItemCode,
+		GroupID:             it.GroupID.String(),
+		ItemName:            it.ItemName,
+		Value:               it.Value,
+		ParentGroupCode:     it.ParentGroupCode,
+		ParentGroupItemCode: it.ParentGroupItemCode,
+		ValueInt:            it.ValueInt,
+		CreateDtm:           it.CreateDtm.String(),
+		UpdateBy:            it.UpdateBy,
+		UpdateDtm:           it.UpdateDtm.String(),
+		CreateBy:            it.CreateBy,
+	}
 }
