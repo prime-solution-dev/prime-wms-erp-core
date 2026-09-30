@@ -425,7 +425,7 @@ func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRe
 	if err != nil {
 		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
 	}
-
+	endpoint := os.Getenv("base_url_supplier") + "/get-suppliers"
 	getSuppliers, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
