@@ -1,11 +1,10 @@
 package unitService
 
 import (
+	"context"
 	"encoding/json"
 	"prime-erp-core/internal/models"
 	unitRepository "prime-erp-core/internal/repositories/unit"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetAllUnitRequest struct {
@@ -49,7 +48,7 @@ func MapUnitToResponse(unit models.Unit) models.GetAllUnitResponse {
 	}
 }
 
-func GetAllUnit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetAllUnit(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetAllUnitRequest{}
 	if jsonPayload != "" {
 		if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

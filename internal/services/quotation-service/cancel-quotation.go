@@ -1,6 +1,7 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -18,7 +18,7 @@ type CancelQuotationRequest struct {
 	ID uuid.UUID `json:"id"`
 }
 
-func CancelQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CancelQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CancelQuotationRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

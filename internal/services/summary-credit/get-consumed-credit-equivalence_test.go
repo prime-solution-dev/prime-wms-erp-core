@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"math"
 	"math/rand"
 	"prime-erp-core/internal/models"
@@ -19,10 +18,10 @@ import (
 // Only its three data-loading calls are injected; the calculation is copied verbatim.
 // This compares service logic, not SQL execution or live database contents.
 
-func legacyConsumedForAudit(ctx *gin.Context, jsonPayload string,
+func legacyConsumedForAudit(ctx context.Context, jsonPayload string,
 	loadSales func(string, string) ([]repositorySale.SaleWithInvoiceItems, error),
-	loadPayment func(*gin.Context, string) (interface{}, error),
-	loadInvoice func(*gin.Context, string) (interface{}, error),
+	loadPayment func(context.Context, string) (interface{}, error),
+	loadInvoice func(context.Context, string) (interface{}, error),
 ) (interface{}, error) {
 
 	var req GetPaidInvoiceRequest
@@ -255,14 +254,14 @@ func TestBatchMatchesLegacyConsumedCalculation(t *testing.T) {
 						}
 						return selected, nil
 					},
-					func(_ *gin.Context, payload string) (interface{}, error) {
+					func(_ context.Context, payload string) (interface{}, error) {
 						var req paymentService.GetPaymentRequest
 						if err := json.Unmarshal([]byte(payload), &req); err != nil {
 							return nil, err
 						}
 						return paymentService.ResultPayment{Payment: auditPaymentSelection(payments, req.InvoiceCode)}, nil
 					},
-					func(*gin.Context, string) (interface{}, error) {
+					func(context.Context, string) (interface{}, error) {
 						// Deliberately nonzero related invoice data: it must not affect TotalAmount.
 						return invoiceService.ResultInvoice{Invoice: []models.Invoice{
 							{InvoiceRef: "I1", InvoiceType: "DN", InvoiceItem: []models.InvoiceItem{{TotalAmount: 9876.54}}},

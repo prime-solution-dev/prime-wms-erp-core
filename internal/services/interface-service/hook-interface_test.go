@@ -1,6 +1,7 @@
 package interfaceService
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -42,7 +43,7 @@ func TestHookInterfaceResponse(t *testing.T) {
 			}))
 			defer server.Close()
 			t.Setenv("base_url_document", server.URL)
-			got, err := HookInterface(HookInterfaceRequest{RequestData: map[string]string{"id": "invoice-1"}})
+			got, err := HookInterface(context.Background(), HookInterfaceRequest{RequestData: map[string]string{"id": "invoice-1"}})
 			if tc.errContains != "" {
 				if err == nil || !strings.Contains(err.Error(), tc.errContains) {
 					t.Fatalf("error = %v, want containing %q", err, tc.errContains)
@@ -63,7 +64,7 @@ func TestHookInterfaceResponse(t *testing.T) {
 }
 
 func TestHookInterfaceRejectsUnencodableRequest(t *testing.T) {
-	_, err := HookInterface(HookInterfaceRequest{RequestData: make(chan int)})
+	_, err := HookInterface(context.Background(), HookInterfaceRequest{RequestData: make(chan int)})
 	if err == nil || !strings.Contains(err.Error(), "encode request") {
 		t.Fatalf("unexpected error: %v", err)
 	}

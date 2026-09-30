@@ -1,14 +1,13 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -139,7 +138,7 @@ type DeliveryItemResponse struct {
 	UnitCode         string  `json:"unit_code"`
 }
 
-func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSalePack(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var res []GetSalePackResponse
 	var req GetSalePackRequest
 
@@ -196,8 +195,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var sales []models.Sale
 	if err := query.Find(&sales).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve sales"})
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve sales: %v", err)
 	}
 
 	// Process each sale
@@ -296,7 +294,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	// Call external packing service
-	externalPackingResponse, err := callPackingService(res, req)
+	externalPackingResponse, err := callPackingService(ctx, res, req)
 	if err != nil {
 		fmt.Printf("Error calling external packing service: %v\n", err)
 		// Return empty result if external service fails
@@ -319,7 +317,7 @@ func GetSalePack(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 }
 
 // callPackingService รวบรวม delivery codes และ excluded pack codes จาก sales ทั้งหมด แล้วเรียก external packing service
-func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (externalService.ResultPackingResponse, error) {
+func callPackingService(ctx context.Context, sales []GetSalePackResponse, req GetSalePackRequest) (externalService.ResultPackingResponse, error) {
 	allDeliveryCodes := make(map[string]bool)
 	allExcludedPackCodes := make(map[string]bool)
 
@@ -362,7 +360,7 @@ func callPackingService(sales []GetSalePackResponse, req GetSalePackRequest) (ex
 		PageSize:         req.PageSize,
 	}
 
-	packingResponse, err := externalService.GetPackSo(packingRequest)
+	packingResponse, err := externalService.GetPackSo(ctx, packingRequest)
 	if err != nil {
 		return externalService.ResultPackingResponse{}, errors.New("Error calling packing service: " + err.Error())
 	}

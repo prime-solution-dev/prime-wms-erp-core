@@ -1,12 +1,12 @@
 package depositService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -27,7 +27,7 @@ type ResultDeposit struct {
 	Deposit    []models.Deposit `json:"deposit"`
 }
 
-func GetDeposit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetDeposit(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetDepositRequest
 

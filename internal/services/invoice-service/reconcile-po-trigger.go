@@ -1,6 +1,7 @@
 package invoiceService
 
 import (
+	"context"
 	"errors"
 	models "prime-erp-core/internal/models"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
@@ -17,7 +18,7 @@ import (
 // per-unit tolerance), and hands off to the reconcile routine. PO codes that are
 // not real POs are ignored by the reconcile routine. Idempotent — safe to call on
 // every create/update of an AP invoice.
-func reconcilePOAfterAPSave(req []models.Invoice) error {
+func reconcilePOAfterAPSave(ctx context.Context, req []models.Invoice) error {
 	// Process each COMPLETED invoice independently so the product master is always
 	// fetched with THAT invoice's own company/site (a batch spanning companies must
 	// not resolve one invoice's products under another's scope).
@@ -50,7 +51,7 @@ func reconcilePOAfterAPSave(req []models.Invoice) error {
 			continue
 		}
 
-		productMap, err := purchaseService.GetProductByCode(models.GetProductRequest{
+		productMap, err := purchaseService.GetProductByCode(ctx, models.GetProductRequest{
 			ProductCode: productCodes,
 			SiteCode:    []string{invoice.SiteCode},
 			CompanyCode: []string{invoice.CompanyCode},

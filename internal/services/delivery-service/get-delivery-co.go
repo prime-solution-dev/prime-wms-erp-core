@@ -1,16 +1,15 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	externalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -72,7 +71,7 @@ type GetDeliveryItemCOResponse struct {
 	Order           externalService.GetOrderDeliveryResponse `gorm:"-" json:"order"`
 }
 
-func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetDeliveryCO(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetDeliveryCOResponse
 	var req GetDeliveryCORequest
@@ -85,7 +84,6 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
@@ -103,7 +101,6 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 		return nil, err
 	}
 
@@ -183,7 +180,7 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 
 		// GetOrderDelivery
-		orderDeliveryResponse, err := GetOrderDelivery(allDeliveries)
+		orderDeliveryResponse, err := GetOrderDelivery(ctx, allDeliveries)
 		if err != nil {
 			fmt.Println("Error in GetOrderDelivery:", err)
 			return res, nil
@@ -250,7 +247,7 @@ func GetDeliveryCO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-func GetOrderDelivery(allDeliveries []GetDeliverySOResponse) (externalService.ResultOrderDeliveryResponse, error) {
+func GetOrderDelivery(ctx context.Context, allDeliveries []GetDeliverySOResponse) (externalService.ResultOrderDeliveryResponse, error) {
 	getOrderRequest := externalService.GetOrderDeliveryRequest{}
 	for _, row := range allDeliveries {
 		getOrderRequest.DeliveryCode = append(getOrderRequest.DeliveryCode, row.DeliveryCode)
@@ -260,7 +257,7 @@ func GetOrderDelivery(allDeliveries []GetDeliverySOResponse) (externalService.Re
 		}
 	}
 
-	getOrderResponse, err := externalService.GetOrdersDelivery(getOrderRequest)
+	getOrderResponse, err := externalService.GetOrdersDelivery(ctx, getOrderRequest)
 	if err != nil {
 		return externalService.ResultOrderDeliveryResponse{}, errors.New("Error get outbound : " + err.Error())
 	}

@@ -5,7 +5,6 @@ package groupService_test
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -239,10 +237,7 @@ func TestSyncGroupMasterHandlerWritesTheSnapshot(t *testing.T) {
 		`"group_items":[{"id":%q,"group_id":%q,"item_code":"BU01","item_name":"Bulk"}]}`,
 		groupID, uuid.New(), groupID)
 
-	gin.SetMode(gin.TestMode)
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-
-	got, err := groupService.SyncGroupMaster(ctx, payload)
+	got, err := groupService.SyncGroupMaster(context.Background(), payload)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

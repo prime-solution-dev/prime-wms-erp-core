@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func withCascadeStubs(t *testing.T, codes func([]uuid.UUID) ([]string, error), run func(models.UpdateLatestPriceListSubGroupRequest) (interface{}, error)) {
+func withCascadeStubs(t *testing.T, codes func([]uuid.UUID) ([]string, error), run func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error)) {
 	t.Helper()
 	origCodes, origRun := getPriceListGroupCodesByIDsFunc, runUpdateLatestSubGroupFunc
 	getPriceListGroupCodesByIDsFunc, runUpdateLatestSubGroupFunc = codes, run
@@ -33,13 +34,13 @@ func TestCascadeBasePriceToSubGroups(t *testing.T) {
 			gotIDs = ids
 			return []string{"GROUP_1_ITEM_4", "GROUP_1_ITEM_9"}, nil
 		},
-		func(req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+		func(_ context.Context, req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
 			calls++
 			gotReq = req
 			return nil, nil
 		})
 
-	err := cascadeBasePriceToSubGroups([]models.PriceListGroup{{ID: idA}, {ID: idB}})
+	err := cascadeBasePriceToSubGroups(context.Background(), []models.PriceListGroup{{ID: idA}, {ID: idB}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,12 +62,12 @@ func TestCascadeBasePriceToSubGroups_NoGroupsIsNoOp(t *testing.T) {
 	calls := 0
 	withCascadeStubs(t,
 		func([]uuid.UUID) ([]string, error) { return nil, nil },
-		func(models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
 			calls++
 			return nil, nil
 		})
 
-	if err := cascadeBasePriceToSubGroups(nil); err != nil {
+	if err := cascadeBasePriceToSubGroups(context.Background(), nil); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if calls != 0 {
@@ -78,18 +79,18 @@ func TestCascadeBasePriceToSubGroups_PropagatesErrors(t *testing.T) {
 	lookupErr := errors.New("lookup boom")
 	withCascadeStubs(t,
 		func([]uuid.UUID) ([]string, error) { return nil, lookupErr },
-		func(models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) { return nil, nil })
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) { return nil, nil })
 
-	if err := cascadeBasePriceToSubGroups([]models.PriceListGroup{{ID: uuid.New()}}); !errors.Is(err, lookupErr) {
+	if err := cascadeBasePriceToSubGroups(context.Background(), []models.PriceListGroup{{ID: uuid.New()}}); !errors.Is(err, lookupErr) {
 		t.Fatalf("want the lookup error wrapped, got %v", err)
 	}
 
 	recalcErr := errors.New("recalc boom")
 	withCascadeStubs(t,
 		func([]uuid.UUID) ([]string, error) { return []string{"GROUP_1_ITEM_4"}, nil },
-		func(models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) { return nil, recalcErr })
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) { return nil, recalcErr })
 
-	if err := cascadeBasePriceToSubGroups([]models.PriceListGroup{{ID: uuid.New()}}); !errors.Is(err, recalcErr) {
+	if err := cascadeBasePriceToSubGroups(context.Background(), []models.PriceListGroup{{ID: uuid.New()}}); !errors.Is(err, recalcErr) {
 		t.Fatalf("want the recalculation error wrapped, got %v", err)
 	}
 }
