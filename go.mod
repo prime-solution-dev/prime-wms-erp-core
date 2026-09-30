@@ -10,7 +10,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
-	github.com/prime-solution-dev/prime-service-x v0.1.3
+	github.com/prime-solution-dev/prime-service-x v0.1.4
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0
 	github.com/xuri/excelize/v2 v2.10.0
