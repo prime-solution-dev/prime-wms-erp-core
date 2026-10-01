@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -17,125 +16,52 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/prime-solution-dev/prime-service-x/apilog"
 	"github.com/prime-solution-dev/prime-service-x/servicelog"
 )
 
 const (
 	logBodyLimit = 64 * 1024
 	logTimeout   = 2 * time.Second
-
-	// defaultServiceLogServiceName ใช้เมื่อไม่ได้ตั้ง API_LOG_SERVICE ไว้ (เช่น .env ที่ยังไม่ได้
-	// เติมค่าจริงจาก Vault) ต่างจาก reference ที่ hardcode ชื่อ service ไว้ตรงๆ เพราะที่นี่ให้
-	// ตั้งค่าผ่าน ENV ได้ แล้วมีค่า default ไว้กันพลาดเท่านั้น
-	defaultServiceLogServiceName = "prime-erp-core"
-
-	// apiLogExcludeEnv ไม่ได้เป็นส่วนหนึ่งของ servicelog.LoadFromEnv() (library ไม่รู้จักตัวนี้)
-	// erp-core เป็นคนอ่านเองเพื่อกันไม่ให้ cron endpoint (ยิงทุกนาที) เขียนลง MongoDB รัวๆ
-	apiLogExcludeEnv = "API_LOG_EXCLUDE"
 )
 
-// RequestLogMiddleware บันทึก request/response ทุกเส้นที่ไม่ถูก API_LOG_EXCLUDE กันไว้ ลง
-// service log (MongoDB ผ่าน prime-service-x/servicelog)
-//
-// ต้องลงทะเบียนหลัง AuthMiddleware (ดู RegisterMiddlewares) เพื่อให้ inbound log เห็น user ที่
-// แกะจาก JWT แล้วจริงๆ ไม่ใช่ค่าว่างเหมือน reference (reference วาง middleware นี้ไว้ก่อน Auth
-// แล้วคอมเมนต์ยอมรับเองว่า user ยังว่างอยู่ตอนนั้น)
-//
-// ส่วน request id / trace id ต้องมาก่อน enabled/excluded check เสมอ เพราะทุก route (รวมเส้นที่
-// AuthMiddleware ปฏิเสธ) ต้องมี trace id ติดตัวไปด้วย ไม่ใช่แค่เส้นที่ถูกบันทึก log
 func RequestLogMiddleware() gin.HandlerFunc {
-
-	// =========================================================
-	// INITIALIZE SERVICE LOG
-	// ทำครั้งเดียวตอน Register Middleware
-	// =========================================================
-
+	log.Println("[ ====================== SERVICE LOG DEBUG] RequestLogMiddleware REGISTERED")
 	cfg := servicelog.LoadFromEnv()
 
-	if cfg.ServiceName == "" {
-		cfg.ServiceName = defaultServiceLogServiceName
-	}
+	cfg.ServiceName = "wms-service-warehouse"
+	log.Printf(
+		"[ ====================== SERVICE LOG DEBUG] CONFIG enabled=%t service=%s database=%s collection=%s",
+		cfg.Enabled,
+		cfg.ServiceName,
+		cfg.DatabaseName,
+		cfg.CollectionName,
+	)
 
 	enabled := cfg.Enabled
+	log.Println("[====================== SERVICE LOG DEBUG] MongoDB Init START")
 
-	if err := utils.InitServiceLog(cfg); err != nil {
+	if err := servicelog.Init(cfg); err != nil {
 		log.Printf(
-			"[SERVICE LOG] DISABLED: %v",
+			"[SERVICE LOG DEBUG] MongoDB Init ERROR: %v",
 			err,
 		)
 
 		enabled = false
-	}
-
-	// =========================================================
-	// INITIALIZE OUTBOUND API LOG (prime-service-x/apilog) — GATED, OFF BY DEFAULT
-	//
-	// ต่างจาก servicelog (inbound) ด้านบน apilog.Init ที่นี่ "ไม่" ถูกเรียกเสมอ — ถูกเรียกก็ต่อเมื่อ
-	// utils.OutboundLogEnabled() คืน true (env: API_LOG_OUTBOUND_ENABLED=true) เท่านั้น ค่า default
-	// (unset) คือข้าม block นี้ไปทั้งหมด ไม่มีการต่อ MongoDB สำหรับ apilog เลย
-	//
-	// เหตุผล — code review เจอ Critical 2 ข้อใน apilog ที่แก้จาก erp-core ไม่ได้ (รายละเอียดเต็มอยู่
-	// ที่คอมเมนต์บน utils.OutboundLogEnabled / apiLogOutboundEnabledEnv ใน
-	// internal/utils/outbound-log-transport.go — อย่าลบคอมเมนต์นี้ทิ้งโดยไม่ก็อปเหตุผลไปด้วย):
-	//   1. apilog เก็บ request/response body เป็น string ดิบ ไม่ redact เลย (มีแค่ truncate) —
-	//      erp-core เรียก service อื่นด้วยชื่อ/เบอร์โทร/ที่อยู่/เลขผู้เสียภาษีลูกค้าแทบทุกเส้น
-	//   2. apilog เขียน Mongo ด้วย context ของผู้เรียกตรงๆ ไม่มี timeout ของตัวเอง และทิ้ง error
-	//      ที่ได้กลับมา — Mongo ช้า/ต่อไม่ได้ = request ค้างรอ server-selection (~30s) เงียบๆ
-	// ห้ามเปิด API_LOG_OUTBOUND_ENABLED ใน Vault จนกว่า library จะแก้สองข้อนี้ — สำคัญที่สุดคือ
-	// API_LOG_ENABLED=true (inbound) ต้อง "ไม่" ทำให้ outbound เปิดตามไปด้วยโดยไม่ได้ตั้งใจ สอง flag
-	// เป็นคนละตัวกันโดยเจตนา
-	//
-	// เมื่อเปิดจริง อ่าน API_LOG_* ชุดเดียวกับ servicelog ด้านบน (ServiceName/MongoDBURI/Database)
-	// จึงต่อ MongoDB ปลายทางเดียวกันโดยอัตโนมัติ ไม่ต้องตั้งค่าแยก ผลของ Init ตัวนี้คือ
-	// apilog.NewLoggingTransport (ที่ utils.NewOutboundLogTransport ห่อไว้อีกชั้น — ดู
-	// internal/utils/outbound-log-transport.go) เริ่มเขียน log ได้จริง ใส่ default ServiceName แบบ
-	// เดียวกับ servicelog ด้านบน (apilog.LoadFromEnv() ไม่มี fallback ของตัวเอง)
-	//
-	// Init ล้มเหลว (เช่นไม่ได้ตั้ง Vault ไว้) ต้อง log แล้วปล่อยผ่าน ห้ามทำให้ service เริ่มไม่ได้
-	// เหมือน servicelog ด้านบน
-	// =========================================================
-
-	if utils.OutboundLogEnabled() {
-
-		apilogCfg := apilog.LoadFromEnv()
-
-		if apilogCfg.ServiceName == "" {
-			apilogCfg.ServiceName = defaultServiceLogServiceName
-		}
-
-		if err := utils.InitAPILog(apilogCfg); err != nil {
-			log.Printf(
-				"[API LOG] DISABLED: %v",
-				err,
-			)
-		}
 	} else {
-		log.Printf(
-			"[API LOG] OUTBOUND LOGGING OFF (API_LOG_OUTBOUND_ENABLED not set to \"true\") — apilog.Init skipped, no Mongo connection made for it",
-		)
-	}
+		log.Println("[SERVICE LOG DEBUG] MongoDB Init SUCCESS")
 
-	excludedPrefixes := utils.ParseAPILogExcludePrefixes(
-		os.Getenv(apiLogExcludeEnv),
-	)
+	}
 
 	return func(c *gin.Context) {
 
-		// =========================================================
-		// STEP 1: START TIME
-		// ใช้สำหรับคำนวณ Duration ของ Request
-		// =========================================================
+		log.Printf(
+			"[SERVICE LOG DEBUG] Middleware ENTER method=%s path=%s enabled=%t",
+			c.Request.Method,
+			c.Request.URL.Path,
+			enabled,
+		)
 
 		startTime := time.Now()
-
-		// =========================================================
-		// STEP 2: REQUEST ID
-		//
-		// Request ID:
-		// สร้างใหม่ทุก Request
-		// ใช้ระบุ Request ปัจจุบันของ Service นี้
-		// =========================================================
 
 		requestID := uuid.NewString()
 
@@ -149,35 +75,13 @@ func RequestLogMiddleware() gin.HandlerFunc {
 			requestID,
 		)
 
-		// =========================================================
-		// STEP 3: TRACE ID
-		//
-		// ถ้า Service ก่อนหน้าส่ง X-Trace-ID มา
-		// → ใช้ Trace ID เดิม
-		//
-		// ถ้าไม่มี
-		// → ออก Trace ID ใหม่ (เดิมจุดนี้อยู่ใน utils.buildContext ซึ่งครอบคลุมแค่ route ที่ผ่าน
-		// ProcessContextRequest — ย้ายมาที่นี่เพื่อให้ทุก route มี trace id รวมถึงเส้นที่
-		// AuthMiddleware ปฏิเสธด้วย utils.buildContext ยังคงอ่านค่าที่มีอยู่แล้วใน context ต่อไป
-		// ไม่ทับ — เป็นตาข่ายรองเหมือนที่ทำกับ user/token)
-		// =========================================================
-
-		traceID := strings.TrimSpace(
-			c.GetHeader(utils.TraceIDHeader),
+		traceID := c.GetHeader(
+			"X-Trace-ID",
 		)
 
 		if traceID == "" {
-			traceID = uuid.NewString()
+			traceID = requestID
 		}
-
-		// =========================================================
-		// STEP 4: ADD TRACE ID TO CONTEXT
-		//
-		// Business Service และ External Service
-		// สามารถอ่าน Trace ID ผ่าน:
-		//
-		// requestcontext.GetTraceID(ctx)
-		// =========================================================
 
 		ctx := requestcontext.WithTraceID(
 			c.Request.Context(),
@@ -188,26 +92,16 @@ func RequestLogMiddleware() gin.HandlerFunc {
 			ctx,
 		)
 
-		// =========================================================
-		// SERVICE LOG DISABLED หรือ PATH ถูกยกเว้น (API_LOG_EXCLUDE)
-		//
-		// ถึงแม้ปิด Log หรือ path ถูกยกเว้น
-		// Request ID / Trace ID ยังคงถูกส่งผ่าน Context ตามปกติ
-		// =========================================================
+		if !enabled {
 
-		if !enabled || utils.IsExcludedPath(c.Request.URL.Path, excludedPrefixes) {
+			log.Printf(
+				"[=================== SERVICE LOG DEBUG] SKIP MongoDB logging because enabled=false path=%s",
+				c.Request.URL.Path,
+			)
+
 			c.Next()
 			return
 		}
-
-		// =========================================================
-		// STEP 5: READ REQUEST BODY
-		//
-		// อ่านเฉพาะสำเนาสำหรับ Logging
-		// จำกัดขนาดไม่เกิน 64 KiB
-		//
-		// Handler ด้านหลังยังสามารถอ่าน Body เดิมได้
-		// =========================================================
 
 		var requestBody interface{}
 
@@ -246,7 +140,7 @@ func RequestLogMiddleware() gin.HandlerFunc {
 
 		serviceName := cfg.ServiceName
 
-		user := requestcontext.GetUserOrDefault(
+		user, _ := requestcontext.GetUser(
 			c.Request.Context(),
 		)
 
@@ -263,23 +157,22 @@ func RequestLogMiddleware() gin.HandlerFunc {
 		endpoint := c.Request.URL.Path
 		method := c.Request.Method
 
-		// =========================================================
-		// STEP 7: CREATE INBOUND LOG
-		//
-		// Request เข้ามายัง Service
-		//
-		// Status เริ่มต้น:
-		// PROCESS
-		//
-		// หมายเหตุ: RequestLogMiddleware ลงทะเบียนหลัง AuthMiddleware (ดู RegisterMiddlewares)
-		// user ตรงนี้จึงเป็น user จริงของคนเรียก ไม่ใช่ค่าว่างเหมือน reference
-		// =========================================================
+		log.Printf(
+			"[================================= SERVICE LOG] CreateInboundLog UTILS:",
+		)
 
 		logCtx, cancel := context.WithTimeout(
 			context.WithoutCancel(
 				c.Request.Context(),
 			),
 			logTimeout,
+		)
+
+		log.Printf(
+			"[SERVICE LOG DEBUG] CreateInboundLog START requestID=%s traceID=%s endpoint=%s",
+			requestID,
+			traceID,
+			endpoint,
 		)
 
 		utils.CreateInboundLog(
@@ -343,7 +236,17 @@ func RequestLogMiddleware() gin.HandlerFunc {
 		// =========================================================
 		// STEP 10: NEXT
 		//
-		// ส่ง Request ไป Handler ถัดไป
+		// ส่ง Request ไป Middleware / Handler ถัดไป
+		//
+		// ตัวอย่าง:
+		//
+		// Auth Middleware
+		//      ↓
+		// Handler
+		//      ↓
+		// ProcessContextGinRequest
+		//      ↓
+		// Business Service
 		// =========================================================
 
 		c.Next()
@@ -366,15 +269,6 @@ func RequestLogMiddleware() gin.HandlerFunc {
 	}
 }
 
-// =========================================================
-// API_LOG_EXCLUDE
-//
-// รายการ path prefix (คั่นด้วย comma) ที่ไม่ต้องบันทึก log เช่น "/cronjob/,/health"
-// erp-core เป็นคนเพิ่มเอง — ไม่มีใน servicelog library และ reference ก็ไม่ได้ทำไว้
-//
-// parseAPILogExcludePrefixes/isExcludedPath ย้ายไปเป็น utils.ParseAPILogExcludePrefixes /
-// utils.IsExcludedPath แล้ว (internal/utils/outbound-log-transport.go) เพื่อให้ inbound (ที่นี่)
-// กับ outbound (utils.NewOutboundLogTransport) อ่าน API_LOG_EXCLUDE ด้วยตรรกะเดียวกันจุดเดียว
 // =========================================================
 // OUTBOUND LOG
 //
