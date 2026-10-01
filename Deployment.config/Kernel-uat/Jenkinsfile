@@ -127,7 +127,8 @@ stage('Build Docker Image') {
                     ssh -o StrictHostKeyChecking=no -i '${SSH_KEY_PATH}' \
                     '${REMOTE_USER}@${REMOTE_HOST}' \
                     'cd ${REPO_NAME} && \
-                    docker build --no-cache \
+                    docker build \
+                    --cpus=1.0 \
                     -f ${DOCKERFILEPATH} \
                     --build-arg GIT_TOKEN="${GIT_TOKEN}" \
                     -t ${IMAGE_NAME}:latest .'
