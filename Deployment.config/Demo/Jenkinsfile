@@ -11,6 +11,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.DemoWMS'
         ENV_FILE_KEY = 'Demo.env.erp' 
+        DOCKERFILEPATH = 'Deployment.config/Demo/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {

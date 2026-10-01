@@ -11,6 +11,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/Crossmax-main.pem'
         VAULT_PATH = 'JenkinsWMS/Jenkins.CrossmaxProdWMS'
         ENV_FILE_KEY = 'CrossmaxMain.env.erp'
+        DOCKERFILEPATH = 'Deployment.config/Crossmax-main/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {
