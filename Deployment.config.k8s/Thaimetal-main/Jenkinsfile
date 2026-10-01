@@ -213,30 +213,25 @@ stage('Prepare .env from Vault') {
         }
     }
 }
-        stage('Build Docker Image') {
+stage('Build Docker Image') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+        ]) {
+            sh '''
+                set +x
+                set -eu
+                test -n "$GIT_TOKEN"
 
-            steps {
-
-                echo '=========================================='
-                echo "Build: ${HARBOR_IMAGE}:${IMAGE_TAG}"
-                echo '=========================================='
-
-                withCredentials([
-                    string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
-
-                        docker build \
-                            -f "$K8S_CONFIG_DIR/Dockerfile" \
-                            --build-arg GIT_TOKEN="$GIT_TOKEN" \
-                            -t "$HARBOR_IMAGE:$IMAGE_TAG" \
-                            .
-                    '''
-                }
-            }
+                DOCKER_BUILDKIT=1 docker build \
+                    --secret id=github_token,env=GIT_TOKEN \
+                    -f "$K8S_CONFIG_DIR/Dockerfile" \
+                    -t "$HARBOR_IMAGE:$IMAGE_TAG" \
+                    .
+            '''
         }
+    }
+}
 
 
         // =========================================================
