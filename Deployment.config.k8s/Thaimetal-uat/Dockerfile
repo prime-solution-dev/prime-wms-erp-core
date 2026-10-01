@@ -1,21 +1,22 @@
-FROM golang:1.25.0 AS builder
+# syntax=docker/dockerfile:1
+FROM golang:1.25 AS builder
 
 WORKDIR /app
 
-# GOPRIVATE makes the go tool skip the public proxy for this module path and
-# fetch it straight from GitHub over git, which is why the token has to be here.
-# The token stays in this builder stage only: the final alpine stage copies just
-# the compiled binary and the .env, so nothing lands in the shipped image.
-ARG GIT_TOKEN
 ENV GOPRIVATE=github.com/prime-solution-dev/*
-RUN if [ -n "$GIT_TOKEN" ]; then \
-        git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"; \
-    fi
+ENV GOPROXY=https://proxy.golang.org,direct
 
 COPY go.mod go.sum ./
-RUN set -e; \
+
+RUN --mount=type=secret,id=github_token,required=true \
+    --mount=type=tmpfs,target=/root \
+    set -eu; \
+    test -s /run/secrets/github_token; \
+    umask 077; \
+    printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
+        "$(cat /run/secrets/github_token)" > /root/.netrc; \
     for i in 1 2 3 4 5; do \
-        if GOPROXY=https://proxy.golang.org,direct go mod download; then \
+        if go mod download; then \
             echo "Go modules downloaded successfully"; \
             break; \
         fi; \
@@ -28,6 +29,7 @@ RUN set -e; \
     done
 
 COPY . .
+
 COPY ./cmd/.env .env
 
 ENV CGO_ENABLED=0 \
