@@ -150,15 +150,17 @@ func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
-			if req[0].Status == "COMPLETED" {
-				req[0].Status = "TEMP"
-				jsonBytesCreateInvoice, err := json.Marshal(req)
-				if err != nil {
-					return nil, err
-				}
-				_, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
-				if errCreateInvoice != nil {
-					return nil, errCreateInvoice
+			if req[0].InvoiceCode != "" {
+				if req[0].Status == "COMPLETED" {
+					req[0].Status = "TEMP"
+					jsonBytesCreateInvoice, err := json.Marshal(req)
+					if err != nil {
+						return nil, err
+					}
+					_, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+					if errCreateInvoice != nil {
+						return nil, errCreateInvoice
+					}
 				}
 			}
 			return nil, err

@@ -51,16 +51,19 @@ type GetGroupRequest struct {
 }
 
 type GetGroupItemResponse struct {
-	ID        string  `json:"id"`
-	ItemCode  string  `json:"item_code"`
-	GroupID   string  `json:"group_id"`
-	ItemName  string  `json:"item_name"`
-	Value     string  `json:"value"`
-	ValueInt  float64 `json:"value_int"`
-	CreateDtm string  `json:"create_dtm"`
-	UpdateBy  string  `json:"update_by"`
-	UpdateDtm string  `json:"update_dtm"`
-	CreateBy  string  `json:"create_by"`
+	ID       string `json:"id"`
+	ItemCode string `json:"item_code"`
+	GroupID  string `json:"group_id"`
+	ItemName string `json:"item_name"`
+	Value    string `json:"value"`
+	// สาย parent ให้หน้า price list กรองตัวเลือกตามแม่ได้แบบเดียวกับหน้า product
+	ParentGroupCode     *string `json:"parent_group_code"`
+	ParentGroupItemCode *string `json:"parent_group_item_code"`
+	ValueInt            float64 `json:"value_int"`
+	CreateDtm           string  `json:"create_dtm"`
+	UpdateBy            string  `json:"update_by"`
+	UpdateDtm           string  `json:"update_dtm"`
+	CreateBy            string  `json:"create_by"`
 }
 
 type GetGroupResponse struct {
