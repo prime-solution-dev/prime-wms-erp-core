@@ -292,7 +292,7 @@ func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req 
 			creditReq.Customers = append(creditReq.Customers, cust)
 		}
 
-		creditRes, err := VerifyCreditLogic(sqlx, creditReq)
+		creditRes, err := VerifyCreditLogic(ctx, creditReq)
 		if err != nil {
 			return nil, err
 		}
