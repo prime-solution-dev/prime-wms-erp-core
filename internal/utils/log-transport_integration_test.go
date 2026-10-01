@@ -11,12 +11,11 @@ import (
 )
 
 // client ที่แปะ utils.NewOutboundLogTransport ต้องส่ง body ออกไปไม่เพี้ยน และเอา response กลับมา
-// ไม่เพี้ยน
+// ไม่เพี้ยน — ยิงของจริงผ่าน httptest server ไม่ได้ปลอม RoundTripper
 //
-// เทสนี้ไม่ได้เรียก utils.InitAPILog ก่อน apilog.store จึงเป็น nil ตาม default ของ process เทส
-// (apilog เป็น package-level var, ไม่มี seam ให้ปลอม MongoDB store จากนอก package) พฤติกรรมที่เทส
-// ได้คือ passthrough ล้วนๆ — ไม่ได้ครอบคลุม path ที่ apilog อ่าน/re-buffer body จริงตอน store != nil
-// (โค้ดส่วนนั้นมีเทสของ library เองแล้วที่ apilog/transport_test.go)
+// NewOutboundLogTransport เหลือเป็น shim ที่คืน http.DefaultTransport แล้ว (ดู log-transport.go)
+// เทสนี้จึงเป็นตัวยืนยันว่า shim โปร่งใสจริง ไม่ได้ไปแตะ body หรือ status ระหว่างทาง ถ้าวันไหนมีคน
+// เอา logging transport กลับมาแปะที่นี่ เทสนี้คือด่านแรกที่ต้องยังผ่าน
 func TestOutboundLogTransportPassesRequestAndResponseUnchanged(t *testing.T) {
 	var gotBody string
 

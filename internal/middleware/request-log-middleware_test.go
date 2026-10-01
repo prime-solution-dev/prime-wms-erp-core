@@ -12,34 +12,8 @@ import (
 	"prime-erp-core/internal/utils"
 
 	"github.com/gin-gonic/gin"
-	"github.com/prime-solution-dev/prime-service-x/apilog"
 	"github.com/prime-solution-dev/prime-service-x/servicelog"
 )
-
-// fakeAPILogInitiator ปลอม apilog.Init ให้เทสที่ไม่ได้ตั้งใจทดสอบ apilog โดยเฉพาะไม่ต้องไปรอ/ล้ม
-// เพราะ apilog พยายามต่อ MONGODB_URI ปลอมที่ setFakeServiceLogSink ตั้งไว้สำหรับ servicelog (คนละ
-// package กัน คนละ Init กัน — servicelog มี seam ของตัวเองอยู่แล้วผ่าน utils.SetServiceLogSinkForTest
-// แต่ apilog ยังไม่มีใครปลอมให้ ถ้าไม่ทำตรงนี้ RequestLogMiddleware() จะเรียก apilog.Init จริงแล้ว
-// พยายามต่อ MongoDB ที่ไม่มีอยู่จริงทุกครั้งที่เทสในไฟล์นี้ตั้ง API_LOG_MONGODB_URI)
-// fakeAPILogInitiator นับจำนวนครั้งที่ apilog.Init ถูกเรียก (ผ่าน utils.InitAPILog) เพื่อพิสูจน์ว่า
-// RequestLogMiddleware ไม่เรียก apilog.Init เลยเมื่อ API_LOG_OUTBOUND_ENABLED ปิดอยู่ (default)
-type fakeAPILogInitiator struct {
-	mu    sync.Mutex
-	calls int
-}
-
-func (f *fakeAPILogInitiator) Init(cfg apilog.Config) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls++
-	return nil
-}
-
-func (f *fakeAPILogInitiator) callCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.calls
-}
 
 // fakeServiceLogSink จับ Create/Update ที่ RequestLogMiddleware ยิงเข้ามา ไว้เทสได้โดยไม่ต้อง
 // พึ่ง MongoDB จริง — Init คืน nil เสมอ (ไม่ต่อ network) ปลอดภัยกับการรันเทสหลายตัวในไฟล์นี้
@@ -82,28 +56,21 @@ func (f *fakeServiceLogSink) Update(ctx context.Context, requestID string, respo
 	return nil
 }
 
-// setFakeServiceLogSink เปิด logging ผ่าน sink ปลอม (ไม่ต่อ MongoDB จริง) คืนฟังก์ชัน restore
-//
-// ตั้ง API_LOG_ENABLED=true ไว้เสมอ (ฝั่ง inbound/servicelog) แต่ "ไม่" ตั้ง
-// API_LOG_OUTBOUND_ENABLED — คือกรณีที่ตั้งใจให้เทสคุมพฤติกรรม: API_LOG_ENABLED=true ต้องไม่ทำให้
-// outbound (apilog) เปิดตามไปด้วย ดู TestRequestLogMiddlewareOutboundLoggingOffByDefault
-func setFakeServiceLogSink(t *testing.T) (*fakeServiceLogSink, *fakeAPILogInitiator) {
+// setFakeServiceLogSink เปิด logging ผ่าน sink ปลอม (ไม่ต่อ MongoDB จริง) restore ให้เองผ่าน
+// t.Cleanup — repo นี้ใช้ servicelog ตัวเดียว ไม่มี outbound logger ให้ปลอมอีกตัวแล้ว
+func setFakeServiceLogSink(t *testing.T) *fakeServiceLogSink {
 	t.Helper()
 
 	fake := &fakeServiceLogSink{}
 	restore := utils.SetServiceLogSinkForTest(fake)
 	t.Cleanup(restore)
 
-	fakeAPILog := &fakeAPILogInitiator{}
-	restoreAPILog := utils.SetAPILogInitiatorForTest(fakeAPILog)
-	t.Cleanup(restoreAPILog)
-
 	t.Setenv("API_LOG_ENABLED", "true")
 	t.Setenv("API_LOG_SERVICE", "erp-core-test")
 	t.Setenv("API_LOG_MONGODB_URI", "mongodb://unused-in-test")
 	t.Setenv("API_LOG_DATABASE", "api_logs_test")
 
-	return fake, fakeAPILog
+	return fake
 }
 
 func newLogTestRouter() *gin.Engine {
@@ -195,7 +162,7 @@ func TestRequestLogMiddlewareGeneratesTraceIDWhenMissing(t *testing.T) {
 
 // path ที่ตรงกับ API_LOG_EXCLUDE ต้องไม่ถูกบันทึก ส่วน path อื่นต้องถูกบันทึกตามปกติ
 func TestRequestLogMiddlewareExcludesConfiguredPathPrefix(t *testing.T) {
-	fake, _ := setFakeServiceLogSink(t)
+	fake := setFakeServiceLogSink(t)
 	t.Setenv("API_LOG_EXCLUDE", "/cronjob/,/health")
 
 	router := newLogTestRouter()
@@ -234,7 +201,7 @@ func TestRequestLogMiddlewareExcludesConfiguredPathPrefix(t *testing.T) {
 // key ที่ดูเป็นข้อมูล sensitive (password, token, secret, authorization, ...) ในตัว body ที่ถูก
 // log ต้องถูก redact — และ handler ด้านหลังยังต้องอ่าน body เดิม (ไม่ถูก redact) ได้ตามปกติ
 func TestRequestLogMiddlewareRedactsSensitiveKeysInLoggedBody(t *testing.T) {
-	fake, _ := setFakeServiceLogSink(t)
+	fake := setFakeServiceLogSink(t)
 
 	var gotBodyInHandler string
 
@@ -339,62 +306,5 @@ func TestRequestLogMiddlewareInitFailureDoesNotBreakRequest(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-}
-
-// =========================================================
-// OUTBOUND LOGGING GATE (API_LOG_OUTBOUND_ENABLED)
-//
-// apilog มี Critical 2 ข้อที่แก้จากฝั่ง erp-core ไม่ได้ (ดูคอมเมนต์เต็มบน utils.OutboundLogEnabled)
-// ตราบใดที่ยังไม่ถูกแก้ apilog.Init ต้อง "ไม่ถูกเรียกเลย" เมื่อไม่ได้เปิด
-// API_LOG_OUTBOUND_ENABLED ไว้อย่างชัดเจน — ต่อให้ API_LOG_ENABLED=true (ฝั่ง inbound/servicelog)
-// ก็ต้องไม่ทำให้ outbound เปิดตามไปด้วย เพราะสอง flag ควบคุมคนละทิศทาง
-// =========================================================
-
-// API_LOG_ENABLED=true (inbound เปิด) แต่ไม่ได้ตั้ง API_LOG_OUTBOUND_ENABLED เลย (default ปิด) →
-// utils.InitServiceLog (inbound) ต้องยังถูกเรียกตามปกติ แต่ utils.InitAPILog (outbound/apilog)
-// ต้องไม่ถูกเรียกเลย
-func TestRequestLogMiddlewareOutboundLoggingOffByDefault(t *testing.T) {
-	_, fakeAPILog := setFakeServiceLogSink(t)
-	t.Setenv("API_LOG_OUTBOUND_ENABLED", "")
-
-	router := newLogTestRouter()
-	router.Use(RequestLogMiddleware())
-	router.GET("/x", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
-
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/x", nil))
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-
-	if got := fakeAPILog.callCount(); got != 0 {
-		t.Fatalf("apilog.Init ถูกเรียก %d ครั้ง, ต้องการ 0 ครั้ง (API_LOG_OUTBOUND_ENABLED ไม่ได้เปิด)", got)
-	}
-}
-
-// ตั้ง API_LOG_OUTBOUND_ENABLED=true ชัดเจน → utils.InitAPILog ต้องถูกเรียก (feature ไม่ใช่ dead code)
-func TestRequestLogMiddlewareOutboundLoggingOnWhenExplicitlyEnabled(t *testing.T) {
-	_, fakeAPILog := setFakeServiceLogSink(t)
-	t.Setenv("API_LOG_OUTBOUND_ENABLED", "true")
-
-	router := newLogTestRouter()
-	router.Use(RequestLogMiddleware())
-	router.GET("/x", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
-
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/x", nil))
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
-	}
-
-	if got := fakeAPILog.callCount(); got != 1 {
-		t.Fatalf("apilog.Init ถูกเรียก %d ครั้ง, ต้องการ 1 ครั้ง (API_LOG_OUTBOUND_ENABLED=true)", got)
 	}
 }
