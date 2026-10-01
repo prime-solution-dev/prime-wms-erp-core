@@ -159,7 +159,7 @@ func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{},
 
 		if result.Error != nil {
 			tx.Rollback()
-			return nil, fmt.Errorf("failed to update delivery items for %s: %v", deliveryCode, result.Error)
+			return nil, fmt.Errorf("failed to update delivery items for %s : %v", deliveryCode, result.Error)
 		}
 
 		res = append(res, UpdateStatusDeliveryResponse{
