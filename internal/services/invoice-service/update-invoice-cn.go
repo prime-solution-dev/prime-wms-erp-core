@@ -66,69 +66,71 @@ func UpdateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 	}
 	if len(tempIDs) == len(req) {
-		if err := repositoryInvoice.DeleteInvoice(tempIDs); err != nil {
-			return nil, err
-		}
-		return CreateInvoiceCN(ctx, jsonPayload)
-	}
-
-	requestData := map[string]interface{}{
-		"module":    []string{"INVOICE"},
-		"topic":     []string{"CN"},
-		"sub_topic": []string{"UPDATE"},
-	}
-
-	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
-	if err != nil {
-		return nil, err
-	}
-	if len(hookConfig) > 0 {
-		urlHook := ""
-		for _, hookConfigValue := range hookConfig {
-			urlHook = hookConfigValue.HookUrl
-		}
-
-		productReq := models.GetProductRequest{
-			ProductCode: productCodes,
-			SiteCode:    []string{req[0].SiteCode},
-			CompanyCode: []string{req[0].CompanyCode},
-		}
-		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
-		if errGetProductInterface != nil {
-			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
-		}
-		reqHook := slices.Clone(req)
-		for i := range reqHook {
-			reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
-			for it := range reqHook[i].InvoiceItem {
-				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
-				if exists {
-					priceUnit, _ := calculateAPPriceUnit(
-						reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
-						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
-					)
-					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
-					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
-				}
-				reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
-					reqHook[i].InvoiceItem[it].ProductDesc,
-					"\\",
-					"",
-				)
+		if req[0].Status != "CANCELED" {
+			if err := repositoryInvoice.DeleteInvoice(tempIDs); err != nil {
+				return nil, err
 			}
+			return CreateInvoiceCN(ctx, jsonPayload)
+		}
+	}
+	if req[0].ExternalID != "" {
+		requestData := map[string]interface{}{
+			"module":    []string{"INVOICE"},
+			"topic":     []string{"CN"},
+			"sub_topic": []string{"UPDATE"},
 		}
 
-		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: reqHook,
-			UrlHook:     urlHook,
-		}
-		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
+		hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
+		if len(hookConfig) > 0 {
+			urlHook := ""
+			for _, hookConfigValue := range hookConfig {
+				urlHook = hookConfigValue.HookUrl
+			}
 
+			productReq := models.GetProductRequest{
+				ProductCode: productCodes,
+				SiteCode:    []string{req[0].SiteCode},
+				CompanyCode: []string{req[0].CompanyCode},
+			}
+			mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
+			if errGetProductInterface != nil {
+				return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+			}
+			reqHook := slices.Clone(req)
+			for i := range reqHook {
+				reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
+				for it := range reqHook[i].InvoiceItem {
+					mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+					if exists {
+						priceUnit, _ := calculateAPPriceUnit(
+							reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+							reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+						)
+						reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+						reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
+					}
+					reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
+						reqHook[i].InvoiceItem[it].ProductDesc,
+						"\\",
+						"",
+					)
+				}
+			}
+
+			requestDataCreateHook := interfaceService.HookInterfaceRequest{
+				RequestData: reqHook,
+				UrlHook:     urlHook,
+			}
+			_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
+			if err != nil {
+				return nil, err
+			}
+
+		}
 	}
-
 	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, jsonPayload)
 	if errCreateInvoice != nil {
 		return nil, errCreateInvoice

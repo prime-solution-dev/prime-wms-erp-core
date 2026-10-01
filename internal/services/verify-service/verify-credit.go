@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"prime-erp-core/internal/db"
 	creditService "prime-erp-core/internal/services/credit-service"
-
-	"github.com/jmoiron/sqlx"
 )
 
 type VerifyCreditRequest struct {
@@ -46,16 +43,13 @@ func VerifyCredit(ctx context.Context, jsonPayload string) (interface{}, error) 
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	sqlx, err := db.ConnectSqlx(`prime_erp`)
-	if err != nil {
-		return nil, err
-	}
-	defer sqlx.Close()
-
-	return VerifyCreditLogic(sqlx, req)
+	return VerifyCreditLogic(ctx, req)
 }
 
-func VerifyCreditLogic(sqlx *sqlx.DB, req VerifyCreditRequest) (*VerifyCreditResponse, error) {
+// VerifyCreditLogic ใช้ยอดจาก creditService.GetSummaryCredit (ตัวเดียวกับหน้า Customer Credit)
+// เพื่อให้ตัวเลขตอน validate ตรงกับหน้าจอ
+// GetSummaryCredit รับได้ทีละลูกค้า จึงเรียกแยกรายลูกค้า
+func VerifyCreditLogic(ctx context.Context, req VerifyCreditRequest) (*VerifyCreditResponse, error) {
 	res := VerifyCreditResponse{}
 
 	customerStrs := []string{}
@@ -71,36 +65,39 @@ func VerifyCreditLogic(sqlx *sqlx.DB, req VerifyCreditRequest) (*VerifyCreditRes
 		return nil, fmt.Errorf(`required customer`)
 	}
 
-	creditReq := creditService.GetCreditRequest{}
-	creditReq.CustomerCodes = customerStrs
-	creditCustomer, err := creditService.GetCreditCurrent(sqlx, creditReq)
-	if err != nil {
-		return nil, err
+	summaryMap := map[string]creditService.ResultGetSummaryCredit{}
+	for _, customerCode := range customerStrs {
+		payload, err := json.Marshal(map[string][]string{
+			"customer_code": {customerCode},
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		summaryRes, err := creditService.GetSummaryCredit(ctx, string(payload))
+		if err != nil {
+			return nil, err
+		}
+
+		summaryMap[customerCode] = summaryRes.(creditService.ResultGetSummaryCredit)
 	}
 
 	for _, rCustomer := range req.Customers {
-		for _, credit := range creditCustomer.CreditCustomers {
-			if credit.CustomerCode == rCustomer.CustomerCode {
-				rCustomer.CreditCalculation = VerifyCreditCalculation{
-					Subject:          "credit",
-					CreditLimit:      credit.Credit,
-					ExtraCreditLimit: credit.Extra,
-					RemainDeposit:    credit.RemainDeposit,
-					UsedCredit:       credit.Used,
-					RemainCredit:     credit.Balance,
-					NeedAmount:       rCustomer.NeedAmount,
-					FinalCredit:      credit.Balance - rCustomer.NeedAmount,
-				}
+		summary := summaryMap[rCustomer.CustomerCode]
 
-				if rCustomer.CreditCalculation.FinalCredit >= 0 {
-					rCustomer.IsPass = true
-				} else {
-					rCustomer.IsPass = false
-				}
-
-				break
-			}
+		// GetSummaryCredit หักมัดจำรวมไว้ใน consumed_credit แล้ว จึงไม่แยก remain_deposit
+		rCustomer.CreditCalculation = VerifyCreditCalculation{
+			Subject:          "credit",
+			CreditLimit:      summary.CreditLimit,
+			ExtraCreditLimit: summary.IncreaseCreditLimit,
+			RemainDeposit:    0,
+			UsedCredit:       summary.ConsumedCredit,
+			RemainCredit:     summary.BalanceCreditLimit,
+			NeedAmount:       rCustomer.NeedAmount,
+			FinalCredit:      summary.BalanceCreditLimit - rCustomer.NeedAmount,
 		}
+
+		rCustomer.IsPass = rCustomer.CreditCalculation.FinalCredit >= 0
 
 		res.Customers = append(res.Customers, rCustomer)
 	}
