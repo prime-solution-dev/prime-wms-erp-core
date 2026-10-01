@@ -10,6 +10,8 @@ import (
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
 	"slices"
+
+	"github.com/google/uuid"
 )
 
 func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -150,7 +152,7 @@ func CreateInvoiceDN(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
-			if req[0].InvoiceCode != "" {
+			if req[0].ID != uuid.Nil {
 				if req[0].Status == "COMPLETED" {
 					req[0].Status = "TEMP"
 					jsonBytesCreateInvoice, err := json.Marshal(req)
