@@ -12,6 +12,7 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"prime-erp-core/internal/requestcontext"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
 	"gorm.io/gorm"
 )
@@ -185,7 +186,73 @@ func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{},
 		closeSalesOfDeliveries(ctx, gormx, deliveryOf, completed, user)
 	}
 
+	// แจ้งปลายทางเฉพาะใบที่รอบนี้เพิ่งถูกยกเลิก ใบที่ CANCELED อยู่ก่อนแล้วเคยแจ้งไปแล้ว
+	if req.Status == "CANCELED" {
+		fireCancelDeliveryHook(postCommitContext(ctx), buildCancelHookRequests(deliveryOf, toUpdate))
+	}
+
 	return res, nil
+}
+
+// CancelDeliveryHookRequest คือ payload ที่ส่งเข้า hook ต่อใบจองหนึ่งใบที่ถูกยกเลิก
+// ชื่อ field delivery_codes เป็นรูปพหูพจน์แต่ค่าเป็นเลขใบเดียว ตามที่ปลายทางกำหนด
+type CancelDeliveryHookRequest struct {
+	DeliveryCodes string `json:"delivery_codes"`
+	Status        string `json:"status"`
+	ExternalID    string `json:"external_id"`
+}
+
+func buildCancelHookRequests(deliveryOf map[string]models.Delivery, deliveryCodes []string) []CancelDeliveryHookRequest {
+	hookReqs := make([]CancelDeliveryHookRequest, 0, len(deliveryCodes))
+	for _, deliveryCode := range deliveryCodes {
+		hookReqs = append(hookReqs, CancelDeliveryHookRequest{
+			DeliveryCodes: deliveryCode,
+			Status:        "CANCELED",
+			ExternalID:    deliveryOf[deliveryCode].ExternalID,
+		})
+	}
+
+	return hookReqs
+}
+
+// fireCancelDeliveryHook แจ้งปลายทาง (TRCloud) ว่าใบจองถูกยกเลิก ยิงทีละใบ
+//
+// ใช้ hook config ตัวเดียวกับ fireUpdateDeliveryHook (DELIVERY/DELIVERY/UPDATE)
+// ทำหลัง commit และ log ทิ้งถ้าพัง ยกเลิกใบสำเร็จไปแล้วต้องไม่กลายเป็น error
+func fireCancelDeliveryHook(ctx context.Context, hookReqs []CancelDeliveryHookRequest) {
+	if len(hookReqs) == 0 {
+		return
+	}
+
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"UPDATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
+	if err != nil {
+		fmt.Printf("UpdateStatusDelivery: cannot read hook config, skipping cancel hook: %v\n", err)
+		return
+	}
+
+	if len(hookConfig) == 0 {
+		return
+	}
+
+	urlHook := ""
+	for _, hookConfigValue := range hookConfig {
+		urlHook = hookConfigValue.HookUrl
+	}
+
+	for _, hookReq := range hookReqs {
+		if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
+			RequestData: hookReq,
+			UrlHook:     urlHook,
+		}); hookErr != nil {
+			fmt.Printf("UpdateStatusDelivery: cancel hook failed for %s, continuing: %v\n", hookReq.DeliveryCodes, hookErr)
+		}
+	}
 }
 
 // partitionDeliveriesByStatus แยกใบที่ต้องอัปเดตจริง ออกจากใบที่อยู่สถานะปลายทางอยู่แล้ว
