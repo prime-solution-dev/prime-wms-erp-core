@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"encoding/json"
 	"testing"
 
 	"prime-erp-core/internal/models"
@@ -93,5 +94,29 @@ func TestPartitionDeliveriesByStatusTreatsCancelTargetAsIdempotent(t *testing.T)
 
 	if len(toUpdate) != 0 || len(alreadyAtStatus) != 1 {
 		t.Errorf("toUpdate = %v, alreadyAtStatus = %v, want [] และ [DBS-X]", toUpdate, alreadyAtStatus)
+	}
+}
+
+// hook ยกเลิกต้องได้ payload หน้าตา {"delivery_codes":"<เลขใบ>","status":"CANCELED","external_id":"<id>"} ทีละใบ
+func TestBuildCancelHookRequestsShape(t *testing.T) {
+	deliveryOf := map[string]models.Delivery{
+		"DBS202610-0004": {DeliveryCode: "DBS202610-0004", ExternalID: "1"},
+		"DBS202610-0005": {DeliveryCode: "DBS202610-0005", ExternalID: "2"},
+	}
+
+	hookReqs := buildCancelHookRequests(deliveryOf, []string{"DBS202610-0004"})
+
+	if len(hookReqs) != 1 {
+		t.Fatalf("จำนวน payload = %d, ต้องการ 1 (ส่งเฉพาะใบที่เพิ่งยกเลิก)", len(hookReqs))
+	}
+
+	got, err := json.Marshal(hookReqs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := `{"delivery_codes":"DBS202610-0004","status":"CANCELED","external_id":"1"}`
+	if string(got) != want {
+		t.Fatalf("payload = %s, ต้องการ %s", got, want)
 	}
 }
