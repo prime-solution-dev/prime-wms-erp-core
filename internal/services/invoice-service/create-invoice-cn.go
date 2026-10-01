@@ -157,7 +157,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
-			if req[0].InvoiceCode != "" {
+			if req[0].ID != uuid.Nil {
 				if req[0].Status == "COMPLETED" {
 					req[0].Status = "TEMP"
 					jsonBytesCreateInvoice, err := json.Marshal(req)
