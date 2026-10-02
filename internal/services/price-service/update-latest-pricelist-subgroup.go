@@ -360,6 +360,9 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup, groupItemValu
 	// ที่แก้ราคาฐาน การล้างจึงจะลามเป็นวงกว้าง
 	//
 	// จึงรีเซ็ตเป็น 0 เฉพาะเมื่อมี rule อย่างน้อยหนึ่งแถวที่ key ตรงกับ subgroup นี้
+	//
+	// การจับคู่ key ต้องตรงกับ anyExtraKeysMatch ใน repositories/priceList ซึ่งใช้ล้าง
+	// extra ตอน rule ถูกลบ (UpdateExtra) ถ้าแก้ฝั่งเดียวค่าจะกลับมาค้าง
 	matchedAnyRule := false
 	extraWeight, extraUnit := 0.0, 0.0
 
