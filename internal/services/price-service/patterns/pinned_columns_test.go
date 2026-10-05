@@ -20,7 +20,8 @@ func TestPatternConfigs_FirstColumnPinnedLeft(t *testing.T) {
 		if err := json.Unmarshal(data, &root); err != nil {
 			t.Fatalf("%s: parse ไม่ผ่าน: %v", entry.Name(), err)
 		}
-		for _, cols := range leadingColumnLists(root) {
+		// pattern ที่ fixedColumns ว่าง (เช่น GROUP_1_ITEM_5) ไม่ถูกตรวจ เพราะ columns เป็น template ต่อ column group
+		for _, cols := range fixedColumnLists(root) {
 			first, _ := cols[0].(map[string]any)
 			if first["pinned"] != "left" {
 				t.Errorf("%s: คอลัมน์แรก %v ไม่ได้ pinned left", entry.Name(), first["field"])
@@ -29,27 +30,23 @@ func TestPatternConfigs_FirstColumnPinnedLeft(t *testing.T) {
 	}
 }
 
-// leadingColumnLists คืนรายการคอลัมน์นำหน้าของแต่ละ tab: fixedColumns ถ้ามี ไม่งั้น columns ที่เป็นคอลัมน์แสดงผล (มี headerName)
-func leadingColumnLists(node any) [][]any {
+// fixedColumnLists คืน fixedColumns ทุกตัวที่ไม่ว่าง — เป็นทางเดียวที่ builder คัดลอก pinned ไปถึง API
+func fixedColumnLists(node any) [][]any {
 	var out [][]any
 	switch v := node.(type) {
 	case map[string]any:
 		if cols, ok := v["fixedColumns"].([]any); ok && len(cols) > 0 {
 			out = append(out, cols)
-		} else if cols, ok := v["columns"].([]any); ok && len(cols) > 0 {
-			if first, ok := cols[0].(map[string]any); ok && first["headerName"] != nil {
-				out = append(out, cols)
-			}
 		}
 		for k, child := range v {
-			if k == "fixedColumns" || k == "columns" {
+			if k == "fixedColumns" {
 				continue
 			}
-			out = append(out, leadingColumnLists(child)...)
+			out = append(out, fixedColumnLists(child)...)
 		}
 	case []any:
 		for _, child := range v {
-			out = append(out, leadingColumnLists(child)...)
+			out = append(out, fixedColumnLists(child)...)
 		}
 	}
 	return out
