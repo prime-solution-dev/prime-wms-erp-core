@@ -1,18 +1,22 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	customerService "prime-erp-core/internal/services/customer-service"
 	interfaceService "prime-erp-core/internal/services/interface-service"
+	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"slices"
+	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -30,7 +34,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestDataGetCustomers)
+	customers, err := customerService.GetCustomers(ctx, requestDataGetCustomers)
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +51,26 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		prefix = "CN"
 	}
 	configCodeValue := "RUNNING_CN"
-	count := len(req)
-	invoiceCodes, err := GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
-	if err != nil {
-		return nil, errors.New("failed to generate invoice codes: " + err.Error())
-	}
-
+	count := 0
 	for i := range req {
-		req[i].InvoiceCode = invoiceCodes[i]
+		if req[i].InvoiceCode == "" {
+			count++
+		}
+	}
+	var invoiceCodes []string
+	if count > 0 {
+		invoiceCodes, err = GenerateInvoiceCodes(ctx, count, prefix, configCodeValue)
+		if err != nil {
+			return nil, errors.New("failed to generate invoice codes: " + err.Error())
+		}
+	}
+	codeIndex := 0
+	productCodes := []string{}
+	for i := range req {
+		if req[i].InvoiceCode == "" {
+			req[i].InvoiceCode = invoiceCodes[codeIndex]
+			codeIndex++
+		}
 		conMapCustomer, exist := convertCustomerMap[req[i].PartyCode]
 		if exist {
 			req[i].PartyName = conMapCustomer.CustomerName
@@ -68,7 +84,9 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyExternalID = conMapCustomer.ExternalID
 			req[i].PartyBranch = conMapCustomer.BranchName
 		}
-
+		for it := range req[i].InvoiceItem {
+			productCodes = append(productCodes, req[i].InvoiceItem[it].ProductCode)
+		}
 	}
 
 	jsonBytesCreateInvoice, err := json.Marshal(req)
@@ -81,6 +99,10 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, errCreateInvoice
 	}
 
+	if req[0].Status == "TEMP" {
+		return createInvoiceReturn, nil
+	}
+
 	invoiceMap, _ := createInvoiceReturn.(map[string]interface{})
 	idInvoice := invoiceMap["id"].([]uuid.UUID)
 	requestData := map[string]interface{}{
@@ -89,7 +111,7 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		"sub_topic": []string{"CREATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +121,55 @@ func CreateInvoiceCN(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			urlHook = hookConfigValue.HookUrl
 		}
 
+		productReq := models.GetProductRequest{
+			ProductCode: productCodes,
+			SiteCode:    []string{req[0].SiteCode},
+			CompanyCode: []string{req[0].CompanyCode},
+		}
+		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
+		if errGetProductInterface != nil {
+			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+		}
+		reqHook := slices.Clone(req)
+		for i := range reqHook {
+			reqHook[i].InvoiceItem = slices.Clone(req[i].InvoiceItem)
+			for it := range reqHook[i].InvoiceItem {
+				mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+				if exists {
+					priceUnit, _ := calculateAPPriceUnit(
+						reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+						reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+					)
+					reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+					reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
+				}
+				reqHook[i].InvoiceItem[it].ProductDesc = strings.ReplaceAll(
+					reqHook[i].InvoiceItem[it].ProductDesc,
+					"\\",
+					"",
+				)
+			}
+		}
+
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: reqHook,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, err := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if err != nil {
+			if req[0].ID != uuid.Nil {
+				if req[0].Status == "COMPLETED" {
+					req[0].Status = "TEMP"
+					jsonBytesCreateInvoice, err := json.Marshal(req)
+					if err != nil {
+						return nil, err
+					}
+					_, errCreateInvoice := CreateInvoice(ctx, string(jsonBytesCreateInvoice))
+					if errCreateInvoice != nil {
+						return nil, errCreateInvoice
+					}
+				}
+			}
 			return nil, err
 		}
 		if HookInterfaceValue != nil {

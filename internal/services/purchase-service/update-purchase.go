@@ -1,28 +1,26 @@
 package purchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	purchaseRepository "prime-erp-core/internal/repositories/purchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
+	"strings"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdatePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.PurchaseFormRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -43,10 +41,15 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		purchase.UpdateBy = userCode
 		purchase.UpdateDtm = time.Now().UTC()
 
-		// Map purchase items
+		// Map purchase items: existing lines keep their purchase_item,
+		// new lines continue the running number after the highest one.
 		reqItems := []models.PurchaseItem{}
+		seq := NextPurchaseItemSeq(r.Items)
 		for _, item := range r.Items {
-			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, purchase.PurchaseCode)
+			purchaseItem := MapPurchaseItemFormRequestToPurchaseItemModel(item, seq)
+			if item.PurchaseItem == nil || strings.TrimSpace(*item.PurchaseItem) == "" {
+				seq++
+			}
 			purchaseItem.PurchaseID = purchase.ID
 
 			reqItems = append(reqItems, purchaseItem)
@@ -65,7 +68,7 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -89,7 +92,7 @@ func UpdatePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApprovePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdateStatusApprovePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -108,7 +111,7 @@ func UpdateStatusApprovePO(ctx *gin.Context, jsonPayload string) (interface{}, e
 	return nil, nil
 }
 
-func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompleteStatusPaymentPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompleteStatusPaymentPurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -122,7 +125,7 @@ func CompleteStatusPaymentPO(ctx *gin.Context, jsonPayload string) (interface{},
 	return nil, nil
 }
 
-func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CompletePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -136,7 +139,21 @@ func CompletePO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CancelPO(ctx context.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePurchaseRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := purchaseRepository.CancelPO(req.PurchaseCodes); err != nil {
+		return nil, errors.New("failed to cancel PO: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CompletePOItem(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.CompletePurchaseItemRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -148,4 +165,15 @@ func CompletePOItem(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return nil, nil
+}
+
+// ReconcilePOFromAP recomputes each PO's completion from persisted COMPLETED-AP
+// state (product-master tolerance, per-unit) and closes lines / headers.
+// Called after an AP invoice (GRA) is saved with status COMPLETED. productMap is
+// keyed by product_code and carries the gr_tolerance / gr_weight_tolerance master.
+func ReconcilePOFromAP(purchaseCodes []string, productMap map[string]models.GetProductsDetailComponent) error {
+	if err := purchaseRepository.ReconcilePOFromAP(purchaseCodes, productMap); err != nil {
+		return errors.New("failed to reconcile PO from AP: " + err.Error())
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package externalService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"prime-erp-core/config"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 )
 
 // InventoryByProductCodeRequest represents the request structure for inventory service
@@ -30,17 +32,20 @@ type InventoryByProductCodeKeyValue struct {
 
 // InventoryByProductCodeResponse represents the response structure from inventory service
 type InventoryByProductCodeResponse struct {
-	ID              string                           `json:"id"`
-	GroupCodeKeys   string                           `json:"group_code_keys"`
-	GroupValueKeys  string                           `json:"group_value_keys"`
-	ProductCode     string                           `json:"product_code"`
-	SupplierCode    string                           `json:"supplier_code"`
-	SupplierName    string                           `json:"supplier_name"`
+	ID             string `json:"id"`
+	GroupCodeKeys  string `json:"group_code_keys"`
+	GroupValueKeys string `json:"group_value_keys"`
+	ProductCode    string `json:"product_code"`
+	SupplierCode   string `json:"supplier_code"`
+	SupplierName   string `json:"supplier_name"`
+	// WeightSpec คือน้ำหนักของ base unit (flag_base = true) จาก product master
+	// มีค่าแม้สินค้าไม่มีสต็อก ต่างจาก InventoryWeight ที่จะว่างเมื่อไม่มีสต็อก
+	WeightSpec      float64                          `json:"weight_spec"`
 	InventoryWeight []models.InventoryWeightResponse `json:"inventory_weight"`
 }
 
 // GetInventoryWeightByKey calls the external inventory service to get inventory weight data
-func GetInventoryWeightByKey(companyCode string, siteCodes []string, keyValues []InventoryByProductCodeKeyValue) ([]InventoryByProductCodeResponse, error) {
+func GetInventoryWeightByKey(ctx context.Context, companyCode string, siteCodes []string, keyValues []InventoryByProductCodeKeyValue) ([]InventoryByProductCodeResponse, error) {
 	// Build request body
 	reqBody := InventoryByProductCodeRequest{
 		CompanyCode: []string{companyCode},
@@ -53,17 +58,16 @@ func GetInventoryWeightByKey(companyCode string, siteCodes []string, keyValues [
 		return nil, fmt.Errorf("failed to marshal inventory request: %w", err)
 	}
 
-	// Create HTTP request
-	req, err := http.NewRequest("POST", config.GET_INVENTORY_BY_KEY_ENDPOINT, bytes.NewBuffer(jsonData))
+	// Create HTTP request — utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้
+	req, err := utils.NewRequest(ctx, "POST", config.GET_INVENTORY_BY_KEY_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-
 	// Execute request
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout:   60 * time.Second,
+		Transport: utils.NewOutboundLogTransport("warehouse"),
 	}
 	resp, err := client.Do(req)
 	if err != nil {

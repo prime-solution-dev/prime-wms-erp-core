@@ -1,6 +1,7 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
@@ -8,7 +9,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -46,7 +46,7 @@ type ResultHistory struct {
 	HistoryRes []GetHistoryRes `json:"credit_request"`
 }
 
-func GetHistory(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetHistory(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetCreditReq
 

@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"prime-erp-core/internal/db"
@@ -8,11 +9,11 @@ import (
 	groupService "prime-erp-core/internal/services/group-service"
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	pricePatterns "prime-erp-core/internal/services/price-service/patterns"
+	"sort"
 	"time"
 
 	externalService "prime-erp-core/external/warehouse-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -32,8 +33,8 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 
 	groupReqString := string(groupReqJson)
 
-	// Note: We need a gin.Context for this call, but we're in a helper function
-	// Let's create a minimal context or use nil if the function supports it
+	// groupService.GetGroup now takes context.Context and never reads it, so nil is safe
+	// here too (this helper has no request-scoped context to pass through anyway).
 	resp, err := groupService.GetGroup(nil, groupReqString)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get groups: %w", err)
@@ -85,7 +86,7 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 }
 
 // loadPriceData loads price list data from database using GetPriceList
-func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
+func loadPriceData(ctx context.Context, sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]models.GetPriceListResponse, error) {
 	// Build GetPriceListGroupRequest from GetPriceDetailRequest
 	priceListReq := GetPriceListGroupRequest{
 		CompanyCode:       req.CompanyCode,
@@ -114,7 +115,7 @@ func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]mode
 	}
 
 	// Transform to GetPriceListResponse format (same as GetPriceList API)
-	result, err := transformToGetPriceListResponse(groupSubGroup)
+	result, err := transformToGetPriceListResponse(ctx, groupSubGroup)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform response: %w", err)
 	}
@@ -122,8 +123,19 @@ func loadPriceData(sqlx *sqlx.DB, req priceDomain.GetPriceDetailRequest) ([]mode
 	return result, nil
 }
 
+// resolveGroupItemName คืนชื่อ item สำหรับ code ที่ให้มา โดยใช้ two-value lookup
+// เพื่อแยก "ไม่มี record ใน group_item" (คืน code) ออกจาก "มี record แต่ item_name
+// ว่างโดยตั้งใจ" (ต้องคืนค่าว่าง) — กติกาเดียวกับ itemNameByCode ฝั่ง export
+func resolveGroupItemName(groupItemMap map[string]models.GetGroupItemResponse, code string) string {
+	item, ok := groupItemMap[code]
+	if !ok {
+		return code
+	}
+	return item.ItemName
+}
+
 // transformToGetPriceListResponse transforms internal response to API response format
-func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
+func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
 	// Get group and group item mappings
 	groupMap, groupItemMap, _, err := getGroupAndItemMappings()
 	if err != nil {
@@ -186,20 +198,19 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		for _, sg := range resp.SubGroups {
 			subGroupKeys := []models.PriceListSubGroupKeyResponse{}
 			for _, sgk := range sg.GroupKeys {
-				// Check if item name exists in group item map, use default empty string if not found
-				itemName := groupItemMap[sgk.Value].ItemName
-				if itemName == "" {
-					itemName = sgk.Value // Fallback to the value itself if item name not found
-				}
+				itemName := resolveGroupItemName(groupItemMap, sgk.Value)
+				valueNumber, hasValue := parseGroupItemValue(groupItemMap, sgk.Value)
 
 				subGroupKeys = append(subGroupKeys, models.PriceListSubGroupKeyResponse{
-					ID:         uuid.New().String(),
-					SubGroupID: sg.ID.String(),
-					GroupCode:  sgk.Code,
-					GroupName:  groupMap[sgk.Code].GroupName,
-					ValueCode:  sgk.Value,
-					ValueName:  itemName,
-					Seq:        sgk.Seq,
+					ID:          uuid.New().String(),
+					SubGroupID:  sg.ID.String(),
+					GroupCode:   sgk.Code,
+					GroupName:   groupMap[sgk.Code].GroupName,
+					ValueCode:   sgk.Value,
+					ValueName:   itemName,
+					Seq:         sgk.Seq,
+					ValueNumber: valueNumber,
+					HasValue:    hasValue,
 				})
 			}
 
@@ -259,15 +270,9 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
-		// Convert sets to slices
-		companyCodes := []string{}
-		for code := range companyCodeSet {
-			companyCodes = append(companyCodes, code)
-		}
-		siteCodes := []string{}
-		for code := range siteCodeSet {
-			siteCodes = append(siteCodes, code)
-		}
+		// Convert sets to slices — sort เพื่อให้ companyCodes[0] และลำดับ siteCodes นิ่ง
+		companyCodes := sortedSetKeys(companyCodeSet)
+		siteCodes := sortedSetKeys(siteCodeSet)
 
 		// Use first company code for the request (as per example, it's a single value array)
 		companyCode := ""
@@ -276,15 +281,19 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
 		} else {
 			// Create a map of inventory data by ID for quick lookup
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
+			// weight_spec มาระดับ result ไม่ได้อยู่ใน InventoryWeight จึงต้องเก็บ map แยก
+			// และต้องใช้ได้แม้ subgroup นั้นไม่มีสต็อก
+			weightSpecMap := make(map[string]float64)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 
 			// Create new result with expanded subgroups for multiple inventory records
@@ -307,22 +316,33 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 							expandedSG.SupplierCode = inv.SupplierCode
 							expandedSG.SupplierName = inv.SupplierName
 							expandedSG.BatchNo = inv.BatchNo
+							expandedSG.WarehouseCode = inv.WarehouseCode
+							expandedSG.WarehouseName = inv.WarehouseName
+							expandedSG.WeightSpec = weightSpecMap[sg.ID]
 
-							// Map new API fields to existing model fields
-							if inv.TotalQty > 0 {
-								expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
-							}
-							if inv.TotalWeight > 0 {
-								expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
-							}
-							if inv.AvgWeight > 0 {
-								expandedSG.InventoryWeight[0].AvgBatch = inv.AvgWeight
-							}
+							// เขียนค่าตรง ๆ ไม่ใช้เงื่อนไข > 0
+							//
+							// InventoryWeightResponse มีทั้ง field เก่า (sum_qty, sum_weight, avg_batch)
+							// และใหม่ (total_qty, total_weight, avg_weight) อยู่ใน struct เดียวกัน
+							// และบรรทัดก่อนหน้า copy ทั้ง struct จาก inv เข้ามา
+							//
+							// ปัจจุบัน endpoint get-inventory-weight-by-key ไม่ส่ง field เก่ามาเลย
+							// จึงเป็น 0 เสมอ และเงื่อนไข > 0 เดิมยังให้ผลเหมือนการเขียนตรง ๆ
+							// แต่เงื่อนไขนั้นเป็นความเสี่ยงเชิงโครงสร้าง ถ้าวันหนึ่ง endpoint ส่ง field เก่ามา
+							// หรือ struct นี้ถูกใช้ซ้ำกับ endpoint อื่น ค่าเก่าจะค้างเมื่อค่าใหม่เป็น 0 จริง
+							// เขียนตรง ๆ จึงปลอดภัยกว่าและอ่านง่ายกว่า
+							//
+							// ไม่เขียน AvgBatch อีกต่อไปเพราะไม่มีผู้อ่านในฝั่ง Go
+							// ค่าระดับ batch อ่านได้จาก AvgWeight และระดับ site จาก AvgProduct
+							expandedSG.InventoryWeight[0].SumQty = inv.TotalQty
+							expandedSG.InventoryWeight[0].SumWeight = inv.TotalWeight
 
 							expandedSubGroups = append(expandedSubGroups, expandedSG)
 						}
 					} else {
-						// No inventory data, keep original subgroup
+						// No inventory data, keep original subgroup.
+						// weight_spec ยังต้องมีค่าเพราะมาจาก product master ไม่ได้มาจากสต็อก
+						sg.WeightSpec = weightSpecMap[sg.ID]
 						expandedSubGroups = append(expandedSubGroups, sg)
 					}
 				}
@@ -337,7 +357,7 @@ func transformToGetPriceListResponse(responses []GetPriceListGroupResponse) ([]m
 	return result, nil
 }
 
-func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error) {
 	// Parse request
 	var req priceDomain.GetPriceDetailRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -385,7 +405,7 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	defer sqlx.Close()
 
 	// Load price data
-	priceListData, err := loadPriceData(sqlx, req)
+	priceListData, err := loadPriceData(ctx, sqlx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load price data: %w", err)
 	}
@@ -438,4 +458,17 @@ func GetPriceDetail(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return response, nil
+}
+
+// sortedSetKeys คืน key ของ set ที่เรียงแล้ว
+//
+// การวน map ใน Go สุ่มลำดับ ผู้เรียกใช้ผลนี้เลือก element ตัวแรกไปส่งต่อ
+// ถ้าไม่ sort ค่าที่ถูกเลือกจะเปลี่ยนทุกครั้งที่เรียก
+func sortedSetKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }

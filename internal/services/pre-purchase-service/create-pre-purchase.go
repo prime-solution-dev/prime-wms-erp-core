@@ -1,21 +1,21 @@
 package prePurchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreatePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.CreatePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -28,10 +28,7 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to generate pre-purchase order codes: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -51,8 +48,8 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		prePurchase.UpdateDtm = time.Now().UTC()
 
 		items := []models.PrePurchaseItem{}
-		for _, itemReq := range r.Items {
-			preItem := fmt.Sprintf("%s-%s", prePurchaseCodes[idx], time.Now().Format("150405"))
+		for itemIdx, itemReq := range r.Items {
+			preItem := BuildPreItemCode(prePurchaseCodes[idx], itemIdx+1)
 			item := MapBigLotRequestToPrePurchaseItemsModel(itemReq, id, prePurchase.CreateBy, time.Now().UTC(), preItem)
 			items = append(items, item)
 		}
@@ -68,7 +65,7 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -90,7 +87,10 @@ func CreatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to create big lot: " + err.Error())
 	}
 
-	if err := CreateBigLotToApproval(ctx, prePurchases); err != nil {
+	// prePurchaseRepository.CreatePOBigLot ข้างบน commit ไปแล้ว (gormx.Transaction ของมันเอง)
+	// ใช้ postCommitContext กัน caller ตัดสายกลางทางแล้ว approval ไม่ถูกสร้างเงียบๆ
+	// ทั้งที่ big lot สร้างไปแล้วจริง
+	if err := CreateBigLotToApproval(postCommitContext(ctx), prePurchases); err != nil {
 		return nil, errors.New("failed to create approval: " + err.Error())
 	}
 

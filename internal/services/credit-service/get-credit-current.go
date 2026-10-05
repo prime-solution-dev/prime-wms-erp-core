@@ -1,13 +1,14 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"prime-erp-core/internal/db"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -29,7 +30,7 @@ type CreditCustomer struct {
 	Balance       float64 `json:"balance"`
 }
 
-func GetCreditCurrentAPI(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditCurrentAPI(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetCreditRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -113,10 +114,11 @@ func getDepositByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []s
 	for _, row := range rows {
 		customerCode := row["customer_code"].(string)
 		amountRemain := row["amount_remain"].(float64)
+		amountRemainVat := math.Round((amountRemain*1.07)*100) / 100
 
 		for i, customer := range res.CreditCustomers {
 			if customer.CustomerCode == customerCode {
-				customer.RemainDeposit += amountRemain
+				customer.RemainDeposit += amountRemainVat
 				res.CreditCustomers[i] = customer
 				break
 			}
@@ -277,7 +279,6 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 			from payment_invoice t 
 			where t.invoice_code in ('%s')
 		`, strings.Join(invoiceCodeString, `','`))
-		fmt.Println(queryPayment)
 		rowsPayment, err := db.ExecuteQuery(sqlx, queryPayment)
 		if err != nil {
 			return res, err
@@ -305,7 +306,6 @@ func getUsedByCustomer(sqlx *sqlx.DB, res GetCreditResponse, customerStrs []stri
 				and ii.document_ref <> '' and ii.document_ref_item != ''
 				and (ii.document_ref, ii.document_ref_item ) in (%s) 
 		`, strings.Join(invoiceCodeItemString, `,`))
-		fmt.Println(queryDN)
 		rowsDN, err := db.ExecuteQuery(sqlx, queryDN)
 		if err != nil {
 			return res, err

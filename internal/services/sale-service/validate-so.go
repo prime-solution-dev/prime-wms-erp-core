@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,6 @@ import (
 	verifyService "prime-erp-core/internal/services/verify-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 )
 
 // ValidateSaleRequest - เฉพาะข้อมูลที่จำเป็นสำหรับการ validate
@@ -62,7 +61,7 @@ type ValidateSaleResponse struct {
 }
 
 // ValidateSale - ตรวจสอบเงื่อนไขการสร้าง Sale Order โดยไม่สร้างข้อมูลจริง
-func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func ValidateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := ValidateSaleRequest{}
 	var responses []ValidateSaleResponse
 
@@ -131,7 +130,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// ตรวจสอบเงื่อนไขต่างๆ
 	for _, verifyReq := range verifyReqMap {
-		verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+		verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +168,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// จ่ายเงินสดจะไม่ส่ง is_verify_credit มา VerifyApproveLogic เลยไม่คำนวณเครดิตให้
 		// แต่หน้าจอต้องโชว์ Balance ทุกกรณี จึงดึงเพิ่มแบบ best-effort
 		if creditCalculation == nil {
-			creditCalculation = lookupCreditBalance(sqlx, verifyReq)
+			creditCalculation = lookupCreditBalance(ctx, verifyReq)
 		}
 
 		responses = append(responses, ValidateSaleResponse{
@@ -192,8 +191,8 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 // lookupCreditBalance ดึงยอดเครดิตคงเหลือมาโชว์อย่างเดียว ไม่มีผลกับ can_create_so
 // ใช้เมื่อ VerifyApproveLogic ไม่ได้คำนวณเครดิตให้ (is_verify_credit = false เช่นจ่ายเงินสด)
 // ตั้งใจกลืน error เพราะเป็นข้อมูลสำหรับแสดงผล ห้ามทำให้ validate ทั้งใบพัง
-// ลูกค้าที่ไม่มีข้อมูลใน credit master จะได้ balance 0 (GetCreditCurrent seed แถวศูนย์ให้ทุกราย)
-func lookupCreditBalance(sqlxDB *sqlx.DB, verifyReq verifyService.VerifyApproveRequest) *verifyService.VerifyCreditCalculation {
+// ลูกค้าที่ไม่มีข้อมูลใน credit master จะได้ balance 0
+func lookupCreditBalance(ctx context.Context, verifyReq verifyService.VerifyApproveRequest) *verifyService.VerifyCreditCalculation {
 	if len(verifyReq.Documents) == 0 {
 		return nil
 	}
@@ -208,7 +207,7 @@ func lookupCreditBalance(sqlxDB *sqlx.DB, verifyReq verifyService.VerifyApproveR
 		needAmount += doc.TransportCost
 	}
 
-	creditRes, err := verifyService.VerifyCreditLogic(sqlxDB, verifyService.VerifyCreditRequest{
+	creditRes, err := verifyService.VerifyCreditLogic(ctx, verifyService.VerifyCreditRequest{
 		Customers: []verifyService.VerifyCreditCustomer{
 			{CustomerCode: doc.CustomerCode, NeedAmount: needAmount},
 		},

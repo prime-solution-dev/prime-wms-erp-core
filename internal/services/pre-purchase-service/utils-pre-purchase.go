@@ -2,20 +2,32 @@ package prePurchaseService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
+	"prime-erp-core/internal/utils"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// postCommitContext คืน context สำหรับงานที่ทำหลังเขียนฐานข้อมูลเสร็จ (เช่น สร้าง approval ต่อ)
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย งานที่เหลือ
+// จะไม่เกิดขึ้นเลยและเงียบด้วย — รูปแบบเดียวกับ sale-service/create-sale.go
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
+}
 
 func MapBigLotRequestToPrePurchaseItemsModel(reqItems models.CreatePOBigLotItemRequest, prePurchaseID uuid.UUID, user string, now time.Time, preItem string) models.PrePurchaseItem {
 	return models.PrePurchaseItem{
@@ -89,12 +101,16 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 	var sumSubTotalExclDiscountExclVat float64
 
 	for _, item := range prePurchaseItems {
+		// ProductGroupName ใช้ HierarchyType เพราะ pre_purchase_item ไม่มีคอลัมน์ชื่อกลุ่มสินค้า
+		// ของตัวเอง — หน้าจอส่ง itemName มาลง product_group_type (ดู PrePurchaseItemTable.vue
+		// handleSelectProductGroup) จึงเป็นแหล่งเดียวของชื่อ ถ้าไม่ส่งต่อ ช่อง "รายการ" ใน PDF จะว่าง
 		items = append(items, models.GetPOBigLotItemResponse{
 			ID:                   item.ID.String(),
 			PrePurchaseID:        item.PrePurchaseID.String(),
 			PreItem:              item.PreItem,
 			ProductGroupType:     item.HierarchyType,
 			ProductGroupCode:     item.HierarchyCode,
+			ProductGroupName:     item.HierarchyType,
 			Qty:                  item.Qty,
 			Unit:                 item.Unit,
 			PurchaseQty:          item.PurchaseQty,
@@ -159,11 +175,42 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 	}
 }
 
-func MapUpdatePOBigLotRequestToPrePurchaseItem(reqItem models.UpdatePOBigLotItemRequest, user string, now time.Time, prePurchaseCode string) models.PrePurchaseItem {
-	preItem := ""
-	if reqItem.PreItem == nil {
-		preItem = fmt.Sprintf("%s-%s", prePurchaseCode, time.Now().Format("150405"))
-	} else {
+// BuildPreItemCode สร้างเลข item ของ big lot PO เป็น running number ต่อท้ายรหัส PO
+// ห้ามใช้ timestamp เพราะ item ที่ถูกสร้างในวินาทีเดียวกันจะได้เลขซ้ำกัน
+func BuildPreItemCode(prePurchaseCode string, seq int) string {
+	return fmt.Sprintf("%s-%03d", prePurchaseCode, seq)
+}
+
+// NextPreItemSeq คืนเลขลำดับถัดไปสำหรับ item ที่ยังไม่มี pre_item
+// นับเฉพาะ suffix ที่เป็นตัวเลข 3 หลักตามรูปแบบของ BuildPreItemCode
+// ของเดิมที่เป็น timestamp 6 หลักจึงไม่ถูกนับ และเลขใหม่จะเริ่มที่ 001
+func NextPreItemSeq(items []models.UpdatePOBigLotItemRequest) int {
+	maxSeq := 0
+	for _, item := range items {
+		if item.PreItem == nil {
+			continue
+		}
+
+		code := strings.TrimSpace(*item.PreItem)
+		idx := strings.LastIndex(code, "-")
+		if idx < 0 || len(code)-idx-1 != 3 {
+			continue
+		}
+
+		seq, err := strconv.Atoi(code[idx+1:])
+		if err != nil || seq <= maxSeq {
+			continue
+		}
+
+		maxSeq = seq
+	}
+
+	return maxSeq + 1
+}
+
+func MapUpdatePOBigLotRequestToPrePurchaseItem(reqItem models.UpdatePOBigLotItemRequest, user string, now time.Time, prePurchaseCode string, seq int) models.PrePurchaseItem {
+	preItem := BuildPreItemCode(prePurchaseCode, seq)
+	if reqItem.PreItem != nil && *reqItem.PreItem != "" {
 		preItem = *reqItem.PreItem
 	}
 
@@ -222,12 +269,8 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 }
 
 // Approval action
-func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) error {
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+func CreateBigLotToApproval(ctx context.Context, prePurchase []models.PrePurchase) error {
+	userID := requestcontext.GetUserOrDefault(ctx)
 
 	approvalReq := []models.Approval{}
 
@@ -261,7 +304,7 @@ func CreateBigLotToApproval(ctx *gin.Context, prePurchase []models.PrePurchase) 
 	return nil
 }
 
-func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error) {
+func GetPOApproval(ctx context.Context, POcodes []string) ([]models.Approval, error) {
 	approvalReq := approvalService.GetApprovalRequest{
 		DocumentCode: POcodes,
 		Page:         1,
@@ -288,7 +331,7 @@ func GetPOApproval(ctx *gin.Context, POcodes []string) ([]models.Approval, error
 	return approvalResp.ApprovalRes, nil
 }
 
-func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map[string]models.Approval) error {
+func UpdatePOApproval(ctx context.Context, docCodes []string, mappedApprovalReq map[string]models.Approval) error {
 	approvalList, err := GetPOApproval(ctx, docCodes)
 	if err != nil {
 		return errors.New("failed get approvals: " + err.Error())
@@ -300,6 +343,7 @@ func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map
 			updateApprovalReq = append(updateApprovalReq, models.Approval{
 				ID:     approval.ID,
 				Status: mapped.Status,
+				Remark: mapped.Remark,
 			})
 		} else {
 			return fmt.Errorf("approval request for document code %s not found", approval.DocumentCode)
@@ -321,7 +365,7 @@ func UpdatePOApproval(ctx *gin.Context, docCodes []string, mappedApprovalReq map
 	return nil
 }
 
-func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
+func UpdateBigLotToApproval(ctx context.Context, updateReqs []models.UpdateStatusApprovePOBigLotRequest) error {
 	prePurchaseCodes := []string{}
 	mapUpdateList := make(map[string]models.Approval)
 
@@ -330,6 +374,7 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 		mapUpdateList[req.PrePurchaseCode] = models.Approval{
 			DocumentCode: req.PrePurchaseCode,
 			Status:       req.StatusApprove,
+			Remark:       req.Remark,
 		}
 	}
 
@@ -341,67 +386,53 @@ func UpdateBigLotToApproval(ctx *gin.Context, updateReqs []models.UpdateStatusAp
 }
 
 // Running code actions
-func GeneratePrePurchaseCodes(ctx *gin.Context, count int) ([]string, error) {
+//
+// เดิมเรียก systemConfigService.GetRunningSystemConfig/UpdateRunningSystemConfig ซึ่งยังรับ
+// พารามิเตอร์ตัวแรกแบบ gin เดิม (ไม่ได้แปลงและอยู่นอก scope งานนี้ ดู system-config package) เปลี่ยนมาใช้
+// ReserveRunningCodes + StandardRunningPeriod ที่ระบบมีอยู่แล้ว (system-config/reserve-running-code.go)
+// เหมือนกับ purchase-service/utils-purchase.go GeneratePurchaseCodes — prefix ส่ง ""
+// เหมือนของเดิม (getReq/updateReq ไม่เคยส่ง prefix มา)
+func GeneratePrePurchaseCodes(ctx context.Context, count int) ([]string, error) {
 	if count <= 0 {
 		return []string{}, nil // No pre-purchase to generate codes for
 	}
 
-	configCode := "RUNNING_PB"
-
-	getReq := systemConfigService.GetRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-	}
-
-	reqJSON, err := json.Marshal(getReq)
+	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal get request: %v", err)
+		// ข้อความเดิมตอน ConnectGORM ล้มเหลวใน GetRunningSystemConfig/UpdateRunningSystemConfig
+		// คือสตริงตายตัว "failed to connect to database" (เขียนผ่าน ctx.JSON ตรงๆ) ไม่ใช่ err ดิบ
+		// คงข้อความเดิมไว้ ไม่ต่อท้าย driver error กันข้อมูลภายในหลุดออกไปหา client
+		return nil, errors.New("failed to connect to database")
 	}
+	defer db.CloseGORM(gormx)
 
-	prePurchaseCodeResponse, err := systemConfigService.GetRunningSystemConfig(ctx, string(reqJSON))
+	codes, err := systemConfigService.ReserveRunningCodes(
+		gormx, "RUNNING_PB", count, "", systemConfigService.StandardRunningPeriod())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate pre-purchase order codes: %v", err)
 	}
 
-	updateReq := systemConfigService.UpdateRunningSystemConfigRequest{
-		ConfigCode: configCode,
-		Count:      count,
-	}
-
-	reqUpdateJSON, err := json.Marshal(updateReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal update request: %v", err)
-	}
-
-	_, err = systemConfigService.UpdateRunningSystemConfig(ctx, string(reqUpdateJSON))
-	if err != nil {
-		return nil, fmt.Errorf("failed to update running config: %v", err)
-	}
-
-	prePurchaseCodeResult, ok := prePurchaseCodeResponse.(systemConfigService.GetRunningSystemConfigResponse)
-	if !ok || len(prePurchaseCodeResult.Data) != count {
+	if len(codes) != count {
 		return nil, errors.New("failed to get correct number of pre-purchase order codes from system config")
 	}
 
-	return prePurchaseCodeResult.Data, nil
+	return codes, nil
 }
 
 // Supplier actions
-func GetSupplierByCode(supplierReq models.GetSupplierListRequest) (map[string]models.Supplier, error) {
+func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRequest) (map[string]models.Supplier, error) {
 	jsonData, err := json.Marshal(supplierReq)
 	if err != nil {
 		return nil, errors.New("failed to marshal supplier data to JSON: " + err.Error())
 	}
 
-	getSuppliers, err := http.NewRequest("POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
+	getSuppliers, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_supplier")+"/get-suppliers", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("failed to create HTTP request: " + err.Error())
 	}
 
-	getSuppliers.Header.Set("Content-Type", "application/json")
-
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("supplier")}
 	resp, err := client.Do(getSuppliers)
 	if err != nil {
 		return nil, errors.New("failed to execute HTTP request: " + err.Error())

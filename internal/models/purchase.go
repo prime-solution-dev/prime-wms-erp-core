@@ -204,14 +204,28 @@ type CreatePOBigLotRequest struct {
 }
 
 type GetPOBigLotListRequest struct {
-	PrePurchaseCodes  []string `json:"pre_purchase_codes"`
-	SupplierCodes     []string `json:"supplier_codes"`
-	ProductGroupCodes []string `json:"product_group_codes"`
-	StatusApprove     []string `json:"status_approve"`
-	CompanyCode       string   `json:"company_code"`
-	SiteCode          string   `json:"site_code"`
-	Page              int      `json:"page"`
-	PageSize          int      `json:"page_size"`
+	PrePurchaseCodes     []string `json:"pre_purchase_codes"`
+	SupplierCodes        []string `json:"supplier_codes"`
+	ProductGroupCodes    []string `json:"product_group_codes"`
+	StatusApprove        []string `json:"status_approve"`
+	Status               []string `json:"status"`
+	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
+	SupplierCodeLike     string   `json:"supplier_code_like"`
+	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	ProductGroupNameLike string   `json:"product_group_name_like"`
+	SupplierNameLike     string   `json:"supplier_name_like"`
+	CompanyCode          string   `json:"company_code"`
+	SiteCode             string   `json:"site_code"`
+	Page                 int      `json:"page"`
+	PageSize             int      `json:"page_size"`
+
+	// OnlyRemaining = คัด Big lot ที่โควตารวมทุกบรรทัดถูกใช้จนหมด (remaining รวม <= 0)
+	// ออกจากผลลัพธ์ ใช้กับ picker "Ref. Big lot PO#" หน้า Create PO เพื่อไม่ให้เลือกใบที่หมดโควตา
+	// (มิเรอร์ pattern only_remaining_pick ของ STO) — default false เพื่อไม่กระทบ caller อื่น
+	OnlyRemaining bool `json:"only_remaining"`
+
+	StartCreateDate *time.Time `json:"start_create_date"`
+	EndCreateDate   *time.Time `json:"end_create_date"`
 }
 
 type GetPOBigLotItemResponse struct {
@@ -332,6 +346,13 @@ type UpdateStatusApprovePOBigLotRequest struct {
 	PrePurchaseCode string    `json:"pre_purchase_code"`
 	IsApproved      bool      `json:"is_approved"`
 	StatusApprove   string    `json:"status_approve"`
+	Remark          string    `json:"remark"`
+}
+
+// CompletePOBigLotRequest is the payload for both Close (Complete) and Cancel of
+// Big lot POs — a list of pre_purchase_code to act on.
+type CompletePOBigLotRequest struct {
+	PrePurchaseCodes []string `json:"pre_purchase_codes"`
 }
 
 // Supplier DTOs
@@ -441,6 +462,8 @@ type GetPurchaseRequest struct {
 	StatusPayment                []string   `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
+	UsedStatus                   []string   `json:"used_status"`
+	UsedStatusNot                []string   `json:"used_status_not"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`
@@ -545,6 +568,7 @@ type UpdateStatusApprovePurchaseRequest struct {
 	PurchaseCode  string    `json:"purchase_code"`
 	IsApproved    bool      `json:"is_approved"`
 	StatusApprove string    `json:"status_approve"`
+	Remark        string    `json:"remark"`
 }
 
 type CompleteStatusPaymentPurchaseRequest struct {
@@ -561,6 +585,7 @@ type GetProductRequest struct {
 	ProductCode []string `json:"product_code"`
 	SiteCode    []string `json:"site_code"`
 	CompanyCode []string `json:"company_code"`
+	ProductType []string `json:"product_type"`
 }
 
 type GetProductsDetailResponse struct {
@@ -647,6 +672,8 @@ type GetProductsDetailComponent struct {
 	ExternalID                    string                         `json:"external_id"`
 	GRTolerance                   float64                        `json:"gr_tolerance"`
 	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	GRWeightTolerance             float64                        `json:"gr_weight_tolerance"`
+	GRWeightToleranceActive       bool                           `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`

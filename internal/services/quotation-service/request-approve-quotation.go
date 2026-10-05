@@ -1,15 +1,16 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +24,7 @@ type RequestApproveQuotationResponse struct {
 	Message   string    `json:"message"`
 }
 
-func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func RequestApproveQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := RequestApproveQuotationRequest{}
 	res := RequestApproveQuotationResponse{}
 	var approvalIDs []uuid.UUID
@@ -81,11 +82,7 @@ func RequestApproveQuotation(ctx *gin.Context, jsonPayload string) (interface{},
 	}
 	approvalResponse, ok := approvalResult.(approvalService.ResultApproval)
 	if !ok || len(approvalResponse.ApprovalRes) == 0 {
-		conUserID, _ := ctx.Get("user")
-		userID := ""
-		if conUserID != nil {
-			userID = conUserID.(string)
-		}
+		userID := requestcontext.GetUserOrDefault(ctx)
 		createApprovalReq := []models.Approval{{
 			ApproveTopic: "QPC ",
 			DocumentType: "QO",

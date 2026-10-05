@@ -58,7 +58,7 @@
           "headerName": "Weight-spec",
           "width": 120,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_weight"
         },
@@ -67,7 +67,7 @@
           "headerName": "Avg.kg stock",
           "width": 120,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "avg_weight"
         },
@@ -76,7 +76,7 @@
           "headerName": "ราคาขาย before",
           "width": 130,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "before_total_net_price_weight"
         },
@@ -85,7 +85,7 @@
           "headerName": "ราคาขาย after",
           "width": 130,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_net_price_weight"
         },
@@ -94,7 +94,7 @@
           "headerName": "Extra (THB)",
           "width": 100,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },

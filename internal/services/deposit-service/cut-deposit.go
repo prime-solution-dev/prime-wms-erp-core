@@ -1,16 +1,16 @@
 package depositService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	models "prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func CutDepost(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CutDepost(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Deposit
 

@@ -97,7 +97,7 @@
       "name": "kg = [Pcs] / [Weight Spec]",
       "uom": "kg",
       "formula_type": "price_calc",
-      "expression": "pcs*weight_spec",
+      "expression": "pcs/weight_spec",
       "params": {
         "required": ["pcs", "weight_spec"],
         "description": "kg = [Pcs] / [Weight Spec]"

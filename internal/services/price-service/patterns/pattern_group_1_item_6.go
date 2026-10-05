@@ -2,7 +2,6 @@ package patterns
 
 import (
 	"fmt"
-	"sort"
 
 	"prime-erp-core/internal/models"
 
@@ -48,7 +47,8 @@ func BuildGroup1Item6Response(priceListData []models.GetPriceListResponse, group
 		groupedByProductGroup2[productGroup2] = append(groupedByProductGroup2[productGroup2], sg)
 	}
 
-	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2)
+	tabOrder := buildTabOrder(pattern.ApplicableCategories, groupedByProductGroup2,
+		getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2"))
 	columns := buildFixedColumns(pattern)
 
 	tabs := make([]PriceListDetailTabConfig, 0, len(tabOrder))
@@ -57,16 +57,8 @@ func BuildGroup1Item6Response(priceListData []models.GetPriceListResponse, group
 
 		productGroup4Code := getGroupCodeFromConfig(config, pattern, "productGroup4", "PRODUCT_GROUP4")
 		productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
-		sort.SliceStable(subGroups, func(i, j int) bool {
-			group4I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup4Code)
-			group4J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup4Code)
-			if group4I == group4J {
-				group7I := getValueNameByGroupCode(subGroups[i].SubGroupKeys, productGroup7Code)
-				group7J := getValueNameByGroupCode(subGroups[j].SubGroupKeys, productGroup7Code)
-				return group7I < group7J
-			}
-			return group4I < group4J
-		})
+		// เรียงด้วยค่าตัวเลขจาก group_item.value แทนการเทียบ ValueName แบบ string
+		SortSubGroupsByValue(subGroups, productGroup4Code, productGroup7Code)
 
 		rowData := buildDirectRows(config, pattern, subGroups)
 		tableData := make([]map[string]interface{}, len(rowData))

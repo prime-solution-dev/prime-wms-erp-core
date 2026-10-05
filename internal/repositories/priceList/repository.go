@@ -37,6 +37,7 @@ func GetPriceListGroup(companyCode string, siteCode string, groupCodes []string)
 			return tx.Order("subgroup_key").Order("id")
 		}).
 		Preload("PriceListSubGroups.PriceListSubGroupKeys").
+		Order("seq ASC").
 		Find(&priceListGroups).Error; err != nil {
 		return priceListGroups, err
 	}
@@ -144,40 +145,6 @@ func GetPriceListSubGroupsByGroupCodes(groupCodes []string) ([]models.PriceListS
 	}
 
 	return subGroups, nil
-}
-
-// GetGroupItemValueInt looks up group_item.value_int for a given group_code (mapped from condition_code)
-// and subgroup key value. It returns (valueInt, found, error).
-func GetGroupItemValueInt(groupCode, value string) (float64, bool, error) {
-	gormx, err := db.ConnectGORM("prime_erp")
-	if err != nil {
-		return 0, false, err
-	}
-	defer db.CloseGORM(gormx)
-
-	// 1) find group by group_code
-	var grp models.Group
-	if err := gormx.Model(&models.Group{}).
-		Where("group_code = ?", groupCode).
-		First(&grp).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, false, nil
-		}
-		return 0, false, err
-	}
-
-	// 2) find group_item by group_id + item_code
-	var item models.GroupItem
-	if err := gormx.Model(&models.GroupItem{}).
-		Where("group_id = ? AND item_code = ?", grp.ID, value).
-		First(&item).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return 0, false, nil
-		}
-		return 0, false, err
-	}
-
-	return item.ValueInt, true, nil
 }
 
 func GetPriceListExtraConfig(groupCodes []string) ([]models.PriceListExtraConfig, error) {
@@ -311,6 +278,10 @@ func UpdateExtra(extras []models.PriceListGroupExtra) error {
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := resetOrphanedSubGroupExtras(tx, priceListGroupIDs, extras); err != nil {
+			return err
+		}
+
 		// Delete old Extra
 		if extraResult := tx.Where("price_list_group_id IN ?", priceListGroupIDs).
 			Delete(&models.PriceListGroupExtra{}); extraResult.Error != nil {
@@ -324,6 +295,92 @@ func UpdateExtra(extras []models.PriceListGroupExtra) error {
 
 		return nil
 	})
+}
+
+// resetOrphanedSubGroupExtras ล้าง extra เป็น 0 ให้ subgroup ที่ key ตรงกับ rule เดิม
+// แต่ไม่ตรงกับ rule ชุดใหม่แล้ว (rule ถูกลบหรือเปลี่ยน key)
+//
+// calculateExtraForSubGroup คืนค่าเดิมเมื่อไม่มี rule ไหน key ตรง เพื่อเก็บค่าที่
+// อัปโหลดมา ค่าที่ rule เคยเขียนไว้จึงแยกไม่ออกจากค่าอัปโหลดและค้างตลอดไป ·
+// ตอนบันทึกนี้เป็นจุดเดียวที่ยังเห็นทั้ง rule เดิมและใหม่ จึงต้องล้างที่นี่
+// subgroup ที่ไม่เคยมี rule ตรงเลยไม่ถูกแตะ
+func resetOrphanedSubGroupExtras(tx *gorm.DB, priceListGroupIDs []uuid.UUID, newExtras []models.PriceListGroupExtra) error {
+	oldExtras := []models.PriceListGroupExtra{}
+	if err := tx.Preload("PriceListGroupExtraKeys").
+		Where("price_list_group_id IN ?", priceListGroupIDs).
+		Find(&oldExtras).Error; err != nil {
+		return err
+	}
+	if len(oldExtras) == 0 {
+		return nil
+	}
+
+	// เทียบเฉพาะ rule ของ group ตัวเอง เหมือน calculateExtraForSubGroup
+	oldByGroup := map[uuid.UUID][]models.PriceListGroupExtra{}
+	for _, e := range oldExtras {
+		oldByGroup[e.PriceListGroupID] = append(oldByGroup[e.PriceListGroupID], e)
+	}
+	newByGroup := map[uuid.UUID][]models.PriceListGroupExtra{}
+	for _, e := range newExtras {
+		newByGroup[e.PriceListGroupID] = append(newByGroup[e.PriceListGroupID], e)
+	}
+
+	subGroups := []models.PriceListSubGroup{}
+	if err := tx.Select("id, price_list_group_id").Preload("PriceListSubGroupKeys").
+		Where("price_list_group_id IN ?", priceListGroupIDs).
+		Find(&subGroups).Error; err != nil {
+		return err
+	}
+
+	orphanIDs := []uuid.UUID{}
+	for _, sg := range subGroups {
+		if anyExtraKeysMatch(oldByGroup[sg.PriceListGroupID], sg.PriceListSubGroupKeys) &&
+			!anyExtraKeysMatch(newByGroup[sg.PriceListGroupID], sg.PriceListSubGroupKeys) {
+			orphanIDs = append(orphanIDs, sg.ID)
+		}
+	}
+	if len(orphanIDs) == 0 {
+		return nil
+	}
+
+	// SET ฝั่งขวาอ่านค่าก่อน UPDATE จึงได้ before_* เป็นค่าเดิม
+	return tx.Model(&models.PriceListSubGroup{}).
+		Where("id IN ?", orphanIDs).
+		Where("extra_price_unit <> 0 OR extra_price_weight <> 0").
+		Updates(map[string]interface{}{
+			"before_extra_price_unit":   gorm.Expr("extra_price_unit"),
+			"before_extra_price_weight": gorm.Expr("extra_price_weight"),
+			"extra_price_unit":          0,
+			"extra_price_weight":        0,
+			"update_by":                 newExtras[0].UpdateBy,
+			"update_dtm":                time.Now().UTC(),
+		}).Error
+}
+
+// anyExtraKeysMatch ใช้กติกาเดียวกับ calculateExtraForSubGroup
+// (services/price-service/update-latest-pricelist-subgroup.go) ต้องแก้คู่กัน:
+// ทุก key ของ rule ต้องตรงกับ subgroup และ rule ที่ไม่มี key ไม่นับว่าตรง
+func anyExtraKeysMatch(extras []models.PriceListGroupExtra, subGroupKeys []models.PriceListSubGroupKey) bool {
+	keyMap := make(map[string]string, len(subGroupKeys))
+	for _, k := range subGroupKeys {
+		keyMap[k.Code] = k.Value
+	}
+	for _, e := range extras {
+		if len(e.PriceListGroupExtraKeys) == 0 {
+			continue
+		}
+		matched := true
+		for _, ek := range e.PriceListGroupExtraKeys {
+			if v, ok := keyMap[ek.Code]; !ok || v != ek.Value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 // DeletePriceListGroup
@@ -485,36 +542,10 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["is_trading"] = *req.IsTrading
 			}
 
-			// Handle price unit fields - update before fields with old values
-			if req.PriceUnit != nil {
-				updateMap["before_price_unit"] = oldSubGroup.PriceUnit
-				updateMap["price_unit"] = *req.PriceUnit
-			}
-			if req.ExtraPriceUnit != nil {
-				updateMap["before_extra_price_unit"] = oldSubGroup.ExtraPriceUnit
-				updateMap["extra_price_unit"] = *req.ExtraPriceUnit
-			}
-			if req.TotalNetPriceUnit != nil {
-				updateMap["before_total_net_price_unit"] = oldSubGroup.TotalNetPriceUnit
-				updateMap["total_net_price_unit"] = *req.TotalNetPriceUnit
-			}
-
-			// Handle price weight fields - update before fields with old values
-			if req.PriceWeight != nil {
-				updateMap["before_price_weight"] = oldSubGroup.PriceWeight
-				updateMap["price_weight"] = *req.PriceWeight
-			}
-			if req.ExtraPriceWeight != nil {
-				updateMap["before_extra_price_weight"] = oldSubGroup.ExtraPriceWeight
-				updateMap["extra_price_weight"] = *req.ExtraPriceWeight
-			}
-			if req.TermPriceWeight != nil {
-				updateMap["before_term_price_weight"] = oldSubGroup.TermPriceWeight
-				updateMap["term_price_weight"] = *req.TermPriceWeight
-			}
-			if req.TotalNetPriceWeight != nil {
-				updateMap["before_total_net_price_weight"] = oldSubGroup.TotalNetPriceWeight
-				updateMap["total_net_price_weight"] = *req.TotalNetPriceWeight
+			// Handle price unit and price weight fields
+			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
+			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
+				updateMap[k] = v
 			}
 
 			if req.EffectiveDate != nil {
@@ -549,6 +580,39 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 // subGroupHistoryBatchSize keeps each history INSERT well under PostgreSQL's
 // 65535 bind-parameter limit; the history row has ~28 columns.
 const subGroupHistoryBatchSize = 500
+
+// buildSubGroupUpdateMap ประกอบ map สำหรับ UPDATE จากค่าเดิมและค่าที่ request ส่งมา
+//
+// field ที่ request ไม่ได้ส่งมา (nil) จะไม่ถูกใส่ใน map เลย เพื่อไม่ให้ GORM
+// เขียนทับด้วย zero value
+//
+// before_* จะถูกเลื่อน **เฉพาะเมื่อค่าเปลี่ยนจริง** เพราะ update-latest ส่ง
+// TotalNetPrice* ทุก subgroup ทุกครั้งแม้ราคาที่คำนวณได้เท่าเดิม และรองรับ
+// update_type = "group" ที่ดึงทั้งกลุ่มมาคำนวณ ถ้าเลื่อนทุกครั้ง snapshot จะถูกทับ
+// จนเท่ากับค่าปัจจุบันและค่า "ก่อนแก้ครั้งล่าสุด" จะหายไป
+func buildSubGroupUpdateMap(oldSubGroup models.PriceListSubGroup, req models.UpdatePriceListSubGroupItem) map[string]interface{} {
+	updateMap := make(map[string]interface{})
+
+	apply := func(column string, newValue *float64, oldValue float64) {
+		if newValue == nil {
+			return
+		}
+		if *newValue != oldValue {
+			updateMap["before_"+column] = oldValue
+		}
+		updateMap[column] = *newValue
+	}
+
+	apply("price_unit", req.PriceUnit, oldSubGroup.PriceUnit)
+	apply("extra_price_unit", req.ExtraPriceUnit, oldSubGroup.ExtraPriceUnit)
+	apply("total_net_price_unit", req.TotalNetPriceUnit, oldSubGroup.TotalNetPriceUnit)
+	apply("price_weight", req.PriceWeight, oldSubGroup.PriceWeight)
+	apply("extra_price_weight", req.ExtraPriceWeight, oldSubGroup.ExtraPriceWeight)
+	apply("term_price_weight", req.TermPriceWeight, oldSubGroup.TermPriceWeight)
+	apply("total_net_price_weight", req.TotalNetPriceWeight, oldSubGroup.TotalNetPriceWeight)
+
+	return updateMap
+}
 
 // loadSubGroupsForUpdate reads every sub group the changes refer to in one query,
 // keyed by id. Ids that do not exist are simply absent from the map, which the
@@ -690,4 +754,87 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 	}
 
 	return result, nil
+}
+
+// SubgroupFormula คือสูตรราคา 1 ตัวที่ผูกกับ price_list_sub_group หนึ่งแถว
+type SubgroupFormula struct {
+	SubgroupCode string `gorm:"column:subgroup_code"`
+	FormulaCode  string `gorm:"column:formula_code"`
+	Name         string `gorm:"column:name"`
+	Uom          string `gorm:"column:uom"`
+}
+
+// GetFormulasBySubgroupCodes คืนสูตรราคาของทุก subgroup ที่ขอมาในคิวรีเดียว
+// key ของ map คือ subgroup_code — subgroup ที่ไม่มีสูตรจะไม่มี key อยู่ใน map
+//
+// เขียน join เองแทนการใช้ Preload ของ models.PriceListSubGroupFormulasMap เพราะ
+// gorm tag ของ struct นั้นอ้าง references:SubgroupKey ซึ่งไม่ตรงกับ FK จริงในฐานข้อมูล
+// ที่ผูกด้วย subgroup_code
+func GetFormulasBySubgroupCodes(codes []string) (map[string][]SubgroupFormula, error) {
+	result := map[string][]SubgroupFormula{}
+	if len(codes) == 0 {
+		return result, nil
+	}
+
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	rows := []SubgroupFormula{}
+	if err := gormx.
+		Table("price_list_subgroup_formulas_map AS m").
+		Select("m.price_list_subgroup_code AS subgroup_code, f.formula_code, f.name, f.uom").
+		Joins("JOIN price_list_formulas AS f ON f.formula_code = m.price_list_formulas_code").
+		Where("m.price_list_subgroup_code IN ?", codes).
+		Order("m.price_list_subgroup_code, f.uom, f.formula_code").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	for _, r := range rows {
+		result[r.SubgroupCode] = append(result[r.SubgroupCode], r)
+	}
+	return result, nil
+}
+
+// SubGroupKeyColumn คือกลุ่มสินค้าหนึ่งตัวที่ price list ใช้อยู่ พร้อมลำดับที่ควรแสดง
+type SubGroupKeyColumn struct {
+	Code string `gorm:"column:code"`
+	Seq  int    `gorm:"column:seq"`
+}
+
+// GetSubGroupKeyColumns คืนกลุ่มสินค้าทุกตัวที่ subgroup ใน price list ของบริษัท/ไซต์นี้ใช้อยู่
+//
+// จงใจไม่รับ groupCodes เป็นพารามิเตอร์ — รายงานต้องมีคอลัมน์ชุดเดิมเสมอไม่ว่าผู้ใช้
+// จะกรอง Product Group 1 ตัวไหน ไม่งั้นไฟล์ที่กรองแล้วจะมีคอลัมน์น้อยกว่าไฟล์เต็ม
+func GetSubGroupKeyColumns(companyCode string, siteCodes []string) ([]SubGroupKeyColumn, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	query := gormx.
+		Table("price_list_sub_group_key AS k").
+		Select("k.code, MIN(k.seq) AS seq").
+		Joins("JOIN price_list_sub_group AS sg ON sg.id = k.sub_group_id").
+		Joins("JOIN price_list_group AS g ON g.id = sg.price_list_group_id").
+		Where("k.code <> ''").
+		Group("k.code").
+		Order("MIN(k.seq), k.code")
+
+	if companyCode != "" {
+		query = query.Where("g.company_code = ?", companyCode)
+	}
+	if len(siteCodes) > 0 {
+		query = query.Where("g.site_code IN ?", siteCodes)
+	}
+
+	cols := []SubGroupKeyColumn{}
+	if err := query.Scan(&cols).Error; err != nil {
+		return nil, err
+	}
+	return cols, nil
 }

@@ -97,6 +97,7 @@ type SaleItem struct {
 	TotalDiscount                  float64        `json:"total_discount"`
 	TotalDiscountPercent           float64        `json:"total_discount_percent"`
 	OldPriceListUnit               float64        `json:"old_price_list_unit"`
+	ConvertPriceListUnit           float64        `json:"convert_price_list_unit"`
 	CreateDate                     *time.Time     `json:"create_date"`
 	CreateBy                       string         `json:"create_by"`
 	UpdateDate                     *time.Time     `json:"update_date"`

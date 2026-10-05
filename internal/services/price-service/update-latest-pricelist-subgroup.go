@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -13,8 +14,6 @@ import (
 	"prime-erp-core/internal/utils"
 
 	"github.com/expr-lang/expr"
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
@@ -25,29 +24,20 @@ var getPriceListSubGroupFormulasMapBySubGroupCodesFunc = priceListRepository.Get
 var getPriceListSubGroupsByGroupCodesFunc = priceListRepository.GetPriceListSubGroupsByGroupCodes
 
 // UpdateLatestPriceListSubGroup calculates and updates the price list sub group data in the database.
-func UpdateLatestPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
+func UpdateLatestPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req models.UpdateLatestPriceListSubGroupRequest
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			var errorMessages []string
-			for _, fieldError := range validationErrors {
-				errorMessages = append(errorMessages, getValidationErrorMessage(fieldError))
-			}
-			return nil, &utils.BindingError{
-				Message: fmt.Sprintf("Validation failed: %v", errorMessages),
-			}
-		}
-		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
+	if err := bindJSONRequest(jsonPayload, &req); err != nil {
+		return nil, err
 	}
 
-	return RunUpdateLatestPriceListSubGroup(req)
+	return RunUpdateLatestPriceListSubGroup(ctx, req)
 }
 
 // RunUpdateLatestPriceListSubGroup recalculates and persists the latest sub group
 // prices. Split out of the HTTP handler so other services (notably the base price
 // update) can cascade into it without going through gin.
-func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
 	updateType := req.UpdateType
@@ -146,6 +136,12 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 	}
+	// สูตร pcs อ้างผลลัพธ์ของสูตร kg ในคู่เดียวกัน จึงต้องประเมินตามลำดับ dependency
+	// ไม่ใช่ตามลำดับ create_dtm ที่ repository คืนมา
+	// เรียงที่นี่ครั้งเดียวต่อ subgroup code เพื่อไม่ให้ parse JSON และ log warning ซ้ำ
+	for code, formulas := range formulasMap {
+		formulasMap[code] = sortFormulasByDependency(code, formulas)
+	}
 	// Collect all key values from all subgroups for inventory service request
 	keyValues := []externalService.InventoryByProductCodeKeyValue{}
 	companyCodeSet := make(map[string]bool)
@@ -174,6 +170,8 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 	// Create inventory maps for quick lookup
 	inventoryMap := make(map[string][]models.InventoryWeightResponse)
 	supplierCodeMap := make(map[string]string)
+	// weight_spec มาจาก product master ระดับ result ใช้ได้แม้ subgroup ไม่มีสต็อก
+	weightSpecMap := make(map[string]float64)
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
@@ -194,7 +192,7 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -203,8 +201,16 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
 				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 		}
+	}
+
+	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
+	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
+	groupItemValues, err := loadGroupItemValueIntsFunc(subGroups)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load group item values: %w", err)
 	}
 
 	// Prepare update requests for each sub group
@@ -220,31 +226,24 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
+		extraPriceWeight, extraPriceUnit := calculateExtraForSubGroup(subGroup, groupItemValues)
+
+		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
+		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch
+		// AvgProduct เป็นค่าเดียวกันทุก entry ของ product/site เดียวกัน จึงหยิบ entry แรกได้
+		//
+		// fallback เป็น 1.0 เมื่อไม่มีสต็อก เป็นพฤติกรรมที่ตกลงกันไว้
+		// ทำให้สูตรที่คูณด้วย avg_kg_stock ให้ผลเหมือนไม่มีตัวคูณ
+		avgKgStock := 1.0
+		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
+			if inventoryWeight[0].AvgProduct != 0 {
+				avgKgStock = inventoryWeight[0].AvgProduct
+			}
 		}
 
-		// Get inventory data for this subgroup
-		avgKgStock := 1.0
-		weightSpec := 1.0
-		pcs := 0.0
-		kg := 0.0
-		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
-			// Use AvgProduct from first inventory weight response
-			if inventoryWeight[0].AvgWeight == 0 {
-				avgKgStock = 1.0
-			} else {
-				avgKgStock = inventoryWeight[0].AvgWeight
-			}
-			if inventoryWeight[0].TotalWeight == 0 {
-				weightSpec = 1.0
-			} else {
-				weightSpec = inventoryWeight[0].TotalWeight
-			}
-			pcs = inventoryWeight[0].TotalQty
-			kg = inventoryWeight[0].TotalWeight
-		}
+		// weight_spec คือน้ำหนักของ base unit จาก product master ไม่ได้ผูกกับสต็อก
+		// จึงอ่านนอกบล็อก inventory (เดิมอ่าน TotalWeight ซึ่งเป็นตัวเดียวกับ kg)
+		weightSpec := weightSpecForFormula(weightSpecMap[subGroupID.String()])
 
 		if len(priceListFormulas) > 0 {
 			// Check for default input formula
@@ -267,11 +266,13 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 					case "pcs":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceUnit,
-							Extra:      extraPriceWeight,
+							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
 						}
 
 						priceFormula := priceDomain.PriceFormula{
@@ -287,11 +288,13 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 					case "kg":
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceUnit,
+							Extra:      extraPriceWeight,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
@@ -335,20 +338,44 @@ func RunUpdateLatestPriceListSubGroup(req models.UpdateLatestPriceListSubGroupRe
 
 // calculateExtraForSubGroup determines the Extra value (for weight) for a given sub group
 // using price_list_group_extras, price_list_group_extra_keys and group_item.value_int.
-func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, float64, error) {
+//
+// groupItemValues ถูกโหลดมาก่อนเข้า loop แล้ว (ดู loadGroupItemValueInts) จึงไม่มี
+// การแตะ DB ในนี้อีก
+func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup, groupItemValues groupItemValueInts) (float64, float64) {
 	// Build a quick lookup map from subgroup keys: code -> value
 	subGroupKeyMap := make(map[string]string, len(subGroup.PriceListSubGroupKeys))
 	for _, k := range subGroup.PriceListSubGroupKeys {
 		subGroupKeyMap[k.Code] = k.Value
 	}
 
-	// Start from existing ExtraPriceWeight so that, in absence of matching config,
-	// we preserve the current extra behavior.
-	extraWeight := subGroup.ExtraPriceWeight
-	extraUnit := subGroup.ExtraPriceUnit
+	// rule เป็นแหล่งความจริงเฉพาะกับ subgroup ที่มี rule ควบคุมอยู่จริง
+	//
+	// เดิมเริ่มจาก subGroup.ExtraPriceWeight แล้วเขียนทับเฉพาะตอน match ทำให้ค่าที่
+	// ไม่ตรงเงื่อนไขใดเลยค้างอยู่ตลอดไป ข้อมูลจริงเคยมี LT ขนาด 40 ที่ได้ทั้ง 0 และ 1
+	// ปนกันเพราะค่าเก่าจากการอัปโหลดไม่เคยถูกล้าง
+	//
+	// แต่การเริ่มจาก 0 เสมอจะล้างค่าที่อัปโหลดมาของ subgroup ที่ไม่มี rule ไหน
+	// key ตรงเลย ซึ่งเป็นคนละเรื่องกับ "มี rule แต่ไม่เข้าเงื่อนไข" และกู้คืนไม่ได้
+	// เพราะไม่มีแหล่งข้อมูลอื่น · cascadeBasePriceToSubGroups เรียกเส้นนี้ทุกครั้ง
+	// ที่แก้ราคาฐาน การล้างจึงจะลามเป็นวงกว้าง
+	//
+	// จึงรีเซ็ตเป็น 0 เฉพาะเมื่อมี rule อย่างน้อยหนึ่งแถวที่ key ตรงกับ subgroup นี้
+	//
+	// การจับคู่ key ต้องตรงกับ anyExtraKeysMatch ใน repositories/priceList ซึ่งใช้ล้าง
+	// extra ตอน rule ถูกลบ (UpdateExtra) ถ้าแก้ฝั่งเดียวค่าจะกลับมาค้าง
+	matchedAnyRule := false
+	extraWeight, extraUnit := 0.0, 0.0
 
-	extras := subGroup.PriceListGroup.PriceListGroupExtras
-	for _, e := range extras {
+	for _, e := range subGroup.PriceListGroup.PriceListGroupExtras {
+		// extra ที่ไม่มีคีย์เลยคือข้อมูลเสีย ไม่ใช่ "ตรงทุกคีย์"
+		//
+		// matchedAllKeys เริ่มที่ true แล้ววนลูป 0 รอบ แถวแบบนี้จึงผ่านการจับคู่
+		// อัตโนมัติและบวกให้ทุก subgroup โดยไม่สนกลุ่มสินค้า · validateExtras กันไว้
+		// ที่ path บันทึกจากหน้าเว็บแล้ว แต่ upload path ไม่ได้เรียก
+		if len(e.PriceListGroupExtraKeys) == 0 {
+			continue
+		}
+
 		// First check that all extra keys match this subgroup's keys
 		matchedAllKeys := true
 		for _, ek := range e.PriceListGroupExtraKeys {
@@ -361,9 +388,15 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 		if !matchedAllKeys {
 			continue
 		}
+		matchedAnyRule = true
 
 		// Now handle condition_code logic against group_item.value_int
+		//
+		// group ที่ config ไม่มีแกน condition (เช่น หมวดตัวซี: PG01, PG04) จะมี
+		// condition_code ว่างเสมอ · แถวแบบนี้คือ extra ที่บวกทันทีเมื่อ key ตรงครบ
+		// ไม่ใช่แถวที่ต้องข้าม การ continue เดิมทำให้ extra ของ group เหล่านี้ไม่เคยถูกใช้
 		if e.ConditionCode == "" {
+			extraWeight, extraUnit = e.ValueInt, e.ValueInt
 			continue
 		}
 
@@ -373,39 +406,44 @@ func calculateExtraForSubGroup(subGroup *models.PriceListSubGroup) (float64, flo
 			continue
 		}
 
-		valInt, found, err := priceListRepository.GetGroupItemValueInt(e.ConditionCode, condValue)
-		if err != nil {
-			return 0, 0, err
-		}
+		valInt, found := groupItemValues.lookup(e.ConditionCode, condValue)
 		if !found {
 			continue
 		}
 
 		if extraConditionMatched(valInt, e.Operator, e.CondRangeMin, e.CondRangeMax) {
 			// Use value_int from extra row as the contribution for Extra
-			extraWeight = float64(e.ValueInt)
-			extraUnit = float64(e.ValueInt)
+			extraWeight = e.ValueInt
+			extraUnit = e.ValueInt
 		}
 	}
 
-	return extraWeight, extraUnit, nil
+	if !matchedAnyRule {
+		return subGroup.ExtraPriceWeight, subGroup.ExtraPriceUnit
+	}
+
+	return extraWeight, extraUnit
 }
 
 // extraConditionMatched evaluates the operator and cond_range_min/max against the
 // group_item.value_int.
+//
+// operator ที่รับค่าตัวเดียวใช้ cond_range_max ทั้งหมด เพราะหน้าจอวางคอลัมน์เป็น
+// [min] [operator] [max] แล้วล็อคช่อง min ให้กรอกได้เฉพาะ "<>" (ExtraPriceTable.vue)
+// ช่องที่ผู้ใช้พิมพ์จึงเป็น max เสมอ · เดิม ">" กับ ">=" อ่าน min ที่ถูกล็อคเป็น 0
+// ทำให้ "> 38" กลายเป็น "> 0" คือ match ทุกแถว
 func extraConditionMatched(val float64, operator string, min, max float64) bool {
 	switch operator {
 	case "=":
-		// Example from requirement: value_int must match cond_range_max
 		return val == max
 	case ">=":
-		return val >= min
+		return val >= max
 	case "<=":
 		return val <= max
 	case "<":
 		return val < max
 	case ">":
-		return val > min
+		return val > max
 	case "<>":
 		return val >= min && val <= max
 	default:

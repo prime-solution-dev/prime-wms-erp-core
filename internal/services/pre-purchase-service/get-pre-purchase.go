@@ -1,22 +1,21 @@
 package prePurchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/models"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
-
-	"github.com/gin-gonic/gin"
 )
 
-func GetPOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.GetPOBigLotListRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	prePurchaseList, total, page, pageSize, totalPage, err := prePurchaseRepository.GetPOBigLotList(req.PrePurchaseCodes, req.SupplierCodes, req.ProductGroupCodes, req.StatusApprove, req.CompanyCode, req.SiteCode, req.Page, req.PageSize)
+	prePurchaseList, total, page, pageSize, totalPage, err := prePurchaseRepository.GetPOBigLotList(req)
 	if err != nil {
 		return nil, errors.New("failed to get big lot list: " + err.Error())
 	}
