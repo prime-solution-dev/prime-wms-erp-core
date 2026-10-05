@@ -30,15 +30,11 @@ Branch: `feature/extra-item3-item5-use-item4-config` (แตกจาก `Develo
 
 1. `migrations/2026-10-05-extra-item3-item5-use-item4-config.sql`
    - `UPDATE price_list_extra_config` ของ `GROUP_1_ITEM_3`, `GROUP_1_ITEM_5`
-     ให้ `config_json` = `config_json` ของแถว `GROUP_1_ITEM_4` (subquery คัดลอกค่าตรงตัวอักษร
+     ให้ `config_json` = `config_json` ของแถว `GROUP_1_ITEM_4` (คัดลอกค่าคอลัมน์ต่อคอลัมน์ตรงตัวอักษร
      กันปัญหา `PG04` vs `PRODUCT_GROUP4`)
    - ตั้ง `update_by = 'system'`, `update_dtm = now()`
-   - ห่อด้วย transaction; ถ้าไม่มีแถว ITEM_4 จะไม่ทำอะไร (subquery ได้ NULL → ใช้ `WHERE EXISTS` กัน)
-2. `migrations/2026-10-05-extra-item3-item5-use-item4-config.down.sql`
-   - คืน `config_json` ของ ITEM_3 / ITEM_5 เป็นค่าเดิม (PG01, PG02, PG03, PG06 condition)
-
-ก่อนเขียน migration ต้องยืนยันชื่อคอลัมน์จริงของ `price_list_extra_config` จาก model/repository
-และชนิดของ `config_json` (text / json / jsonb)
+   - ห่อด้วย `BEGIN/COMMIT`; ใช้ `UPDATE ... FROM` แถว ITEM_4 — ถ้าไม่มีแถว ITEM_4 จะไม่แก้อะไร
+2. ไม่มี `.down.sql` ตาม convention ของ `migrations/` — สร้าง `price_list_extra_config_backup_20261005` ในไฟล์เดียวกัน และมี rollback snippet ในคอมเมนต์หัวไฟล์
 
 ## ข้อมูล extra เดิม
 
@@ -50,10 +46,8 @@ Branch: `feature/extra-item3-item5-use-item4-config` (แตกจาก `Develo
 1. Integration test (testcontainers, ตาม pattern ของ `make test-integration`):
    seed `price_list_extra_config` 3 แถว (ITEM_3/4/5 ด้วยค่าปัจจุบัน) → รัน migration up
    → assert `config_json` ของ ITEM_3 และ ITEM_5 เท่ากับ ITEM_4 และแถวอื่นไม่เปลี่ยน
-   → รัน down → assert กลับเป็นค่าเดิม
-2. Unit test frontend (`prime-wms-web/src/utils/helper/priceListExtra.spec.ts`):
-   ส่ง config แบบ ITEM_4 เข้า `convertExtraConfigToColumns()` → assert ได้คอลัมน์ "ขนาด" + "Unit"
-   และคอลัมน์ condition PG06 (ถ้า case นี้มี test อยู่แล้ว ไม่เพิ่ม)
+   → รัน rollback snippet → assert กลับเป็นค่าเดิม; รวมกรณีรันซ้ำ และไม่มีแถว ITEM_4
+2. ไม่เพิ่ม frontend test — ไม่มีโค้ด frontend เปลี่ยน, case PRODUCT_GROUP4 มี test อยู่แล้วใน `prime-wms-web/src/utils/helper/priceListExtra.spec.ts`
 3. ตรวจด้วยตาบน UAT หลังรัน migration: เปิดหน้า extra ITEM_3 / 4 / 5 เทียบคอลัมน์
 
 ## Deploy
