@@ -725,6 +725,52 @@ func udfNumeric(udfData map[string]interface{}, key string) interface{} {
 	return raw
 }
 
+// getQtyFromInventory extracts the on-hand quantity (จำนวน / ลูก) from the first
+// InventoryWeight entry. Returns 0 when inventory data is unavailable so the grid
+// shows "0" rather than a blank cell.
+func getQtyFromInventory(sg models.PriceListSubGroupResponse) float64 {
+	if len(sg.InventoryWeight) > 0 {
+		inv := sg.InventoryWeight[0]
+		if inv.SumQty != 0 {
+			return inv.SumQty
+		}
+		return inv.TotalQty
+	}
+	return 0
+}
+
+func roundTo2(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
+// udfNumeric reads a numeric udf_json value. The grid saves these fields through
+// both number and text cell editors, so the same key can be stored as a JSON
+// number or a JSON string. Numeric strings are parsed; a non-numeric string is
+// passed through unchanged so whatever the user typed still round-trips instead
+// of coming back blank. Returns nil only when the key is absent or empty.
+func udfNumeric(udfData map[string]interface{}, key string) interface{} {
+	raw, ok := udfData[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return nil
+		}
+		if f, err := strconv.ParseFloat(trimmed, 64); err == nil {
+			return f
+		}
+		return v
+	}
+	return raw
+}
+
 func buildCompositeKey(subGroupKeys []models.PriceListSubGroupKeyResponse, groupCodes []string) string {
 	return buildCompositeKeyBy(subGroupKeys, groupCodes, "|", getValueNameByGroupCode)
 }
