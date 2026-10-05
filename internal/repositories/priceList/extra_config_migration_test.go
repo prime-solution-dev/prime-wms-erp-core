@@ -100,6 +100,7 @@ func TestMigration_ExtraItem3Item5UseItem4Config(t *testing.T) {
 		runExtraConfigMigration(t, gormx)
 
 		item4 := extraConfigOf(t, gormx, "price_list_extra_config", "GROUP_1_ITEM_4")
+		assert.JSONEq(t, extraConfigItem4, item4)
 		assert.Equal(t, item4, extraConfigOf(t, gormx, "price_list_extra_config", "GROUP_1_ITEM_3"))
 		assert.JSONEq(t, extraConfigPG03, extraConfigOf(t, gormx, extraConfigBackupTable, "GROUP_1_ITEM_3"))
 	})
