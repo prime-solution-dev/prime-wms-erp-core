@@ -15,6 +15,7 @@
           "field": "#",
           "headerName": "#",
           "width": 60,
+          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
@@ -27,6 +28,7 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 120,
+          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {

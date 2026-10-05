@@ -15,6 +15,7 @@
           "field": "row_number",
           "headerName": "#",
           "width": 70,
+          "pinned": "left",
           "cellStyle": {
             "textAlign": "center",
             "fontWeight": "500"
@@ -24,6 +25,7 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 100,
+          "pinned": "left",
           "cellStyle": {
             "textAlign": "center"
           },

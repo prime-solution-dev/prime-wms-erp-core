@@ -259,6 +259,7 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 80,
+          "pinned": "left",
           "dataMapping": "PG06"
         },
         {
