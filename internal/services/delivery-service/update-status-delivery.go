@@ -245,14 +245,13 @@ func fireCancelDeliveryHook(ctx context.Context, hookReqs []CancelDeliveryHookRe
 		urlHook = hookConfigValue.HookUrl
 	}
 
-	for _, hookReq := range hookReqs {
-		if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
-			RequestData: hookReq,
-			UrlHook:     urlHook,
-		}); hookErr != nil {
-			fmt.Printf("UpdateStatusDelivery: cancel hook failed for %s, continuing: %v\n", hookReq.DeliveryCodes, hookErr)
-		}
+	if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
+		RequestData: hookReqs,
+		UrlHook:     urlHook,
+	}); hookErr != nil {
+		fmt.Printf("UpdateStatusDelivery: cancel hook failed for  continuing: %v\n", hookErr)
 	}
+
 }
 
 // partitionDeliveriesByStatus แยกใบที่ต้องอัปเดตจริง ออกจากใบที่อยู่สถานะปลายทางอยู่แล้ว
