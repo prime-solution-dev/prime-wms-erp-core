@@ -13,9 +13,12 @@ import (
 // utils.NewOutboundLogTransport (หรือ apilog.NewLoggingTransport ตรงๆ) ที่ client ของสองไฟล์นี้
 // เด็ดขาด
 //
-// เทสนี้เป็นรั้วกันคนแก้ทีหลัง "ทำให้เหมือนที่อื่น" โดยเผลอเติม logging transport เข้าไป — ผ่าน
-// อยู่แล้วตั้งแต่ก่อน apilog เข้ามาในระบบ (เพราะยังไม่มีใครอ้างถึง apilog ในสองไฟล์นี้เลย) จะพังก็
-// ต่อเมื่อมีคนเพิ่มมันเข้าไปในอนาคต
+// เทสนี้เป็นรั้วกันคนแก้ทีหลัง "ทำให้เหมือนที่อื่น" โดยเผลอเติม logging transport เข้าไป
+//
+// ตอนนี้ apilog ถูกถอดออกจาก repo ทั้งหมดแล้ว (นโยบาย: ใช้ servicelog ตัวเดียว — ดูรั้วกว้างที่
+// no_apilog_anywhere_test.go) และ utils.NewOutboundLogTransport เหลือเป็น shim ที่คืน
+// http.DefaultTransport เฉยๆ สองไฟล์นี้จึงไม่ได้เสี่ยงอะไรในวันนี้ แต่รั้วนี้ยังคงไว้ เพราะวันไหน
+// มีคนทำ outbound logging ขึ้นมาใหม่ สองเส้นนี้ต้องไม่ถูกลากเข้าไปด้วยโดยอัตโนมัติ
 func TestDepositClientsNeverGetOutboundLoggingTransport(t *testing.T) {
 	files := []string{
 		"../services/interface-service/get-deposit.go",

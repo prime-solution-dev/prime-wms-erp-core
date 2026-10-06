@@ -278,6 +278,10 @@ func UpdateExtra(extras []models.PriceListGroupExtra) error {
 	defer db.CloseGORM(gormx)
 
 	return gormx.Transaction(func(tx *gorm.DB) error {
+		if err := resetOrphanedSubGroupExtras(tx, priceListGroupIDs, extras); err != nil {
+			return err
+		}
+
 		// Delete old Extra
 		if extraResult := tx.Where("price_list_group_id IN ?", priceListGroupIDs).
 			Delete(&models.PriceListGroupExtra{}); extraResult.Error != nil {
@@ -291,6 +295,92 @@ func UpdateExtra(extras []models.PriceListGroupExtra) error {
 
 		return nil
 	})
+}
+
+// resetOrphanedSubGroupExtras ล้าง extra เป็น 0 ให้ subgroup ที่ key ตรงกับ rule เดิม
+// แต่ไม่ตรงกับ rule ชุดใหม่แล้ว (rule ถูกลบหรือเปลี่ยน key)
+//
+// calculateExtraForSubGroup คืนค่าเดิมเมื่อไม่มี rule ไหน key ตรง เพื่อเก็บค่าที่
+// อัปโหลดมา ค่าที่ rule เคยเขียนไว้จึงแยกไม่ออกจากค่าอัปโหลดและค้างตลอดไป ·
+// ตอนบันทึกนี้เป็นจุดเดียวที่ยังเห็นทั้ง rule เดิมและใหม่ จึงต้องล้างที่นี่
+// subgroup ที่ไม่เคยมี rule ตรงเลยไม่ถูกแตะ
+func resetOrphanedSubGroupExtras(tx *gorm.DB, priceListGroupIDs []uuid.UUID, newExtras []models.PriceListGroupExtra) error {
+	oldExtras := []models.PriceListGroupExtra{}
+	if err := tx.Preload("PriceListGroupExtraKeys").
+		Where("price_list_group_id IN ?", priceListGroupIDs).
+		Find(&oldExtras).Error; err != nil {
+		return err
+	}
+	if len(oldExtras) == 0 {
+		return nil
+	}
+
+	// เทียบเฉพาะ rule ของ group ตัวเอง เหมือน calculateExtraForSubGroup
+	oldByGroup := map[uuid.UUID][]models.PriceListGroupExtra{}
+	for _, e := range oldExtras {
+		oldByGroup[e.PriceListGroupID] = append(oldByGroup[e.PriceListGroupID], e)
+	}
+	newByGroup := map[uuid.UUID][]models.PriceListGroupExtra{}
+	for _, e := range newExtras {
+		newByGroup[e.PriceListGroupID] = append(newByGroup[e.PriceListGroupID], e)
+	}
+
+	subGroups := []models.PriceListSubGroup{}
+	if err := tx.Select("id, price_list_group_id").Preload("PriceListSubGroupKeys").
+		Where("price_list_group_id IN ?", priceListGroupIDs).
+		Find(&subGroups).Error; err != nil {
+		return err
+	}
+
+	orphanIDs := []uuid.UUID{}
+	for _, sg := range subGroups {
+		if anyExtraKeysMatch(oldByGroup[sg.PriceListGroupID], sg.PriceListSubGroupKeys) &&
+			!anyExtraKeysMatch(newByGroup[sg.PriceListGroupID], sg.PriceListSubGroupKeys) {
+			orphanIDs = append(orphanIDs, sg.ID)
+		}
+	}
+	if len(orphanIDs) == 0 {
+		return nil
+	}
+
+	// SET ฝั่งขวาอ่านค่าก่อน UPDATE จึงได้ before_* เป็นค่าเดิม
+	return tx.Model(&models.PriceListSubGroup{}).
+		Where("id IN ?", orphanIDs).
+		Where("extra_price_unit <> 0 OR extra_price_weight <> 0").
+		Updates(map[string]interface{}{
+			"before_extra_price_unit":   gorm.Expr("extra_price_unit"),
+			"before_extra_price_weight": gorm.Expr("extra_price_weight"),
+			"extra_price_unit":          0,
+			"extra_price_weight":        0,
+			"update_by":                 newExtras[0].UpdateBy,
+			"update_dtm":                time.Now().UTC(),
+		}).Error
+}
+
+// anyExtraKeysMatch ใช้กติกาเดียวกับ calculateExtraForSubGroup
+// (services/price-service/update-latest-pricelist-subgroup.go) ต้องแก้คู่กัน:
+// ทุก key ของ rule ต้องตรงกับ subgroup และ rule ที่ไม่มี key ไม่นับว่าตรง
+func anyExtraKeysMatch(extras []models.PriceListGroupExtra, subGroupKeys []models.PriceListSubGroupKey) bool {
+	keyMap := make(map[string]string, len(subGroupKeys))
+	for _, k := range subGroupKeys {
+		keyMap[k.Code] = k.Value
+	}
+	for _, e := range extras {
+		if len(e.PriceListGroupExtraKeys) == 0 {
+			continue
+		}
+		matched := true
+		for _, ek := range e.PriceListGroupExtraKeys {
+			if v, ok := keyMap[ek.Code]; !ok || v != ek.Value {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 // DeletePriceListGroup
