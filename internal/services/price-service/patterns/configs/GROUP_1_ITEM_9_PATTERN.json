@@ -126,15 +126,6 @@
           }
         },
         {
-          "field": "line_bundle",
-          "headerName": "เส้น/มัด",
-          "width": 120,
-          "dataMapping": "line_bundle",
-          "cellStyle": {
-            "textAlign": "left"
-          }
-        },
-        {
           "field": "inactive",
           "headerName": "Inactive",
           "width": 110,
