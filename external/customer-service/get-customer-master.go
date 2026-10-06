@@ -2,12 +2,14 @@ package externalService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"prime-erp-core/config"
+	"prime-erp-core/internal/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,7 +32,14 @@ type GetCustomerResponse struct {
 	CreateDate   time.Time                    `gorm:"type:timestamp" json:"create_date"`
 	UpdateBy     string                       `gorm:"type:varchar(50)" json:"update_by"`
 	UpdateDate   time.Time                    `gorm:"type:timestamp" json:"update_date"`
-	Address      []GetCustomerAddressResponse `gorm:"foreignKey:CustomerCode;references:CustomerCode" json:"address"`
+	// customer service เคยส่ง address เป็น array ของที่อยู่ แต่ตอนนี้ส่งเป็นสตริง
+	// การประกาศเป็น []GetCustomerAddressResponse ทำให้ unmarshal ทั้งก้อนล้ม แล้วทุก
+	// endpoint ที่แปลงชื่อลูกค้าเป็นรหัส (เช่นตัวกรอง Customer Name ของ delivery list)
+	// ตอบ 500 ทั้งที่ต้องการแค่ customer_code
+	//
+	// เก็บเป็น RawMessage เพราะไม่มีใครในนี้อ่านค่าออกไปใช้ และรับได้ทั้งสองรูปแบบ
+	// ถ้าวันหน้า service เปลี่ยนกลับ ก็ไม่ต้องตามแก้อีก
+	Address json.RawMessage `gorm:"-" json:"address"`
 }
 type GetCustomerAddressResponse struct {
 	ID           uuid.UUID `gorm:"type:uuid;primary_key" json:"id"`
@@ -58,21 +67,21 @@ type ResultCustomerResponse struct {
 	Customers  []GetCustomerResponse `json:"customers"`
 }
 
-func GetCustomer(jsonPayload GetCustomerRequest) (ResultCustomerResponse, error) {
+func GetCustomer(ctx context.Context, jsonPayload GetCustomerRequest) (ResultCustomerResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
+	// utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้ ปลายทางจะได้รู้ว่าใครสั่ง
+	req, err := utils.NewRequest(ctx, "POST", config.GET_CUSTOMER_MASTER_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error creating request: " + err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("customer")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error sending request: " + err.Error())

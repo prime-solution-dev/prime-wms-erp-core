@@ -1,13 +1,14 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	orderExternalService "prime-erp-core/external/order-service"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	systemConfigService "prime-erp-core/internal/services/system-config"
 	"time"
@@ -22,6 +23,7 @@ type CreateDeliveryRequest struct {
 	CompanyCode       string                       `json:"company_code"`
 	SiteCode          string                       `json:"site_code"`
 	DeliveryMethod    string                       `json:"delivery_method"`
+	DeliveryCode      string                       `json:"delivery_code"`
 	DocumentRef       string                       `json:"document_ref"`
 	CustomerCode      string                       `json:"customer_code"`
 	SoldToCode        string                       `json:"sold_to_code"`
@@ -46,6 +48,7 @@ type CreateDeliveryRequest struct {
 
 type CreateDeliveryItemsRequest struct {
 	ProductCode     string  `json:"product_code"`
+	ProductDesc     string  `json:"product_desc"`
 	Qty             float64 `json:"qty"`
 	UnitCode        string  `json:"unit_code"`
 	Weight          float64 `json:"weight"`
@@ -56,7 +59,7 @@ type CreateDeliveryItemsRequest struct {
 	Remark          string  `json:"remark"`
 }
 
-func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req []CreateDeliveryRequest
 
 	// Bind JSON payload
@@ -68,14 +71,18 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// defer ต้องอยู่หลังเช็ค err ไม่งั้นต่อ DB ไม่ได้แล้ว gormx = nil และ CloseGORM จะ panic
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
 	// กันจองเกินจำนวนใน sale order ก่อนแตะอะไรทั้งนั้น (ทั้ง DB และ hook ภายนอก)
+	// Save Draft (is_draft) ยังไม่ผูกของจริง จึงไม่ต้องกันจองเกิน SO — ข้ามใบร่างไป
+	// ใบที่ไม่ใช่ร่างในเพย์โหลดเดียวกันยังถูกตรวจตามปกติ
 	bookingLines := []bookingLine{}
 	for _, deliveryReq := range req {
+		if deliveryReq.IsDraft {
+			continue
+		}
 		for _, item := range deliveryReq.DeliveryItems {
 			bookingLines = append(bookingLines, bookingLine{
 				SaleCode:        deliveryReq.DocumentRef,
@@ -85,7 +92,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(gormx, bookingLines, nil); err != nil {
+	if err := ValidateBookingQty(ctx, gormx, bookingLines, nil); err != nil {
 		return nil, err
 	}
 
@@ -110,21 +117,34 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"sub_topic": []string{"CREATE"},
 	}
 
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
-	if len(hookConfig) > 0 {
+	// เจนเลขที่ใบจองก่อนยิง hook เพื่อให้ปลายทางได้ delivery_code ไปด้วย
+	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
+	if err != nil {
+		return nil, err
+	}
+	for i := range req {
+		req[i].DeliveryCode = deliveryCodes[i]
+	}
+
+	// TRCloud ไม่เอาบรรทัดที่จอง 0 ชิ้น ตัด item qty 0 และใบที่ไม่เหลือ item ออกก่อนยิง hook
+	// (ตัด req ที่ส่งเข้า hook เท่านั้น ฝั่ง insert ลง DB ยังใช้ req เดิมครบทุกบรรทัด)
+	hookReq := buildHookRequest(req)
+
+	if len(hookConfig) > 0 && len(hookReq) > 0 {
 		urlHook := ""
 		for _, hookConfigValue := range hookConfig {
 			urlHook = hookConfigValue.HookUrl
 		}
 
 		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
+			RequestData: hookReq,
 			UrlHook:     urlHook,
 		}
-		HookInterfaceValue, hookErr := interfaceService.HookInterface(requestDataCreateHook)
+		HookInterfaceValue, hookErr := interfaceService.HookInterface(ctx, requestDataCreateHook)
 		if hookErr != nil {
 			// hook เป็นข้อมูลเสริม (external id) ไม่ควรทำให้สร้างใบไม่ได้ แต่ต้องเห็นใน log
 			fmt.Printf("CreateDelivery: delivery hook failed, continuing without external id: %v\n", hookErr)
@@ -137,21 +157,12 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		}
 	}
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
 	deliveryToAdd := []models.Delivery{}
 	deliveryItemToAdd := []models.DeliveryItem{}
-
-	// Generate all delivery codes first
-	deliveryCodes, err := generateDeliveryCodes(gormx, len(req))
-	if err != nil {
-		return nil, err
-	}
 
 	for num, deliveryReq := range req {
 		deliveryId := uuid.New()
@@ -184,7 +195,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			LicensePlate:     deliveryReq.LicensePlate,
 			ContactName:      deliveryReq.ContactName,
 			Tel:              deliveryReq.Tel,
-			TotalWeight:      deliveryReq.TotalWeight,
+			TotalWeight:      roundWeight(deliveryReq.TotalWeight),
 			Remark:           deliveryReq.Remark,
 			Status: func() string {
 				if deliveryReq.IsDraft {
@@ -212,10 +223,11 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
 				DeliveryID:      deliveryId,
 				ProductCode:     deliveryItem.ProductCode,
+				ProductDesc:     deliveryItem.ProductDesc,
 				Qty:             deliveryItem.Qty,
 				UnitCode:        deliveryItem.UnitCode,
-				Weight:          deliveryItem.Weight,
-				WeightUnit:      deliveryItem.WeightUnit,
+				Weight:          roundWeight(deliveryItem.Weight),
+				WeightUnit:      roundWeight(deliveryItem.WeightUnit),
 				Status:          "PENDING",
 				DocumentRefItem: deliveryItem.DocumentRefItem,
 				Remark:          deliveryItem.Remark,
@@ -255,7 +267,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	var orderRes orderExternalService.CreateOrderResponse
 	// Only call external service if there are non-draft deliveries
 	if hasNonDraftDelivery {
-		orderRes, err = CreateOrder(req, deliveryToAdd, deliveryItemToAdd)
+		orderRes, err = CreateOrder(ctx, req, deliveryToAdd, deliveryItemToAdd)
 		if err != nil {
 			return nil, err
 		}
@@ -281,7 +293,7 @@ func CreateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return response, nil
 }
 
-func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrder(ctx context.Context, req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 	// deliveryToAdd เรียงตรงกับ req ทีละใบ (สร้างมาจากลูปเดียวกัน) ส่วน deliveryItemToAdd
@@ -313,6 +325,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				OrderItem:         "",
 				DocumentRefItem:   srcItem.DeliveryItem,
 				ProductCode:       item.ProductCode,
+				ProductDesc:       item.ProductDesc,
 				ProductType:       "normal",
 				InterfaceOrderQty: item.Qty,
 				Qty:               item.Qty,
@@ -323,8 +336,8 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCode,
 				SaleMethod:        item.SaleMethod,
-				Weight:            item.Weight,
-				WeightUnit:        item.WeightUnit,
+				Weight:            roundWeight(item.Weight),
+				WeightUnit:        roundWeight(item.WeightUnit),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
@@ -346,7 +359,7 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 			Action:       "X",
 			OrderID:      uuid.New(),
 			OrderCode:    "",
-			OrderType:    "DELIVERY",
+			OrderType:    "NORMAL",
 			OrderDate:    time.Now(),
 			TenantID:     nil,
 			CustomerCode: deliveryReq.CustomerCode,
@@ -393,15 +406,38 @@ func CreateOrder(req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, d
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	fmt.Println("createOrderRequest : ", createOrderRequest)
-
-	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(ctx, createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
-	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
+}
+
+// buildHookRequest ตัดบรรทัดที่ qty <= 0 ออกจาก payload ที่จะยิงเข้า hook
+// ใบที่กรองแล้วไม่เหลือ item เลย ตัดทั้งใบทิ้ง ไม่ส่งหัวใบเปล่าไปให้ปลายทาง
+func buildHookRequest(req []CreateDeliveryRequest) []CreateDeliveryRequest {
+	hookReq := make([]CreateDeliveryRequest, 0, len(req))
+
+	// deliveryReq เป็น copy จาก range อยู่แล้ว เขียนทับ DeliveryItems ไม่กระทบ req ตัวจริง
+	for _, deliveryReq := range req {
+		items := make([]CreateDeliveryItemsRequest, 0, len(deliveryReq.DeliveryItems))
+		for _, item := range deliveryReq.DeliveryItems {
+			if item.Qty <= 0 {
+				continue
+			}
+			items = append(items, item)
+		}
+
+		if len(items) == 0 {
+			continue
+		}
+
+		deliveryReq.DeliveryItems = items
+		hookReq = append(hookReq, deliveryReq)
+	}
+
+	return hookReq
 }
 
 // generateDeliveryCodes จองเลขที่ใบจองแบบ atomic (ล็อกแถว config จนกว่าจะเดินเลขเสร็จ)

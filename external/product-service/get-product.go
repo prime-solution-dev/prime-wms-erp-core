@@ -2,6 +2,7 @@ package externalProductService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"prime-erp-core/config"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,7 +91,9 @@ type GetProductsComponent struct {
 	UpdateDtm                     time.Time             `json:"update_dtm"`
 	ExternalID                    string                `json:"external_id"`
 	GRTolerance                   float64               `json:"gr_tolerance"`
+	GRWeightTolerance             float64               `json:"gr_weight_tolerance"`
 	GRToleranceActive             bool                  `json:"gr_tolerance_active"`
+	GRWeightToleranceActive       bool                  `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                `json:"unit_interface"`
 	AdjustmentUnit                string                `json:"adjustment_unit"`
 	Weight                        float64               `json:"weight"`
@@ -139,21 +143,21 @@ type GetUnitsBarcodeComponent struct {
 	Barcode       string    `gorm:"type:varchar(100)" json:"barcode"`
 }
 
-func GetProduct(jsonPayload GetProductRequest) (GetProductsResponse, error) {
+func GetProduct(ctx context.Context, jsonPayload GetProductRequest) (GetProductsResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
 		return GetProductsResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_PRODUCT_ENDPOINT, bytes.NewBuffer(jsonData))
+	// utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้ ปลายทางจะได้รู้ว่าใครสั่ง
+	req, err := utils.NewRequest(ctx, "POST", config.GET_PRODUCT_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GetProductsResponse{}, errors.New("Error creating request: " + err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("product")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return GetProductsResponse{}, errors.New("Error sending request: " + err.Error())

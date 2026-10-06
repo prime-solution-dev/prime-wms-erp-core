@@ -1,6 +1,7 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,10 +10,11 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UpdateQuotationRequest struct {
@@ -25,7 +27,14 @@ type UpdateQuotationResponse struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// updateQuotationSalePerson writes sale_person_code with Update (not Updates
+// with a struct), so an empty string is written too instead of being skipped
+// as a zero value.
+func updateQuotationSalePerson(tx *gorm.DB, id uuid.UUID, code string) error {
+	return tx.Model(&models.Quotation{}).Where("id = ?", id).Update("sale_person_code", code).Error
+}
+
+func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateQuotationRequest{}
 	res := []UpdateQuotationResponse{}
 
@@ -45,7 +54,7 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	}
 	defer db.CloseGORM(gormx)
 
-	user := `system` // TODO: get from ctx
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -178,7 +187,7 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	//Verification
 	if req.IsVerifyPrice {
 		for _, verifyReq := range verifyReqMap {
-			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+			verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 			if err != nil {
 				return nil, err
 			}
@@ -225,6 +234,14 @@ func UpdateQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		if err := tx.Model(&models.Quotation{}).
 			Where("id = ?", quotation.ID).
 			Updates(quotation).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
+		}
+
+		// GORM's struct Updates() skips zero-value fields, so it never clears
+		// sale_person_code back to "" (allow-clear, or switching the customer
+		// clears the sales person). Write it explicitly, every time.
+		if err := updateQuotationSalePerson(tx, quotation.ID, quotation.SalePersonCode); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
 		}

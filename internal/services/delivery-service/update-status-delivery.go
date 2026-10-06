@@ -1,16 +1,20 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	orderExternalService "prime-erp-core/external/order-service"
+	"prime-erp-core/internal/apperr"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
-	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type UpdateStatusDeliveryRequest struct {
@@ -24,7 +28,7 @@ type UpdateStatusDeliveryResponse struct {
 	Message      string `json:"message"`
 }
 
-func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateStatusDeliveryRequest{}
 	res := []UpdateStatusDeliveryResponse{}
 
@@ -34,7 +38,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 
 	// Validate request
 	if len(req.DeliveryCodes) == 0 {
-		return nil, errors.New("delivery_codes is required")
+		return nil, apperr.BadRequest("delivery_codes is required")
 	}
 
 	if req.Status == "" {
@@ -47,10 +51,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -65,43 +66,33 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		deliveryOf[delivery.DeliveryCode] = delivery
 	}
 
-	// เดิมไม่เช็คสถานะเดิมเลย สั่งซ้ำกี่รอบก็ยิง WMS ซ้ำทุกรอบ
-	//
-	// ใบที่อยู่สถานะปลายทางอยู่แล้วให้ "ข้าม" ไม่ใช่ทำให้ทั้ง request พัง เพราะ endpoint นี้
-	// รับได้หลายใบต่อครั้งและ status ว่างจะ default เป็น COMPLETED ซึ่งเป็นรูปแบบของ callback
-	// ที่ยิงซ้ำได้ ใบเดียวที่ซ้ำจึงไม่ควรทำให้อีกเก้าใบไม่ถูกอัปเดต
-	toUpdate := []string{}
-	for _, deliveryCode := range req.DeliveryCodes {
-		delivery, found := deliveryOf[deliveryCode]
-		if !found {
-			return nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
-		}
+	toUpdate, alreadyAtStatus, err := partitionDeliveriesByStatus(req.DeliveryCodes, deliveryOf, req.Status)
+	if err != nil {
+		return nil, err
+	}
 
-		if delivery.Status == req.Status {
-			res = append(res, UpdateStatusDeliveryResponse{
-				DeliveryCode: deliveryCode,
-				Status:       "success",
-				Message:      fmt.Sprintf("Delivery is already %s", req.Status),
-			})
-			continue
-		}
-
-		// ยกเลิกไปแล้วย้อนกลับไม่ได้
-		if delivery.Status == "CANCELED" {
-			return nil, fmt.Errorf("delivery %s is already canceled", deliveryCode)
-		}
-
-		toUpdate = append(toUpdate, deliveryCode)
+	for _, deliveryCode := range alreadyAtStatus {
+		res = append(res, UpdateStatusDeliveryResponse{
+			DeliveryCode: deliveryCode,
+			Status:       "success",
+			Message:      fmt.Sprintf("Delivery is already %s", req.Status),
+		})
 	}
 
 	if len(toUpdate) == 0 {
+		// ไม่มีใบไหนต้องอัปเดต แต่ยังต้องลองปิด SO ของใบที่อยู่ COMPLETED อยู่แล้ว
+		// (hook ตัวที่สองของ outbound เดียวกันมาถึงตรงนี้ และเป็นรอบที่ข้อมูลครบ)
+		if req.Status == "COMPLETED" {
+			closeSalesOfDeliveries(ctx, gormx, deliveryOf, alreadyAtStatus, user)
+		}
+
 		return res, nil
 	}
 
 	// ห้ามยกเลิกใบที่คลังหยิบไปทำงานแล้ว หน้าจอปิดปุ่มด้วย isCreateOutbound อยู่แล้ว
 	// แต่ฝั่ง server ไม่เคยบังคับ ยิง API ตรงหรือแข่งจังหวะกันก็ผ่าน
 	if req.Status == "CANCELED" {
-		started, err := deliveriesWithOutbound(toUpdate)
+		started, err := deliveriesWithOutbound(ctx, toUpdate)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +112,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 	// ทำให้พังตรงไหนก็ตาม ERP ยังไม่ถูกแตะเลย ผู้ใช้กดยกเลิกซ้ำได้
 	if req.Status == "CANCELED" {
 		for _, deliveryCode := range toUpdate {
-			if _, err := CancelOrder(deliveryOf[deliveryCode]); err != nil {
+			if _, err := CancelOrder(ctx, deliveryOf[deliveryCode]); err != nil {
 				return nil, fmt.Errorf("failed to cancel order for delivery %s: %v", deliveryCode, err)
 			}
 		}
@@ -168,7 +159,7 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 
 		if result.Error != nil {
 			tx.Rollback()
-			return nil, fmt.Errorf("failed to update delivery items for %s: %v", deliveryCode, result.Error)
+			return nil, fmt.Errorf("failed to update delivery items for %s : %v", deliveryCode, result.Error)
 		}
 
 		res = append(res, UpdateStatusDeliveryResponse{
@@ -183,30 +174,175 @@ func UpdateStatusDelivery(ctx *gin.Context, jsonPayload string) (interface{}, er
 		return nil, err
 	}
 
+	// ใบจองที่ปิดแล้ว แปลว่าของออกไปแล้ว ให้ไปดูว่า SO ต้นทางส่งครบหรือยัง
+	//
+	// นับทั้งใบที่รอบนี้เพิ่งพลิกและใบที่อยู่ COMPLETED มาก่อนแล้ว การปิดเป็น idempotent
+	// รันซ้ำได้และนั่นคือเจตนา (ดูเหตุผลที่ partitionDeliveriesByStatus)
+	if req.Status == "COMPLETED" {
+		completed := make([]string, 0, len(toUpdate)+len(alreadyAtStatus))
+		completed = append(completed, toUpdate...)
+		completed = append(completed, alreadyAtStatus...)
+
+		closeSalesOfDeliveries(ctx, gormx, deliveryOf, completed, user)
+	}
+
+	// แจ้งปลายทางเฉพาะใบที่รอบนี้เพิ่งถูกยกเลิก ใบที่ CANCELED อยู่ก่อนแล้วเคยแจ้งไปแล้ว
+	if req.Status == "CANCELED" {
+		fireCancelDeliveryHook(postCommitContext(ctx), buildCancelHookRequests(deliveryOf, toUpdate))
+	}
+
 	return res, nil
 }
 
-func CancelOrder(delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
+// CancelDeliveryHookRequest คือ payload ที่ส่งเข้า hook ต่อใบจองหนึ่งใบที่ถูกยกเลิก
+// ชื่อ field delivery_codes เป็นรูปพหูพจน์แต่ค่าเป็นเลขใบเดียว ตามที่ปลายทางกำหนด
+type CancelDeliveryHookRequest struct {
+	DeliveryCodes string `json:"delivery_codes"`
+	Status        string `json:"status"`
+	ExternalID    string `json:"external_id"`
+}
+
+func buildCancelHookRequests(deliveryOf map[string]models.Delivery, deliveryCodes []string) []CancelDeliveryHookRequest {
+	hookReqs := make([]CancelDeliveryHookRequest, 0, len(deliveryCodes))
+	for _, deliveryCode := range deliveryCodes {
+		hookReqs = append(hookReqs, CancelDeliveryHookRequest{
+			DeliveryCodes: deliveryCode,
+			Status:        "CANCELED",
+			ExternalID:    deliveryOf[deliveryCode].ExternalID,
+		})
+	}
+
+	return hookReqs
+}
+
+// fireCancelDeliveryHook แจ้งปลายทาง (TRCloud) ว่าใบจองถูกยกเลิก ยิงทีละใบ
+//
+// ใช้ hook config ตัวเดียวกับ fireUpdateDeliveryHook (DELIVERY/DELIVERY/UPDATE)
+// ทำหลัง commit และ log ทิ้งถ้าพัง ยกเลิกใบสำเร็จไปแล้วต้องไม่กลายเป็น error
+func fireCancelDeliveryHook(ctx context.Context, hookReqs []CancelDeliveryHookRequest) {
+	if len(hookReqs) == 0 {
+		return
+	}
+
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"UPDATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
+	if err != nil {
+		fmt.Printf("UpdateStatusDelivery: cannot read hook config, skipping cancel hook: %v\n", err)
+		return
+	}
+
+	if len(hookConfig) == 0 {
+		return
+	}
+
+	urlHook := ""
+	for _, hookConfigValue := range hookConfig {
+		urlHook = hookConfigValue.HookUrl
+	}
+
+	if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
+		RequestData: hookReqs,
+		UrlHook:     urlHook,
+	}); hookErr != nil {
+		fmt.Printf("UpdateStatusDelivery: cancel hook failed for  continuing: %v\n", hookErr)
+	}
+
+}
+
+// partitionDeliveriesByStatus แยกใบที่ต้องอัปเดตจริง ออกจากใบที่อยู่สถานะปลายทางอยู่แล้ว
+//
+// เดิมไม่เช็คสถานะเดิมเลย สั่งซ้ำกี่รอบก็ยิง WMS ซ้ำทุกรอบ
+//
+// ใบที่อยู่สถานะปลายทางอยู่แล้วให้ "ข้าม" ไม่ใช่ทำให้ทั้ง request พัง เพราะ endpoint นี้
+// รับได้หลายใบต่อครั้งและ status ว่างจะ default เป็น COMPLETED ซึ่งเป็นรูปแบบของ callback
+// ที่ยิงซ้ำได้ ใบเดียวที่ซ้ำจึงไม่ควรทำให้อีกเก้าใบไม่ถูกอัปเดต
+//
+// คืน alreadyAtStatus แยกออกมาด้วย เพราะเส้นปิด SO ต้องนับใบพวกนี้ด้วย:
+// outbound ใบเดียวยืนยันได้หลาย CO และแต่ละ CO ยิง hook ของตัวเอง hook ตัวแรกพลิก DBS
+// เป็น COMPLETED แล้วรันปิด SO ตอนที่บรรทัดของ CO ตัวที่สองยังเปิดอยู่ พอ hook ตัวที่สอง
+// มาถึง DBS ก็ COMPLETED ไปแล้ว ถ้าตัดใบพวกนี้ออกจากการปิด จะไม่มีรอบไหนเลยที่ข้อมูลครบ
+func partitionDeliveriesByStatus(deliveryCodes []string, deliveryOf map[string]models.Delivery, targetStatus string) ([]string, []string, error) {
+	toUpdate := []string{}
+	alreadyAtStatus := []string{}
+
+	for _, deliveryCode := range deliveryCodes {
+		delivery, found := deliveryOf[deliveryCode]
+		if !found {
+			return nil, nil, fmt.Errorf("delivery with code %s not found", deliveryCode)
+		}
+
+		if delivery.Status == targetStatus {
+			alreadyAtStatus = append(alreadyAtStatus, deliveryCode)
+			continue
+		}
+
+		// ยกเลิกไปแล้วย้อนกลับไม่ได้
+		if delivery.Status == "CANCELED" {
+			return nil, nil, fmt.Errorf("delivery %s is already canceled", deliveryCode)
+		}
+
+		toUpdate = append(toUpdate, deliveryCode)
+	}
+
+	return toUpdate, alreadyAtStatus, nil
+}
+
+// closeSalesOfDeliveries ไล่ปิด SO ต้นทางของใบจองที่ตอนนี้อยู่ COMPLETED
+//
+// ต้องทำหลัง commit และ "log ทิ้งถ้าพัง" ห้ามคืน error — hook ORDER/DELIVERY/UPDATE
+// ยิงเข้ามาระหว่างที่ wms-order-service ยังไม่ commit ถ้าเราคืน error ฝั่งนั้นจะ rollback
+// แล้วยืนยัน pack ล้มทั้งใบ ทั้งที่สต็อกกับ GI ตัดไปแล้ว
+func closeSalesOfDeliveries(ctx context.Context, gormx *gorm.DB, deliveryOf map[string]models.Delivery, deliveryCodes []string, user string) {
+	if len(deliveryCodes) == 0 {
+		return
+	}
+
+	// เส้นนี้ทำงานหลัง commit และห้ามล้มตาม caller
+	// postCommitContext เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ hook ฝั่ง
+	// wms-order-service หมดเวลาแล้วตัดสาย ctx จะถูกยกเลิกและการปิด SO จะไม่เกิดขึ้นเลย
+	ctx = postCommitContext(ctx)
+
+	saleCodes := []string{}
+	for _, deliveryCode := range deliveryCodes {
+		saleCodes = append(saleCodes, deliveryOf[deliveryCode].DocumentRef)
+	}
+
+	if err := CloseSalesFullyDelivered(ctx, gormx, saleCodes, user); err != nil {
+		fmt.Printf("UpdateStatusDelivery: cannot close sales of %v: %v\n", deliveryCodes, err)
+	}
+}
+
+// postCommitContext คืน context สำหรับงานที่ทำหลัง commit
+// เก็บ user/token ไว้ครบ แต่ตัดการยกเลิกทิ้ง ไม่งั้นพอ caller หมดเวลาแล้วตัดสาย
+// งานที่เหลือจะไม่เกิดขึ้นเลยและเงียบด้วย
+func postCommitContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
+}
+
+func CancelOrder(ctx context.Context, delivery models.Delivery) (orderExternalService.CancelOrderResponse, error) {
 	cancelOrderRequest := orderExternalService.CancelOrderRequest{
 		DocumentRef: []string{delivery.DeliveryCode},
 	}
 
-	fmt.Println("cancelOrderRequest : ", cancelOrderRequest)
-	cancelOrderResponse, err := orderExternalService.CancelOrder(cancelOrderRequest)
+	cancelOrderResponse, err := orderExternalService.CancelOrder(ctx, cancelOrderRequest)
 	if err != nil {
 		return orderExternalService.CancelOrderResponse{}, errors.New("Error cancel order : " + err.Error())
 	}
-	fmt.Println("cancelOrderResponse : ", cancelOrderResponse)
 
 	return cancelOrderResponse, nil
 }
 
 // deliveriesWithOutbound ถาม WMS ว่าใบไหนถูกสร้าง outbound ไปแล้วบ้าง
 // ใช้กันไม่ให้ยกเลิกใบที่คลังเริ่มทำงานไปแล้ว
-func deliveriesWithOutbound(deliveryCodes []string) (map[string]bool, error) {
+func deliveriesWithOutbound(ctx context.Context, deliveryCodes []string) (map[string]bool, error) {
 	started := map[string]bool{}
 
-	orderRes, err := orderExternalService.GetOrdersDelivery(orderExternalService.GetOrderDeliveryRequest{
+	orderRes, err := orderExternalService.GetOrdersDelivery(ctx, orderExternalService.GetOrderDeliveryRequest{
 		DeliveryCode: deliveryCodes,
 	})
 	if err != nil {

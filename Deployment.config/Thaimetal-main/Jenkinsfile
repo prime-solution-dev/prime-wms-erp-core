@@ -5,11 +5,11 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115'
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Thaimetal-main' 
-        REMOTE_USER = 'ec2-user'
+        TARGET_BRANCH = 'Thaimetal-main'
+        REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '54.179.75.32'
         SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS' // path ของ secret
+        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS'
         ENV_FILE_KEY = 'thaimetalprd.env.erp'
     }
 
@@ -69,7 +69,7 @@ pipeline {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
                     cd ${REPO_NAME} &&
-                    mkdir -p cmd &&
+                                        mkdir -p cmd &&
                     cat << "EOF" > cmd/.env
 ${AUTHEN_ENV}
 EOF
@@ -85,8 +85,10 @@ stage('Build Docker Image') {
             steps {
                 script {
                     echo 'Building Docker image on remote server with updated .env...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
+                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t ${IMAGE_NAME}:latest .'"""
+                    }
                 }
             }
         }

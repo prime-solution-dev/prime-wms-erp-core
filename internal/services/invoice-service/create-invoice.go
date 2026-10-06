@@ -1,28 +1,25 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
+	"prime-erp-core/internal/requestcontext"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	invoiceValue := []models.Invoice{}
 	invoiceItemValue := []models.InvoiceItem{}
 	invoiceDepositValue := []models.InvoiceDeposit{}
@@ -30,6 +27,10 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	invoiceCode := []string{}
 	for i, invoice := range req {
 		invoiceID := uuid.New()
+
+		if req[i].ID != uuid.Nil {
+			invoiceID = req[i].ID
+		}
 		req[i].ID = invoiceID
 		req[i].CreateBy = userID
 		req[i].UpdateBy = userID
@@ -44,7 +45,7 @@ func CreateInvoice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			invoiceItemID := uuid.New()
 			req[i].InvoiceItem[o].ID = invoiceItemID
 			req[i].InvoiceItem[o].InvoiceID = invoiceID
-			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(i)
+			req[i].InvoiceItem[o].InvoiceItem = strconv.Itoa(o + 1)
 			invoiceItemValue = append(invoiceItemValue, req[i].InvoiceItem[o])
 		}
 		for d := range invoice.InvoiceDeposit {

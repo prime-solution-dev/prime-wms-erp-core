@@ -5,12 +5,13 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Demo' 
+        TARGET_BRANCH = 'Demo'
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '18.139.159.17'
         SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.DemoWMS' 
+        VAULT_PATH = 'JenkinsWMS/jenkins.DemoWMS'
         ENV_FILE_KEY = 'Demo.env.erp' 
+        DOCKERFILEPATH = 'Deployment.config/Demo/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -105,7 +106,7 @@ stage('Fetch .env from Vault (Remote)') {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
                     cd ${REPO_NAME} &&
-                    mkdir -p cmd &&
+                                        mkdir -p cmd &&
                     cat << "EOF" > cmd/.env
 ${AUTHEN_ENV}
 EOF
@@ -122,8 +123,10 @@ stage('Build Docker Image') {
             steps {
                 script {
                     echo 'Building Docker image on remote server...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t  ${IMAGE_NAME}:latest .'"""
+                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t  ${IMAGE_NAME}:latest .'"""
+                    }
                 }
             }
         }

@@ -2,22 +2,31 @@ package externalService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"prime-erp-core/config"
+	"prime-erp-core/internal/utils"
 	"time"
 )
 
 type GetInventoryAtpRequest struct {
-	CompanyCodes   []string   `json:"company_codes"`
-	SiteCodes      []string   `json:"site_codes"`
-	WarehouseCodes []string   `json:"warehouse_codes"`
-	ProductCodes   []string   `json:"product_codes"`
-	StorageTypes   []string   `json:"storage_types"`
-	ToDate         *time.Time `json:"to_date"`
+	CompanyCodes     []string           `json:"company_codes"`
+	SiteCodes        []string           `json:"site_codes"`
+	WarehouseCodes   []string           `json:"warehouse_codes"`
+	ProductCodes     []string           `json:"product_codes"`
+	StorageTypes     []string           `json:"storage_types"`
+	NotWarehoseCodes []NotwarehouseCode `json:"not_warehouse_codes"`
+	ToDate           *time.Time         `json:"to_date"`
+}
+
+type NotwarehouseCode struct {
+	CompanyCode   string `json:"company_code"`
+	SiteCode      string `json:"site_code"`
+	WarehouseCode string `json:"warehouse_code"`
 }
 
 type GetInventoryAtpResponse struct {
@@ -25,48 +34,59 @@ type GetInventoryAtpResponse struct {
 }
 
 type productAtp struct {
-	CompanyCode   string   `json:"company_code"`
-	SiteCode      string   `json:"site_code"`
-	ProductCode   string   `json:"product_code"`
-	TodayStockQty float64  `json:"today_stock_qty"`
-	TodayAtpQty   float64  `json:"today_atp_qty"`
-	TotalAtpQty   float64  `json:"total_atp_qty"`
-	DayAtps       []dayAtp `json:"day_atps"`
+	CompanyCode      string   `json:"company_code"`
+	SiteCode         string   `json:"site_code"`
+	ProductCode      string   `json:"product_code"`
+	TodayStockQty    float64  `json:"today_stock_qty"`
+	TodayStockWeight float64  `json:"today_stock_weight"`
+	TodayAtpQty      float64  `json:"today_atp_qty"`
+	TodayAtpWeight   float64  `json:"today_atp_weight"`
+	TotalAtpQty      float64  `json:"total_atp_qty"`
+	TotalAtpWeight   float64  `json:"total_atp_weight"`
+	DayAtps          []dayAtp `json:"day_atps"`
 }
 type dayAtp struct {
 	Date         time.Time     `json:"date"`
-	AtpQty       int           `json:"atp_qty"`
+	AtpQty       float64       `json:"atp_qty"`
+	Weight       float64       `json:"weight"`
 	DocumentAtps []documentAtp `json:"document_atps"`
 }
 
 type documentAtp struct {
+	CompanyCode     string    `json:"company_code"`
+	SiteCode        string    `json:"site_code"`
+	WarehouseCode   string    `json:"warehouse_code"`
+	ProductCode     string    `json:"product_code"`
 	Seq             int       `json:"seq"`
 	Date            time.Time `json:"date"`
-	DocumentType    string    `json:"document_type"`     //e.g., SO, PO, KITTING
-	DocumentSubType string    `json:"document_sub_type"` //e.g., KITTING-IN, KITTING-OUT
+	DocumentType    string    `json:"document_type"`     // e.g., SO, PO, KITTING
+	DocumentSubType string    `json:"document_sub_type"` // e.g., KITTING-IN, KITTING-OUT
+	DocumentDisplay string    `json:"document_display"`
 	DocumentCode    string    `json:"document_code"`
+	ItemCode        string    `json:"item_code"`
 	DocumentDate    time.Time `json:"document_date"`
-	Qty             int       `json:"qty"`
-	FinishedQty     int       `json:"finished_qty"`
-	RemainQty       int       `json:"remain_qty"`
-	BalanceQty      int       `json:"balance_qty"`
+	Qty             float64   `json:"qty"`
+	UnitCode        string    `json:"unit_code"`
+	Weight          float64   `json:"weight"`
+	BalanceQty      float64   `json:"balance_qty"`
+	BalanceWeight   float64   `json:"balance_weight"`
 }
 
-func GetInventoryATP(jsonPayload GetInventoryAtpRequest) (GetInventoryAtpResponse, error) {
+func GetInventoryATP(ctx context.Context, jsonPayload GetInventoryAtpRequest) (GetInventoryAtpResponse, error) {
 
 	jsonData, err := json.Marshal(jsonPayload)
 	if err != nil {
 		return GetInventoryAtpResponse{}, errors.New("Error marshaling struct to JSON: " + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", config.GET_INVENTORY_ATP_ENDPOINT, bytes.NewBuffer(jsonData))
+	// utils.NewRequest แปะ token ของคนที่ยิงเข้ามาไปกับ header ให้ ปลายทางจะได้รู้ว่าใครสั่ง
+	req, err := utils.NewRequest(ctx, "POST", config.GET_INVENTORY_ATP_ENDPOINT, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GetInventoryAtpResponse{}, errors.New("Error creating request: " + err.Error())
 	}
-	req.Header.Set("Content-Type", "application/json")
 
 	// timeout กันปลายทางค้างแล้วลาก request ของเราค้างตาม (default ของ http.Client คือไม่มี timeout)
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second, Transport: utils.NewOutboundLogTransport("warehouse")}
 	resp, err := client.Do(req)
 	if err != nil {
 		return GetInventoryAtpResponse{}, errors.New("Error sending request: " + err.Error())

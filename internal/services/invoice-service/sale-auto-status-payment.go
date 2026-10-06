@@ -1,19 +1,18 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	repositorySale "prime-erp-core/internal/repositories/sale"
-
-	"github.com/gin-gonic/gin"
 )
 
 type SaleAutoStatusPaymentReq struct {
 	InvoiceCode []string `json:"invoice_code"`
 }
 
-func SaleAutoStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func SaleAutoStatusPayment(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req SaleAutoStatusPaymentReq
 
@@ -22,7 +21,7 @@ func SaleAutoStatusPayment(ctx *gin.Context, jsonPayload string) (interface{}, e
 	}
 	saleCode := ""
 
-	invoice, _, _, errDeposit := repositoryInvoice.GetInvoicePreload(nil, req.InvoiceCode, nil, nil, nil, nil, nil, nil, 0, 0, "", "", "", "", "", "", nil, nil, nil)
+	invoice, _, _, errDeposit := repositoryInvoice.GetInvoicePreload(nil, req.InvoiceCode, nil, nil, nil, nil, nil, nil, 0, 0, "", "", "", "", "", "", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

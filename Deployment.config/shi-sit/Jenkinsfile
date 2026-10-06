@@ -9,8 +9,9 @@ pipeline {
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '13.250.66.64'
         SSH_KEY_PATH = '/home/ec2-user/key/shiseido-sit.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.shiseidosit' 
+        VAULT_PATH = 'JenkinsWMS/jenkins.shiseidosit'
         ENV_FILE_KEY = 'shiseidosit.env.erp' 
+        DOCKERFILEPATH = 'Deployment.config/shi-sit/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -105,7 +106,7 @@ stage('Fetch .env from Vault (Remote)') {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
                     cd ${REPO_NAME} &&
-                    mkdir -p cmd &&
+                                        mkdir -p cmd &&
                     cat << "EOF" > cmd/.env
 ${AUTHEN_ENV}
 EOF
@@ -122,8 +123,10 @@ stage('Build Docker Image') {
             steps {
                 script {
                     echo 'Building Docker image on remote server...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t  ${IMAGE_NAME}:latest .'"""
+                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t  ${IMAGE_NAME}:latest .'"""
+                    }
                 }
             }
         }

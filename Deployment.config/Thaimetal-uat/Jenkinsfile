@@ -9,7 +9,7 @@ pipeline {
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '18.138.69.85'
         SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS' 
+        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS'
         ENV_FILE_KEY = 'thaimetaluat.env.erp'
     }
 
@@ -69,7 +69,7 @@ pipeline {
                 sh """
                 ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
                     cd ${REPO_NAME} &&
-                    mkdir -p cmd &&
+                                        mkdir -p cmd &&
                     cat << "EOF" > cmd/.env
 ${AUTHEN_ENV}
 EOF
@@ -92,8 +92,10 @@ EOF
             steps {
                 script {
                     echo 'Building Docker image on remote server with updated .env...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
+                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t ${IMAGE_NAME}:latest .'"""
+                    }
                 }
             }
         }

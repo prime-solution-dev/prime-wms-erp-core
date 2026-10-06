@@ -1,6 +1,7 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"prime-erp-core/internal/db"
 	priceService "prime-erp-core/internal/services/price-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
@@ -68,11 +68,12 @@ type VerifyApproveResponse struct {
 	IsPassExpiryPrice     bool                         `json:"is_pass_expiry_price"`
 	IsPassInventory       bool                         `json:"is_pass_inventory"`
 	CreditDetails         []VerifyCreditCustomer       `json:"credit_details"`
+	ProductAtps           []VerifyInventoryProductAtp  `json:"product_atps"`
 	InventoryCalculations []VerifyInventoryCalculation `json:"inventory_calculations"`
 	Documents             []VerifyApproveDocument      `json:"documents"`
 }
 
-func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func VerifyApprove(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := VerifyApproveRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -91,12 +92,13 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	return VerifyApproveLogic(gormx, sqlx, req)
+	return VerifyApproveLogic(ctx, gormx, sqlx, req)
 }
 
-func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
+func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
 		CreditDetails:         []VerifyCreditCustomer{},
+		ProductAtps:           []VerifyInventoryProductAtp{},
 		InventoryCalculations: []VerifyInventoryCalculation{},
 		Documents:             []VerifyApproveDocument{},
 	}
@@ -131,6 +133,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 
 	inventoryReq.CompanyCode = req.CompanyCode
 	inventoryReq.SiteCode = req.SiteCode
+	inventoryReq.WarehouseCodes = req.InventoryWarehouseCode
 	inventoryReq.StorageTypes = req.StorageType
 	inventoryReq.ToDate = &req.SaleDate
 
@@ -208,12 +211,14 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				newProductInv := VerifyInventoryProduct{
 					ProductCode: docItem.ProductCode,
 					Qty:         0,
+					TotalWeight: 0,
 				}
 
 				productInv = newProductInv
 			}
 
 			productInv.Qty += docItem.Qty
+			productInv.TotalWeight += docItem.TotalWeight
 			productInvMap[productInvKey] = productInv
 		}
 
@@ -287,7 +292,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 			creditReq.Customers = append(creditReq.Customers, cust)
 		}
 
-		creditRes, err := VerifyCreditLogic(sqlx, creditReq)
+		creditRes, err := VerifyCreditLogic(ctx, creditReq)
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +320,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	if req.IsVerifyInventory {
 		res.IsPassInventory = true
 
-		invenRes, err := VerifyInventoryLogic(inventoryReq)
+		invenRes, err := VerifyInventoryLogic(ctx, inventoryReq)
 		if err != nil {
 			return nil, err
 		}
@@ -324,6 +329,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 			res.IsPassInventory = false
 		}
 
+		res.ProductAtps = append(res.ProductAtps, invenRes.ProductAtps...)
 		res.InventoryCalculations = append(res.InventoryCalculations, invenRes.InventoryCalculations...)
 	} else {
 		res.IsPassInventory = true

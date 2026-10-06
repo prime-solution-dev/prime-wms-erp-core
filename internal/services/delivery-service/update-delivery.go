@@ -1,6 +1,7 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,8 +11,9 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
+	interfaceService "prime-erp-core/internal/services/interface-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -53,7 +55,7 @@ type UpdateDeliveryResponse struct {
 	OrderCode    string `json:"order_code,omitempty"`
 }
 
-func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateDeliveryRequest{}
 	res := []UpdateDeliveryResponse{}
 
@@ -67,10 +69,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -145,7 +144,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			"license_plate":      tempDelivery.LicensePlate,
 			"contact_name":       tempDelivery.ContactName,
 			"tel":                tempDelivery.Tel,
-			"total_weight":       tempDelivery.TotalWeight,
+			"total_weight":       roundWeight(tempDelivery.TotalWeight),
 			"remark":             tempDelivery.Remark,
 			"booking_slot_type":  tempDelivery.BookingSlotType,
 			"status":             tempDelivery.Status,
@@ -163,29 +162,44 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			updateDeliveryItems = append(updateDeliveryItems, item.DeliveryItem)
 
 			itemUpdateFields[item.DeliveryItem.ID] = map[string]interface{}{
-				"product_code":      item.DeliveryItem.ProductCode,
-				"qty":               item.DeliveryItem.Qty,
-				"unit_code":         item.DeliveryItem.UnitCode,
-				"price_list_unit":   item.DeliveryItem.PriceListUnit,
-				"sale_qty":          item.DeliveryItem.SaleQty,
-				"sale_unit_code":    item.DeliveryItem.SaleUnitCode,
-				"total_weight":      item.DeliveryItem.TotalWeight,
-				"weight":            item.DeliveryItem.Weight,
-				"weight_unit":       item.DeliveryItem.WeightUnit,
-				"document_ref_item": item.DeliveryItem.DocumentRefItem,
-				"remark":            item.DeliveryItem.Remark,
-				"status":            item.DeliveryItem.Status,
-				"update_date":       item.DeliveryItem.UpdateDate,
-				"update_by":         item.DeliveryItem.UpdateBy,
+				"product_code":    item.DeliveryItem.ProductCode,
+				"qty":             item.DeliveryItem.Qty,
+				"unit_code":       item.DeliveryItem.UnitCode,
+				"price_list_unit": item.DeliveryItem.PriceListUnit,
+				"sale_qty":        item.DeliveryItem.SaleQty,
+				"sale_unit_code":  item.DeliveryItem.SaleUnitCode,
+				"total_weight":    roundWeight(item.DeliveryItem.TotalWeight),
+				"weight":          roundWeight(item.DeliveryItem.Weight),
+				"weight_unit":     roundWeight(item.DeliveryItem.WeightUnit),
+				"remark":          item.DeliveryItem.Remark,
+				"status":          item.DeliveryItem.Status,
+				"update_date":     item.DeliveryItem.UpdateDate,
+				"update_by":       item.DeliveryItem.UpdateBy,
+			}
+			// document_ref_item คือ key ชี้บรรทัดใน SO ใช้ตรวจจองเกินและแสดงผลหน้าจอ
+			// หน้าบ้านเคยส่งค่าว่างมาทับจนใบจองหาบรรทัด SO ไม่เจอ (DBS202609-0004/0005)
+			// จึงเขียนทับเฉพาะเมื่อมีค่าจริง ค่าว่างให้คงของเดิมไว้
+			if item.DeliveryItem.DocumentRefItem != "" {
+				itemUpdateFields[item.DeliveryItem.ID]["document_ref_item"] = item.DeliveryItem.DocumentRefItem
+			}
+			// product_desc มาจาก sale_item ผ่านหน้าจอ ใบเก่าก่อนมีฟิลด์นี้จะส่งค่าว่างมา
+			// เขียนทับเฉพาะเมื่อมีค่าจริง ไม่งั้นกด Edit ครั้งเดียวคำอธิบายหายทั้งใบ
+			if item.DeliveryItem.ProductDesc != "" {
+				itemUpdateFields[item.DeliveryItem.ID]["product_desc"] = item.DeliveryItem.ProductDesc
 			}
 		}
 	}
 
 	// กันจองเกินจำนวนใน sale order โดยไม่นับจำนวนของใบที่กำลังแก้ซ้ำเข้าไปเอง
+	// Save Draft (is_draft) ยังไม่ผูกของจริง จึงไม่ต้องกันจองเกิน SO — ข้ามใบร่างไป
+	// ใบที่ไม่ใช่ร่างในเพย์โหลดเดียวกันยังถูกตรวจตามปกติ
 	bookingLines := []bookingLine{}
 	editingDeliveryCodes := []string{}
 	for _, deliveryReq := range req.Deliveries {
 		editingDeliveryCodes = append(editingDeliveryCodes, deliveryReq.DeliveryCode)
+		if deliveryReq.IsDraft {
+			continue
+		}
 		for _, item := range deliveryReq.Items {
 			bookingLines = append(bookingLines, bookingLine{
 				SaleCode:        deliveryReq.DocumentRef,
@@ -195,7 +209,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			})
 		}
 	}
-	if err := ValidateBookingQty(gormx, bookingLines, editingDeliveryCodes); err != nil {
+	if err := ValidateBookingQty(ctx, gormx, bookingLines, editingDeliveryCodes); err != nil {
 		return nil, err
 	}
 
@@ -213,6 +227,10 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			updateOrderDeliveries = append(updateOrderDeliveries, deliveryReq)
 		}
 	}
+
+	// แจ้งปลายทางว่าใบจองถูกแก้ ล้อเส้น create-delivery ต่างกันที่ sub_topic เป็น UPDATE
+	// hook เป็นการแจ้งอย่างเดียว ไม่ได้อ่านค่าที่ตอบกลับมา ใบที่แก้มี external_id ของตัวเองอยู่แล้ว
+	fireUpdateDeliveryHook(ctx, req.Deliveries)
 
 	tx := gormx.Begin()
 	if tx.Error != nil {
@@ -264,7 +282,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
 	if len(newOrderDeliveries) > 0 {
-		orderRes, err := CreateOrderForUpdate(newOrderDeliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(ctx, newOrderDeliveries, updateDeliveries, updateDeliveryItems)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
@@ -275,7 +293,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for _, deliveryReq := range updateOrderDeliveries {
-		if err := UpdateOrderByDeliveryForUpdate(deliveryReq, updateDeliveries); err != nil {
+		if err := UpdateOrderByDeliveryForUpdate(ctx, deliveryReq, updateDeliveries); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
@@ -296,7 +314,7 @@ func UpdateDelivery(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return res, nil
 }
 
-func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 
@@ -329,6 +347,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				OrderItem:         "",
 				DocumentRefItem:   srcItem.DeliveryItem,
 				ProductCode:       item.ProductCode,
+				ProductDesc:       item.ProductDesc,
 				ProductType:       "normal",
 				InterfaceOrderQty: item.Qty,
 				Qty:               item.Qty,
@@ -339,8 +358,8 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCodeForOrder,
 				SaleMethod:        item.SaleMethodForOrder,
-				Weight:            item.Weight,
-				WeightUnit:        item.WeightUnit,
+				Weight:            roundWeight(item.Weight),
+				WeightUnit:        roundWeight(item.WeightUnit),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
@@ -362,7 +381,7 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 			Action:              "X",
 			OrderID:             uuid.New(),
 			OrderCode:           "",
-			OrderType:           "DELIVERY",
+			OrderType:           "NORMAL",
 			OrderDate:           time.Now(),
 			TenantID:            nil,
 			CustomerCode:        deliveryReq.CustomerCode,
@@ -404,20 +423,15 @@ func CreateOrderForUpdate(req []DeliveryDocumentUpdate, deliveryToAdd []models.D
 	}
 	createOrderRequest.Orders = createOrderdetail
 
-	requestJSON, _ := json.MarshalIndent(createOrderRequest, "", "  ")
-	fmt.Println("CreateGoodsIssueRequest JSON:")
-	fmt.Println(string(requestJSON))
-	fmt.Println("createOrderRequest : ", createOrderRequest)
-	createOrderResponse, err := orderExternalService.CreateOrder(createOrderRequest)
+	createOrderResponse, err := orderExternalService.CreateOrder(ctx, createOrderRequest)
 	if err != nil {
 		return orderExternalService.CreateOrderResponse{}, errors.New("Error create order : " + err.Error())
 	}
-	fmt.Println("createOrderResponse : ", createOrderResponse)
 
 	return createOrderResponse, nil
 }
 
-func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
 	// Find the corresponding delivery from updateDeliveries
 	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
@@ -432,9 +446,13 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	orderItems := []externalService.UpdateOrderByDeliveryItemDetail{}
 	for _, item := range deliveryReq.Items {
 		orderItem := externalService.UpdateOrderByDeliveryItemDetail{
-			OrderItem:            "",
-			DocumentRefItem:      item.DocumentRefItem,
+			OrderItem: "",
+			// ฝั่ง WMS ใช้ document_ref_item ชี้กลับมาที่ "บรรทัดของใบจอง" (delivery_item)
+			// เหมือนตอน CreateOrder ไม่ใช่ key ของบรรทัด SO — เดิมส่ง SO key มา หน้าจอ
+			// จองคิวเลยจับคู่ CO กับใบจองไม่เจอ (hasOutbound/calculateBookedUsage)
+			DocumentRefItem:      item.DeliveryItem.DeliveryItem,
 			ProductCode:          item.ProductCode,
+			ProductDesc:          item.ProductDesc,
 			ProductType:          "normal",
 			InterfaceOrderQty:    item.Qty,
 			Qty:                  item.Qty,
@@ -445,9 +463,9 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 			SerialCode:           "",
 			SaleUnitCode:         item.SaleUnitCodeForOrder,
 			SaleMethod:           item.SaleMethodForOrder,
-			InterfaceOrderWeight: item.Weight,
-			Weight:               item.Weight,
-			WeightUnit:           item.WeightUnit,
+			InterfaceOrderWeight: roundWeight(item.Weight),
+			Weight:               roundWeight(item.Weight),
+			WeightUnit:           roundWeight(item.WeightUnit),
 			MfgDate:              nil,
 			ExpDate:              nil,
 			LocationCode:         "",
@@ -471,11 +489,79 @@ func UpdateOrderByDeliveryForUpdate(deliveryReq DeliveryDocumentUpdate, updateDe
 	}
 
 	// Call UpdateOrderByDelivery
-	resp, err := externalService.UpdateOrderByDelivery(updateOrderReq)
+	_, err := externalService.UpdateOrderByDelivery(ctx, updateOrderReq)
 	if err != nil {
 		return fmt.Errorf("failed to call UpdateOrderByDelivery: %v", err)
 	}
 
-	fmt.Println("updateOrderResponse : ", resp)
 	return nil
+}
+
+// fireUpdateDeliveryHook แจ้งปลายทาง (TRCloud) ว่าใบจองถูกแก้
+//
+// ล้อ CreateDelivery ทุกข้อ ต่างกัน 2 อย่าง: sub_topic เป็น UPDATE และไม่อ่านค่าที่ hook ตอบกลับ
+// เพราะใบที่ถูกแก้มี external_id จากตอนสร้างอยู่แล้ว
+//
+// hook เป็นข้อมูลเสริม พังแล้วต้องไม่ทำให้แก้ใบไม่ได้ แต่ต้องเห็นใน log
+func fireUpdateDeliveryHook(ctx context.Context, deliveries []DeliveryDocumentUpdate) {
+	requestData := map[string]interface{}{
+		"module":    []string{"DELIVERY"},
+		"topic":     []string{"DELIVERY"},
+		"sub_topic": []string{"UPDATE"},
+	}
+
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
+	if err != nil {
+		fmt.Printf("UpdateDelivery: cannot read hook config, skipping hook: %v\n", err)
+		return
+	}
+
+	hookReq := buildUpdateHookRequest(deliveries)
+	if len(hookConfig) == 0 || len(hookReq) == 0 {
+		return
+	}
+
+	urlHook := ""
+	for _, hookConfigValue := range hookConfig {
+		urlHook = hookConfigValue.HookUrl
+	}
+
+	if _, hookErr := interfaceService.HookInterface(ctx, interfaceService.HookInterfaceRequest{
+		RequestData: hookReq,
+		UrlHook:     urlHook,
+	}); hookErr != nil {
+		fmt.Printf("UpdateDelivery: delivery hook failed, continuing: %v\n", hookErr)
+	}
+}
+
+// buildUpdateHookRequest ตัดใบร่างและบรรทัดที่ qty <= 0 ออกจาก payload ที่จะยิงเข้า hook
+//
+// ใบร่างยังไม่ผูกของจริง ปลายทางไม่ต้องรู้ และ TRCloud ไม่เอาบรรทัดที่จอง 0 ชิ้น
+// ใบที่กรองแล้วไม่เหลือ item เลย ตัดทั้งใบทิ้ง ไม่ส่งหัวใบเปล่าไปให้ปลายทาง
+func buildUpdateHookRequest(deliveries []DeliveryDocumentUpdate) []DeliveryDocumentUpdate {
+	hookReq := make([]DeliveryDocumentUpdate, 0, len(deliveries))
+
+	// deliveryReq เป็น copy จาก range อยู่แล้ว เขียนทับ Items ไม่กระทบ req ตัวจริง
+	for _, deliveryReq := range deliveries {
+		if deliveryReq.IsDraft {
+			continue
+		}
+
+		items := make([]DeliveryItemDocumentUpdate, 0, len(deliveryReq.Items))
+		for _, item := range deliveryReq.Items {
+			if item.DeliveryItem.Qty <= 0 {
+				continue
+			}
+			items = append(items, item)
+		}
+
+		if len(items) == 0 {
+			continue
+		}
+
+		deliveryReq.Items = items
+		hookReq = append(hookReq, deliveryReq)
+	}
+
+	return hookReq
 }

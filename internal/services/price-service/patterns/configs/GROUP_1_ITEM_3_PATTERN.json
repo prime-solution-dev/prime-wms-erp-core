@@ -15,6 +15,7 @@
           "field": "#",
           "headerName": "#",
           "width": 60,
+          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "valueGetter": "node.rowIndex + 1",
@@ -27,10 +28,11 @@
           "field": "thickness",
           "headerName": "หนา",
           "width": 120,
+          "pinned": "left",
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "PG06"
         },
@@ -42,7 +44,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_weight"
         },
@@ -54,7 +56,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "avg_weight"
         },
@@ -66,7 +68,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "od"
         },
@@ -78,7 +80,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "line_bundle"
         },
@@ -89,9 +91,9 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
-          "dataMapping": "stock"
+          "dataMapping": "warehouse"
         },
         {
           "field": "is_highlight",
@@ -111,7 +113,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },
@@ -135,7 +137,7 @@
               "headerName": "วัน เข้า",
               "width": 120,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "import_date"
             },
@@ -144,7 +146,7 @@
               "headerName": "ตัน",
               "width": 120,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "ton"
             },
@@ -153,7 +155,7 @@
               "headerName": "ผู้ผลิต",
               "width": 120,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "producer"
             }
@@ -169,7 +171,7 @@
               "headerName": "ราคาขาย Before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_weight"
             },
@@ -178,7 +180,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_weight"
             }
@@ -194,7 +196,7 @@
               "headerName": "ราคาขาย before",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_unit"
             },
@@ -203,7 +205,7 @@
               "headerName": "ราคาขาย After",
               "width": 150,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_unit"
             }
