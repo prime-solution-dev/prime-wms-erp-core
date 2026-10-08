@@ -23,6 +23,7 @@ func HookInterface(ctx context.Context, requestData HookInterfaceRequest) (inter
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: encode request: %w", err)
 	}
+	fmt.Printf("HookInterface request: %s\n", string(jsonData))
 	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_document")+"/interface/hook-interface", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("hook interface: create request: %w", err)

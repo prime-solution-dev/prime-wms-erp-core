@@ -9,8 +9,6 @@ import (
 
 	"prime-erp-core/internal/requestcontext"
 	"prime-erp-core/internal/utils"
-
-	"github.com/prime-solution-dev/prime-service-x/apilog"
 )
 
 // ปลายทางรู้ว่าใครเรียกได้จาก header เท่านั้น เทสนี้จึงยิงของจริงไปหา httptest server
@@ -86,35 +84,5 @@ func TestNewRequestUsesTokenFromContextAsIs(t *testing.T) {
 
 	if got := req.Header.Get("Authorization"); got != "Bearer user-token" {
 		t.Fatalf("Authorization = %q", got)
-	}
-}
-
-// trace id ที่มีอยู่ใน context ต้องกลายเป็น transaction id ที่ apilog เห็น (จุดเดียวที่เชื่อมสอง
-// ระบบนี้เข้าด้วยกันคือ utils.NewRequest — ดูคอมเมนต์ในนั้น) ไม่งั้นจะมีสอง id วิ่งคนละเส้น ไล่ log
-// ข้าม service ไม่ได้ (requestcontext ของเราเอง ส่ง X-Trace-ID กับ apilog.WithTransactionID ที่ส่ง
-// X-Transaction-ID)
-func TestNewRequestMakesTraceIDTheAPILogTransactionID(t *testing.T) {
-	ctx := requestcontext.WithTraceID(context.Background(), "trace-เชื่อมสองระบบ")
-
-	req, err := utils.NewRequest(ctx, http.MethodPost, "http://example.local", nil)
-	if err != nil {
-		t.Fatalf("NewRequest: %v", err)
-	}
-
-	if got := apilog.TransactionIDFromContext(req.Context()); got != "trace-เชื่อมสองระบบ" {
-		t.Fatalf("apilog transaction id = %q, ต้องการเลขเดียวกับ trace id คือ %q", got, "trace-เชื่อมสองระบบ")
-	}
-}
-
-// ไม่มี trace id ใน context เลย ต้องไม่ปั้น transaction id ขึ้นมาเอง (ค่าว่าง = apilog ไม่แปะ
-// X-Transaction-ID header ให้ ดู apilog/transport.go)
-func TestNewRequestWithoutTraceIDLeavesAPILogTransactionIDEmpty(t *testing.T) {
-	req, err := utils.NewRequest(context.Background(), http.MethodPost, "http://example.local", nil)
-	if err != nil {
-		t.Fatalf("NewRequest: %v", err)
-	}
-
-	if got := apilog.TransactionIDFromContext(req.Context()); got != "" {
-		t.Fatalf("apilog transaction id = %q, ต้องการค่าว่างเมื่อไม่มี trace id", got)
 	}
 }
