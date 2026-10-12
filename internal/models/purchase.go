@@ -30,6 +30,7 @@ type PrePurchase struct {
 	IsApproved                  bool              `json:"is_approved"`
 	StatusApprove               string            `json:"status_approve"`
 	Remark                      string            `json:"remark"`
+	Note                        *string           `gorm:"default:''" json:"note"`
 	CreditTerm                  int               `json:"credit_term"`
 	CreateBy                    string            `json:"create_by"`
 	CreateDtm                   time.Time         `json:"create_dtm"`
@@ -103,6 +104,7 @@ type Purchase struct {
 	IsApproved                  bool           `json:"is_approved"`
 	StatusApprove               string         `json:"status_approve"`
 	Remark                      string         `json:"remark"`
+	Note                        *string        `gorm:"default:''" json:"note"`
 	CreditTerm                  int            `json:"credit_term"`
 	StatusPayment               string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	UsedType                    string         `json:"used_type"`      // GR
@@ -199,6 +201,7 @@ type CreatePOBigLotRequest struct {
 	IsApproved      bool                        `json:"is_approved"`
 	StatusApprove   string                      `json:"status_approve"`
 	Remark          string                      `json:"remark"`
+	Note            *string                     `json:"note"`
 	CreditTerm      int                         `json:"credit_term"`
 	Items           []CreatePOBigLotItemRequest `json:"items"`
 }
@@ -281,6 +284,7 @@ type GetPOBigLotResponse struct {
 	IsApproved                  bool                      `json:"is_approved"`
 	StatusApprove               string                    `json:"status_approve"`
 	Remark                      string                    `json:"remark"`
+	Note                        string                    `json:"note"`
 	CreditTerm                  int                       `json:"credit_term"`
 	CreateBy                    string                    `json:"create_by"`
 	CreateDtm                   string                    `json:"create_dtm"`
@@ -336,6 +340,7 @@ type UpdatePOBigLotRequest struct {
 	IsApproved       bool                        `json:"is_approved"`
 	StatusApprove    string                      `json:"status_approve"`
 	Remark           string                      `json:"remark"`
+	Note             *string                     `json:"note"`
 	CreditTerm       int                         `json:"credit_term"`
 	DeliveryAddress  string                      `json:"delivery_address"`
 	PrePurchaseItems []UpdatePOBigLotItemRequest `json:"pre_purchase_items"`
@@ -445,6 +450,7 @@ type PurchaseFormRequest struct {
 	IsApproved      bool                      `json:"is_approved"`
 	StatusApprove   string                    `json:"status_approve"`
 	Remark          string                    `json:"remark"`
+	Note            *string                   `json:"note"`
 	CreditTerm      int                       `json:"credit_term"`
 	Items           []PurchaseItemFormRequest `json:"items"`
 }
@@ -546,6 +552,7 @@ type PurchaseResponse struct {
 	UsedType                    string                 `json:"used_type"`      // GR
 	UsedStatus                  string                 `json:"used_status"`    // PENDING, COMPLETED
 	Remark                      string                 `json:"remark"`
+	Note                        string                 `json:"note"`
 	CreditTerm                  int                    `json:"credit_term"`
 	CreateBy                    string                 `json:"create_by"`
 	CreateDtm                   string                 `json:"create_dtm"`

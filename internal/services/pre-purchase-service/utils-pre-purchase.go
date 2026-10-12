@@ -86,6 +86,7 @@ func MapBigLotRequestToPrePurchaseModel(req models.CreatePOBigLotRequest) models
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
+		Note:            req.Note,
 		CreditTerm:      req.CreditTerm,
 		CreateBy:        user,
 		CreateDtm:       now,
@@ -144,6 +145,11 @@ func MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchaseItems []models.Pre
 func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) models.GetPOBigLotResponse {
 	items, sumSubTotalExclDiscountExclVat := MapPrePurchaseItemsModelToBigLotItemsResponse(prePurchases.PrePurchaseItems)
 
+	note := ""
+	if prePurchases.Note != nil {
+		note = *prePurchases.Note
+	}
+
 	return models.GetPOBigLotResponse{
 		ID:                          prePurchases.ID.String(),
 		PrePurchaseCode:             prePurchases.PrePurchaseCode,
@@ -166,6 +172,7 @@ func MapPrePurchasesModelToBigLotsResponse(prePurchases models.PrePurchase) mode
 		IsApproved:                  prePurchases.IsApproved,
 		StatusApprove:               prePurchases.StatusApprove,
 		Remark:                      prePurchases.Remark,
+		Note:                        note,
 		CreditTerm:                  prePurchases.CreditTerm,
 		CreateBy:                    prePurchases.CreateBy,
 		CreateDtm:                   prePurchases.CreateDtm.Format(time.RFC3339),
@@ -262,6 +269,7 @@ func MapUpdatePOBigLotRequestToPrePurchase(req models.UpdatePOBigLotRequest) mod
 		StatusApprove:   req.StatusApprove,
 		DeliveryAddress: req.DeliveryAddress,
 		Remark:          req.Remark,
+		Note:            req.Note,
 		CreditTerm:      req.CreditTerm,
 		UpdateBy:        user,
 		UpdateDtm:       now,

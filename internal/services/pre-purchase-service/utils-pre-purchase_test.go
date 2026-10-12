@@ -1,6 +1,7 @@
 package prePurchaseService
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -86,5 +87,66 @@ func TestMapPrePurchaseItemsModelToBigLotItemsResponse_NoItems(t *testing.T) {
 	}
 	if sum != 0 {
 		t.Errorf("sum = %v, want 0", sum)
+	}
+}
+
+func TestBigLotNoteRequestAndResponse(t *testing.T) {
+	cases := []struct {
+		name    string
+		payload string
+		want    string
+		wantNil bool
+	}{
+		{"text", `{"note":"  หมายเหตุ\nบรรทัดสอง  ","remark":"original remark"}`, "  หมายเหตุ\nบรรทัดสอง  ", false},
+		{"empty", `{"note":"","remark":"original remark"}`, "", false},
+		{"omitted", `{"remark":"original remark"}`, "", true},
+		{"null", `{"note":null,"remark":"original remark"}`, "", true},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			var req models.CreatePOBigLotRequest
+			if err := json.Unmarshal([]byte(tt.payload), &req); err != nil {
+				t.Fatal(err)
+			}
+			purchase := MapBigLotRequestToPrePurchaseModel(req)
+			var updateReq models.UpdatePOBigLotRequest
+			if err := json.Unmarshal([]byte(tt.payload), &updateReq); err != nil {
+				t.Fatal(err)
+			}
+			update := MapUpdatePOBigLotRequestToPrePurchase(updateReq)
+			if (update.Note == nil) != tt.wantNil {
+				t.Fatalf("update Note nil = %v, want %v", update.Note == nil, tt.wantNil)
+			}
+			if update.Note != nil && *update.Note != tt.want {
+				t.Fatalf("update Note = %q, want %q", *update.Note, tt.want)
+			}
+			if update.Remark != "original remark" {
+				t.Fatal("update note mapping changed remark")
+			}
+			if (purchase.Note == nil) != tt.wantNil {
+				t.Fatalf("Note nil = %v, want %v", purchase.Note == nil, tt.wantNil)
+			}
+			if purchase.Note != nil && *purchase.Note != tt.want {
+				t.Fatalf("Note = %q, want %q", *purchase.Note, tt.want)
+			}
+			response := MapPrePurchasesModelToBigLotsResponse(purchase)
+			if response.Note != tt.want {
+				t.Fatalf("response Note = %q, want %q", response.Note, tt.want)
+			}
+			if purchase.Remark != "original remark" || response.Remark != "original remark" {
+				t.Fatal("note mapping changed remark")
+			}
+			payload, err := json.Marshal(response)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire map[string]interface{}
+			if err := json.Unmarshal(payload, &wire); err != nil {
+				t.Fatal(err)
+			}
+			if value, ok := wire["note"].(string); !ok || value != tt.want {
+				t.Fatalf("JSON note = %#v, want string %q", wire["note"], tt.want)
+			}
+		})
 	}
 }
