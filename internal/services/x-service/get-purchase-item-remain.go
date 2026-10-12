@@ -72,6 +72,7 @@ type GetPurchaseItemRemainResponseResult struct {
 	StatusApprove               string   `json:"status_approve"`
 	StatusPayment               string   `json:"status_payment"`
 	DeliveryDate                string   `json:"delivery_date"`
+	Note                        string   `json:"note"`
 	ID                          string   `json:"id"`
 	PurchaseItem                string   `json:"purchase_item"`
 	DocRefItem                  string   `json:"doc_ref_item"`
@@ -601,6 +602,7 @@ func ConvertToResponse(
 				StatusApprove:        po.StatusApprove,
 				StatusPayment:        po.StatusPayment,
 				DeliveryDate:         po.DeliveryDate,
+				Note:                 po.Note,
 				ID:                   it.ID,
 				PurchaseItem:         it.PurchaseItem,
 				DocRefItem:           it.DocRefItem,
@@ -753,7 +755,7 @@ func getPurchase(ctx context.Context, gormx *gorm.DB, req GetPurchaseItemRemainR
 			"delivery_date",
 			"status", "status_approve", "status_payment",
 			"total_amount", "total_weight", "total_discount", "total_vat", "subtotal_excl_vat",
-			"remark",
+			"remark", "note",
 			"create_by", "create_dtm", "update_by", "update_dtm",
 		}).
 		Order("purchase_code ASC").
@@ -1292,6 +1294,11 @@ func paginateResults(
 }
 
 func toPurchaseResponse(p models.Purchase) models.PurchaseResponse {
+	note := ""
+	if p.Note != nil {
+		note = *p.Note
+	}
+
 	delivery := ""
 	if p.DeliveryDate != nil && !p.DeliveryDate.IsZero() {
 		delivery = p.DeliveryDate.Format("2006-01-02")
@@ -1307,6 +1314,7 @@ func toPurchaseResponse(p models.Purchase) models.PurchaseResponse {
 		StatusApprove: p.StatusApprove,
 		StatusPayment: p.StatusPayment,
 		DeliveryDate:  delivery,
+		Note:          note,
 		Items:         []models.PurchaseItemResponse{},
 	}
 }

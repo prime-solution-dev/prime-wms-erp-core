@@ -4,6 +4,7 @@ package purchaseRepository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -323,4 +324,70 @@ func TestGetPurchaseList_CreateDateRangeIncludesLastDay(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, total)
 	assert.ElementsMatch(t, []string{"PO-DATE-0902", "PO-DATE-0903"}, codesOf(list))
+}
+
+func TestPurchaseNotePersistence(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.CloseGORM(gormx)
+
+	cases := []struct {
+		name       string
+		payload    string
+		wantCreate string
+		wantUpdate string
+	}{
+		{"text", `{"note":"  หมายเหตุ\nบรรทัดสอง  "}`, "  หมายเหตุ\nบรรทัดสอง  ", "  หมายเหตุ\nบรรทัดสอง  "},
+		{"empty", `{"note":""}`, "", ""},
+		{"omitted", `{}`, "", "existing note"},
+		{"null", `{"note":null}`, "", "existing note"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			var req models.PurchaseFormRequest
+			if err := json.Unmarshal([]byte(tt.payload), &req); err != nil {
+				t.Fatal(err)
+			}
+			created := models.Purchase{
+				ID: uuid.New(), PurchaseCode: "NOTE-" + uuid.NewString(),
+				CompanyCode: testCompanyCode, SiteCode: "NOTE-TEST",
+				Note: req.Note, Remark: "original remark",
+			}
+			if err := CreatePurchase(gormx, []models.Purchase{created}); err != nil {
+				t.Fatal(err)
+			}
+			defer gormx.Where("id = ?", created.ID).Delete(&models.Purchase{})
+
+			var got models.Purchase
+			if err := gormx.First(&got, "id = ?", created.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if got.Note == nil || *got.Note != tt.wantCreate {
+				t.Fatalf("created Note = %v, want %q", got.Note, tt.wantCreate)
+			}
+			if got.Remark != "original remark" {
+				t.Fatalf("created Remark = %q", got.Remark)
+			}
+
+			if err := gormx.Model(&models.Purchase{}).Where("id = ?", created.ID).Update("note", "existing note").Error; err != nil {
+				t.Fatal(err)
+			}
+			update := models.Purchase{ID: created.ID, Note: req.Note}
+			if err := UpdatePurchase([]models.Purchase{update}); err != nil {
+				t.Fatal(err)
+			}
+			got = models.Purchase{}
+			if err := gormx.First(&got, "id = ?", created.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if got.Note == nil || *got.Note != tt.wantUpdate {
+				t.Fatalf("updated Note = %v, want %q", got.Note, tt.wantUpdate)
+			}
+			if got.Remark != "original remark" {
+				t.Fatalf("updated Remark = %q", got.Remark)
+			}
+		})
+	}
 }
