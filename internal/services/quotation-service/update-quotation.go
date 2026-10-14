@@ -27,11 +27,14 @@ type UpdateQuotationResponse struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-// updateQuotationSalePerson writes sale_person_code with Update (not Updates
-// with a struct), so an empty string is written too instead of being skipped
-// as a zero value.
-func updateQuotationSalePerson(tx *gorm.DB, id uuid.UUID, code string) error {
-	return tx.Model(&models.Quotation{}).Where("id = ?", id).Update("sale_person_code", code).Error
+// updateQuotationClearableFields writes the fields a user can clear back to ""
+// with Updates(map) (not Updates with a struct), so an empty string is written
+// too instead of being skipped as a zero value.
+func updateQuotationClearableFields(tx *gorm.DB, quotation models.Quotation) error {
+	return tx.Model(&models.Quotation{}).Where("id = ?", quotation.ID).Updates(map[string]interface{}{
+		"sale_person_code": quotation.SalePersonCode,
+		"ref_po_doc":       quotation.RefPoDoc,
+	}).Error
 }
 
 func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -239,9 +242,9 @@ func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 
 		// GORM's struct Updates() skips zero-value fields, so it never clears
-		// sale_person_code back to "" (allow-clear, or switching the customer
-		// clears the sales person). Write it explicitly, every time.
-		if err := updateQuotationSalePerson(tx, quotation.ID, quotation.SalePersonCode); err != nil {
+		// sale_person_code / ref_po_doc back to "" (allow-clear, or switching the
+		// customer clears the sales person). Write them explicitly, every time.
+		if err := updateQuotationClearableFields(tx, quotation); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
 		}
