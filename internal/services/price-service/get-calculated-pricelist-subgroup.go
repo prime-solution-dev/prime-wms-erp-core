@@ -130,6 +130,11 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 	siteCodeSet := make(map[string]bool)
 
 	for _, subGroup := range subGroups {
+		// subgroup ที่ไม่คำนวณใหม่ไม่ต้องใช้ข้อมูลสต็อก
+		if !subGroup.NeedRecalculate {
+			continue
+		}
+
 		// Collect company code and site code
 		if subGroup.PriceListGroup.CompanyCode != "" {
 			companyCodeSet[subGroup.PriceListGroup.CompanyCode] = true
@@ -205,6 +210,11 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		// Capture the current database values as "before" values
 		beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit
 		beforeTotalNetPriceWeight := subGroup.TotalNetPriceWeight
+
+		if !subGroup.NeedRecalculate {
+			responseData = append(responseData, unchangedCalculatedItem(subGroup))
+			continue
+		}
 
 		priceListFormulas := formulasMap[subGroup.SubGroupCode]
 		// Initialize calculated values with current values
@@ -333,4 +343,19 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		Message: "Price calculations retrieved successfully",
 		Data:    responseData,
 	}, nil
+}
+
+// unchangedCalculatedItem คืนราคาปัจจุบันใน DB เป็นทั้ง before และ after
+// ใช้กับ subgroup ที่ราคา group ยังไม่ถูกแก้ตั้งแต่ save หน้า detail ครั้งล่าสุด
+// default_uom และ weight_spec ไม่ส่งกลับ (omitempty หรือ 0) หน้า detail จะคงค่าเดิมไว้
+func unchangedCalculatedItem(subGroup *models.PriceListSubGroup) models.GetCalculatedPriceListSubGroupItem {
+	return models.GetCalculatedPriceListSubGroupItem{
+		SubGroupID:                subGroup.ID.String(),
+		TotalNetPriceUnit:         subGroup.TotalNetPriceUnit,
+		TotalNetPriceWeight:       subGroup.TotalNetPriceWeight,
+		ExtraPriceUnit:            subGroup.ExtraPriceUnit,
+		ExtraPriceWeight:          subGroup.ExtraPriceWeight,
+		BeforeTotalNetPriceUnit:   subGroup.TotalNetPriceUnit,
+		BeforeTotalNetPriceWeight: subGroup.TotalNetPriceWeight,
+	}
 }
