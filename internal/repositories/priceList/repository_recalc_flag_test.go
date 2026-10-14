@@ -68,6 +68,22 @@ func TestUpdatePriceListBase_NeedRecalculate(t *testing.T) {
 
 		require.False(t, needRecalculate(t, gormx, subGroup.ID))
 	})
+
+	t.Run("failed update rolls back the flag", func(t *testing.T) {
+		seed := seedBaseGroup(t, gormx, "RECALC_ROLLBACK")
+		subGroup := seedRecalcSubGroup(t, gormx, seed.ID, false)
+
+		payload := payloadFrom(seed)
+		payload.PriceWeight = 110
+		// term ซ้ำ ID เดียวกัน → insert ตัวที่สองชน primary key ภายใน transaction
+		payload.PriceListGroupTerms = append(payload.PriceListGroupTerms, payload.PriceListGroupTerms[0])
+
+		_, err := UpdatePriceListBase([]models.PriceListGroup{payload})
+		require.Error(t, err)
+
+		require.False(t, needRecalculate(t, gormx, subGroup.ID), "flag ต้อง rollback ไปกับ transaction")
+		require.Equal(t, 100.0, reloadGroup(t, gormx, seed.ID).PriceWeight)
+	})
 }
 
 func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
