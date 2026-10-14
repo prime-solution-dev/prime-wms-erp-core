@@ -106,3 +106,27 @@ func TestUpdateQuotationRefPoDocSetsNonEmptyValue(t *testing.T) {
 		t.Errorf("UPDATE ต้องตั้งค่า ref_po_doc ที่ส่งมา: %s", sql)
 	}
 }
+
+// ใบที่ยกเลิกแล้ว (เช่นถูก revise ไปเป็น -R1) หรือแปลงเป็น SO แล้ว ห้าม UpdateQuotation ทับ
+// เคสจริง QU202610-0057 (2026-10-14): แท็บเก่ากด Submit หลัง revise ใบเดิมเลยกลับเป็น PENDING
+// คู่กับ -R1 เพราะหน้าบ้านส่ง status = PENDING มาตายตัว
+func TestCheckQuotationUpdatableRejectsClosedStatus(t *testing.T) {
+	for _, status := range []string{"CANCELED", "COMPLETED"} {
+		err := checkQuotationUpdatable("QU-1", status)
+		if err == nil {
+			t.Errorf("status %s ต้องถูกปฏิเสธ", status)
+			continue
+		}
+		if !strings.Contains(err.Error(), "QU-1") {
+			t.Errorf("error ต้องบอกเลขใบ: %v", err)
+		}
+	}
+}
+
+func TestCheckQuotationUpdatableAllowsOpenStatus(t *testing.T) {
+	for _, status := range []string{"TEMP", "PENDING"} {
+		if err := checkQuotationUpdatable("QU-1", status); err != nil {
+			t.Errorf("status %s ต้องแก้ได้ ได้ error %v", status, err)
+		}
+	}
+}

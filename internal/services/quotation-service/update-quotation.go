@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UpdateQuotationRequest struct {
@@ -35,6 +36,20 @@ func updateQuotationClearableFields(tx *gorm.DB, quotation models.Quotation) err
 		"sale_person_code": quotation.SalePersonCode,
 		"ref_po_doc":       quotation.RefPoDoc,
 	}).Error
+}
+
+// checkQuotationUpdatable ด่านเดียวกับ ReviseQuotation ใบที่ยกเลิกแล้วหรือแปลงเป็น SO แล้ว
+// ห้ามเขียนทับ เพราะหน้าบ้านส่ง status = PENDING มาตายตัว ถ้าปล่อยผ่าน ใบที่ถูก revise
+// ไปแล้วจะฟื้นกลับมาเป็น PENDING คู่กับใบ -R ใหม่ (เคส QU202610-0057 จากแท็บเก่า)
+func checkQuotationUpdatable(quotationCode string, status string) error {
+	switch status {
+	case "CANCELED":
+		return fmt.Errorf("quotation %s is canceled and cannot be updated", quotationCode)
+	case "COMPLETED":
+		return fmt.Errorf("quotation %s already converted to a sale order and cannot be updated", quotationCode)
+	}
+
+	return nil
 }
 
 func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -234,6 +249,22 @@ func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 
 	// Update quotations
 	for _, quotation := range updateQuotations {
+		// อ่านสถานะสดพร้อม lock แถว ถ้า ReviseQuotation ยกเลิกใบนี้ไปพร้อมกัน
+		// จะรอจน revise commit แล้วเห็น CANCELED
+		var current models.Quotation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("status").
+			Where("id = ?", quotation.ID).
+			Take(&current).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("quotation %s not found: %v", quotation.QuotationCode, err)
+		}
+
+		if err := checkQuotationUpdatable(quotation.QuotationCode, current.Status); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
 		if err := tx.Model(&models.Quotation{}).
 			Where("id = ?", quotation.ID).
 			Updates(quotation).Error; err != nil {
