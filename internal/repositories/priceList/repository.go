@@ -5,6 +5,7 @@ import (
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -572,8 +573,13 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 
 			// Handle price unit and price weight fields
 			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
+			// before_* ถูกใส่เฉพาะ field ราคาที่เปลี่ยนจริง จึงใช้เป็นตัวบอกว่าราคาเปลี่ยน
+			priceChanged := false
 			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
 				updateMap[k] = v
+				if strings.HasPrefix(k, "before_") {
+					priceChanged = true
+				}
 			}
 
 			if req.EffectiveDate != nil {
@@ -584,7 +590,8 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["remark"] = *req.Remark
 			}
 
-			if reqs.ClearRecalculate {
+			// ล้าง flag เฉพาะเมื่อราคาเปลี่ยนจริง แก้แค่ remark/udf_json/is_trading/effective_date ไม่นับ
+			if reqs.ClearRecalculate && priceChanged {
 				updateMap["need_recalculate"] = false
 			}
 

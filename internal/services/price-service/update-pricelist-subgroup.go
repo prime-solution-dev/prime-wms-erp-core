@@ -66,7 +66,7 @@ func UpdatePriceListSubGroup(ctx context.Context, jsonPayload string) (interface
 		return nil, err
 	}
 
-	// save จากหน้า detail = ใช้ราคาที่คำนวณใหม่แล้ว จึงล้าง need_recalculate
+	// save จากหน้า detail = ใช้ราคาที่คำนวณใหม่แล้ว จึงล้าง need_recalculate (repo ล้างเฉพาะ subgroup ที่ราคาเปลี่ยนจริง)
 	req.ClearRecalculate = true
 
 	// Call repository function (batch)
