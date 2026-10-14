@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"prime-erp-core/internal/models"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	gormtests "gorm.io/gorm/utils/tests"
@@ -29,7 +31,7 @@ func dryRunDB(t *testing.T) (*gorm.DB, *[]string) {
 	return db, statements
 }
 
-// updateQuotationSalePerson ต้องเขียน sale_person_code แม้ค่าจะเป็น "" (ล้าง Sales Person)
+// updateQuotationClearableFields ต้องเขียน sale_person_code แม้ค่าจะเป็น "" (ล้าง Sales Person)
 //
 // เดิม UpdateQuotation ใช้ tx.Model(...).Updates(quotation) แบบส่ง struct — GORM ข้าม
 // zero-value field โดยอัตโนมัติ ทำให้กด allow-clear หรือเปลี่ยนลูกค้าแล้ว sale_person_code
@@ -38,8 +40,8 @@ func TestUpdateQuotationSalePersonClearsToEmptyString(t *testing.T) {
 	db, statements := dryRunDB(t)
 	id := uuid.New()
 
-	if err := updateQuotationSalePerson(db, id, ""); err != nil {
-		t.Fatalf("updateQuotationSalePerson error = %v", err)
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: id}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
 	}
 
 	if len(*statements) != 1 {
@@ -60,8 +62,8 @@ func TestUpdateQuotationSalePersonSetsNonEmptyValue(t *testing.T) {
 	db, statements := dryRunDB(t)
 	id := uuid.New()
 
-	if err := updateQuotationSalePerson(db, id, "U1"); err != nil {
-		t.Fatalf("updateQuotationSalePerson error = %v", err)
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: id, SalePersonCode: "U1"}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
 	}
 
 	if len(*statements) != 1 {
@@ -71,5 +73,36 @@ func TestUpdateQuotationSalePersonSetsNonEmptyValue(t *testing.T) {
 	sql := (*statements)[0]
 	if !strings.Contains(sql, "sale_person_code") || !strings.Contains(sql, "U1") {
 		t.Errorf("UPDATE ต้องตั้งค่าที่ส่งมา: %s", sql)
+	}
+}
+
+// ref_po_doc ล้างเป็นค่าว่างได้ (ลบเลข PO ที่กรอกผิดออก) — กติกาเดียวกับ sale_person_code
+func TestUpdateQuotationRefPoDocClearsToEmptyString(t *testing.T) {
+	db, statements := dryRunDB(t)
+	id := uuid.New()
+
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: id, SalePersonCode: "U1"}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
+	}
+
+	if len(*statements) != 1 {
+		t.Fatalf("ได้ UPDATE %d คำสั่ง want 1: %v", len(*statements), *statements)
+	}
+
+	if sql := (*statements)[0]; !strings.Contains(sql, "ref_po_doc") {
+		t.Errorf("UPDATE ไม่มีคอลัมน์ ref_po_doc แม้ค่าจะเป็นค่าว่าง: %s", sql)
+	}
+}
+
+func TestUpdateQuotationRefPoDocSetsNonEmptyValue(t *testing.T) {
+	db, statements := dryRunDB(t)
+	id := uuid.New()
+
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: id, RefPoDoc: "PO-123"}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
+	}
+
+	if sql := (*statements)[0]; !strings.Contains(sql, "ref_po_doc") || !strings.Contains(sql, "PO-123") {
+		t.Errorf("UPDATE ต้องตั้งค่า ref_po_doc ที่ส่งมา: %s", sql)
 	}
 }
