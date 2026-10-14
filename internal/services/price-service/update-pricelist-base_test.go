@@ -111,3 +111,67 @@ func TestUpdatePriceListBase_RepoErrorStopsBeforeCascade(t *testing.T) {
 		t.Fatalf("want cascade untouched on repo error, got %d calls", calls)
 	}
 }
+
+func TestUpdatePriceListBase_InvalidJSONStopsEverything(t *testing.T) {
+	calls := 0
+	withUpdateBaseStub(t, func([]models.PriceListGroup) ([]models.PriceListGroup, error) {
+		calls++
+		return nil, nil
+	})
+	withCascadeStubs(t,
+		func([]uuid.UUID) ([]string, error) { calls++; return nil, nil },
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+			calls++
+			return nil, nil
+		})
+
+	if _, err := UpdatePriceListBase(context.Background(), "not json"); err == nil {
+		t.Fatal("want error for invalid JSON")
+	}
+	if calls != 0 {
+		t.Fatalf("want repo and cascade untouched, got %d calls", calls)
+	}
+}
+
+func TestUpdatePriceListBase_MapsTermsToRepoPayload(t *testing.T) {
+	id, termID := uuid.New(), uuid.New()
+	var sent []models.PriceListGroup
+	withUpdateBaseStub(t, func(groups []models.PriceListGroup) ([]models.PriceListGroup, error) {
+		sent = groups
+		return nil, nil
+	})
+	withCascadeStubs(t,
+		func([]uuid.UUID) ([]string, error) { return nil, nil },
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+			return nil, nil
+		})
+
+	payload := fmt.Sprintf(`[{"id":"%s","price_weight":100,"terms":[{"id":"%s","term_code":"T30","pdc_percent":2,"due_percent":3}]}]`, id, termID)
+	if _, err := UpdatePriceListBase(context.Background(), payload); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sent) != 1 || len(sent[0].PriceListGroupTerms) != 1 {
+		t.Fatalf("want 1 group with 1 term, got %+v", sent)
+	}
+	term := sent[0].PriceListGroupTerms[0]
+	if term.ID != termID || term.PriceListGroupID != id || term.TermCode != "T30" || term.PdcPercent != 2 || term.DuePercent != 3 {
+		t.Fatalf("term not mapped correctly: %+v", term)
+	}
+}
+
+func TestUpdatePriceListBase_CascadeErrorIsReturned(t *testing.T) {
+	id := uuid.New()
+	withUpdateBaseStub(t, func(groups []models.PriceListGroup) ([]models.PriceListGroup, error) {
+		return groups, nil
+	})
+	cascadeErr := errors.New("cascade boom")
+	withCascadeStubs(t,
+		func([]uuid.UUID) ([]string, error) { return []string{"G"}, nil },
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+			return nil, cascadeErr
+		})
+
+	if _, err := UpdatePriceListBase(context.Background(), basePayload(id)); !errors.Is(err, cascadeErr) {
+		t.Fatalf("want wrapped cascade error, got %v", err)
+	}
+}

@@ -150,4 +150,23 @@ func TestUpdatePriceListBase_Integration(t *testing.T) {
 		require.Equal(t, int64(0), historyCount(t, gormx, "BASE_MIX_SAME"))
 		require.Equal(t, int64(1), historyCount(t, gormx, "BASE_MIX_EDIT"))
 	})
+
+	t.Run("failed term insert rolls back the whole update", func(t *testing.T) {
+		seed := seedBaseGroup(t, gormx, "BASE_ROLLBACK")
+		other := seedBaseGroup(t, gormx, "BASE_ROLLBACK_OTHER")
+		payload := payloadFrom(seed)
+		payload.PriceWeight = 150
+		// ใช้ term ID ของอีก group → PK ชนตอน insert (delete ลบเฉพาะ term ของ group นี้)
+		payload.PriceListGroupTerms[0].ID = other.PriceListGroupTerms[0].ID
+
+		changed, err := UpdatePriceListBase([]models.PriceListGroup{payload})
+		require.Error(t, err)
+		require.Nil(t, changed)
+
+		require.Equal(t, int64(0), historyCount(t, gormx, "BASE_ROLLBACK"))
+		got := reloadGroup(t, gormx, seed.ID)
+		require.Equal(t, 100.0, got.PriceWeight)
+		require.Equal(t, "seed", got.UpdateBy)
+		require.Len(t, got.PriceListGroupTerms, 1, "original term must survive the rollback")
+	})
 }
