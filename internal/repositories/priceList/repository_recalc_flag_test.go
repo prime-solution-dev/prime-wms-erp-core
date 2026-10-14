@@ -69,3 +69,36 @@ func TestUpdatePriceListBase_NeedRecalculate(t *testing.T) {
 		require.False(t, needRecalculate(t, gormx, subGroup.ID))
 	})
 }
+
+func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	require.NoError(t, err)
+	defer db.CloseGORM(gormx)
+
+	price := 50.0
+
+	t.Run("detail save clears the flag", func(t *testing.T) {
+		seed := seedBaseGroup(t, gormx, "RECALC_CLEAR")
+		subGroup := seedRecalcSubGroup(t, gormx, seed.ID, true)
+
+		err := UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{
+			Changes:          []models.UpdatePriceListSubGroupItem{{SubGroupID: subGroup.ID, TotalNetPriceWeight: &price}},
+			ClearRecalculate: true,
+		})
+		require.NoError(t, err)
+
+		require.False(t, needRecalculate(t, gormx, subGroup.ID))
+	})
+
+	t.Run("cascade keeps the flag", func(t *testing.T) {
+		seed := seedBaseGroup(t, gormx, "RECALC_CASCADE")
+		subGroup := seedRecalcSubGroup(t, gormx, seed.ID, true)
+
+		err := UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{
+			Changes: []models.UpdatePriceListSubGroupItem{{SubGroupID: subGroup.ID, TotalNetPriceWeight: &price}},
+		})
+		require.NoError(t, err)
+
+		require.True(t, needRecalculate(t, gormx, subGroup.ID), "cascade ต้องไม่ล้าง flag")
+	})
+}

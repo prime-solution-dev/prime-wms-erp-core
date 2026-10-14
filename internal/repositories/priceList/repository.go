@@ -584,6 +584,10 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 				updateMap["remark"] = *req.Remark
 			}
 
+			if reqs.ClearRecalculate {
+				updateMap["need_recalculate"] = false
+			}
+
 			updateMap["update_by"] = "system" // TODO: get user from auth
 			updateMap["update_dtm"] = now
 

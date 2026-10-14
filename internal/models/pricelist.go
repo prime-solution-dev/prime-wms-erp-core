@@ -457,6 +457,11 @@ type UpdatePriceListSubGroupItem struct {
 type UpdatePriceListSubGroupRequest struct {
 	SiteCode string                        `json:"site_code"`
 	Changes  []UpdatePriceListSubGroupItem `json:"changes" binding:"required,dive"`
+
+	// ClearRecalculate ล้าง need_recalculate ของ subgroup ใน Changes
+	// ตั้งค่าได้เฉพาะจาก service ของหน้า detail ส่วน cascade ต้องไม่ล้าง
+	// json:"-" กันไม่ให้ client ส่งค่านี้มาเอง
+	ClearRecalculate bool `json:"-"`
 }
 
 type UpdateLatestPriceListSubGroupRequest struct {
