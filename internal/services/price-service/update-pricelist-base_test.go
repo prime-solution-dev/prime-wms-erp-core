@@ -99,7 +99,10 @@ func TestUpdatePriceListBase_RepoErrorStopsBeforeCascade(t *testing.T) {
 	calls := 0
 	withCascadeStubs(t,
 		func([]uuid.UUID) ([]string, error) { calls++; return nil, nil },
-		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) { calls++; return nil, nil })
+		func(context.Context, models.UpdateLatestPriceListSubGroupRequest) (interface{}, error) {
+			calls++
+			return nil, nil
+		})
 
 	if _, err := UpdatePriceListBase(context.Background(), basePayload(uuid.New())); !errors.Is(err, repoErr) {
 		t.Fatalf("want repo error, got %v", err)
