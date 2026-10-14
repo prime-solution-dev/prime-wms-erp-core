@@ -66,6 +66,9 @@ func UpdatePriceListSubGroup(ctx context.Context, jsonPayload string) (interface
 		return nil, err
 	}
 
+	// save จากหน้า detail = ใช้ราคาที่คำนวณใหม่แล้ว จึงล้าง need_recalculate
+	req.ClearRecalculate = true
+
 	// Call repository function (batch)
 	if err := updateSubGroupFunc(req); err != nil {
 		return nil, fmt.Errorf("failed to update price list sub group: %w", err)
