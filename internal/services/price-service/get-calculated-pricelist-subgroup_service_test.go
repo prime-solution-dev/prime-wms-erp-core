@@ -105,8 +105,9 @@ func TestGetCalculatedPriceListSubGroup_RespectsRecalculateFlag(t *testing.T) {
 
 	// flag = true: คำนวณใหม่ตามสูตร before = after เดิมใน DB
 	got := items[flagged.ID.String()]
-	assert.NotEqual(t, 45.0, got.TotalNetPriceWeight, "flag=true ต้องคำนวณใหม่")
-	assert.NotEqual(t, 90.0, got.TotalNetPriceUnit, "flag=true ต้องคำนวณใหม่")
+	// สูตร base_price + extra: kg = 50 + 5, pcs = 100 + 2
+	assert.Equal(t, 55.0, got.TotalNetPriceWeight, "flag=true ต้องคำนวณใหม่")
+	assert.Equal(t, 102.0, got.TotalNetPriceUnit, "flag=true ต้องคำนวณใหม่")
 	assert.Equal(t, 45.0, got.BeforeTotalNetPriceWeight)
 	assert.Equal(t, 90.0, got.BeforeTotalNetPriceUnit)
 	assert.Equal(t, "kg", got.DefaultUom)
@@ -162,8 +163,8 @@ func TestGetCalculatedPriceListSubGroup_DependencyErrors(t *testing.T) {
 	sg := calcSubGroup(true)
 
 	cases := map[string]struct {
-		payload map[string]interface{}
-		break_  func()
+		payload  map[string]interface{}
+		sabotage func()
 	}{
 		"fetch by ids": {
 			map[string]interface{}{"subgroup_ids": []string{sg.ID.String()}},
@@ -195,7 +196,7 @@ func TestGetCalculatedPriceListSubGroup_DependencyErrors(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			stubGetCalculatedDeps(t, []models.PriceListSubGroup{sg})
-			tc.break_()
+			tc.sabotage()
 			body, _ := json.Marshal(tc.payload)
 			_, err := GetCalculatedPriceListSubGroup(context.Background(), string(body))
 			assert.ErrorIs(t, err, boom)

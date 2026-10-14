@@ -207,14 +207,14 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 	for _, subGroupID := range subGroupUUIDs {
 		subGroup := subGroupMap[subGroupID]
 
-		// Capture the current database values as "before" values
-		beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit
-		beforeTotalNetPriceWeight := subGroup.TotalNetPriceWeight
-
 		if !subGroup.NeedRecalculate {
 			responseData = append(responseData, unchangedCalculatedItem(subGroup))
 			continue
 		}
+
+		// Capture the current database values as "before" values
+		beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit
+		beforeTotalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		priceListFormulas := formulasMap[subGroup.SubGroupCode]
 		// Initialize calculated values with current values
