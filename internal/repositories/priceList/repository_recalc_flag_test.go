@@ -126,3 +126,10 @@ func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
 }
+
+func TestUpdatePriceListBase_ConnectError(t *testing.T) {
+	t.Setenv("database_gorm_url_prime_erp", "host=127.0.0.1 port=1 user=x password=x dbname=x sslmode=disable connect_timeout=1")
+
+	_, err := UpdatePriceListBase(nil)
+	require.Error(t, err)
+}
