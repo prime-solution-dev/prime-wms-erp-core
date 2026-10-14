@@ -261,6 +261,14 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) ([]models.Price
 				return err
 			}
 
+			// ราคา group เปลี่ยน → subgroup ทุกตัวต้องคำนวณใหม่ตอนกด Edit ในหน้า detail
+			// ล้างกลับเป็น false เมื่อ save หน้า detail (UpdatePriceListSubGroups + ClearRecalculate)
+			if err := tx.Model(&models.PriceListSubGroup{}).
+				Where("price_list_group_id = ?", group.ID).
+				Update("need_recalculate", true).Error; err != nil {
+				return err
+			}
+
 			// Delete old Terms
 			if termResult := tx.Where("price_list_group_id = ?", group.ID).Delete(&models.PriceListGroupTerm{}); termResult.Error != nil {
 				return termResult.Error
