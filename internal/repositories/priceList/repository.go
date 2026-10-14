@@ -261,6 +261,14 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) ([]models.Price
 				return err
 			}
 
+			// ราคา group เปลี่ยน → subgroup ทุกตัวต้องคำนวณใหม่ตอนกด Edit ในหน้า detail
+			// ล้างกลับเป็น false เมื่อ save หน้า detail (UpdatePriceListSubGroups + ClearRecalculate)
+			if err := tx.Model(&models.PriceListSubGroup{}).
+				Where("price_list_group_id = ?", group.ID).
+				Update("need_recalculate", true).Error; err != nil {
+				return err
+			}
+
 			// Delete old Terms
 			if termResult := tx.Where("price_list_group_id = ?", group.ID).Delete(&models.PriceListGroupTerm{}); termResult.Error != nil {
 				return termResult.Error
@@ -564,7 +572,9 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 
 			// Handle price unit and price weight fields
 			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
-			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
+			// map มีเฉพาะ field ราคาที่ persist และ request ส่งมา จึงไม่ว่าง = ส่งราคามา (แม้เท่าเดิม)
+			priceUpdates := buildSubGroupUpdateMap(oldSubGroup, req)
+			for k, v := range priceUpdates {
 				updateMap[k] = v
 			}
 
@@ -574,6 +584,12 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 
 			if req.Remark != nil {
 				updateMap["remark"] = *req.Remark
+			}
+
+			// ล้าง flag เมื่อส่ง field ราคาที่ persist มาอย่างน้อยหนึ่งตัว แม้ค่าเท่า DB
+			// (ราคาที่คำนวณใหม่ได้เท่าเดิมต้องไม่ค้าง flag) แก้แค่ remark/udf_json/is_trading/effective_date ไม่นับ
+			if reqs.ClearRecalculate && len(priceUpdates) > 0 {
+				updateMap["need_recalculate"] = false
 			}
 
 			updateMap["update_by"] = "system" // TODO: get user from auth

@@ -123,7 +123,8 @@ func createSchema() error {
             create_dtm timestamp,
             update_by text,
             update_dtm timestamp,
-            udf_json json NULL
+            udf_json json NULL,
+            need_recalculate boolean NOT NULL DEFAULT false
         );`,
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group_history (
             id uuid PRIMARY KEY,
