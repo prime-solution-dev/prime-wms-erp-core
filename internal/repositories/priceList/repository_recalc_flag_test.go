@@ -101,4 +101,12 @@ func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
 
 		require.True(t, needRecalculate(t, gormx, subGroup.ID), "cascade ต้องไม่ล้าง flag")
 	})
+
+	t.Run("unknown subgroup returns not found", func(t *testing.T) {
+		err := UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{
+			Changes:          []models.UpdatePriceListSubGroupItem{{SubGroupID: uuid.New(), TotalNetPriceWeight: &price}},
+			ClearRecalculate: true,
+		})
+		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
 }
