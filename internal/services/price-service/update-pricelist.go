@@ -18,6 +18,7 @@ import (
 // seams for unit testing: allow stubbing the cascade dependencies
 var getPriceListGroupCodesByIDsFunc = priceListRepository.GetPriceListGroupCodesByIDs
 var runUpdateLatestSubGroupFunc = RunUpdateLatestPriceListSubGroup
+var updatePriceListBaseFunc = priceListRepository.UpdatePriceListBase
 
 // seam for unit testing: allow stubbing UpdateExtras' repository write so a test can
 // capture what CreateBy/UpdateBy landed in the model without touching the database
@@ -71,7 +72,8 @@ func UpdatePriceListBase(ctx context.Context, jsonPayload string) (interface{}, 
 
 	}
 
-	if _, err := priceListRepository.UpdatePriceListBase(priceListGroup); err != nil {
+	changedGroups, err := updatePriceListBaseFunc(priceListGroup)
+	if err != nil {
 		return nil, err
 	}
 
@@ -84,7 +86,9 @@ func UpdatePriceListBase(ctx context.Context, jsonPayload string) (interface{}, 
 	// this cascade is still running, cancelling ctx would abandon it mid-way and
 	// leave price_list_sub_group stale relative to the base price that already
 	// landed — so this part must outlive the request.
-	if err := cascadeBasePriceToSubGroups(postCommitContext(ctx), priceListGroup); err != nil {
+	// cascade เฉพาะ group ที่เปลี่ยนจริง — group ที่ Adjust Price = 0 / ค่าเดิม
+	// ต้องไม่ถูกคำนวณ subgroup/detail ใหม่
+	if err := cascadeBasePriceToSubGroups(postCommitContext(ctx), changedGroups); err != nil {
 		return nil, err
 	}
 
