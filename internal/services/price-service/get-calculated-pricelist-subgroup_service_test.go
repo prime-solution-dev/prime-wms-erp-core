@@ -254,6 +254,50 @@ func TestGetCalculatedPriceListSubGroup_InvalidExpressionReturnsError(t *testing
 	assert.Error(t, err)
 }
 
+func TestGetCalculatedPriceListSubGroup_NothingFlaggedSkipsLoaders(t *testing.T) {
+	unflagged := calcSubGroup(false)
+	stubGetCalculatedDeps(t, []models.PriceListSubGroup{unflagged})
+	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func([]string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+		t.Fatal("formula loader must not be called when nothing is flagged")
+		return nil, nil
+	}
+	loadGroupItemValueIntsFunc = func([]models.PriceListSubGroup) (groupItemValueInts, error) {
+		t.Fatal("group item loader must not be called when nothing is flagged")
+		return nil, nil
+	}
+
+	items := getCalculated(t, map[string]interface{}{"subgroup_ids": []string{unflagged.ID.String()}})
+	assert.Equal(t, unchangedCalculatedItem(&unflagged), items[unflagged.ID.String()])
+}
+
+func TestGetCalculatedPriceListSubGroup_MixedLoadsFlaggedOnly(t *testing.T) {
+	flagged := calcSubGroup(true)
+	unflagged := calcSubGroup(false)
+	unflagged.SubGroupCode = "SUB_UNFLAGGED"
+	stubGetCalculatedDeps(t, []models.PriceListSubGroup{flagged, unflagged})
+
+	var gotCodes []string
+	var gotSubGroups []uuid.UUID
+	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func(codes []string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+		gotCodes = codes
+		return map[string][]models.PriceListSubGroupFormulasMap{"SUB001": {calcFormula("F_KG", "kg")}}, nil
+	}
+	loadGroupItemValueIntsFunc = func(sgs []models.PriceListSubGroup) (groupItemValueInts, error) {
+		for _, sg := range sgs {
+			gotSubGroups = append(gotSubGroups, sg.ID)
+		}
+		return groupItemValueInts{}, nil
+	}
+
+	items := getCalculated(t, map[string]interface{}{
+		"subgroup_ids": []string{flagged.ID.String(), unflagged.ID.String()},
+	})
+	assert.Equal(t, []string{"SUB001"}, gotCodes)
+	assert.Equal(t, []uuid.UUID{flagged.ID}, gotSubGroups)
+	assert.Equal(t, 55.0, items[flagged.ID.String()].TotalNetPriceWeight)
+	assert.Equal(t, unchangedCalculatedItem(&unflagged), items[unflagged.ID.String()])
+}
+
 // benchSubGroups สร้าง subgroup จำลองขนาด n โดยมี formula code วน 20 แบบ และ key 3 ตัวต่อ subgroup
 func benchSubGroups(n int, flagged bool) []models.PriceListSubGroup {
 	subGroups := make([]models.PriceListSubGroup, n)
