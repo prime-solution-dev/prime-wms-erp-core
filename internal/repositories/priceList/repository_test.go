@@ -201,6 +201,37 @@ func createSchema() error {
             is_default boolean DEFAULT false,
             create_dtm timestamp
         );`,
+		`CREATE TABLE IF NOT EXISTS price_list_group_term (
+            id uuid PRIMARY KEY,
+            price_list_group_id uuid REFERENCES price_list_group(id),
+            term_code text,
+            pdc double precision,
+            pdc_percent double precision,
+            due double precision,
+            due_percent double precision,
+            create_by text,
+            create_dtm timestamp NULL,
+            update_by text,
+            update_dtm timestamp NULL
+        );`,
+		`CREATE TABLE IF NOT EXISTS price_list_group_history (
+            id uuid PRIMARY KEY,
+            company_code text,
+            site_code text,
+            group_code text,
+            price_unit double precision,
+            price_weight double precision,
+            before_price_unit double precision,
+            before_price_weight double precision,
+            currency text,
+            effective_date timestamp NULL,
+            expiry_date timestamp NULL,
+            remark text,
+            create_by text,
+            create_dtm timestamp,
+            update_by text,
+            update_dtm timestamp
+        );`,
 	}
 
 	for _, s := range stmts {
