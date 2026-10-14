@@ -256,7 +256,13 @@ func TestGetCalculatedPriceListSubGroup_InvalidExpressionReturnsError(t *testing
 
 func TestGetCalculatedPriceListSubGroup_NothingFlaggedSkipsLoaders(t *testing.T) {
 	unflagged := calcSubGroup(false)
+	// มี key จึงเรียก inventory ได้ถ้าไม่มี early return
+	unflagged.PriceListSubGroupKeys = []models.PriceListSubGroupKey{{SubGroupID: unflagged.ID, Code: "SIZE", Value: "1", Seq: 1}}
 	stubGetCalculatedDeps(t, []models.PriceListSubGroup{unflagged})
+	getInventoryWeightByKeyFunc = func(context.Context, string, []string, []externalService.InventoryByProductCodeKeyValue) ([]externalService.InventoryByProductCodeResponse, error) {
+		t.Fatal("inventory loader must not be called when nothing is flagged")
+		return nil, nil
+	}
 	getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func([]string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
 		t.Fatal("formula loader must not be called when nothing is flagged")
 		return nil, nil

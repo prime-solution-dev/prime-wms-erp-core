@@ -120,7 +120,7 @@ func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
 		require.True(t, needRecalculate(t, gormx, subGroup.ID), "ไม่ได้แก้ราคา ต้องไม่ล้าง flag")
 	})
 
-	t.Run("unchanged price values keep the flag", func(t *testing.T) {
+	t.Run("price fields sent but equal to DB clear the flag", func(t *testing.T) {
 		seed := seedBaseGroup(t, gormx, "RECALC_SAME_PRICE")
 		subGroup := seedRecalcSubGroup(t, gormx, seed.ID, true)
 		same := subGroup.TotalNetPriceWeight
@@ -136,7 +136,52 @@ func TestUpdatePriceListSubGroups_ClearRecalculate(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.True(t, needRecalculate(t, gormx, subGroup.ID), "ส่งราคาเท่าเดิม ต้องไม่ล้าง flag")
+		require.False(t, needRecalculate(t, gormx, subGroup.ID), "ราคาที่คำนวณใหม่เท่าเดิมก็ต้องล้าง flag")
+	})
+
+	t.Run("one request clears only subgroups with price sent", func(t *testing.T) {
+		seed := seedBaseGroup(t, gormx, "RECALC_MIXED")
+		priced := seedRecalcSubGroup(t, gormx, seed.ID, true)
+		remarked := seedRecalcSubGroup(t, gormx, seed.ID, true)
+		remark := "แก้แค่ remark"
+
+		err := UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{
+			Changes: []models.UpdatePriceListSubGroupItem{
+				{SubGroupID: priced.ID, TotalNetPriceWeight: &price},
+				{SubGroupID: remarked.ID, Remark: &remark},
+			},
+			ClearRecalculate: true,
+		})
+		require.NoError(t, err)
+
+		require.False(t, needRecalculate(t, gormx, priced.ID))
+		require.True(t, needRecalculate(t, gormx, remarked.ID))
+	})
+
+	t.Run("non-price fields keep the flag", func(t *testing.T) {
+		isTrading := true
+		effective := time.Now().UTC()
+		cases := map[string]func(*models.UpdatePriceListSubGroupItem){
+			"udf_json":       func(it *models.UpdatePriceListSubGroupItem) { it.UdfJson = []byte(`{"k":"v"}`) },
+			"is_trading":     func(it *models.UpdatePriceListSubGroupItem) { it.IsTrading = &isTrading },
+			"effective_date": func(it *models.UpdatePriceListSubGroupItem) { it.EffectiveDate = &effective },
+		}
+		for name, edit := range cases {
+			t.Run(name, func(t *testing.T) {
+				seed := seedBaseGroup(t, gormx, "RECALC_NONPRICE_"+name)
+				subGroup := seedRecalcSubGroup(t, gormx, seed.ID, true)
+				item := models.UpdatePriceListSubGroupItem{SubGroupID: subGroup.ID}
+				edit(&item)
+
+				err := UpdatePriceListSubGroups(models.UpdatePriceListSubGroupRequest{
+					Changes:          []models.UpdatePriceListSubGroupItem{item},
+					ClearRecalculate: true,
+				})
+				require.NoError(t, err)
+
+				require.True(t, needRecalculate(t, gormx, subGroup.ID), "แก้ %s อย่างเดียว ต้องไม่ล้าง flag", name)
+			})
+		}
 	})
 
 	t.Run("cascade keeps the flag", func(t *testing.T) {
