@@ -185,14 +185,19 @@ func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
 }
 
 // UpdatePriceListGroup
-func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
+//
+// คืนเฉพาะ group ที่เปลี่ยนจริง — group ที่ราคาและ term % เท่าเดิม (เช่น Adjust Price = 0)
+// จะถูกข้ามทั้งหมด ไม่เขียน history ไม่ทับ before_* และไม่ลบ/สร้าง terms ใหม่
+// ผู้เรียกใช้รายการที่คืนไปเป็นตัวกำหนดว่าต้อง cascade subgroup ไหน
+func UpdatePriceListBase(priceListGroup []models.PriceListGroup) ([]models.PriceListGroup, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
-	return gormx.Transaction(func(tx *gorm.DB) error {
+	changed := []models.PriceListGroup{}
+	err = gormx.Transaction(func(tx *gorm.DB) error {
 		for _, group := range priceListGroup {
 			oldPriceListGroup := models.PriceListGroup{}
 
@@ -202,6 +207,16 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 				Error; err != nil {
 				return err
 			}
+
+			oldTerms := []models.PriceListGroupTerm{}
+			if err := tx.Where("price_list_group_id = ?", group.ID).Find(&oldTerms).Error; err != nil {
+				return err
+			}
+
+			if isBasePriceUnchanged(oldPriceListGroup, oldTerms, group) {
+				continue
+			}
+			changed = append(changed, group)
 
 			now := time.Now().UTC()
 
@@ -262,6 +277,11 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return changed, nil
 }
 
 // UpdateExtra

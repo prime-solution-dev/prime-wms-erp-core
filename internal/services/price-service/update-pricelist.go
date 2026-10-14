@@ -71,7 +71,7 @@ func UpdatePriceListBase(ctx context.Context, jsonPayload string) (interface{}, 
 
 	}
 
-	if err := priceListRepository.UpdatePriceListBase(priceListGroup); err != nil {
+	if _, err := priceListRepository.UpdatePriceListBase(priceListGroup); err != nil {
 		return nil, err
 	}
 
