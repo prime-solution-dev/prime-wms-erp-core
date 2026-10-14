@@ -184,7 +184,7 @@ func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
 	})
 }
 
-// UpdatePriceListGroup
+// UpdatePriceListBase
 //
 // คืนเฉพาะ group ที่เปลี่ยนจริง — group ที่ราคาและ term % เท่าเดิม (เช่น Adjust Price = 0)
 // จะถูกข้ามทั้งหมด ไม่เขียน history ไม่ทับ before_* และไม่ลบ/สร้าง terms ใหม่

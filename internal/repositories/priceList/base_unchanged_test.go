@@ -52,3 +52,22 @@ func TestIsBasePriceUnchanged(t *testing.T) {
 		})
 	}
 }
+
+func TestIsBasePriceUnchanged_DuplicateOldTermCode(t *testing.T) {
+	old := models.PriceListGroup{PriceUnit: 1, PriceWeight: 100}
+	oldTerms := []models.PriceListGroupTerm{
+		{TermCode: "T30", PdcPercent: 5},
+		{TermCode: "T30", PdcPercent: 2},
+	}
+	group := models.PriceListGroup{
+		PriceUnit:   1,
+		PriceWeight: 100,
+		PriceListGroupTerms: []models.PriceListGroupTerm{
+			{TermCode: "T30", PdcPercent: 2},
+			{TermCode: "T30", PdcPercent: 2},
+		},
+	}
+	if isBasePriceUnchanged(old, oldTerms, group) {
+		t.Fatal("duplicate term codes in DB must not be treated as unchanged")
+	}
+}
