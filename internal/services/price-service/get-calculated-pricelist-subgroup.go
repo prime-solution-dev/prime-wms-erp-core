@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// getInventoryWeightByKeyFunc เป็น seam ให้ test/benchmark stub warehouse-core ได้
+var getInventoryWeightByKeyFunc = externalService.GetInventoryWeightByKey
+
 // GetCalculatedPriceListSubGroup calculates price list sub group values using formulas
 // and returns them without persisting to the database.
 func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -179,7 +182,7 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
+		inventoryResponse, err := getInventoryWeightByKeyFunc(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)

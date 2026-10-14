@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
+	"time"
 
+	externalService "prime-erp-core/external/warehouse-service"
 	"prime-erp-core/internal/models"
 	"prime-erp-core/internal/utils"
 
@@ -48,17 +51,19 @@ func calcFormula(code, uom string) models.PriceListSubGroupFormulasMap {
 	}
 }
 
-func stubGetCalculatedDeps(t *testing.T, subGroups []models.PriceListSubGroup) {
+func stubGetCalculatedDeps(t testing.TB, subGroups []models.PriceListSubGroup) {
 	t.Helper()
 	origByIDs := getPriceListSubGroupsByIDsFunc
 	origByGroupCodes := getPriceListSubGroupsByGroupCodesFunc
 	origFormulas := getPriceListSubGroupFormulasMapBySubGroupCodesFunc
 	origItems := loadGroupItemValueIntsFunc
+	origInventory := getInventoryWeightByKeyFunc
 	t.Cleanup(func() {
 		getPriceListSubGroupsByIDsFunc = origByIDs
 		getPriceListSubGroupsByGroupCodesFunc = origByGroupCodes
 		getPriceListSubGroupFormulasMapBySubGroupCodesFunc = origFormulas
 		loadGroupItemValueIntsFunc = origItems
+		getInventoryWeightByKeyFunc = origInventory
 	})
 
 	getPriceListSubGroupsByIDsFunc = func([]uuid.UUID) ([]models.PriceListSubGroup, error) {
@@ -74,6 +79,9 @@ func stubGetCalculatedDeps(t *testing.T, subGroups []models.PriceListSubGroup) {
 	}
 	loadGroupItemValueIntsFunc = func([]models.PriceListSubGroup) (groupItemValueInts, error) {
 		return groupItemValueInts{}, nil
+	}
+	getInventoryWeightByKeyFunc = func(context.Context, string, []string, []externalService.InventoryByProductCodeKeyValue) ([]externalService.InventoryByProductCodeResponse, error) {
+		return nil, nil
 	}
 }
 
@@ -244,4 +252,86 @@ func TestGetCalculatedPriceListSubGroup_InvalidExpressionReturnsError(t *testing
 	body, _ := json.Marshal(map[string]interface{}{"subgroup_ids": []string{sg.ID.String()}})
 	_, err := GetCalculatedPriceListSubGroup(context.Background(), string(body))
 	assert.Error(t, err)
+}
+
+// benchSubGroups สร้าง subgroup จำลองขนาด n โดยมี formula code วน 20 แบบ และ key 3 ตัวต่อ subgroup
+func benchSubGroups(n int, flagged bool) []models.PriceListSubGroup {
+	subGroups := make([]models.PriceListSubGroup, n)
+	for i := range subGroups {
+		id := uuid.New()
+		subGroups[i] = models.PriceListSubGroup{
+			ID:                  id,
+			SubGroupCode:        fmt.Sprintf("SUB_%02d", i%20),
+			ExtraPriceUnit:      2,
+			ExtraPriceWeight:    5,
+			TotalNetPriceUnit:   90,
+			TotalNetPriceWeight: 45,
+			NeedRecalculate:     flagged,
+			PriceListGroup:      models.PriceListGroup{CompanyCode: "C1", SiteCode: "S1", PriceUnit: 100, PriceWeight: 50},
+			PriceListSubGroupKeys: []models.PriceListSubGroupKey{
+				{SubGroupID: id, Code: "SIZE", Value: fmt.Sprint(i), Seq: 1},
+				{SubGroupID: id, Code: "GRADE", Value: "A", Seq: 2},
+				{SubGroupID: id, Code: "LENGTH", Value: "6M", Seq: 3},
+			},
+		}
+	}
+	return subGroups
+}
+
+// BenchmarkGetCalculatedPriceListSubGroup จำลอง latency ของ DB (5ms ต่อ query) และ
+// warehouse-core (20ms ต่อ call) แล้วนับจำนวนครั้งที่เรียก loader แต่ละตัวต่อ op
+func BenchmarkGetCalculatedPriceListSubGroup(b *testing.B) {
+	const dbLatency = 5 * time.Millisecond
+	const inventoryLatency = 20 * time.Millisecond
+
+	for _, n := range []int{50, 500, 1200} {
+		for _, flagged := range []bool{true, false} {
+			name := fmt.Sprintf("N=%d/flagged=%t", n, flagged)
+			b.Run(name, func(b *testing.B) {
+				subGroups := benchSubGroups(n, flagged)
+				ids := make([]string, n)
+				for i, sg := range subGroups {
+					ids[i] = sg.ID.String()
+				}
+				body, _ := json.Marshal(map[string]interface{}{"subgroup_ids": ids})
+
+				stubGetCalculatedDeps(b, subGroups)
+				var formulaCalls, groupItemCalls, inventoryCalls int
+				getPriceListSubGroupFormulasMapBySubGroupCodesFunc = func(codes []string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
+					formulaCalls++
+					time.Sleep(dbLatency)
+					kg, pcs := kgThenPcsFormulas()
+					kg.IsDefault = true
+					out := make(map[string][]models.PriceListSubGroupFormulasMap, len(codes))
+					for _, code := range codes {
+						// pcs อ้าง kg และมาก่อนตามลำดับ create_dtm จึงต้องผ่าน sortFormulasByDependency จริง
+						out[code] = []models.PriceListSubGroupFormulasMap{pcs, kg}
+					}
+					return out, nil
+				}
+				loadGroupItemValueIntsFunc = func([]models.PriceListSubGroup) (groupItemValueInts, error) {
+					groupItemCalls++
+					time.Sleep(dbLatency)
+					return groupItemValueInts{}, nil
+				}
+				getInventoryWeightByKeyFunc = func(_ context.Context, _ string, _ []string, keyValues []externalService.InventoryByProductCodeKeyValue) ([]externalService.InventoryByProductCodeResponse, error) {
+					inventoryCalls++
+					time.Sleep(inventoryLatency)
+					return nil, nil
+				}
+
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := GetCalculatedPriceListSubGroup(context.Background(), string(body)); err != nil {
+						b.Fatal(err)
+					}
+				}
+				b.StopTimer()
+				b.ReportMetric(float64(formulaCalls)/float64(b.N), "formulaCalls/op")
+				b.ReportMetric(float64(groupItemCalls)/float64(b.N), "groupItemCalls/op")
+				b.ReportMetric(float64(inventoryCalls)/float64(b.N), "inventoryCalls/op")
+			})
+		}
+	}
 }
