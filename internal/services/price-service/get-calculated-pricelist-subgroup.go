@@ -12,6 +12,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// getInventoryWeightByKeyFunc เป็น seam ให้ test/benchmark stub warehouse-core ได้
+var getInventoryWeightByKeyFunc = externalService.GetInventoryWeightByKey
+
 // GetCalculatedPriceListSubGroup calculates price list sub group values using formulas
 // and returns them without persisting to the database.
 func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -107,9 +110,30 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		subGroupMap[subGroups[i].ID] = &subGroups[i]
 	}
 
-	// Collect all sub group codes for batch formula fetching
-	subGroupCodes := make([]string, 0, len(subGroups))
+	// subgroup ที่ไม่ได้ flag ตอบด้วยค่าใน DB ล้วน ไม่ใช้สูตร สต็อก หรือ group item
+	// loader ทุกตัวจึงโหลดเฉพาะ subgroup ที่ flag
+	flaggedSubGroups := make([]models.PriceListSubGroup, 0, len(subGroups))
 	for _, subGroup := range subGroups {
+		if subGroup.NeedRecalculate {
+			flaggedSubGroups = append(flaggedSubGroups, subGroup)
+		}
+	}
+
+	if len(flaggedSubGroups) == 0 {
+		responseData := make([]models.GetCalculatedPriceListSubGroupItem, 0, len(subGroupUUIDs))
+		for _, subGroupID := range subGroupUUIDs {
+			responseData = append(responseData, unchangedCalculatedItem(subGroupMap[subGroupID]))
+		}
+		return models.GetCalculatedPriceListSubGroupResponse{
+			Success: true,
+			Message: "Price calculations retrieved successfully",
+			Data:    responseData,
+		}, nil
+	}
+
+	// Collect sub group codes for batch formula fetching
+	subGroupCodes := make([]string, 0, len(flaggedSubGroups))
+	for _, subGroup := range flaggedSubGroups {
 		// Include SubGroupCode in the list, even if it's empty string
 		subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
 	}
@@ -129,7 +153,7 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 	companyCodeSet := make(map[string]bool)
 	siteCodeSet := make(map[string]bool)
 
-	for _, subGroup := range subGroups {
+	for _, subGroup := range flaggedSubGroups {
 		// Collect company code and site code
 		if subGroup.PriceListGroup.CompanyCode != "" {
 			companyCodeSet[subGroup.PriceListGroup.CompanyCode] = true
@@ -174,7 +198,7 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
+		inventoryResponse, err := getInventoryWeightByKeyFunc(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -190,7 +214,7 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 
 	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
 	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
-	groupItemValues, err := loadGroupItemValueIntsFunc(subGroups)
+	groupItemValues, err := loadGroupItemValueIntsFunc(flaggedSubGroups)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load group item values: %w", err)
 	}
@@ -201,6 +225,11 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 	// Process each sub group using the maps
 	for _, subGroupID := range subGroupUUIDs {
 		subGroup := subGroupMap[subGroupID]
+
+		if !subGroup.NeedRecalculate {
+			responseData = append(responseData, unchangedCalculatedItem(subGroup))
+			continue
+		}
 
 		// Capture the current database values as "before" values
 		beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit
@@ -333,4 +362,19 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 		Message: "Price calculations retrieved successfully",
 		Data:    responseData,
 	}, nil
+}
+
+// unchangedCalculatedItem คืนราคาปัจจุบันใน DB เป็นทั้ง before และ after
+// ใช้กับ subgroup ที่ราคา group ยังไม่ถูกแก้ตั้งแต่ save หน้า detail ครั้งล่าสุด
+// default_uom และ weight_spec ไม่ส่งกลับ (omitempty หรือ 0) หน้า detail จะคงค่าเดิมไว้
+func unchangedCalculatedItem(subGroup *models.PriceListSubGroup) models.GetCalculatedPriceListSubGroupItem {
+	return models.GetCalculatedPriceListSubGroupItem{
+		SubGroupID:                subGroup.ID.String(),
+		TotalNetPriceUnit:         subGroup.TotalNetPriceUnit,
+		TotalNetPriceWeight:       subGroup.TotalNetPriceWeight,
+		ExtraPriceUnit:            subGroup.ExtraPriceUnit,
+		ExtraPriceWeight:          subGroup.ExtraPriceWeight,
+		BeforeTotalNetPriceUnit:   subGroup.TotalNetPriceUnit,
+		BeforeTotalNetPriceWeight: subGroup.TotalNetPriceWeight,
+	}
 }
