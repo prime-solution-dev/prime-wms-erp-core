@@ -140,15 +140,25 @@ stage('Fetch .env from Vault (Remote)') {
                 }
             }
         }
-        stage('Deploy Container') {
-            steps {
-                script {
-                    echo 'Deploying container on remote server...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
-                }
-            }
+stage('Deploy Container') {
+    steps {
+        script {
+            echo 'Deploying container on remote server...'
+            sh """
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    docker run -d \
+                        -p ${PORT} \
+                        --cpus=1.0 \
+                        --name ${CONTAINER_NAME} \
+                        -m 4g \
+                        --memory-swap 4g \
+                        ${IMAGE_NAME}:${env.BUILD_NUMBER} &&
+                    docker tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${IMAGE_NAME}:latest
+                '
+            """
         }
+    }
+}
 stage('Clean Up Repository') {
     steps {
         script {
