@@ -339,6 +339,10 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 		groupRecs := make([]map[string]any, 0, len(req.Groups))
 		for _, g := range req.Groups {
 			gk := groupKey(g.CompanyCode, g.SiteCode, g.GroupCode)
+			var seq any // blank/0 -> NULL so an existing seq is kept on upsert
+			if g.Seq != 0 {
+				seq = g.Seq
+			}
 			groupRecs = append(groupRecs, map[string]any{
 				"id":                  groupIDs[gk],
 				"company_code":        g.CompanyCode,
@@ -352,6 +356,7 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 				"before_price_unit":   g.BeforePriceUnit,
 				"before_price_weight": g.BeforePriceWeight,
 				"remark":              g.Remark,
+				"seq":                 seq,
 				"create_by":           g.CreateBy,
 				"create_dtm":          now,
 				"update_by":           g.UpdateBy,
@@ -507,6 +512,7 @@ func CreatePricelist(gormx *gorm.DB, req CreatePricelistRequest) (*CreatePriceli
 						"before_price_unit":   gorm.Expr("COALESCE(NULLIF(excluded.before_price_unit, 0), price_list_group.before_price_unit)"),
 						"before_price_weight": gorm.Expr("COALESCE(NULLIF(excluded.before_price_weight, 0), price_list_group.before_price_weight)"),
 						"remark":              gorm.Expr("COALESCE(NULLIF(excluded.remark, ''), price_list_group.remark)"),
+						"seq":                 gorm.Expr("COALESCE(excluded.seq, price_list_group.seq)"),
 						"update_by":           gorm.Expr("COALESCE(NULLIF(excluded.update_by, ''), price_list_group.update_by)"),
 						"update_dtm":          gorm.Expr("excluded.update_dtm"),
 					}),
