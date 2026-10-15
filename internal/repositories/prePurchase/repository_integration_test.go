@@ -4,6 +4,7 @@ package prePurchaseRepository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -344,4 +345,74 @@ func TestGetPOBigLotList_CreateDateRangeIncludesLastDay(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, total)
 	assert.ElementsMatch(t, []string{"PB-DATE-0902", "PB-DATE-0903"}, codesOf(list))
+}
+
+func TestBigLotNotePersistence(t *testing.T) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.CloseGORM(gormx)
+
+	cases := []struct {
+		name       string
+		payload    string
+		wantCreate string
+		wantUpdate string
+	}{
+		{"text", `{"note":"  หมายเหตุ\nบรรทัดสอง  "}`, "  หมายเหตุ\nบรรทัดสอง  ", "  หมายเหตุ\nบรรทัดสอง  "},
+		{"empty", `{"note":""}`, "", ""},
+		{"omitted", `{}`, "", "existing note"},
+		{"null", `{"note":null}`, "", "existing note"},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			var req models.CreatePOBigLotRequest
+			if err := json.Unmarshal([]byte(tt.payload), &req); err != nil {
+				t.Fatal(err)
+			}
+			created := models.PrePurchase{
+				ID: uuid.New(), PrePurchaseCode: "NOTE-" + uuid.NewString(),
+				CompanyCode: testCompanyCode, SiteCode: "NOTE-TEST",
+				Note: req.Note, Remark: "original remark",
+			}
+			if err := CreatePOBigLot([]models.PrePurchase{created}); err != nil {
+				t.Fatal(err)
+			}
+			defer gormx.Where("id = ?", created.ID).Delete(&models.PrePurchase{})
+
+			var got models.PrePurchase
+			if err := gormx.First(&got, "id = ?", created.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if got.Note == nil || *got.Note != tt.wantCreate {
+				t.Fatalf("created Note = %v, want %q", got.Note, tt.wantCreate)
+			}
+			if got.Remark != "original remark" {
+				t.Fatalf("created Remark = %q", got.Remark)
+			}
+
+			if err := gormx.Model(&models.PrePurchase{}).Where("id = ?", created.ID).Update("note", "existing note").Error; err != nil {
+				t.Fatal(err)
+			}
+			var updateReq models.UpdatePOBigLotRequest
+			if err := json.Unmarshal([]byte(tt.payload), &updateReq); err != nil {
+				t.Fatal(err)
+			}
+			update := models.PrePurchase{ID: created.ID, Note: updateReq.Note}
+			if err := UpdatePOBigLot(gormx, []models.PrePurchase{update}); err != nil {
+				t.Fatal(err)
+			}
+			got = models.PrePurchase{}
+			if err := gormx.First(&got, "id = ?", created.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if got.Note == nil || *got.Note != tt.wantUpdate {
+				t.Fatalf("updated Note = %v, want %q", got.Note, tt.wantUpdate)
+			}
+			if got.Remark != "original remark" {
+				t.Fatalf("updated Remark = %q", got.Remark)
+			}
+		})
+	}
 }
