@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	groupService "prime-erp-core/internal/services/group-service"
@@ -18,8 +19,39 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// priceTimings เก็บเวลาแต่ละ phase ของ GetPriceDetail หนึ่ง request (ไม่ thread-safe — ทุก phase รันต่อเนื่อง)
+type priceTimings map[string]time.Duration
+
+type priceTimingsKey struct{}
+
+// lap บันทึกเวลาตั้งแต่ start ลง key; nil-safe เพื่อให้ caller ที่ไม่ได้วัดเวลาส่ง nil ได้
+func (t priceTimings) lap(key string, start time.Time) {
+	if t != nil {
+		t[key] += time.Since(start)
+	}
+}
+
+func timingsFrom(ctx context.Context) priceTimings {
+	t, _ := ctx.Value(priceTimingsKey{}).(priceTimings)
+	return t
+}
+
+// String คืนรูป "k=dur k=dur" เรียงตาม key เพื่อให้ log อ่านเทียบกันได้
+func (t priceTimings) String() string {
+	keys := make([]string, 0, len(t))
+	for k := range t {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := ""
+	for _, k := range keys {
+		out += fmt.Sprintf(" %s=%s", k, t[k].Round(time.Millisecond))
+	}
+	return out
+}
+
 // getGroupAndItemMappings gets group and group item mappings for value name resolution
-func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]models.GetGroupItemResponse, map[string]GetPaymentTermResponse, error) {
+func getGroupAndItemMappings(tm priceTimings) (map[string]models.GetGroupResponse, map[string]models.GetGroupItemResponse, map[string]GetPaymentTermResponse, error) {
 	// Get groups using group service
 	groupReq := models.GetGroupRequest{
 		GroupCodes: []string{},
@@ -35,7 +67,9 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 
 	// groupService.GetGroup now takes context.Context and never reads it, so nil is safe
 	// here too (this helper has no request-scoped context to pass through anyway).
+	t0 := time.Now()
 	resp, err := groupService.GetGroup(nil, groupReqString)
+	tm.lap("getGroup", t0)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get groups: %w", err)
 	}
@@ -67,7 +101,9 @@ func getGroupAndItemMappings() (map[string]models.GetGroupResponse, map[string]m
 
 	termReqString := string(termReqJson)
 
+	t0 = time.Now()
 	termResp, err := GetPaymentTerm(nil, termReqString)
+	tm.lap("getPaymentTerm", t0)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get payment terms: %w", err)
 	}
@@ -97,25 +133,34 @@ func loadPriceData(ctx context.Context, sqlx *sqlx.DB, req priceDomain.GetPriceD
 	}
 
 	// Get price list groups with subgroups
+	tm := timingsFrom(ctx)
+	t0 := time.Now()
 	groupSubGroup, err := getGroupSubGroup(sqlx, priceListReq)
+	tm.lap("getGroupSubGroup", t0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group sub group: %w", err)
 	}
 
 	// Get terms
+	t0 = time.Now()
 	groupSubGroup, err = getTerms(sqlx, groupSubGroup)
+	tm.lap("getTerms", t0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get terms: %w", err)
 	}
 
 	// Get extras
+	t0 = time.Now()
 	groupSubGroup, err = getExtras(sqlx, groupSubGroup)
+	tm.lap("getExtras", t0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get extras: %w", err)
 	}
 
 	// Transform to GetPriceListResponse format (same as GetPriceList API)
+	t0 = time.Now()
 	result, err := transformToGetPriceListResponse(ctx, groupSubGroup)
+	tm.lap("transform", t0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform response: %w", err)
 	}
@@ -137,7 +182,10 @@ func resolveGroupItemName(groupItemMap map[string]models.GetGroupItemResponse, c
 // transformToGetPriceListResponse transforms internal response to API response format
 func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceListGroupResponse) ([]models.GetPriceListResponse, error) {
 	// Get group and group item mappings
-	groupMap, groupItemMap, _, err := getGroupAndItemMappings()
+	tm := timingsFrom(ctx)
+	t0 := time.Now()
+	groupMap, groupItemMap, _, err := getGroupAndItemMappings(tm)
+	tm.lap("mappings", t0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mappings: %w", err)
 	}
@@ -281,7 +329,9 @@ func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceLi
 		}
 
 		// Call inventory service
+		t0 = time.Now()
 		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
+		tm.lap("warehouse", t0)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -358,6 +408,14 @@ func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceLi
 }
 
 func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error) {
+	start := time.Now()
+	tm := priceTimings{}
+	ctx = context.WithValue(ctx, priceTimingsKey{}, tm)
+	group := ""
+	defer func() {
+		log.Printf("[GetPriceDetail] group=%s total=%s%s", group, time.Since(start).Round(time.Millisecond), tm)
+	}()
+
 	// Parse request
 	var req priceDomain.GetPriceDetailRequest
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -377,6 +435,7 @@ func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error
 
 	// Load configuration using the first groupCode to extract requiredGroupCodes
 	groupCode := req.GroupCodes[0]
+	group = groupCode
 	config, err := pricePatterns.LoadConfiguration(groupCode)
 	if err != nil {
 		// If config loading fails, continue with original groupCodes
@@ -452,7 +511,9 @@ func GetPriceDetail(ctx context.Context, jsonPayload string) (interface{}, error
 		return nil, fmt.Errorf("unsupported GroupCode: %s", dataGroupCode)
 	}
 
+	t0 := time.Now()
 	response, err := handler(priceListData, dataGroupCode)
+	tm.lap("handler", t0)
 	if err != nil {
 		return nil, err
 	}
