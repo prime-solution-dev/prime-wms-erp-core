@@ -158,6 +158,10 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 			item.DeliveryItem.UpdateDate = nowDateOnly
 			item.DeliveryItem.UpdateBy = user
 			item.DeliveryItem.Status = "PENDING"
+			// sale_qty / total_weight = ของที่บรรทัดนี้จองเอง ไม่ใช้ค่าที่หน้าบ้านส่ง
+			// หน้าบ้านเคยส่งยอดทั้งบรรทัด SO มา ทำให้ ATP (อ่าน total_weight) นับน้ำหนักจองผิดเมื่อจองบางส่วน
+			item.DeliveryItem.SaleQty = item.DeliveryItem.Qty
+			item.DeliveryItem.TotalWeight = roundWeight(item.DeliveryItem.Weight)
 
 			updateDeliveryItems = append(updateDeliveryItems, item.DeliveryItem)
 

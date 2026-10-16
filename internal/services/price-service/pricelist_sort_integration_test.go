@@ -11,7 +11,7 @@ import (
 )
 
 // ยืนยันว่าค่าที่ group_item เก็บเป็น varchar พร้อม thousand separator ถูกอ่านผ่าน
-// getGroupAndItemMappings() แล้วแปลงเป็นตัวเลขได้ถูกต้อง — เป็นต้นทางของลำดับ
+// getGroupAndItemMappings(nil) แล้วแปลงเป็นตัวเลขได้ถูกต้อง — เป็นต้นทางของลำดับ
 // ทุกแกนในหน้า Price List Detail
 //
 // ค่าที่ seed ดึงจาก UAT จริง (thaimetal-wms-uat, site TMI_WH)
@@ -22,7 +22,7 @@ func TestIntegration_GroupItemValueFeedsSortOrder(t *testing.T) {
 	ensureGroupPaymentTablesForTest(t)
 	seedGroupItemsForSortTest(t)
 
-	_, groupItemMap, _, err := getGroupAndItemMappings()
+	_, groupItemMap, _, err := getGroupAndItemMappings(nil)
 	if err != nil {
 		t.Fatalf("getGroupAndItemMappings: %v", err)
 	}

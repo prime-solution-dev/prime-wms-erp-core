@@ -75,7 +75,7 @@ func createPricelistSchema() error {
 			company_code text, site_code text, group_code text, group_name text,
 			price_unit double precision, price_weight double precision,
 			before_price_unit double precision, before_price_weight double precision,
-			currency text, effective_date timestamp NULL, remark text, group_key text,
+			currency text, effective_date timestamp NULL, remark text, group_key text, seq integer,
 			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_list_group_group_code ON price_list_group(group_code);`,
@@ -480,5 +480,48 @@ func TestCreatePricelist_ExtraKeysBindToOwnExtraRow(t *testing.T) {
 		if mismatched != 0 {
 			t.Errorf("%s: มี %d คีย์ที่ value ไม่ตรงกับ extra_key ของ extra ที่มันสังกัด", round, mismatched)
 		}
+	}
+}
+
+func TestCreatePricelist_PersistsGroupSeq(t *testing.T) {
+	gormx := openTestDB(t)
+	truncateAll(t, gormx)
+
+	upload := func(seq string, replaceAll bool) {
+		t.Helper()
+		sh := fullSheets()
+		sh["price_list_group"] = [][]string{
+			{"company_code", "site_code", "group_code", "group_name", "currency", "effective_date", "price_unit", "price_weight", "PG01", "Seq"},
+			{testCompany, testSite, "G1", "กลุ่ม 1", "THB", "2026-01-01", "18.5", "18.5", "PG01_1", seq},
+		}
+		req, err := buildCreatePricelistRequestFromExcel(buildXlsx(t, sh))
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		req.ReplaceAll = replaceAll
+		if resp, err := CreatePricelist(gormx, *req); err != nil || resp.ResponseCode != 0 {
+			t.Fatalf("CreatePricelist: %v %+v", err, resp)
+		}
+	}
+	seqOf := func() *int {
+		t.Helper()
+		var got *int
+		if err := gormx.Raw(`SELECT seq FROM price_list_group WHERE group_code = 'G1'`).Row().Scan(&got); err != nil {
+			t.Fatalf("select seq: %v", err)
+		}
+		return got
+	}
+
+	upload("7", true)
+	if got := seqOf(); got == nil || *got != 7 {
+		t.Fatalf("seq after replace_all = %v, want 7", got)
+	}
+	upload("", false) // blank Seq must not clobber
+	if got := seqOf(); got == nil || *got != 7 {
+		t.Fatalf("seq after blank upload = %v, want 7", got)
+	}
+	upload("3", false)
+	if got := seqOf(); got == nil || *got != 3 {
+		t.Fatalf("seq after update = %v, want 3", got)
 	}
 }

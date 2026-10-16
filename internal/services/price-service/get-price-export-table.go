@@ -82,7 +82,7 @@ func GetPriceExportTable(ctx context.Context, jsonPayload string) (interface{}, 
 	}
 
 	// Enrich subgroup keys with group_name and value_name (required for columns and table values).
-	groupMap, groupItemMap, paymentTermMap, err := getGroupAndItemMappings()
+	groupMap, groupItemMap, paymentTermMap, err := getGroupAndItemMappings(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group mappings: %w", err)
 	}
