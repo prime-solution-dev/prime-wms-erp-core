@@ -56,7 +56,39 @@ type CreateDeliveryItemsRequest struct {
 	DocumentRefItem string  `json:"document_ref_item"`
 	SaleUnitCode    string  `json:"sale_unit_code"`
 	SaleMethod      string  `json:"sale_method"`
+	PriceListUnit   float64 `json:"price_list_unit"`
+	SaleQty         float64 `json:"sale_qty"`
+	TotalWeight     float64 `json:"total_weight"`
 	Remark          string  `json:"remark"`
+}
+
+// newDeliveryItem สร้างแถว delivery_booking_item จากบรรทัดที่หน้าบ้านส่งมา
+// total_weight = น้ำหนักที่บรรทัดนี้จองเอง (ค่าเดียวกับ weight) ไม่ใช่น้ำหนักทั้งบรรทัด SO
+// เพราะ ATP ของ wms-warehouse-service อ่านคอลัมน์นี้เป็นน้ำหนักที่ใบจองกันไว้
+// sale_qty = qty ที่จอง (บรรทัด SO ทุกแบบ sale_qty = qty เพราะหน่วยขาย PC = base PCS)
+func newDeliveryItem(deliveryID uuid.UUID, numItem int, item CreateDeliveryItemsRequest, user string, nowDateOnly time.Time) models.DeliveryItem {
+	return models.DeliveryItem{
+		ID:              uuid.New(),
+		DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryID.String(), numItem),
+		DeliveryID:      deliveryID,
+		ProductCode:     item.ProductCode,
+		ProductDesc:     item.ProductDesc,
+		Qty:             item.Qty,
+		UnitCode:        item.UnitCode,
+		PriceListUnit:   item.PriceListUnit,
+		SaleQty:         item.Qty,
+		SaleUnitCode:    item.SaleUnitCode,
+		TotalWeight:     roundWeight(item.Weight),
+		Weight:          roundWeight(item.Weight),
+		WeightUnit:      roundWeight(item.WeightUnit),
+		Status:          "PENDING",
+		DocumentRefItem: item.DocumentRefItem,
+		Remark:          item.Remark,
+		CreateDate:      nowDateOnly, // date-only format
+		CreateBy:        user,
+		UpdateDate:      nowDateOnly, // date-only format
+		UpdateBy:        user,
+	}
 }
 
 func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -216,28 +248,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 		deliveryToAdd = append(deliveryToAdd, newDelivery)
 
 		for numItem, deliveryItem := range deliveryReq.DeliveryItems {
-			deliveryItemId := uuid.New()
-
-			newDeliveryItem := models.DeliveryItem{
-				ID:              deliveryItemId,
-				DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryId.String(), numItem),
-				DeliveryID:      deliveryId,
-				ProductCode:     deliveryItem.ProductCode,
-				ProductDesc:     deliveryItem.ProductDesc,
-				Qty:             deliveryItem.Qty,
-				UnitCode:        deliveryItem.UnitCode,
-				Weight:          roundWeight(deliveryItem.Weight),
-				WeightUnit:      roundWeight(deliveryItem.WeightUnit),
-				Status:          "PENDING",
-				DocumentRefItem: deliveryItem.DocumentRefItem,
-				Remark:          deliveryItem.Remark,
-				CreateDate:      nowDateOnly, // date-only format
-				CreateBy:        user,
-				UpdateDate:      nowDateOnly, // date-only format
-				UpdateBy:        user,
-			}
-
-			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem)
+			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem(deliveryId, numItem, deliveryItem, user, nowDateOnly))
 		}
 	}
 
