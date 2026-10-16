@@ -717,8 +717,14 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 	}
 	defer sqlxDB.Close()
 
-	// Build query to handle empty strings properly using COALESCE
-	// This ensures empty strings are properly matched
+	// เทียบ column ตรง ๆ เพื่อให้ใช้ index ได้ — "" ต้องแมตช์ NULL ด้วย (เดิมใช้ COALESCE(col,'') IN (...))
+	nullCond := ""
+	for _, c := range subGroupCodes {
+		if c == "" {
+			nullCond = " OR psfm.price_list_subgroup_code IS NULL"
+			break
+		}
+	}
 	query := `
 		SELECT 
 			psfm.id,
@@ -737,7 +743,7 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 			pf.create_dtm
 		FROM price_list_subgroup_formulas_map psfm
 		LEFT JOIN price_list_formulas pf ON psfm.price_list_formulas_code = pf.formula_code
-		WHERE COALESCE(psfm.price_list_subgroup_code, '') IN (?)
+		WHERE (psfm.price_list_subgroup_code IN (?)` + nullCond + `)
 		ORDER BY psfm.create_dtm DESC
 	`
 
