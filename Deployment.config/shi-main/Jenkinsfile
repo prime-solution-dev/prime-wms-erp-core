@@ -10,7 +10,8 @@ pipeline {
         REMOTE_HOST = '56.10.15.199'
         SSH_KEY_PATH = '/home/ec2-user/key/shiseido-main.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.shiseidomain'
-        ENV_FILE_KEY = 'shiseidomain.env.erp' 
+        ENV_FILE_KEY = 'shiseidomain.env.erp'
+        DOCKERFILEPATH = 'Deployment.config/shi-main/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {

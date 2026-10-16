@@ -11,6 +11,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/paci-prd.pem'
         VAULT_PATH = 'JenkinsWMS/Jenkins.PacificaPRODWMS'
         ENV_FILE_KEY = 'PacificaPROD.env.erp'
+        DOCKERFILEPATH = 'Deployment.config/Pacifica-main/Dockerfile'
     }
     stages {
         stage('Check SSH Key Access and User') {
