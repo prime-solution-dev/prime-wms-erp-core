@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	"prime-erp-core/internal/requestcontext"
@@ -20,6 +22,10 @@ func CreateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
+	if err := validateExtraCreditRequests(ctx, req, GetHistory); err != nil {
+		return nil, err
+	}
+
 	creditRequestValue := []models.CreditRequest{}
 	approvalValue := []models.Approval{}
 	approvalIDForReturn := []uuid.UUID{}
@@ -120,5 +126,53 @@ func CreateCreditRequest(ctx context.Context, jsonPayload string) (interface{}, 
 	}, nil
 }
 
-// RequestType Base  ให้เอา customer ไป where credit_request status = pedding type base ว่ามีไหม ถ้า มี return กลับและสร้างไม่ได้
-// RequestType extra ไม่ต้องเช็ค
+type getCreditHistoryFunc func(context.Context, string) (interface{}, error)
+
+func validateExtraCreditRequests(ctx context.Context, requests []models.CreditRequest, getHistory getCreditHistoryFunc) error {
+	checkedCustomers := make(map[string]struct{})
+
+	for _, request := range requests {
+		if request.RequestType != "EXTRA" {
+			continue
+		}
+		if request.CustomerCode == "" {
+			return fmt.Errorf("customer_code is required for EXTRA credit request")
+		}
+		if _, checked := checkedCustomers[request.CustomerCode]; checked {
+			continue
+		}
+
+		payload, err := json.Marshal(GetHistoryReq{
+			CustomerCode: []string{request.CustomerCode},
+		})
+		if err != nil {
+			return err
+		}
+
+		result, err := getHistory(ctx, string(payload))
+		if err != nil {
+			return err
+		}
+		history, ok := result.(ResultHistory)
+		if !ok {
+			return fmt.Errorf("unexpected GetHistory response type %T", result)
+		}
+
+		hasActiveBase := false
+		for _, item := range history.HistoryRes {
+			if item.RequestType == "BASE" && item.Status == "ACTIVE" {
+				hasActiveBase = true
+				break
+			}
+		}
+		if !hasActiveBase {
+			return fmt.Errorf("customer %s must have an ACTIVE BASE credit before creating an EXTRA credit request", request.CustomerCode)
+		}
+
+		checkedCustomers[request.CustomerCode] = struct{}{}
+	}
+
+	return nil
+}
+
+// RequestType EXTRA requires an ACTIVE BASE credit for the same customer.
