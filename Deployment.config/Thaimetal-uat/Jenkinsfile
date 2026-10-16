@@ -11,6 +11,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS'
         ENV_FILE_KEY = 'thaimetaluat.env.erp'
+        DOCKERFILEPATH = 'Deployment.config/Crossmax-uat/Dockerfile'
     }
 
     stages {
@@ -131,24 +132,34 @@ stage('Build Docker Image') {
         }
     }
 }
-                stage('Stop and Remove Old Container') {
+        stage('Stop and Remove Old Container') {
             steps {
                 script {
-                    echo "Stopping and removing old container on remote..."
+                    echo 'Stopping and removing old container on remote server...'
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                     "docker ps -aq --filter name=${CONTAINER_NAME} | xargs -r docker stop && docker ps -aq --filter name=${CONTAINER_NAME} | xargs -r docker rm" """
                 }
             }
         }
-        stage('Deploy Container') {
-            steps {
-                script {
-                    echo 'Deploying container on remote...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest" """
-                }
-            }
+stage('Deploy Container') {
+    steps {
+        script {
+            echo 'Deploying container on remote server...'
+            sh """
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    docker run -d \
+                        -p ${PORT} \
+                        --cpus=1.0 \
+                        --name ${CONTAINER_NAME} \
+                        -m 4g \
+                        --memory-swap 4g \
+                        ${IMAGE_NAME}:${env.BUILD_NUMBER} &&
+                    docker tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${IMAGE_NAME}:latest
+                '
+            """
         }
+    }
+}
         stage('Clean Up Repository') {
     steps {
         script {
