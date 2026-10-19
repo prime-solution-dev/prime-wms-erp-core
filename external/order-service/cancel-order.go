@@ -54,10 +54,25 @@ func CancelOrder(ctx context.Context, jsonPayload CancelOrderRequest) (CancelOrd
 	// เดิมข้ามการเช็ค status ทำให้ปลายทางตอบ 500 แล้วเราคืน struct เปล่ากับ error = nil
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var errResp struct {
-			Error string `json:"error"`
+			Error     string `json:"error"`
+			Message   string `json:"message"`
+			FailOrder []struct {
+				OrderCode string `json:"order_code"`
+				Reason    string `json:"reason"`
+			} `json:"fail_order"`
 		}
-		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil && errResp.Error != "" {
-			return CancelOrderResponse{}, errors.New(errResp.Error)
+		if jsonErr := json.Unmarshal(body, &errResp); jsonErr == nil {
+			if errResp.Error != "" {
+				return CancelOrderResponse{}, errors.New(errResp.Error)
+			}
+			// CancelOrderByCode ตอบแบบ batch: message รวม + เหตุผลรายใบ
+			if errResp.Message != "" {
+				msg := errResp.Message
+				for _, fail := range errResp.FailOrder {
+					msg += fmt.Sprintf(": %s %s", fail.OrderCode, fail.Reason)
+				}
+				return CancelOrderResponse{}, errors.New(msg)
+			}
 		}
 		return CancelOrderResponse{}, fmt.Errorf("API error status %d: %s", resp.StatusCode, string(body))
 	}
