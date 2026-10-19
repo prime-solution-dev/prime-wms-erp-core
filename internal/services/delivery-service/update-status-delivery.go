@@ -91,14 +91,16 @@ func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{},
 
 	// ห้ามยกเลิกใบที่คลังหยิบไปทำงานแล้ว หน้าจอปิดปุ่มด้วย isCreateOutbound อยู่แล้ว
 	// แต่ฝั่ง server ไม่เคยบังคับ ยิง API ตรงหรือแข่งจังหวะกันก็ผ่าน
+	var warehouse map[string]deliveryWarehouseState
 	if req.Status == "CANCELED" {
-		started, err := deliveriesWithOutbound(ctx, toUpdate)
+		var err error
+		warehouse, err = deliveryWarehouseStates(ctx, toUpdate)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, deliveryCode := range toUpdate {
-			if started[deliveryCode] {
+			if warehouse[deliveryCode].Blocked {
 				return nil, fmt.Errorf(
 					"delivery %s is already being processed in the warehouse and cannot be canceled", deliveryCode)
 			}
@@ -112,6 +114,10 @@ func UpdateStatusDelivery(ctx context.Context, jsonPayload string) (interface{},
 	// ทำให้พังตรงไหนก็ตาม ERP ยังไม่ถูกแตะเลย ผู้ใช้กดยกเลิกซ้ำได้
 	if req.Status == "CANCELED" {
 		for _, deliveryCode := range toUpdate {
+			// CancelOrderByCode ตอบ "no order found" ถ้าไม่มี CO — เส้นเก่าปล่อยผ่าน คงพฤติกรรมเดิม
+			if !warehouse[deliveryCode].HasOrder {
+				continue
+			}
 			if _, err := CancelOrder(ctx, deliveryOf[deliveryCode]); err != nil {
 				return nil, fmt.Errorf("failed to cancel order for delivery %s: %v", deliveryCode, err)
 			}
@@ -337,11 +343,46 @@ func CancelOrder(ctx context.Context, delivery models.Delivery) (orderExternalSe
 	return cancelOrderResponse, nil
 }
 
-// deliveriesWithOutbound ถาม WMS ว่าใบไหนถูกสร้าง outbound ไปแล้วบ้าง
-// ใช้กันไม่ให้ยกเลิกใบที่คลังเริ่มทำงานไปแล้ว
-func deliveriesWithOutbound(ctx context.Context, deliveryCodes []string) (map[string]bool, error) {
-	started := map[string]bool{}
+// deliveryWarehouseState คือสถานะฝั่ง WMS ของใบจองหนึ่งใบ ก่อนยกเลิก
+type deliveryWarehouseState struct {
+	HasOrder bool // มี CO ใน WMS
+	Blocked  bool // มี pick/pack ค้าง หรือมีของออกจากคลังไปแล้ว
+}
 
+// outboundBlocksCancel ห้ามยกเลิกเมื่อมีของออกไปแล้ว หรือยังมี outbound ทำงานค้าง
+//
+// cancel pick / cancel pack ปิด outbound เป็น COMPLETED qty 0 (ไม่ใช่ CANCELED)
+// จึงต้องนับว่าจบแล้ว — เกณฑ์เดียวกับ HasShippedGoods + HasOpenOutbound ของ
+// wms-order-service ที่ปุ่ม Cancel/Close หน้า CO ใช้
+func outboundBlocksCancel(items []orderExternalService.OutboundItemWithGoodsIssue) bool {
+	for _, item := range items {
+		if item.ConfirmQty > 0 {
+			return true
+		}
+		if item.Status != "CANCELED" && item.Status != "COMPLETED" {
+			return true
+		}
+	}
+	return false
+}
+
+func summarizeDeliveryWarehouse(orders []orderExternalService.GetOrderDeliveryResponse) map[string]deliveryWarehouseState {
+	states := map[string]deliveryWarehouseState{}
+	for _, order := range orders {
+		state := states[order.DocumentRef]
+		state.HasOrder = true
+		for _, orderItem := range order.OrderItem {
+			if outboundBlocksCancel(orderItem.OutboundItem) {
+				state.Blocked = true
+			}
+		}
+		states[order.DocumentRef] = state
+	}
+	return states
+}
+
+// deliveryWarehouseStates ถาม WMS ว่าใบจองไหนยกเลิกได้ และใบไหนมี CO ให้ยกเลิกตาม
+func deliveryWarehouseStates(ctx context.Context, deliveryCodes []string) (map[string]deliveryWarehouseState, error) {
 	orderRes, err := orderExternalService.GetOrdersDelivery(ctx, orderExternalService.GetOrderDeliveryRequest{
 		DeliveryCode: deliveryCodes,
 	})
@@ -349,14 +390,5 @@ func deliveriesWithOutbound(ctx context.Context, deliveryCodes []string) (map[st
 		return nil, fmt.Errorf("failed to read warehouse progress before cancelling: %v", err)
 	}
 
-	for _, order := range orderRes.Orders {
-		for _, orderItem := range order.OrderItem {
-			if len(orderItem.OutboundItem) > 0 {
-				started[order.DocumentRef] = true
-				break
-			}
-		}
-	}
-
-	return started, nil
+	return summarizeDeliveryWarehouse(orderRes.Orders), nil
 }
