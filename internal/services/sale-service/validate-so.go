@@ -35,9 +35,27 @@ type SaleValidationItem struct {
 	TotalWeight   float64 `json:"total_weight"`
 	PriceUnit     float64 `json:"price_unit"`
 	PriceListUnit float64 `json:"price_list_unit"`
-	TotalAmount   float64 `json:"total_amount"`
+	TotalAmount   float64 `json:"total_amount"` // รวม VAT ใช้คิด credit
 	SaleUnit      string  `json:"sale_unit"`
 	SaleUnitType  string  `json:"sale_unit_type"`
+	// ยอดก่อน VAT ใช้เทียบ price list ให้ตรงกับตอน Submit QU — ไม่ส่งมา = ใช้ TotalAmount แบบเดิม
+	SubtotalExclVat *float64 `json:"subtotal_excl_vat"`
+}
+
+func buildValidateApproveItem(item SaleValidationItem) verifyService.VerifyApproveItem {
+	return verifyService.VerifyApproveItem{
+		ItemRef:          fmt.Sprintf("temp_item_%s", item.ProductCode),
+		ProductCode:      item.ProductCode,
+		Qty:              item.Qty,
+		Unit:             item.Unit,
+		TotalWeight:      item.TotalWeight,
+		PriceUnit:        item.PriceUnit,
+		PriceListUnit:    item.PriceListUnit,
+		TotalAmount:      item.TotalAmount,
+		SaleUnit:         item.SaleUnit,
+		SaleUnitType:     item.SaleUnitType,
+		PriceCheckAmount: item.SubtotalExclVat,
+	}
 }
 
 type ValidateSaleResponse struct {
@@ -109,19 +127,7 @@ func ValidateSale(ctx context.Context, jsonPayload string) (interface{}, error) 
 		}
 
 		for _, item := range saleReq.Items {
-			newApprItem := verifyService.VerifyApproveItem{
-				ItemRef:       fmt.Sprintf("temp_item_%s", item.ProductCode),
-				ProductCode:   item.ProductCode,
-				Qty:           item.Qty,
-				Unit:          item.Unit,
-				TotalWeight:   item.TotalWeight,
-				PriceUnit:     item.PriceUnit,
-				PriceListUnit: item.PriceListUnit,
-				TotalAmount:   item.TotalAmount,
-				SaleUnit:      item.SaleUnit,
-				SaleUnitType:  item.SaleUnitType,
-			}
-			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
+			newApprDoc.Items = append(newApprDoc.Items, buildValidateApproveItem(item))
 		}
 
 		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
