@@ -30,6 +30,7 @@ func TestUpdateSaleZeroableAmountsWritesZero(t *testing.T) {
 	}
 
 	for _, column := range []string{
+		"ref_po_doc",
 		"total_transport_cost",
 		"total_transport_cost_vat",
 		"total_discount",

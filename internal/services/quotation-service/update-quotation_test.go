@@ -142,6 +142,7 @@ func TestUpdateQuotationAmountsClearToZero(t *testing.T) {
 
 	sql := (*statements)[0]
 	for _, column := range []string{
+		"peyment_term_code",
 		"total_transport_cost",
 		"total_transport_cost_vat",
 		"total_discount",
