@@ -130,3 +130,30 @@ func TestCheckQuotationUpdatableAllowsOpenStatus(t *testing.T) {
 		}
 	}
 }
+
+// ค่าขนส่ง/ยอดเงินแก้เป็น 0 ได้ — เคส QU202610-0502-R4 (UAT 2026-10-19) แก้ transport 12 → 0
+// แล้ว submit แต่ total_transport_cost ยังเป็น 12 เพราะ struct Updates() ข้ามค่า 0
+func TestUpdateQuotationAmountsClearToZero(t *testing.T) {
+	db, statements := dryRunDB(t)
+
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: uuid.New()}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
+	}
+
+	sql := (*statements)[0]
+	for _, column := range []string{
+		"total_transport_cost",
+		"total_transport_cost_vat",
+		"total_discount",
+		"total_vat",
+		"total_amount",
+		"total_weight",
+		"subtotal_excl_transport",
+		"subtotal_weight_excl_transport",
+		"subtotal_excl_vat",
+	} {
+		if !strings.Contains(sql, column) {
+			t.Errorf("UPDATE ไม่มีคอลัมน์ %s แม้ค่าจะเป็น 0: %s", column, sql)
+		}
+	}
+}
