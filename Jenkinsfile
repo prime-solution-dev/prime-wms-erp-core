@@ -5,12 +5,12 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115'
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Thaimetal-uat'
-        REMOTE_USER = 'ubuntu'
-        REMOTE_HOST = '18.138.69.85'
-        SSH_KEY_PATH = '/home/ec2-user/key/Thaimetal.pem'
-        VAULT_PATH = 'JenkinsWMS/jenkins.thaimataluatWMS' 
-        ENV_FILE_KEY = 'thaimetaluat.env.erp'
+        TARGET_BRANCH = 'Thaimetal-main' 
+        REMOTE_USER = 'ec2-user'
+        REMOTE_HOST = '54.179.75.32'
+        SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
+        VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS' // path ของ secret
+        ENV_FILE_KEY = 'thaimetalprd.env.erp'
     }
 
     stages {
@@ -165,3 +165,5 @@ stage('Build Docker Image') {
         }
     }
 }
+
+
