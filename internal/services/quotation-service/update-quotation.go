@@ -28,13 +28,23 @@ type UpdateQuotationResponse struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-// updateQuotationClearableFields writes the fields a user can clear back to ""
-// with Updates(map) (not Updates with a struct), so an empty string is written
-// too instead of being skipped as a zero value.
+// updateQuotationClearableFields writes the fields a user can clear back to "" or 0
+// with Updates(map) (not Updates with a struct), so an empty string or a zero amount
+// is written too instead of being skipped as a zero value.
 func updateQuotationClearableFields(tx *gorm.DB, quotation models.Quotation) error {
 	return tx.Model(&models.Quotation{}).Where("id = ?", quotation.ID).Updates(map[string]interface{}{
-		"sale_person_code": quotation.SalePersonCode,
-		"ref_po_doc":       quotation.RefPoDoc,
+		"sale_person_code":               quotation.SalePersonCode,
+		"ref_po_doc":                     quotation.RefPoDoc,
+		"peyment_term_code":              quotation.PeymentTermCode, // DUE/PDC → CASH ส่ง "" มา
+		"total_transport_cost":           quotation.TotalTransportCost,
+		"total_transport_cost_vat":       quotation.TotalTransportCostVat,
+		"total_discount":                 quotation.TotalDiscount,
+		"total_vat":                      quotation.TotalVat,
+		"total_amount":                   quotation.TotalAmount,
+		"total_weight":                   quotation.TotalWeight,
+		"subtotal_excl_transport":        quotation.SubtotalExclTransport,
+		"subtotal_weight_excl_transport": quotation.SubtotalWeightExclTransport,
+		"subtotal_excl_vat":              quotation.SubtotalExclVat,
 	}).Error
 }
 
@@ -274,7 +284,8 @@ func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 
 		// GORM's struct Updates() skips zero-value fields, so it never clears
 		// sale_person_code / ref_po_doc back to "" (allow-clear, or switching the
-		// customer clears the sales person). Write them explicitly, every time.
+		// customer clears the sales person) or an amount back to 0 (transport
+		// edited to 0). Write them explicitly, every time.
 		if err := updateQuotationClearableFields(tx, quotation); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
