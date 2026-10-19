@@ -26,6 +26,9 @@ type SaleValidationDocument struct {
 	CustomerCode string               `json:"customer_code"`
 	DeliveryDate *time.Time           `json:"delivery_date"`
 	Items        []SaleValidationItem `json:"items"`
+	// ค่าขนส่งของใบ: INCL หักออกก่อนเทียบ price list (เหมือน Submit QU), EXCL บวกเข้า credit
+	TransportCost float64 `json:"transport_cost"`
+	TransportType string  `json:"transport_type"`
 }
 
 type SaleValidationItem struct {
@@ -56,6 +59,33 @@ func buildValidateApproveItem(item SaleValidationItem) verifyService.VerifyAppro
 		SaleUnitType:     item.SaleUnitType,
 		PriceCheckAmount: item.SubtotalExclVat,
 	}
+}
+
+// buildValidateApproveDocument ประกอบใบที่ส่งเข้า verify
+//
+// TotalAmount ของใบใช้เกลี่ยค่าขนส่ง INCL ลงแต่ละแถว จึงต้องเป็นผลรวมของยอดที่ใช้เทียบราคา
+// (ก่อน VAT) ไม่ใช่ยอดรวม VAT — ตรงกับ UpdateQuotation ที่ส่ง SubtotalExclVat ทั้งใบและรายแถว
+func buildValidateApproveDocument(saleReq SaleValidationDocument) verifyService.VerifyApproveDocument {
+	doc := verifyService.VerifyApproveDocument{
+		DocRef:        fmt.Sprintf("TEMP_%s_%s", saleReq.CompanyCode, saleReq.SiteCode),
+		CustomerCode:  saleReq.CustomerCode,
+		TransportCost: saleReq.TransportCost,
+		TransportType: saleReq.TransportType,
+		Items:         []verifyService.VerifyApproveItem{},
+	}
+
+	for _, item := range saleReq.Items {
+		apprItem := buildValidateApproveItem(item)
+		if apprItem.PriceCheckAmount != nil {
+			doc.TotalAmount += *apprItem.PriceCheckAmount
+		} else {
+			doc.TotalAmount += apprItem.TotalAmount
+		}
+		doc.TotalWeight += item.TotalWeight
+		doc.Items = append(doc.Items, apprItem)
+	}
+
+	return doc
 }
 
 type ValidateSaleResponse struct {
@@ -120,15 +150,7 @@ func ValidateSale(ctx context.Context, jsonPayload string) (interface{}, error) 
 			verifyReq = newVerifyReq
 		}
 
-		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:       fmt.Sprintf("TEMP_%s_%s", saleReq.CompanyCode, saleReq.SiteCode),
-			CustomerCode: saleReq.CustomerCode,
-			Items:        []verifyService.VerifyApproveItem{},
-		}
-
-		for _, item := range saleReq.Items {
-			newApprDoc.Items = append(newApprDoc.Items, buildValidateApproveItem(item))
-		}
+		newApprDoc := buildValidateApproveDocument(saleReq)
 
 		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
 		verifyReqMap[verifyReqKey] = verifyReq
