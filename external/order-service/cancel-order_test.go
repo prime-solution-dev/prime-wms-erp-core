@@ -42,3 +42,26 @@ func TestCancelOrderForwardsCallerToken(t *testing.T) {
 		t.Fatalf("service ปลายทางได้ Authorization = %q ซึ่งแปลว่า user ไม่ได้ตามไป", gotAuth)
 	}
 }
+
+// CancelOrderByCode ตอบ 500 แบบ {status, message, fail_order} ไม่มี key "error"
+// เหตุผลรายใบต้องไปถึงผู้ใช้ ไม่ใช่ body ดิบทั้งก้อน
+func TestCancelOrderSurfacesFailOrderReason(t *testing.T) {
+	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"status":"error","message":"cannot cancel 1 order(s)","fail_order":[{"order_code":"CO2610-00001","reason":"cannot cancel: goods have already left the warehouse, use Close instead"}]}`))
+	}))
+	defer downstream.Close()
+
+	original := config.CANCEL_ORDER_ENDPOINT
+	config.CANCEL_ORDER_ENDPOINT = downstream.URL
+	defer func() { config.CANCEL_ORDER_ENDPOINT = original }()
+
+	_, err := CancelOrder(context.Background(), CancelOrderRequest{DocumentRef: []string{"DBS2610-0001"}})
+	if err == nil {
+		t.Fatal("want error")
+	}
+	want := "cannot cancel 1 order(s): CO2610-00001 cannot cancel: goods have already left the warehouse, use Close instead"
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}
