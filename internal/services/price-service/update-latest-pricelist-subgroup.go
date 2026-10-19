@@ -192,7 +192,7 @@ func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLate
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(ctx, companyCode, siteCodes, keyValues)
+		inventoryResponse, err := getInventoryWeightByKeyFunc(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -274,6 +274,9 @@ func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLate
 							Pcs: totalNetPriceUnit,
 							Kg:  totalNetPriceWeight,
 						}
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
+						}
 
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
@@ -295,6 +298,9 @@ func RunUpdateLatestPriceListSubGroup(ctx context.Context, req models.UpdateLate
 							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
 							Pcs: totalNetPriceUnit,
 							Kg:  totalNetPriceWeight,
+						}
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,

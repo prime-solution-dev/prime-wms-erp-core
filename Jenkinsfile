@@ -81,17 +81,34 @@ EOF
         }
     }
 }
-stage('Build Docker Image') {
+        stage('Check Workspace') {
             steps {
                 script {
-                    echo 'Building Docker image on remote server with updated .env...'
-                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
-                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t ${IMAGE_NAME}:latest .'"""
-                    }
+                    sh "ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} 'pwd && ls -la ${REPO_NAME}'"
                 }
             }
         }
+stage('Build Docker Image') {
+    steps {
+        script {
+            echo 'Building Docker image on remote server...'
+
+            withCredentials([
+                string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+            ]) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no -i '${SSH_KEY_PATH}' \
+                    '${REMOTE_USER}@${REMOTE_HOST}' \
+                    'cd ${REPO_NAME} && \
+                    docker build --no-cache \
+                    -f ${DOCKERFILEPATH} \
+                    --build-arg GIT_TOKEN="${GIT_TOKEN}" \
+                    -t ${IMAGE_NAME}:${env.BUILD_NUMBER} .'
+                """
+            }
+        }
+    }
+}
                 stage('Stop and Remove Old Container') {
             steps {
                 script {

@@ -3,6 +3,7 @@ package priceService
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"prime-erp-core/internal/models"
 )
@@ -78,4 +79,12 @@ func formulaRequiredVars(formula models.PriceListFormulas) []string {
 		return nil
 	}
 	return parsed.Required
+}
+
+// skipFormulaWithoutBasePrice บอกว่าสูตรนี้ต้องข้าม เพราะต้องใช้ base_price แต่ราคาฐานของ
+// group (ตาม uom ของสูตร) เป็น 0 — group ที่ไม่ได้ตั้งราคาฐานของ uom นั้น (เช่น GROUP_1_ITEM_6
+// บน prod) ผู้ใช้กรอกราคาของแต่ละ subgroup เอง ถ้าคำนวณ base_price+extra ต่อ จะได้ 0+extra ทับราคาที่กรอกไว้
+// การข้ามทำให้คงค่าเดิมไว้ และสูตรที่อ้างค่านั้น (เช่น pcs = kg*weight_spec) ยังคำนวณต่อได้
+func skipFormulaWithoutBasePrice(formula models.PriceListFormulas, basePrice float64) bool {
+	return basePrice == 0 && slices.Contains(formulaRequiredVars(formula), "base_price")
 }
