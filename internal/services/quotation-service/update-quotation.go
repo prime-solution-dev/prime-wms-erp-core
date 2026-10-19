@@ -35,6 +35,7 @@ func updateQuotationClearableFields(tx *gorm.DB, quotation models.Quotation) err
 	return tx.Model(&models.Quotation{}).Where("id = ?", quotation.ID).Updates(map[string]interface{}{
 		"sale_person_code":               quotation.SalePersonCode,
 		"ref_po_doc":                     quotation.RefPoDoc,
+		"peyment_term_code":              quotation.PeymentTermCode, // DUE/PDC → CASH ส่ง "" มา
 		"total_transport_cost":           quotation.TotalTransportCost,
 		"total_transport_cost_vat":       quotation.TotalTransportCostVat,
 		"total_discount":                 quotation.TotalDiscount,
