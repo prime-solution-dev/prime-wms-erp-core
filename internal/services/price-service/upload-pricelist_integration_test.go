@@ -87,7 +87,18 @@ func createPricelistSchema() error {
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group_history (
 			id uuid PRIMARY KEY,
 			price_list_group_id uuid REFERENCES price_list_group(id) ON DELETE CASCADE,
-			subgroup_key text, create_dtm timestamp
+			subgroup_key text, create_dtm timestamp,
+			is_trading boolean,
+			price_unit double precision, extra_price_unit double precision,
+			term_price_unit double precision, total_net_price_unit double precision,
+			price_weight double precision, extra_price_weight double precision,
+			term_price_weight double precision, total_net_price_weight double precision,
+			before_price_unit double precision, before_extra_price_unit double precision,
+			before_term_price_unit double precision, before_total_net_price_unit double precision,
+			before_price_weight double precision, before_extra_price_weight double precision,
+			before_term_price_weight double precision, before_total_net_price_weight double precision,
+			effective_date timestamp NULL, expiry_date timestamp NULL, remark text,
+			create_by text, update_by text, update_dtm timestamp
 		);`,
 		`CREATE TABLE IF NOT EXISTS price_list_group_key (
 			id uuid PRIMARY KEY,
@@ -128,7 +139,8 @@ func createPricelistSchema() error {
 			before_price_weight double precision, before_extra_price_weight double precision,
 			before_term_price_weight double precision, before_total_net_price_weight double precision,
 			effective_date timestamp NULL, remark text, udf_json json NULL,
-			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp
+			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp,
+			need_recalculate boolean NOT NULL DEFAULT false
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_list_sub_group_subgroup_code ON price_list_sub_group(subgroup_code);`,
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group_key (

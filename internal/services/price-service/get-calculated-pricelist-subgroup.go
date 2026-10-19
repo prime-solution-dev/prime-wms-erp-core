@@ -294,6 +294,10 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 							Pcs: totalNetPriceUnit,
 							Kg:  totalNetPriceWeight,
 						}
+						// ต้องตรงกับ RunUpdateLatestPriceListSubGroup ไม่งั้น preview กับที่บันทึกจะไม่ตรงกัน
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
+						}
 
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
@@ -316,6 +320,9 @@ func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (in
 							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
 							Pcs: totalNetPriceUnit,
 							Kg:  totalNetPriceWeight,
+						}
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
