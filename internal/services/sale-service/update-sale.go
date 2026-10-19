@@ -20,6 +20,7 @@ import (
 // written too. Same fix as UpdateQuotation (QU202610-0502-R4: transport 12 -> 0 kept 12).
 func updateSaleZeroableAmounts(tx *gorm.DB, sale models.Sale) error {
 	return tx.Model(&models.Sale{}).Where("id = ?", sale.ID).Updates(map[string]interface{}{
+		"ref_po_doc":                     sale.RefPoDoc, // ช่องเดียวบนหัวใบ SO ที่ user ล้างเป็นค่าว่างได้
 		"total_transport_cost":           sale.TotalTransportCost,
 		"total_transport_cost_vat":       sale.TotalTransportCostVat,
 		"total_discount":                 sale.TotalDiscount,
