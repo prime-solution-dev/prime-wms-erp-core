@@ -441,7 +441,7 @@ func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRe
 
 	if resp.StatusCode != http.StatusOK {
 
-		return nil, errors.New("received non-OK HTTP status: " + resp.Status + " " + endpoint)
+		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
 	}
 
 	supplierBody, err := io.ReadAll(resp.Body)
