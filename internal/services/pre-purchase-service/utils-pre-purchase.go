@@ -448,6 +448,7 @@ func GetSupplierByCode(ctx context.Context, supplierReq models.GetSupplierListRe
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+
 		return nil, errors.New("received non-OK HTTP status: " + resp.Status)
 	}
 
