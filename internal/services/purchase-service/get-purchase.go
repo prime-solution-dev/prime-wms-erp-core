@@ -44,6 +44,7 @@ func GetPO(ctx context.Context, jsonPayload string) (interface{}, error) {
 		req.EndCreateDate,
 		req.UsedStatus,
 		req.UsedStatusNot,
+		purchaseListOptions(req),
 	)
 	if err != nil {
 		return nil, errors.New("failed to get purchase list: " + err.Error())
