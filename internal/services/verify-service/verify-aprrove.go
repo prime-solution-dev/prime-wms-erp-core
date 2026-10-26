@@ -60,6 +60,16 @@ type VerifyApproveItem struct {
 	//Option
 	TransportCostUnit       *float64 `json:"transport_cost_unit"`
 	TransportCostUnitWeight *float64 `json:"transport_cost_unit_weight"`
+	// PriceCheckAmount ยอดที่ใช้เทียบ price list เมื่อไม่ตรงกับ TotalAmount ที่ใช้คิด credit
+	// (Convert to SO: เทียบราคาด้วยยอดก่อน VAT แต่ credit ต้องรวม VAT) — nil = ใช้ TotalAmount
+	PriceCheckAmount *float64 `json:"price_check_amount,omitempty"`
+}
+
+func priceCheckAmount(item VerifyApproveItem) float64 {
+	if item.PriceCheckAmount != nil {
+		return *item.PriceCheckAmount
+	}
+	return item.TotalAmount
 }
 
 type VerifyApproveResponse struct {
@@ -187,7 +197,7 @@ func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req 
 				Unit:          docItem.Unit,
 				PriceUnit:     docItem.PriceUnit,
 				PriceListUnit: docItem.PriceListUnit,
-				TotalAmount:   docItem.TotalAmount,
+				TotalAmount:   priceCheckAmount(docItem),
 				TotalWeight:   docItem.TotalWeight,
 				SaleUnit:      docItem.SaleUnit,
 				SaleUnitType:  docItem.SaleUnitType,

@@ -32,6 +32,7 @@ type Invoice struct {
 	TotalVat                 float64          `json:"total_vat"`
 	Status                   string           `json:"status"`
 	Remark                   string           `json:"remark"`
+	Note                     string           `json:"note"`
 	CreateBy                 string           `gorm:"type:varchar(100)" json:"create_by"`
 	CreateDtm                time.Time        `gorm:"autoCreateTime;<-:create" json:"create_dtm"`
 	UpdateBy                 string           `gorm:"type:varchar(100)" json:"update_by"`

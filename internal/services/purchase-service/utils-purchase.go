@@ -132,6 +132,7 @@ func MapPurchaseFormRequestToPurchaseModel(req models.PurchaseFormRequest) model
 		IsApproved:      req.IsApproved,
 		StatusApprove:   req.StatusApprove,
 		Remark:          req.Remark,
+		Note:            req.Note,
 		CreditTerm:      req.CreditTerm,
 		UpdateBy:        "system",
 		UpdateDtm:       now,
@@ -192,6 +193,11 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		deliveryDateStr = purchase.DeliveryDate.Format(time.RFC3339)
 	}
 
+	note := ""
+	if purchase.Note != nil {
+		note = *purchase.Note
+	}
+
 	return models.PurchaseResponse{
 		ID:              purchase.ID.String(),
 		PurchaseCode:    purchase.PurchaseCode,
@@ -220,6 +226,7 @@ func MapPurchaseModelToPurchaseResponse(purchase models.Purchase) models.Purchas
 		UsedType:        purchase.UsedType,
 		UsedStatus:      purchase.UsedStatus,
 		Remark:          purchase.Remark,
+		Note:            note,
 		CreditTerm:      purchase.CreditTerm,
 		CreateBy:        purchase.CreateBy,
 		CreateDtm:       purchase.CreateDtm.Format(time.RFC3339),

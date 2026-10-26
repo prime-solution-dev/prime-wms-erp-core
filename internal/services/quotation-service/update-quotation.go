@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UpdateQuotationRequest struct {
@@ -27,11 +28,38 @@ type UpdateQuotationResponse struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-// updateQuotationSalePerson writes sale_person_code with Update (not Updates
-// with a struct), so an empty string is written too instead of being skipped
-// as a zero value.
-func updateQuotationSalePerson(tx *gorm.DB, id uuid.UUID, code string) error {
-	return tx.Model(&models.Quotation{}).Where("id = ?", id).Update("sale_person_code", code).Error
+// updateQuotationClearableFields writes the fields a user can clear back to "" or 0
+// with Updates(map) (not Updates with a struct), so an empty string or a zero amount
+// is written too instead of being skipped as a zero value.
+func updateQuotationClearableFields(tx *gorm.DB, quotation models.Quotation) error {
+	return tx.Model(&models.Quotation{}).Where("id = ?", quotation.ID).Updates(map[string]interface{}{
+		"sale_person_code":               quotation.SalePersonCode,
+		"ref_po_doc":                     quotation.RefPoDoc,
+		"peyment_term_code":              quotation.PeymentTermCode, // DUE/PDC → CASH ส่ง "" มา
+		"total_transport_cost":           quotation.TotalTransportCost,
+		"total_transport_cost_vat":       quotation.TotalTransportCostVat,
+		"total_discount":                 quotation.TotalDiscount,
+		"total_vat":                      quotation.TotalVat,
+		"total_amount":                   quotation.TotalAmount,
+		"total_weight":                   quotation.TotalWeight,
+		"subtotal_excl_transport":        quotation.SubtotalExclTransport,
+		"subtotal_weight_excl_transport": quotation.SubtotalWeightExclTransport,
+		"subtotal_excl_vat":              quotation.SubtotalExclVat,
+	}).Error
+}
+
+// checkQuotationUpdatable ด่านเดียวกับ ReviseQuotation ใบที่ยกเลิกแล้วหรือแปลงเป็น SO แล้ว
+// ห้ามเขียนทับ เพราะหน้าบ้านส่ง status = PENDING มาตายตัว ถ้าปล่อยผ่าน ใบที่ถูก revise
+// ไปแล้วจะฟื้นกลับมาเป็น PENDING คู่กับใบ -R ใหม่ (เคส QU202610-0057 จากแท็บเก่า)
+func checkQuotationUpdatable(quotationCode string, status string) error {
+	switch status {
+	case "CANCELED":
+		return fmt.Errorf("quotation %s is canceled and cannot be updated", quotationCode)
+	case "COMPLETED":
+		return fmt.Errorf("quotation %s already converted to a sale order and cannot be updated", quotationCode)
+	}
+
+	return nil
 }
 
 func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
@@ -231,6 +259,22 @@ func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 
 	// Update quotations
 	for _, quotation := range updateQuotations {
+		// อ่านสถานะสดพร้อม lock แถว ถ้า ReviseQuotation ยกเลิกใบนี้ไปพร้อมกัน
+		// จะรอจน revise commit แล้วเห็น CANCELED
+		var current models.Quotation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("status").
+			Where("id = ?", quotation.ID).
+			Take(&current).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("quotation %s not found: %v", quotation.QuotationCode, err)
+		}
+
+		if err := checkQuotationUpdatable(quotation.QuotationCode, current.Status); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
 		if err := tx.Model(&models.Quotation{}).
 			Where("id = ?", quotation.ID).
 			Updates(quotation).Error; err != nil {
@@ -239,9 +283,10 @@ func UpdateQuotation(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 
 		// GORM's struct Updates() skips zero-value fields, so it never clears
-		// sale_person_code back to "" (allow-clear, or switching the customer
-		// clears the sales person). Write it explicitly, every time.
-		if err := updateQuotationSalePerson(tx, quotation.ID, quotation.SalePersonCode); err != nil {
+		// sale_person_code / ref_po_doc back to "" (allow-clear, or switching the
+		// customer clears the sales person) or an amount back to 0 (transport
+		// edited to 0). Write them explicitly, every time.
+		if err := updateQuotationClearableFields(tx, quotation); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update quotation %s: %v", quotation.QuotationCode, err)
 		}

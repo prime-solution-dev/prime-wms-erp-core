@@ -39,19 +39,41 @@ pipeline {
                 }
             }
         }
-        stage('Clone Repository') {
-            steps {
-                script {
-                    echo "Cloning or updating repository branch: ${TARGET_BRANCH} on remote server..."
-                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
-                        sh """ssh -o StrictHostKeyChecking=no -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                        'git clone -b ${TARGET_BRANCH} https://${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME} || \\
-                        (cd ${REPO_NAME} && git fetch && git checkout ${TARGET_BRANCH} && git pull origin ${TARGET_BRANCH})'"""
-                    }
-                    echo 'Repository cloned/updated successfully on remote!'
-                }
+stage('Clone Repository') {
+    steps {
+        script {
+            echo "Cloning repository branch: ${TARGET_BRANCH} on remote server..."
+
+            withCredentials([
+                string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+            ]) {
+                sh '''
+                    set +x
+                    set -e
+
+                    ssh -o StrictHostKeyChecking=no \
+                        -i "$SSH_KEY_PATH" \
+                        "$REMOTE_USER@$REMOTE_HOST" \
+                        "
+                        if [ -d '$REPO_NAME/.git' ]; then
+                            cd '$REPO_NAME'
+                            git fetch origin '$TARGET_BRANCH'
+                            git checkout '$TARGET_BRANCH'
+                            git reset --hard 'origin/$TARGET_BRANCH'
+                        else
+                            git clone --depth 1 \
+                                -b '$TARGET_BRANCH' \
+                                'https://x-access-token:${GIT_TOKEN}@github.com/prime-solution-dev/${REPO_NAME}.git' \
+                                '$REPO_NAME'
+                        fi
+                        "
+                '''
             }
+
+            echo 'Repository cloned/updated successfully!'
         }
+    }
+}
         stage('Check Workspace') {
             steps {
                 script {
@@ -119,16 +141,26 @@ EOF
     }
 }
 stage('Build Docker Image') {
-            steps {
-                script {
-                    echo 'Building Docker image on remote server...'
-                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
-                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t  ${IMAGE_NAME}:latest .'"""
-                    }
-                }
+    steps {
+        script {
+            echo 'Building Docker image on remote server...'
+
+            withCredentials([
+                string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')
+            ]) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no -i '${SSH_KEY_PATH}' \
+                    '${REMOTE_USER}@${REMOTE_HOST}' \
+                    'cd ${REPO_NAME} && \
+                    docker build --no-cache \
+                    -f ${DOCKERFILEPATH} \
+                    --build-arg GIT_TOKEN="${GIT_TOKEN}" \
+                    -t ${IMAGE_NAME}:${env.BUILD_NUMBER} .'
+                """
             }
         }
+    }
+}
         stage('Stop and Remove Old Container') {
             steps {
                 script {
@@ -138,15 +170,25 @@ stage('Build Docker Image') {
                 }
             }
         }
-        stage('Deploy Container') {
-            steps {
-                script {
-                    echo 'Deploying container on remote server...'
-                    sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
-                    "docker run -d -p ${PORT} --cpus=1.0 --name ${CONTAINER_NAME} -m 4g --memory-swap 4g ${IMAGE_NAME}:latest" """
-                }
-            }
+stage('Deploy Container') {
+    steps {
+        script {
+            echo 'Deploying container on remote server...'
+            sh """
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    docker run -d \
+                        -p ${PORT} \
+                        --cpus=1.0 \
+                        --name ${CONTAINER_NAME} \
+                        -m 4g \
+                        --memory-swap 4g \
+                        ${IMAGE_NAME}:${env.BUILD_NUMBER} &&
+                    docker tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${IMAGE_NAME}:latest
+                '
+            """
         }
+    }
+}
 stage('Clean Up Repository') {
     steps {
         script {

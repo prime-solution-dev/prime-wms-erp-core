@@ -22,6 +22,7 @@ type Quotation struct {
 	ShipToType                  string     `json:"ship_to_type"`
 	ShipToAddress               string     `json:"ship_to_address"`
 	DeliveryMethod              string     `json:"delivery_method"`
+	RefPoDoc                    string     `json:"ref_po_doc"`
 	TransportCostType           string     `json:"transport_cost_type"`
 	TotalTransportCost          float64    `json:"total_transport_cost"`
 	PassPrice                   bool       `json:"pass_price"`

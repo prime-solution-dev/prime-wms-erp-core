@@ -184,15 +184,20 @@ func CreatePriceListBase(priceListGroups []models.PriceListGroup) error {
 	})
 }
 
-// UpdatePriceListGroup
-func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
+// UpdatePriceListBase
+//
+// คืนเฉพาะ group ที่เปลี่ยนจริง — group ที่ราคาและ term % เท่าเดิม (เช่น Adjust Price = 0)
+// จะถูกข้ามทั้งหมด ไม่เขียน history ไม่ทับ before_* และไม่ลบ/สร้าง terms ใหม่
+// ผู้เรียกใช้รายการที่คืนไปเป็นตัวกำหนดว่าต้อง cascade subgroup ไหน
+func UpdatePriceListBase(priceListGroup []models.PriceListGroup) ([]models.PriceListGroup, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer db.CloseGORM(gormx)
 
-	return gormx.Transaction(func(tx *gorm.DB) error {
+	changed := []models.PriceListGroup{}
+	err = gormx.Transaction(func(tx *gorm.DB) error {
 		for _, group := range priceListGroup {
 			oldPriceListGroup := models.PriceListGroup{}
 
@@ -202,6 +207,16 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 				Error; err != nil {
 				return err
 			}
+
+			oldTerms := []models.PriceListGroupTerm{}
+			if err := tx.Where("price_list_group_id = ?", group.ID).Find(&oldTerms).Error; err != nil {
+				return err
+			}
+
+			if isBasePriceUnchanged(oldPriceListGroup, oldTerms, group) {
+				continue
+			}
+			changed = append(changed, group)
 
 			now := time.Now().UTC()
 
@@ -246,6 +261,14 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 				return err
 			}
 
+			// ราคา group เปลี่ยน → subgroup ทุกตัวต้องคำนวณใหม่ตอนกด Edit ในหน้า detail
+			// ล้างกลับเป็น false เมื่อ save หน้า detail (UpdatePriceListSubGroups + ClearRecalculate)
+			if err := tx.Model(&models.PriceListSubGroup{}).
+				Where("price_list_group_id = ?", group.ID).
+				Update("need_recalculate", true).Error; err != nil {
+				return err
+			}
+
 			// Delete old Terms
 			if termResult := tx.Where("price_list_group_id = ?", group.ID).Delete(&models.PriceListGroupTerm{}); termResult.Error != nil {
 				return termResult.Error
@@ -262,6 +285,11 @@ func UpdatePriceListBase(priceListGroup []models.PriceListGroup) error {
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return changed, nil
 }
 
 // UpdateExtra
@@ -544,7 +572,9 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 
 			// Handle price unit and price weight fields
 			// before_* เลื่อนเฉพาะเมื่อค่าเปลี่ยนจริง ดูเหตุผลที่ doc ของ buildSubGroupUpdateMap
-			for k, v := range buildSubGroupUpdateMap(oldSubGroup, req) {
+			// map มีเฉพาะ field ราคาที่ persist และ request ส่งมา จึงไม่ว่าง = ส่งราคามา (แม้เท่าเดิม)
+			priceUpdates := buildSubGroupUpdateMap(oldSubGroup, req)
+			for k, v := range priceUpdates {
 				updateMap[k] = v
 			}
 
@@ -554,6 +584,12 @@ func UpdatePriceListSubGroups(reqs models.UpdatePriceListSubGroupRequest) error 
 
 			if req.Remark != nil {
 				updateMap["remark"] = *req.Remark
+			}
+
+			// ล้าง flag เมื่อส่ง field ราคาที่ persist มาอย่างน้อยหนึ่งตัว แม้ค่าเท่า DB
+			// (ราคาที่คำนวณใหม่ได้เท่าเดิมต้องไม่ค้าง flag) แก้แค่ remark/udf_json/is_trading/effective_date ไม่นับ
+			if reqs.ClearRecalculate && len(priceUpdates) > 0 {
+				updateMap["need_recalculate"] = false
 			}
 
 			updateMap["update_by"] = "system" // TODO: get user from auth
@@ -681,8 +717,14 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 	}
 	defer sqlxDB.Close()
 
-	// Build query to handle empty strings properly using COALESCE
-	// This ensures empty strings are properly matched
+	// เทียบ column ตรง ๆ เพื่อให้ใช้ index ได้ — "" ต้องแมตช์ NULL ด้วย (เดิมใช้ COALESCE(col,'') IN (...))
+	nullCond := ""
+	for _, c := range subGroupCodes {
+		if c == "" {
+			nullCond = " OR psfm.price_list_subgroup_code IS NULL"
+			break
+		}
+	}
 	query := `
 		SELECT 
 			psfm.id,
@@ -701,7 +743,7 @@ func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map
 			pf.create_dtm
 		FROM price_list_subgroup_formulas_map psfm
 		LEFT JOIN price_list_formulas pf ON psfm.price_list_formulas_code = pf.formula_code
-		WHERE COALESCE(psfm.price_list_subgroup_code, '') IN (?)
+		WHERE (psfm.price_list_subgroup_code IN (?)` + nullCond + `)
 		ORDER BY psfm.create_dtm DESC
 	`
 

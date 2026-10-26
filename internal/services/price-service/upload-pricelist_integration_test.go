@@ -75,7 +75,7 @@ func createPricelistSchema() error {
 			company_code text, site_code text, group_code text, group_name text,
 			price_unit double precision, price_weight double precision,
 			before_price_unit double precision, before_price_weight double precision,
-			currency text, effective_date timestamp NULL, remark text, group_key text,
+			currency text, effective_date timestamp NULL, remark text, group_key text, seq integer,
 			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_list_group_group_code ON price_list_group(group_code);`,
@@ -87,7 +87,18 @@ func createPricelistSchema() error {
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group_history (
 			id uuid PRIMARY KEY,
 			price_list_group_id uuid REFERENCES price_list_group(id) ON DELETE CASCADE,
-			subgroup_key text, create_dtm timestamp
+			subgroup_key text, create_dtm timestamp,
+			is_trading boolean,
+			price_unit double precision, extra_price_unit double precision,
+			term_price_unit double precision, total_net_price_unit double precision,
+			price_weight double precision, extra_price_weight double precision,
+			term_price_weight double precision, total_net_price_weight double precision,
+			before_price_unit double precision, before_extra_price_unit double precision,
+			before_term_price_unit double precision, before_total_net_price_unit double precision,
+			before_price_weight double precision, before_extra_price_weight double precision,
+			before_term_price_weight double precision, before_total_net_price_weight double precision,
+			effective_date timestamp NULL, expiry_date timestamp NULL, remark text,
+			create_by text, update_by text, update_dtm timestamp
 		);`,
 		`CREATE TABLE IF NOT EXISTS price_list_group_key (
 			id uuid PRIMARY KEY,
@@ -128,7 +139,8 @@ func createPricelistSchema() error {
 			before_price_weight double precision, before_extra_price_weight double precision,
 			before_term_price_weight double precision, before_total_net_price_weight double precision,
 			effective_date timestamp NULL, remark text, udf_json json NULL,
-			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp
+			create_by text, create_dtm timestamp, update_by text, update_dtm timestamp,
+			need_recalculate boolean NOT NULL DEFAULT false
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_list_sub_group_subgroup_code ON price_list_sub_group(subgroup_code);`,
 		`CREATE TABLE IF NOT EXISTS price_list_sub_group_key (
@@ -480,5 +492,48 @@ func TestCreatePricelist_ExtraKeysBindToOwnExtraRow(t *testing.T) {
 		if mismatched != 0 {
 			t.Errorf("%s: มี %d คีย์ที่ value ไม่ตรงกับ extra_key ของ extra ที่มันสังกัด", round, mismatched)
 		}
+	}
+}
+
+func TestCreatePricelist_PersistsGroupSeq(t *testing.T) {
+	gormx := openTestDB(t)
+	truncateAll(t, gormx)
+
+	upload := func(seq string, replaceAll bool) {
+		t.Helper()
+		sh := fullSheets()
+		sh["price_list_group"] = [][]string{
+			{"company_code", "site_code", "group_code", "group_name", "currency", "effective_date", "price_unit", "price_weight", "PG01", "Seq"},
+			{testCompany, testSite, "G1", "กลุ่ม 1", "THB", "2026-01-01", "18.5", "18.5", "PG01_1", seq},
+		}
+		req, err := buildCreatePricelistRequestFromExcel(buildXlsx(t, sh))
+		if err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		req.ReplaceAll = replaceAll
+		if resp, err := CreatePricelist(gormx, *req); err != nil || resp.ResponseCode != 0 {
+			t.Fatalf("CreatePricelist: %v %+v", err, resp)
+		}
+	}
+	seqOf := func() *int {
+		t.Helper()
+		var got *int
+		if err := gormx.Raw(`SELECT seq FROM price_list_group WHERE group_code = 'G1'`).Row().Scan(&got); err != nil {
+			t.Fatalf("select seq: %v", err)
+		}
+		return got
+	}
+
+	upload("7", true)
+	if got := seqOf(); got == nil || *got != 7 {
+		t.Fatalf("seq after replace_all = %v, want 7", got)
+	}
+	upload("", false) // blank Seq must not clobber
+	if got := seqOf(); got == nil || *got != 7 {
+		t.Fatalf("seq after blank upload = %v, want 7", got)
+	}
+	upload("3", false)
+	if got := seqOf(); got == nil || *got != 3 {
+		t.Fatalf("seq after update = %v, want 3", got)
 	}
 }

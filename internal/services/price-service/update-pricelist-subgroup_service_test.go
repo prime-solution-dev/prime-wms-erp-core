@@ -94,3 +94,23 @@ func TestUpdatePriceListSubGroup_Success_CallsRepository(t *testing.T) {
 	assert.True(t, ok, "expected map response, got %T", resp)
 	assert.Equal(t, true, m["success"])
 }
+
+func TestUpdatePriceListSubGroup_ClearsRecalculateFlag(t *testing.T) {
+	var captured models.UpdatePriceListSubGroupRequest
+	original := updateSubGroupFunc
+	updateSubGroupFunc = func(req models.UpdatePriceListSubGroupRequest) error {
+		captured = req
+		return nil
+	}
+	defer func() { updateSubGroupFunc = original }()
+
+	// ClearRecalculate เป็น json:"-" client ส่งมาเองไม่ได้ แต่ endpoint นี้ต้อง set ให้เสมอ
+	body, _ := json.Marshal(map[string]interface{}{
+		"ClearRecalculate": false,
+		"changes":          []map[string]interface{}{{"subgroup_id": uuid.New().String()}},
+	})
+
+	_, err := UpdatePriceListSubGroup(context.Background(), string(body))
+	assert.NoError(t, err)
+	assert.True(t, captured.ClearRecalculate)
+}
