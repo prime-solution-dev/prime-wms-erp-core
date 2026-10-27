@@ -23,7 +23,7 @@ import (
 
 // migrationFile คือไฟล์ที่ทีมรันด้วยมือตอน deploy เทสต์นี้รันไฟล์เดียวกันจริงๆ
 // เพื่อให้ SQL ที่ผิด syntax หรือชื่อคอลัมน์ผิดถูกจับได้ก่อนขึ้น production
-const migrationFile = "../../../migrations/2026-09-09-unit-pcs-label.sql"
+const migrationFile = "testdata/2026-09-09-unit-pcs-label.sql"
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
