@@ -1,8 +1,16 @@
-FROM golang:1.24.0 AS builder
+FROM golang:1.25 AS builder
+
+ARG GIT_TOKEN
 
 WORKDIR /app
 
+ENV GOPRIVATE=github.com/prime-solution-dev/*
+ENV GOPROXY=https://proxy.golang.org,direct
+
+RUN git config --global url."https://${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
+
 COPY go.mod go.sum ./
+
 RUN set -e; \
     for i in 1 2 3 4 5; do \
         if GOPROXY=https://proxy.golang.org,direct go mod download; then \
@@ -18,6 +26,7 @@ RUN set -e; \
     done
 
 COPY . .
+
 COPY ./cmd/.env .env
 
 ENV CGO_ENABLED=0 \

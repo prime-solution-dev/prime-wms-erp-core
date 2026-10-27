@@ -1,8 +1,29 @@
-FROM golang:1.25.0
+# =========================================================
+# Stage 1: Builder
+# =========================================================
+
+FROM golang:1.25 AS builder
 
 WORKDIR /app
 
+ENV GOPROXY=https://proxy.golang.org,direct
+
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64
+
+# GOPRIVATE makes the go tool skip the public proxy for this module path and
+# fetch it straight from GitHub over git, which is why the token has to be here.
+# The token stays in this builder stage only: the final alpine stage copies just
+# the compiled binary and the .env, so nothing lands in the shipped image.
+ARG GIT_TOKEN
+ENV GOPRIVATE=github.com/prime-solution-dev/*
+RUN if [ -n "$GIT_TOKEN" ]; then \
+        git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"; \
+    fi
+
 COPY go.mod go.sum ./
+
 RUN set -e; \
     for i in 1 2 3 4 5; do \
         if GOPROXY=https://proxy.golang.org,direct go mod download; then \
@@ -18,28 +39,54 @@ RUN set -e; \
     done
 
 COPY . .
-COPY ./cmd/.env .env
 
-RUN go mod tidy
+COPY ./cmd/.env /app/.env
 
-ENV CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64
+RUN go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/wms-reports-core \
+    ./cmd
 
-RUN go build -o wms-document-core ./cmd
 
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    fontconfig \
-    nano \
+# =========================================================
+# Stage 2: Runtime
+# =========================================================
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        fontconfig \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /usr/share/fonts/truetype/sukhumvit \
-    && cp /app/assets/fonts/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
-    && fc-cache -fv
+COPY --from=builder \
+    /out/wms-reports-core \
+    /app/wms-reports-core
+
+COPY --from=builder \
+    /app/assets \
+    /app/assets
+
+# เก็บ .env สำหรับ Docker runtime
+COPY --from=builder \
+    /app/.env \
+    /app/.env
+
+COPY assets/ /app/assets/
+
+RUN mkdir -p /app/assets/fonts/truetype/sukhumvit \
+    /usr/share/fonts/truetype/sukhumvit \
+    && cp /app/assets/fonts/*.ttf /app/assets/fonts/truetype/sukhumvit/ \
+    && cp /app/assets/fonts/truetype/sukhumvit/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
+    && fc-cache -f
 
 ENV FONT_PATH_PREFIX=/app/
 
 EXPOSE 9106
 
-CMD ["./wms-document-core"]
+CMD ["./wms-reports-core"]
