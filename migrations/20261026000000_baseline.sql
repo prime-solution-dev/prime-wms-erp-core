@@ -2,6 +2,9 @@
 -- baseline: pg_dump --schema-only ของ prime_erp (server ต้นแบบ, 2026-10-26) แปลงเป็น idempotent
 -- รันบน DB ที่มี schema อยู่แล้วจะไม่เปลี่ยนอะไร — ห้ามแก้ไฟล์นี้ ให้สร้าง migration ใหม่แทน
 -- +goose StatementBegin
+-- รอ lock ไม่เกิน 10 วินาที ถ้าตารางถูกใช้งานอยู่ให้ fail แทนการค้างรอจน traffic อื่นต่อคิว
+SET LOCAL lock_timeout = '10s';
+
 CREATE TABLE IF NOT EXISTS public.approval (
     id uuid NOT NULL,
     approve_code character varying,
@@ -963,12 +966,6 @@ END $baseline$;
 
 DO $baseline$ BEGIN
 ALTER TABLE ONLY public.group_item
-    ADD CONSTRAINT group_item_item_code_key UNIQUE (item_code);
-EXCEPTION WHEN duplicate_object OR duplicate_table OR invalid_table_definition OR object_not_in_prerequisite_state OR duplicate_function THEN NULL;
-END $baseline$;
-
-DO $baseline$ BEGIN
-ALTER TABLE ONLY public.group_item
     ADD CONSTRAINT group_item_pkey PRIMARY KEY (id);
 EXCEPTION WHEN duplicate_object OR duplicate_table OR invalid_table_definition OR object_not_in_prerequisite_state OR duplicate_function THEN NULL;
 END $baseline$;
@@ -1149,8 +1146,6 @@ END $baseline$;
 
 CREATE INDEX IF NOT EXISTS delivery_booking_company_site_idx ON public.delivery_booking USING btree (company_code, site_code);
 
-CREATE UNIQUE INDEX IF NOT EXISTS delivery_booking_delivery_code_key ON public.delivery_booking USING btree (delivery_code);
-
 CREATE INDEX IF NOT EXISTS delivery_booking_document_ref_idx ON public.delivery_booking USING btree (document_ref);
 
 CREATE INDEX IF NOT EXISTS delivery_booking_item_delivery_id_idx ON public.delivery_booking_item USING btree (delivery_id);
@@ -1171,8 +1166,6 @@ CREATE INDEX IF NOT EXISTS quotation_company_site_idx ON public.quotation USING 
 
 CREATE INDEX IF NOT EXISTS quotation_item_quotation_id_idx ON public.quotation_item USING btree (quotation_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS quotation_quotation_code_key ON public.quotation USING btree (quotation_code);
-
 CREATE INDEX IF NOT EXISTS sale_company_site_idx ON public.sale USING btree (company_code, site_code);
 
 CREATE INDEX IF NOT EXISTS sale_deposit_sale_id_idx ON public.sale_deposit USING btree (sale_id);
@@ -1180,10 +1173,6 @@ CREATE INDEX IF NOT EXISTS sale_deposit_sale_id_idx ON public.sale_deposit USING
 CREATE INDEX IF NOT EXISTS sale_item_sale_id_idx ON public.sale_item USING btree (sale_id);
 
 CREATE INDEX IF NOT EXISTS sale_item_sale_item_idx ON public.sale_item USING btree (sale_item);
-
-CREATE UNIQUE INDEX IF NOT EXISTS sale_sale_code_key ON public.sale USING btree (sale_code);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_group_item_key ON public.group_item USING btree (group_id, upper((item_code)::text));
 
 DO $baseline$ BEGIN
 ALTER TABLE ONLY public.group_item
