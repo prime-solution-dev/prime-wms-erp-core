@@ -63,6 +63,7 @@ func GetPurchaseList(
 	endCreateDate *time.Time,
 	usedStatus []string,
 	usedStatusNot []string,
+	opts PurchaseListOptions,
 ) ([]models.Purchase, int, int, int, int, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -183,6 +184,9 @@ func GetPurchaseList(
 		query = query.Where("trading_ref IN ?", tradingRef)
 	}
 
+	// Multi Select ต่อด้วย AND เสมอ จึงกรองก่อนนับ total และก่อน page / page_size
+	query = applyPurchaseMultiSelect(query, opts)
+
 	// Count total records (no preload needed)
 	if err := query.Count(&totalRecords).Error; err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -206,7 +210,7 @@ func GetPurchaseList(
         create_dtm DESC
     `
 
-	q := query.Preload("PurchaseItems").Order(orderClause).Debug()
+	q := query.Preload("PurchaseItems").Order(purchaseOrderClause(orderClause, opts.SortBy, opts.SortDir)).Debug()
 
 	if applyPaging {
 		offset := (page - 1) * pageSize

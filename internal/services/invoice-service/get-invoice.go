@@ -11,6 +11,7 @@ import (
 	paymentService "prime-erp-core/internal/services/payment-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"prime-erp-core/internal/utils"
 	"sort"
 	"strconv"
 	"time"
@@ -42,6 +43,19 @@ type GetInvoiceRequest struct {
 	LastSubmitDate     *time.Time  `json:"last_submit_date"`
 	InvoiceNotGrReturn *bool       `json:"invoice_not_gr_return"`
 
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	InvoiceCodeLikes  []InvoiceCodeLikeTerm  `json:"invoice_code_likes"`
+	InvoiceRefLikes   []InvoiceRefLikeTerm   `json:"invoice_ref_likes"`
+	PackingLikes      []PackingLikeTerm      `json:"packing_likes"`
+	SalesOrderLikes   []SalesOrderLikeTerm   `json:"sales_order_likes"`
+	CustomerCodeLikes []CustomerCodeLikeTerm `json:"customer_code_likes"`
+	CustomerNameLikes []CustomerNameLikeTerm `json:"customer_name_likes"`
+
+	// sort_by: invoice_code / invoice_ref / packing / sales_order / customer_code / customer_name
+	// sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
+
 	EndCreateDate       *time.Time `json:"end_create_date"`
 	EndDocumentDate     *time.Time `json:"end_document_date"`
 	EndLastSubmitDate   *time.Time `json:"end_last_submit_date"`
@@ -49,6 +63,69 @@ type GetInvoiceRequest struct {
 	StartDocumentDate   *time.Time `json:"start_document_date"`
 	StartLastSubmitDate *time.Time `json:"start_last_submit_date"`
 }
+
+// *_in / *_not ของแต่ละคอลัมน์เป็นค่าของคอลัมน์รหัสเสมอ
+// (invoice_code, document_ref, source_code, document_ref ของ item, party_code)
+// ยกเว้นคอลัมน์ชื่อลูกค้าที่ส่งเป็น party_code
+type InvoiceCodeLikeTerm struct {
+	Like string   `json:"invoice_code_like"`
+	In   []string `json:"invoice_code_in"`
+	Not  []string `json:"invoice_code_not"`
+}
+
+type InvoiceRefLikeTerm struct {
+	Like string   `json:"invoice_ref_like"`
+	In   []string `json:"invoice_ref_in"`
+	Not  []string `json:"invoice_ref_not"`
+}
+
+type PackingLikeTerm struct {
+	Like string   `json:"packing_like"`
+	In   []string `json:"packing_in"`
+	Not  []string `json:"packing_not"`
+}
+
+type SalesOrderLikeTerm struct {
+	Like string   `json:"sales_order_like"`
+	In   []string `json:"sales_order_in"`
+	Not  []string `json:"sales_order_not"`
+}
+
+type CustomerCodeLikeTerm struct {
+	Like string   `json:"customer_code_like"`
+	In   []string `json:"customer_code_in"`
+	Not  []string `json:"customer_code_not"`
+}
+
+type CustomerNameLikeTerm struct {
+	Like string   `json:"customer_name_like"`
+	In   []string `json:"customer_code_in"`
+	Not  []string `json:"customer_code_not"`
+}
+
+func (r GetInvoiceRequest) listOptions() repositoryInvoice.InvoiceListOptions {
+	opts := repositoryInvoice.InvoiceListOptions{SortBy: r.SortBy, SortDir: r.SortDir}
+	for _, t := range r.InvoiceCodeLikes {
+		opts.InvoiceCode = append(opts.InvoiceCode, utils.MultiSelectTerm{Column: "invoice.invoice_code", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	for _, t := range r.InvoiceRefLikes {
+		opts.InvoiceRef = append(opts.InvoiceRef, utils.MultiSelectTerm{Column: "invoice.document_ref", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	for _, t := range r.PackingLikes {
+		opts.Packing = append(opts.Packing, utils.MultiSelectTerm{Column: "ii.source_code", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	for _, t := range r.SalesOrderLikes {
+		opts.SalesOrder = append(opts.SalesOrder, utils.MultiSelectTerm{Column: "ii.document_ref", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	for _, t := range r.CustomerCodeLikes {
+		opts.CustomerCode = append(opts.CustomerCode, utils.MultiSelectTerm{Column: "invoice.party_code", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	for _, t := range r.CustomerNameLikes {
+		opts.CustomerName = append(opts.CustomerName, utils.MultiSelectTerm{Column: "invoice.party_name", Like: t.Like, In: t.In, Not: t.Not})
+	}
+	return opts
+}
+
 type ResultInvoice struct {
 	Total      int              `json:"total"`
 	Page       int              `json:"page"`
@@ -65,7 +142,7 @@ func GetInvoice(ctx context.Context, jsonPayload string) (interface{}, error) {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn, req.StartCreateDate, req.EndCreateDate, req.StartDocumentDate, req.EndDocumentDate, req.StartLastSubmitDate, req.EndLastSubmitDate)
+	invoice, totalPages, totalRecords, errDeposit := repositoryInvoice.GetInvoicePreload(req.ID, req.InvoiceCode, req.InvoiceType, req.CustomerCode, req.Status, req.DocRef, req.InvoiceRef, req.InvoiceItemDocRef, req.Page, req.PageSize, req.InvoiceCodeLike, req.InvoiceRefLike, req.PackingLike, req.SalesOrderLike, req.CustomerCodeLike, req.CustomerNameLike, req.DocumentDate, req.CreateDate, req.LastSubmitDate, req.InvoiceNotGrReturn, req.StartCreateDate, req.EndCreateDate, req.StartDocumentDate, req.EndDocumentDate, req.StartLastSubmitDate, req.EndLastSubmitDate, req.listOptions())
 	if errDeposit != nil {
 		return nil, errDeposit
 	}

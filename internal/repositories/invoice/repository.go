@@ -13,7 +13,7 @@ import (
 )
 
 // Create
-func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time, invoiceNotGrReturn *bool, startCreateDate *time.Time, endCreateDate *time.Time, startDocumentDate *time.Time, endDocumentDate *time.Time, startLastSubmitDate *time.Time, endLastSubmitDate *time.Time) ([]models.Invoice, int, int, error) {
+func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []string, customerCode []string, status []string, docRef []string, invoiceRef []string, invoiceItemDocRef []string, page int, pageSize int, invoiceCodeLike string, invoiceRefLike string, packingLike string, salesOrderLike string, customerCodeLike string, customerNameLike string, documentDate *time.Time, createDate *time.Time, lastSubmitDate *time.Time, invoiceNotGrReturn *bool, startCreateDate *time.Time, endCreateDate *time.Time, startDocumentDate *time.Time, endDocumentDate *time.Time, startLastSubmitDate *time.Time, endLastSubmitDate *time.Time, opts InvoiceListOptions) ([]models.Invoice, int, int, error) {
 	invoice := []models.Invoice{}
 
 	gormx, err := db.ConnectGORM(`prime_erp`)
@@ -146,10 +146,14 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 	}
 
 	var invoiceID []uuid.UUID
-	gormx.Table("invoice").Select("invoice.id").
+	idQuery := gormx.Table("invoice").Select("invoice.id").
 		Joins("inner join invoice_item on invoice.id = invoice_item.invoice_id").
-		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "").
-		Group("invoice.id").Scan(&invoiceID)
+		Where("1=1 " + searchID + "" + searchInvoiceCode + "" + searchInvoiceType + "" + searchInvoiceRef + "" + searchCustomerCode + "" + searchIsStatus + "" + searchDocRef + "")
+	// Multi Select ต่อท้ายด้วย AND เสมอ จึงกรองก่อนนับ total และก่อน page / page_size
+	idQuery = applyMultiSelect(idQuery, opts)
+	if errID := idQuery.Group("invoice.id").Scan(&invoiceID).Error; errID != nil {
+		return nil, 0, 0, errID
+	}
 
 	if len(invoiceID) > 0 {
 
@@ -174,7 +178,7 @@ func GetInvoicePreload(id []uuid.UUID, invoiceCode []string, invoiceType []strin
 
 		}
 
-		err = query.Order("update_dtm desc").Find(&invoice).Error
+		err = query.Order(invoiceOrderClause(opts.SortBy, opts.SortDir)).Find(&invoice).Error
 		sqlDB, err1 := gormx.DB()
 		if err1 != nil {
 			return nil, 0, 0, err1

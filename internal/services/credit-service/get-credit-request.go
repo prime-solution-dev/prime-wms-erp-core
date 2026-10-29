@@ -37,6 +37,14 @@ type GetCreditReq struct {
 	CompletedDateEnd        *time.Time  `json:"completed_date_end"`
 	CreateDateStart         *time.Time  `json:"create_date_start"`
 	CreateDateEnd           *time.Time  `json:"create_date_end"`
+
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	CustomerCodeLikes []CustomerCodeLikeTerm `json:"customer_code_likes"`
+	CustomerNameLikes []CustomerNameLikeTerm `json:"customer_name_likes"`
+
+	// sort_by: customer_code / customer_name, sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
 }
 type ResultCreditRequest struct {
 	Total         int                    `json:"total"`
@@ -81,9 +89,45 @@ func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, er
 		}
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd)
+	// ชื่อลูกค้าอยู่ใน master: resolve เป็นรหัสก่อน แล้ว AND เป็น customer_code IN ใน repository
+	// (ไม่ append เข้า req.CustomerCode เพราะเป็น scope เดิม ต้อง AND แยกกัน)
+	nameCodes, nameFiltered, errName := resolveCustomerNameCodes(req.CustomerNameLikes, fetchCustomerCodesByNameLike(ctx))
+	if errName != nil {
+		return nil, errName
+	}
+	if nameFiltered && len(nameCodes) == 0 {
+		return ResultCreditRequest{
+			Total: 0, Page: req.Page, PageSize: req.PageSize,
+			TotalPages: 0, CreditRequest: []models.CreditRequest{},
+		}, nil
+	}
+
+	// เรียงตามชื่อต้อง resolve ชื่อก่อนตัดหน้า จึงดึงทั้งหมดมาเรียงเองแล้วค่อยตัดหน้า
+	sortByName := req.SortBy == "customer_name"
+	repoPage, repoPageSize := req.Page, req.PageSize
+	if sortByName {
+		repoPage, repoPageSize = 0, 0
+	}
+
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, repoPage, repoPageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd, req.listOptions(nameCodes))
 	if errApproval != nil {
 		return nil, errApproval
+	}
+	if sortByName && len(credit) > 0 {
+		allCodes := make([]string, 0, len(credit))
+		for _, creditValue := range credit {
+			allCodes = append(allCodes, creditValue.CustomerCode)
+		}
+		customers, err := customerService.GetCustomers(ctx, map[string]interface{}{"customer_code": allCodes})
+		if err != nil {
+			return nil, err
+		}
+		names := make(map[string]string, len(customers.Customers))
+		for _, customer := range customers.Customers {
+			names[customer.CustomerCode] = customer.CustomerName
+		}
+		sortCreditRequestsByName(credit, names, req.SortDir == "desc" || req.SortDir == "DESC")
+		credit, totalPages = paginateCreditRequests(credit, req.Page, req.PageSize)
 	}
 	if len(credit) == 0 {
 		return ResultCreditRequest{
