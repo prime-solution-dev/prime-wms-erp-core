@@ -1,10 +1,10 @@
 pipeline {
     agent any
     environment {
-        REPO_NAME = 'prime-wms-document-core'        
-        IMAGE_NAME = 'wms-document-core'
+        REPO_NAME = 'prime-wms-reports-core'        
+        IMAGE_NAME = 'wms-reports-core'
         PORT = '9106:9106'  
-        CONTAINER_NAME = 'wms-document-core-container'
+        CONTAINER_NAME = 'wms-reports-core-container'
         TARGET_BRANCH = 'Kernel-uat'
         REMOTE_USER = 'ubuntu'
         REMOTE_HOST = '47.128.166.228'
