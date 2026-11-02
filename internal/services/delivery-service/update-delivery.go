@@ -92,8 +92,20 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	}
 
 	previousOf := map[uuid.UUID]models.Delivery{}
+	companyCodes := []string{}
 	for _, delivery := range previousDeliveries {
 		previousOf[delivery.ID] = delivery
+		companyCodes = append(companyCodes, delivery.CompanyCode)
+	}
+
+	// ใช้ company_code จากแถวใน DB หน้าบ้านอาจไม่ส่งมาตอนแก้ใบ
+	weightDigits, err := getWeightDigits(ctx, companyCodes)
+	if err != nil {
+		return nil, err
+	}
+	weightDigitOf := map[uuid.UUID]int{}
+	for _, delivery := range previousDeliveries {
+		weightDigitOf[delivery.ID] = weightDigits[delivery.CompanyCode]
 	}
 
 	updateDeliveries := []models.Delivery{}
@@ -144,7 +156,7 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 			"license_plate":      tempDelivery.LicensePlate,
 			"contact_name":       tempDelivery.ContactName,
 			"tel":                tempDelivery.Tel,
-			"total_weight":       roundWeight(tempDelivery.TotalWeight),
+			"total_weight":       roundWeight(tempDelivery.TotalWeight, weightDigitOf[deliveryReq.ID]),
 			"remark":             tempDelivery.Remark,
 			"booking_slot_type":  tempDelivery.BookingSlotType,
 			"status":             tempDelivery.Status,
@@ -161,7 +173,7 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 			// sale_qty / total_weight = ของที่บรรทัดนี้จองเอง ไม่ใช้ค่าที่หน้าบ้านส่ง
 			// หน้าบ้านเคยส่งยอดทั้งบรรทัด SO มา ทำให้ ATP (อ่าน total_weight) นับน้ำหนักจองผิดเมื่อจองบางส่วน
 			item.DeliveryItem.SaleQty = item.DeliveryItem.Qty
-			item.DeliveryItem.TotalWeight = roundWeight(item.DeliveryItem.Weight)
+			item.DeliveryItem.TotalWeight = roundWeight(item.DeliveryItem.Weight, weightDigitOf[deliveryReq.ID])
 
 			updateDeliveryItems = append(updateDeliveryItems, item.DeliveryItem)
 
@@ -172,9 +184,9 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 				"price_list_unit": item.DeliveryItem.PriceListUnit,
 				"sale_qty":        item.DeliveryItem.SaleQty,
 				"sale_unit_code":  item.DeliveryItem.SaleUnitCode,
-				"total_weight":    roundWeight(item.DeliveryItem.TotalWeight),
-				"weight":          roundWeight(item.DeliveryItem.Weight),
-				"weight_unit":     roundWeight(item.DeliveryItem.WeightUnit),
+				"total_weight":    roundWeight(item.DeliveryItem.TotalWeight, weightDigitOf[deliveryReq.ID]),
+				"weight":          roundWeight(item.DeliveryItem.Weight, weightDigitOf[deliveryReq.ID]),
+				"weight_unit":     roundWeight(item.DeliveryItem.WeightUnit, weightDigitOf[deliveryReq.ID]),
 				"remark":          item.DeliveryItem.Remark,
 				"status":          item.DeliveryItem.Status,
 				"update_date":     item.DeliveryItem.UpdateDate,
@@ -286,7 +298,7 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	// เดิม commit ไปแล้วค่อยยิง ถ้า WMS พังใบจะดูเหมือน submit สำเร็จแต่คลังไม่เคยได้ order
 	var orderCode string
 	if len(newOrderDeliveries) > 0 {
-		orderRes, err := CreateOrderForUpdate(ctx, newOrderDeliveries, updateDeliveries, updateDeliveryItems)
+		orderRes, err := CreateOrderForUpdate(ctx, newOrderDeliveries, updateDeliveries, updateDeliveryItems, weightDigitOf)
 		if err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update external order: %v", err)
@@ -297,7 +309,7 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	}
 
 	for _, deliveryReq := range updateOrderDeliveries {
-		if err := UpdateOrderByDeliveryForUpdate(ctx, deliveryReq, updateDeliveries); err != nil {
+		if err := UpdateOrderByDeliveryForUpdate(ctx, deliveryReq, updateDeliveries, weightDigitOf[deliveryReq.ID]); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update order by delivery for %s: %v", deliveryReq.DeliveryCode, err)
 		}
@@ -318,7 +330,7 @@ func UpdateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	return res, nil
 }
 
-func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem, weightDigitOf map[uuid.UUID]int) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 
@@ -362,8 +374,8 @@ func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, del
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCodeForOrder,
 				SaleMethod:        item.SaleMethodForOrder,
-				Weight:            roundWeight(item.Weight),
-				WeightUnit:        roundWeight(item.WeightUnit),
+				Weight:            roundWeight(item.Weight, weightDigitOf[deliveryReq.ID]),
+				WeightUnit:        roundWeight(item.WeightUnit, weightDigitOf[deliveryReq.ID]),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
@@ -435,7 +447,7 @@ func CreateOrderForUpdate(ctx context.Context, req []DeliveryDocumentUpdate, del
 	return createOrderResponse, nil
 }
 
-func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery) error {
+func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDocumentUpdate, updateDeliveries []models.Delivery, weightDigit int) error {
 	// Find the corresponding delivery from updateDeliveries
 	// เทียบด้วย id ของใบ ไม่ใช่ DocumentRef (เลข SO) ซึ่งซ้ำกันได้หลายใบ
 	var delivery models.Delivery
@@ -467,9 +479,9 @@ func UpdateOrderByDeliveryForUpdate(ctx context.Context, deliveryReq DeliveryDoc
 			SerialCode:           "",
 			SaleUnitCode:         item.SaleUnitCodeForOrder,
 			SaleMethod:           item.SaleMethodForOrder,
-			InterfaceOrderWeight: roundWeight(item.Weight),
-			Weight:               roundWeight(item.Weight),
-			WeightUnit:           roundWeight(item.WeightUnit),
+			InterfaceOrderWeight: roundWeight(item.Weight, weightDigit),
+			Weight:               roundWeight(item.Weight, weightDigit),
+			WeightUnit:           roundWeight(item.WeightUnit, weightDigit),
 			MfgDate:              nil,
 			ExpDate:              nil,
 			LocationCode:         "",
