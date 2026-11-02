@@ -66,7 +66,7 @@ type CreateDeliveryItemsRequest struct {
 // total_weight = น้ำหนักที่บรรทัดนี้จองเอง (ค่าเดียวกับ weight) ไม่ใช่น้ำหนักทั้งบรรทัด SO
 // เพราะ ATP ของ wms-warehouse-service อ่านคอลัมน์นี้เป็นน้ำหนักที่ใบจองกันไว้
 // sale_qty = qty ที่จอง (บรรทัด SO ทุกแบบ sale_qty = qty เพราะหน่วยขาย PC = base PCS)
-func newDeliveryItem(deliveryID uuid.UUID, numItem int, item CreateDeliveryItemsRequest, user string, nowDateOnly time.Time) models.DeliveryItem {
+func newDeliveryItem(deliveryID uuid.UUID, numItem int, item CreateDeliveryItemsRequest, user string, nowDateOnly time.Time, weightDigit int) models.DeliveryItem {
 	return models.DeliveryItem{
 		ID:              uuid.New(),
 		DeliveryItem:    fmt.Sprintf("ITEM-%s-%d", deliveryID.String(), numItem),
@@ -78,9 +78,9 @@ func newDeliveryItem(deliveryID uuid.UUID, numItem int, item CreateDeliveryItems
 		PriceListUnit:   item.PriceListUnit,
 		SaleQty:         item.Qty,
 		SaleUnitCode:    item.SaleUnitCode,
-		TotalWeight:     roundWeight(item.Weight),
-		Weight:          roundWeight(item.Weight),
-		WeightUnit:      roundWeight(item.WeightUnit),
+		TotalWeight:     roundWeight(item.Weight, weightDigit),
+		Weight:          roundWeight(item.Weight, weightDigit),
+		WeightUnit:      roundWeight(item.WeightUnit, weightDigit),
 		Status:          "PENDING",
 		DocumentRefItem: item.DocumentRefItem,
 		Remark:          item.Remark,
@@ -125,6 +125,15 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 		}
 	}
 	if err := ValidateBookingQty(ctx, gormx, bookingLines, nil); err != nil {
+		return nil, err
+	}
+
+	companyCodes := []string{}
+	for _, deliveryReq := range req {
+		companyCodes = append(companyCodes, deliveryReq.CompanyCode)
+	}
+	weightDigits, err := getWeightDigits(ctx, companyCodes)
+	if err != nil {
 		return nil, err
 	}
 
@@ -227,7 +236,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 			LicensePlate:     deliveryReq.LicensePlate,
 			ContactName:      deliveryReq.ContactName,
 			Tel:              deliveryReq.Tel,
-			TotalWeight:      roundWeight(deliveryReq.TotalWeight),
+			TotalWeight:      roundWeight(deliveryReq.TotalWeight, weightDigits[deliveryReq.CompanyCode]),
 			Remark:           deliveryReq.Remark,
 			Status: func() string {
 				if deliveryReq.IsDraft {
@@ -248,7 +257,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 		deliveryToAdd = append(deliveryToAdd, newDelivery)
 
 		for numItem, deliveryItem := range deliveryReq.DeliveryItems {
-			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem(deliveryId, numItem, deliveryItem, user, nowDateOnly))
+			deliveryItemToAdd = append(deliveryItemToAdd, newDeliveryItem(deliveryId, numItem, deliveryItem, user, nowDateOnly, weightDigits[deliveryReq.CompanyCode]))
 		}
 	}
 
@@ -278,7 +287,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	var orderRes orderExternalService.CreateOrderResponse
 	// Only call external service if there are non-draft deliveries
 	if hasNonDraftDelivery {
-		orderRes, err = CreateOrder(ctx, req, deliveryToAdd, deliveryItemToAdd)
+		orderRes, err = CreateOrder(ctx, req, deliveryToAdd, deliveryItemToAdd, weightDigits)
 		if err != nil {
 			return nil, err
 		}
@@ -304,7 +313,7 @@ func CreateDelivery(ctx context.Context, jsonPayload string) (interface{}, error
 	return response, nil
 }
 
-func CreateOrder(ctx context.Context, req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem) (orderExternalService.CreateOrderResponse, error) {
+func CreateOrder(ctx context.Context, req []CreateDeliveryRequest, deliveryToAdd []models.Delivery, deliveryItemToAdd []models.DeliveryItem, weightDigits map[string]int) (orderExternalService.CreateOrderResponse, error) {
 	createOrderRequest := orderExternalService.CreateOrderRequest{}
 	createOrderdetail := []orderExternalService.CreateOrderDetail{}
 	// deliveryToAdd เรียงตรงกับ req ทีละใบ (สร้างมาจากลูปเดียวกัน) ส่วน deliveryItemToAdd
@@ -347,8 +356,8 @@ func CreateOrder(ctx context.Context, req []CreateDeliveryRequest, deliveryToAdd
 				SerialCode:        "",
 				SaleUnitCode:      item.SaleUnitCode,
 				SaleMethod:        item.SaleMethod,
-				Weight:            roundWeight(item.Weight),
-				WeightUnit:        roundWeight(item.WeightUnit),
+				Weight:            roundWeight(item.Weight, weightDigits[deliveryReq.CompanyCode]),
+				WeightUnit:        roundWeight(item.WeightUnit, weightDigits[deliveryReq.CompanyCode]),
 				Remark:            item.Remark,
 				Status:            "PENDING",
 			}
