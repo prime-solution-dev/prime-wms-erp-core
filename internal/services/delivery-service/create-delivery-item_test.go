@@ -22,7 +22,7 @@ func TestNewDeliveryItemFillsBookedFields(t *testing.T) {
 		DocumentRefItem: "SO-ITEM-1",
 		SaleUnitCode:    "PC",
 		PriceListUnit:   22.7,
-	}, "tester", now)
+	}, "tester", now, 2)
 
 	if item.TotalWeight != 5280 {
 		t.Fatalf("total_weight = %v, want booked weight 5280 (not SO line weight)", item.TotalWeight)
@@ -48,7 +48,7 @@ func TestNewDeliveryItemTotalWeightFollowsLineWeight(t *testing.T) {
 		Weight:      1260.004,
 		TotalWeight: 99999,
 		SaleQty:     30,
-	}, "tester", time.Now())
+	}, "tester", time.Now(), 2)
 
 	if item.TotalWeight != 1260 {
 		t.Fatalf("total_weight = %v, want 1260 (rounded line weight)", item.TotalWeight)
@@ -57,7 +57,7 @@ func TestNewDeliveryItemTotalWeightFollowsLineWeight(t *testing.T) {
 
 // sale_qty = qty ที่จองเสมอ ไม่ใช้ค่าที่หน้าบ้านส่ง (เคยส่ง sale_qty ทั้งบรรทัด SO มา)
 func TestNewDeliveryItemSaleQtyIsBookedQty(t *testing.T) {
-	item := newDeliveryItem(uuid.New(), 0, CreateDeliveryItemsRequest{Qty: 4, SaleQty: 100, Weight: 10}, "tester", time.Now())
+	item := newDeliveryItem(uuid.New(), 0, CreateDeliveryItemsRequest{Qty: 4, SaleQty: 100, Weight: 10}, "tester", time.Now(), 2)
 
 	if item.SaleQty != 4 {
 		t.Fatalf("sale_qty = %v, want booked qty 4", item.SaleQty)
