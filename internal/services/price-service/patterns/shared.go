@@ -4,7 +4,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"math"
 	"prime-erp-core/internal/models"
 	"regexp"
 	"sort"
@@ -533,15 +532,15 @@ func getValueCodeByGroupCode(subGroupKeys []models.PriceListSubGroupKeyResponse,
 // แสดงคอลัมน์ batch_no โดย 1 row = 1 batch ค่าระดับ site จะไม่สื่ออะไรใน row แบบนั้น
 //
 // คืน 0 (ไม่ใช่ string ว่าง) เมื่อไม่มีข้อมูลสต็อก เพื่อให้กริดแสดงเลข 0
-// และ format เป็นตัวเลขได้
+// และ format เป็นตัวเลขได้ ค่าถูกปัดตาม weight_digit มาแล้วตอนแนบสต็อก (loadPriceData)
 func getAvgKgStockFromInventory(sg models.PriceListSubGroupResponse, perBatch bool) float64 {
 	if len(sg.InventoryWeight) == 0 {
 		return 0
 	}
 	if perBatch {
-		return roundTo2(sg.InventoryWeight[0].AvgWeight)
+		return sg.InventoryWeight[0].AvgWeight
 	}
-	return roundTo2(sg.InventoryWeight[0].AvgProduct)
+	return sg.InventoryWeight[0].AvgProduct
 }
 
 // patternHasBatchColumn บอกว่า pattern นี้แสดงข้อมูลแยกต่อ batch หรือไม่
@@ -691,10 +690,6 @@ func getQtyFromInventory(sg models.PriceListSubGroupResponse) float64 {
 		return inv.TotalQty
 	}
 	return 0
-}
-
-func roundTo2(v float64) float64 {
-	return math.Round(v*100) / 100
 }
 
 // udfNumeric reads a numeric udf_json value. The grid saves these fields through

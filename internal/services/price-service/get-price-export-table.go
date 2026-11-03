@@ -159,9 +159,10 @@ func GetPriceExportTable(ctx context.Context, jsonPayload string) (interface{}, 
 			inventoryMap := make(map[string][]models.InventoryWeightResponse)
 			// weight_spec มาระดับ result และต้องใช้ได้แม้ subgroup ไม่มีสต็อก
 			weightSpecMap := make(map[string]float64)
+			weightDigit := weightDigitForDisplay(ctx, companyCode)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
-				weightSpecMap[invItem.ID] = invItem.WeightSpec
+				weightSpecMap[invItem.ID] = roundWeight(invItem.WeightSpec, weightDigit)
 			}
 
 			// Enrich subgroups with inventory data
@@ -171,7 +172,7 @@ func GetPriceExportTable(ctx context.Context, jsonPayload string) (interface{}, 
 					sg.WeightSpec = weightSpecMap[sg.ID.String()]
 					if inventoryWeights, ok := inventoryMap[sg.ID.String()]; ok && len(inventoryWeights) > 0 {
 						// For export, use first inventory record per subgroup
-						inv := inventoryWeights[0]
+						inv := roundInventoryWeight(inventoryWeights[0], weightDigit)
 						sg.InventoryWeight = []models.InventoryWeightResponse{inv}
 						sg.ProductCode = inv.ProductCode
 						sg.SupplierCode = inv.SupplierCode
