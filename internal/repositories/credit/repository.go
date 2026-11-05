@@ -280,6 +280,7 @@ func GetCreditRequestPreload(
 	completedDateEnd *time.Time,
 	createDateStart *time.Time,
 	createDateEnd *time.Time,
+	opts CreditRequestListOptions,
 ) ([]models.CreditRequest, int, int, error) {
 
 	creditRequest := []models.CreditRequest{}
@@ -358,6 +359,9 @@ func GetCreditRequestPreload(
 			createDateEnd,
 		)
 	}
+
+	// Multi Select กรองก่อน group / count / pagination จึงนับ total หลังกรอง
+	query = applyCreditRequestMultiSelect(query, opts)
 
 	// =========================
 	// Group Query
@@ -475,7 +479,7 @@ func GetCreditRequestPreload(
 		Table("(?) AS sub", baseQuery)
 
 	err = dataQuery.
-		Order("sub.is_approve DESC").
+		Order(creditRequestOrderClause(opts.SortBy, opts.SortDir)).
 		Limit(pageSize).
 		Offset(offset).
 		Find(&creditRequest).Error

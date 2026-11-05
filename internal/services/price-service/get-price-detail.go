@@ -341,9 +341,10 @@ func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceLi
 			// weight_spec มาระดับ result ไม่ได้อยู่ใน InventoryWeight จึงต้องเก็บ map แยก
 			// และต้องใช้ได้แม้ subgroup นั้นไม่มีสต็อก
 			weightSpecMap := make(map[string]float64)
+			weightDigit := weightDigitForDisplay(ctx, companyCode)
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
-				weightSpecMap[invItem.ID] = invItem.WeightSpec
+				weightSpecMap[invItem.ID] = roundWeight(invItem.WeightSpec, weightDigit)
 			}
 
 			// Create new result with expanded subgroups for multiple inventory records
@@ -361,7 +362,7 @@ func transformToGetPriceListResponse(ctx context.Context, responses []GetPriceLi
 							expandedSG := sg // Copy the subgroup
 
 							// Set inventory-specific data
-							expandedSG.InventoryWeight = []models.InventoryWeightResponse{inv}
+							expandedSG.InventoryWeight = []models.InventoryWeightResponse{roundInventoryWeight(inv, weightDigit)}
 							expandedSG.ProductCode = inv.ProductCode
 							expandedSG.SupplierCode = inv.SupplierCode
 							expandedSG.SupplierName = inv.SupplierName

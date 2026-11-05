@@ -22,7 +22,7 @@ func TestGetAvgKgStockFromInventory(t *testing.T) {
 		perBatch bool
 		want     float64
 	}{
-		{name: "pattern ทั่วไปใช้ค่าระดับ site", perBatch: false, want: 3.0},
+		{name: "pattern ทั่วไปใช้ค่าระดับ site", perBatch: false, want: 2.9969},
 		{name: "pattern ที่แสดง batch ใช้ค่าระดับ batch", perBatch: true, want: 32.0},
 	}
 
@@ -48,19 +48,19 @@ func TestGetAvgKgStockFromInventoryNoStock(t *testing.T) {
 	}
 }
 
-// ค่าที่แสดงต้องถูกปัดเป็น 2 ตำแหน่งเหมือนพฤติกรรมเดิม
-func TestGetAvgKgStockFromInventoryRoundsToTwoDecimals(t *testing.T) {
+// ไม่ปัดซ้ำใน pattern — loadPriceData ปัดตาม weight_digit ของบริษัทมาแล้ว (ปัด 2 ตรงนี้จะทับ 3 หลักของ TMI)
+func TestGetAvgKgStockFromInventoryKeepsDigits(t *testing.T) {
 	sg := models.PriceListSubGroupResponse{
 		InventoryWeight: []models.InventoryWeightResponse{
-			{AvgWeight: 9.16666666, AvgProduct: 2.99690876},
+			{AvgWeight: 9.167, AvgProduct: 2.997},
 		},
 	}
 
-	if got := getAvgKgStockFromInventory(sg, false); got != 3.0 {
-		t.Errorf("site: ได้ %v ต้องเป็น 3", got)
+	if got := getAvgKgStockFromInventory(sg, false); got != 2.997 {
+		t.Errorf("site: ได้ %v ต้องเป็น 2.997", got)
 	}
-	if got := getAvgKgStockFromInventory(sg, true); got != 9.17 {
-		t.Errorf("batch: ได้ %v ต้องเป็น 9.17", got)
+	if got := getAvgKgStockFromInventory(sg, true); got != 9.167 {
+		t.Errorf("batch: ได้ %v ต้องเป็น 9.167", got)
 	}
 }
 

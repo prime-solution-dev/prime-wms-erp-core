@@ -487,6 +487,60 @@ type GetPurchaseRequest struct {
 	ItemsProductGroupOneNameLike string     `json:"items_product_group_one_name_like"`
 	StartCreateDate              *time.Time `json:"start_create_date"`
 	EndCreateDate                *time.Time `json:"end_create_date"`
+
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	PurchaseCodeLikes             []PurchaseCodeLikeTerm             `json:"purchase_code_likes"`
+	DocRefLikes                   []DocRefLikeTerm                   `json:"doc_ref_likes"`
+	SupplierCodeLikes             []SupplierCodeLikeTerm             `json:"supplier_code_likes"`
+	SupplierNameLikes             []SupplierNameLikeTerm             `json:"supplier_name_likes"`
+	ItemsProductCodeLikes         []ItemsProductCodeLikeTerm         `json:"items_product_code_likes"`
+	ItemsProductDescLikes         []ItemsProductDescLikeTerm         `json:"items_product_desc_likes"`
+	ItemsProductGroupOneNameLikes []ItemsProductGroupOneNameLikeTerm `json:"items_product_group_one_name_likes"`
+
+	// sort_by: purchase_code / doc_ref / supplier_code / supplier_name / items_product_code /
+	// items_product_desc / items_product_group_one_name, sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
+}
+
+// ค้นด้วย ILIKE อย่างเดียว ไม่มี _in / _not
+type PurchaseCodeLikeTerm struct {
+	Like string `json:"purchase_code_like"`
+}
+
+type DocRefLikeTerm struct {
+	Like string `json:"doc_ref_like"`
+}
+
+// *_in / *_not เป็นรหัสของคอลัมน์เสมอ แม้ entry จะอยู่ในคอลัมน์ชื่อ (คอลัมน์ชื่อแสดงชื่อแต่ส่งรหัส)
+type SupplierCodeLikeTerm struct {
+	Like string   `json:"supplier_code_like"`
+	In   []string `json:"supplier_code_in"`
+	Not  []string `json:"supplier_code_not"`
+}
+
+type SupplierNameLikeTerm struct {
+	Like string   `json:"supplier_name_like"`
+	In   []string `json:"supplier_code_in"`
+	Not  []string `json:"supplier_code_not"`
+}
+
+type ItemsProductCodeLikeTerm struct {
+	Like string   `json:"items_product_code_like"`
+	In   []string `json:"items_product_code_in"`
+	Not  []string `json:"items_product_code_not"`
+}
+
+type ItemsProductDescLikeTerm struct {
+	Like string   `json:"items_product_desc_like"`
+	In   []string `json:"items_product_code_in"`
+	Not  []string `json:"items_product_code_not"`
+}
+
+type ItemsProductGroupOneNameLikeTerm struct {
+	Like string   `json:"items_product_group_one_name_like"`
+	In   []string `json:"items_product_group_one_code_in"`
+	Not  []string `json:"items_product_group_one_code_not"`
 }
 
 type PurchaseItemResponse struct {

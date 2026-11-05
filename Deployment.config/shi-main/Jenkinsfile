@@ -1,6 +1,7 @@
 pipeline {
     agent any
     environment {
+        DEPLOY_STATE_DIR = '/wms/deploy-state'
         REPO_NAME = 'prime-wms-erp-core'      
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
@@ -12,6 +13,11 @@ pipeline {
         VAULT_PATH = 'JenkinsWMS/jenkins.shiseidomain'
         ENV_FILE_KEY = 'shiseidomain.env.erp'
         DOCKERFILEPATH = 'Deployment.config/shi-main/Dockerfile'
+    }
+    parameters {
+        choice(name: 'MIGRATE', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ migrations/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
+        choice(name: 'SEED', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ seeds/<SEED_SET>/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
+        string(name: 'SEED_SET', defaultValue: '', description: 'folder ใต้ seeds/ ที่จะรัน (ว่าง = TARGET_BRANCH)')
     }
     stages {
         stage('Check SSH Key Access and User') {
@@ -74,6 +80,90 @@ stage('Clone Repository') {
         }
     }
 }
+        stage('Check GitHub Changes') {
+            steps {
+                script {
+                    def migrateMode = params.MIGRATE ?: 'auto'
+                    def seedMode = params.SEED ?: 'auto'
+                    env.SEED_DIR = params.SEED_SET?.trim() ? params.SEED_SET.trim() : env.TARGET_BRANCH
+                    if (!(env.SEED_DIR ==~ /[A-Za-z0-9_-]+/)) {
+                        error("SEED_SET must be a folder name under seeds/ (letters, digits, _ or -): ${env.SEED_DIR}")
+                    }
+                    if (env.SEED_DIR in ['schema', 'dev']) {
+                        error("SEED_SET must not be '${env.SEED_DIR}' (reserved folder under seeds/)")
+                    }
+                    env.STATE_KEY = env.JOB_NAME.replaceAll('[^A-Za-z0-9_.-]', '_')
+                    echo 'Comparing the fetched GitHub commit with the last deployed commit...'
+                    def changeFlags = sh(
+                        script: '''
+                            set -eu
+                            ssh -o StrictHostKeyChecking=no -i "$SSH_KEY_PATH" \
+                                "$REMOTE_USER@$REMOTE_HOST" \
+                                bash -s -- "$REPO_NAME" "$DEPLOY_STATE_DIR" "$SEED_DIR" "$STATE_KEY" <<'REMOTE_SCRIPT'
+set -eu
+repo_name=$1
+state_dir=$2
+seed_dir=$3
+state_key=$4
+cd "$repo_name"
+current=$(git rev-parse HEAD)
+state_file="$state_dir/$state_key.commit"
+if [ ! -s "$state_file" ]; then
+    echo 'No previous deployed commit; treating migrations and seeds as changed.' >&2
+    echo 'true true'
+else
+    previous=$(cat "$state_file")
+    if ! git cat-file -e "$previous^{commit}" 2>/dev/null; then
+        git fetch --depth 1 origin "$previous" >&2 || { echo 'previous commit unavailable; treating as changed' >&2; echo 'true true'; exit 0; }
+    fi
+    changed=$(git diff --name-only "$previous" "$current" -- migrations/ "seeds/$seed_dir/")
+    migrations=false
+    seeds=false
+    printf '%s\n' "$changed" | grep -q '^migrations/' && migrations=true || true
+    printf '%s\n' "$changed" | grep -q "^seeds/$seed_dir/" && seeds=true || true
+    echo "$migrations $seeds"
+fi
+REMOTE_SCRIPT
+                        ''',
+                        returnStdout: true
+                    ).trim()
+                    def flags = changeFlags.tokenize()
+                    if (flags.size() != 2 || !(flags[0] in ['true', 'false']) || !(flags[1] in ['true', 'false'])) {
+                        error("Could not determine migration/seed changes from GitHub: ${changeFlags}")
+                    }
+                    if (params.SEED_SET?.trim() && seedMode == 'auto') {
+                        flags[1] = 'true'
+                    }
+                    env.RECORD_COMMIT = (!((migrateMode == 'skip' && flags[0] == 'true') || (seedMode == 'skip' && flags[1] == 'true'))).toString()
+                    if (env.RECORD_COMMIT == 'false') {
+                        echo 'WARNING: changes skipped; deployed commit not recorded so next auto run will apply them'
+                    }
+                    env.RUN_MIGRATE = (migrateMode == 'force' || (migrateMode == 'auto' && flags[0] == 'true')).toString()
+                    env.RUN_SEED = (seedMode == 'force' || (seedMode == 'auto' && flags[1] == 'true')).toString()
+                    echo "MIGRATE=${migrateMode} changed=${flags[0]} -> run=${env.RUN_MIGRATE}; SEED=${seedMode} set=${env.SEED_DIR} changed=${flags[1]} -> run=${env.RUN_SEED}"
+                }
+            }
+        }
+        stage('Ensure Go Migration Image') {
+            when {
+                expression { env.RUN_MIGRATE == 'true' || env.RUN_SEED == 'true' }
+            }
+            steps {
+                script {
+                    sh '''
+                        set -eu
+                        ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" bash -s <<'REMOTE_IMAGE_CHECK'
+set -eu
+if docker image inspect golang:1.25 >/dev/null 2>&1; then
+    echo 'Found golang:1.25 locally; skipping pull.'
+else
+    docker pull golang:1.25
+fi
+REMOTE_IMAGE_CHECK
+                    '''
+                }
+            }
+        }
         stage('Check Workspace') {
             steps {
                 script {
@@ -141,6 +231,94 @@ EOF
     }
 }
 
+stage('Run Database Migrations') {
+    when { expression { env.RUN_MIGRATE == 'true' } }
+    steps {
+        script {
+            echo 'Running database migrations (schema) before replacing the container...'
+            withVault([vaultSecrets: [[
+                path: "${VAULT_PATH}",
+                engineVersion: 2,
+                secretValues: [[envVar: 'MIGRATION_ENV', vaultKey: "${ENV_FILE_KEY}"]]
+            ]]]) {
+                withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        printf '%s\n' "$MIGRATION_ENV" | ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            "cd '$REPO_NAME' && umask 077 && cat > .env && chmod 600 .env"
+                        printf 'GIT_TOKEN=%s\n' "$GIT_TOKEN" | ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            "cd '$REPO_NAME' && umask 077 && cat > .migration-secrets && chmod 600 .migration-secrets"
+                        ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            bash -s -- "$REPO_NAME" <<'REMOTE_TASK_SCRIPT'
+set -eu
+repo_name=$1
+cd "$repo_name"
+run_status=0
+docker run --rm --network host --env-file .migration-secrets \
+    -e 'GOPRIVATE=github.com/prime-solution-dev/*' \
+    -v gomodcache:/go/pkg/mod -v gobuildcache:/root/.cache/go-build \
+    -v "$PWD:/src" -w /src golang:1.25 sh -ec '
+        set -eu
+        umask 077
+        printf "machine github.com\nlogin x-access-token\npassword %s\n" "$GIT_TOKEN" > /root/.netrc
+        trap "rm -f /root/.netrc" EXIT
+        go run ./cmd/migrate -command up
+    ' || run_status=$?
+rm -f .env .migration-secrets
+exit "$run_status"
+REMOTE_TASK_SCRIPT
+                    '''
+                }
+            }
+        }
+    }
+}
+stage('Run Database Seeds') {
+    when { expression { env.RUN_SEED == 'true' } }
+    steps {
+        script {
+            echo "Running database seeds from seeds/${env.SEED_DIR}/ before replacing the container..."
+            withVault([vaultSecrets: [[
+                path: "${VAULT_PATH}",
+                engineVersion: 2,
+                secretValues: [[envVar: 'SEED_ENV', vaultKey: "${ENV_FILE_KEY}"]]
+            ]]]) {
+                withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                    sh '''
+                        set +x
+                        set -eu
+                        printf '%s\n' "$SEED_ENV" | ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            "cd '$REPO_NAME' && umask 077 && cat > .env && chmod 600 .env"
+                        printf 'GIT_TOKEN=%s\n' "$GIT_TOKEN" | ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            "cd '$REPO_NAME' && umask 077 && cat > .migration-secrets && chmod 600 .migration-secrets"
+                        ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                            bash -s -- "$REPO_NAME" "$SEED_DIR" <<'REMOTE_TASK_SCRIPT'
+set -eu
+repo_name=$1
+seed_dir=$2
+cd "$repo_name"
+run_status=0
+docker run --rm --network host --env-file .migration-secrets \
+    -e 'GOPRIVATE=github.com/prime-solution-dev/*' \
+    -v gomodcache:/go/pkg/mod -v gobuildcache:/root/.cache/go-build \
+    -e SEED_DIR="$seed_dir" \
+    -v "$PWD:/src" -w /src golang:1.25 sh -ec '
+        set -eu
+        umask 077
+        printf "machine github.com\nlogin x-access-token\npassword %s\n" "$GIT_TOKEN" > /root/.netrc
+        trap "rm -f /root/.netrc" EXIT
+        go run ./cmd/migrate -set "$SEED_DIR" -command up
+    ' || run_status=$?
+rm -f .env .migration-secrets
+exit "$run_status"
+REMOTE_TASK_SCRIPT
+                    '''
+                }
+            }
+        }
+    }
+}
 stage('Build Docker Image') {
     steps {
         script {
@@ -187,6 +365,18 @@ stage('Deploy Container') {
                     docker tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${IMAGE_NAME}:latest
                 '
             """
+        }
+    }
+}
+stage('Record Deployed Commit') {
+    when { expression { env.RECORD_COMMIT == 'true' } }
+    steps {
+        script {
+            sh '''
+                set -eu
+                ssh -i "$SSH_KEY_PATH" "$REMOTE_USER@$REMOTE_HOST" \
+                    "set -eu; mkdir -p '$DEPLOY_STATE_DIR'; cd '$REPO_NAME'; git rev-parse HEAD > '$DEPLOY_STATE_DIR/$STATE_KEY.commit.tmp'; mv '$DEPLOY_STATE_DIR/$STATE_KEY.commit.tmp' '$DEPLOY_STATE_DIR/$STATE_KEY.commit'"
+            '''
         }
     }
 }
