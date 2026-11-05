@@ -128,7 +128,7 @@ func CreateInvoiceCN(ctx context.Context, jsonPayload string) (interface{}, erro
 		}
 		mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
 		if errGetProductInterface != nil {
-			return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+			return nil, errors.New("failed to get product interface : " + errGetProductInterface.Error())
 		}
 		reqHook := slices.Clone(req)
 		for i := range reqHook {
