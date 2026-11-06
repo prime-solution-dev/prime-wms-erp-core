@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = 'wms-document-core'
         PORT = '9106:9106'  
         CONTAINER_NAME = 'wms-reports-core-container'
-        BRANCH = 'Develop'
+        TARGET_BRANCH = 'Develop'
         VAULT_PATH = 'JenkinsWMS/jenkins.developWMS'
         ENV_FILE_KEY = 'Develop.env.erp' 
     }
