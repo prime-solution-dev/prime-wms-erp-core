@@ -45,7 +45,7 @@ COPY ./cmd/.env /app/.env
 RUN go build \
     -trimpath \
     -ldflags="-s -w" \
-    -o /out/wms-reports-core \
+    -o /out/wms-document-core \
     ./cmd
 
 
@@ -65,8 +65,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder \
-    /out/wms-reports-core \
-    /app/wms-reports-core
+    /out/wms-document-core \
+    /app/wms-document-core
 
 COPY --from=builder \
     /app/assets \
@@ -77,12 +77,8 @@ COPY --from=builder \
     /app/.env \
     /app/.env
 
-COPY assets/ /app/assets/
-
-RUN mkdir -p /app/assets/fonts/truetype/sukhumvit \
-    /usr/share/fonts/truetype/sukhumvit \
-    && cp /app/assets/fonts/*.ttf /app/assets/fonts/truetype/sukhumvit/ \
-    && cp /app/assets/fonts/truetype/sukhumvit/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
+RUN mkdir -p /usr/share/fonts/truetype/sukhumvit \
+    && cp /app/assets/fonts/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
     && fc-cache -f
 
 ENV FONT_PATH_PREFIX=/app/

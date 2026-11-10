@@ -2,12 +2,15 @@ package interfaceService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -23,23 +26,20 @@ type HookConfig struct {
 	Body       string    `json:"body"`
 }
 
-func GetHookConfig(requestData map[string]interface{}) ([]HookConfig, error) {
+func GetHookConfig(ctx context.Context, requestData map[string]interface{}) ([]HookConfig, error) {
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	fmt.Println(string(jsonData))
 
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_document")+"/interface/get-hook-config", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_document")+"/interface/get-hook-config", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
-
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("document")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -48,15 +48,13 @@ func GetHookConfig(requestData map[string]interface{}) ([]HookConfig, error) {
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetHookConfig: read body failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
 	var hookConfig []HookConfig
 	err = json.Unmarshal(body, &hookConfig)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetHookConfig: decode response failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
-
-	fmt.Println("Response Status:", resp.Status)
 
 	return hookConfig, nil
 

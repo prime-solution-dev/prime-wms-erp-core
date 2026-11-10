@@ -33,7 +33,7 @@ func Initialize() {
 	GET_INVENTORY_BY_KEY_ENDPOINT = GetBaseURL() + "/warehouse/Inventory/get-inventory-weight-by-key"
 	CREATE_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CreateOrders"
 	UPDATE_ORDER_BY_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/UpdateOrderByDelivery"
-	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrders"
+	CANCEL_ORDER_ENDPOINT = GetBaseURL() + "/order/Order/CancelOrderByCode"
 	GET_PACK_SO_ENDPOINT = GetBaseURL() + "/packing/packing/get-packing-so"
 	GET_INBOUND_ENDPOINT = GetBaseURL() + "/goods-receive/get-inbounds"
 	GET_GOODS_RECEIVE_ENDPOINT = GetBaseURL() + "/goods-receive/get-goods-recieves"

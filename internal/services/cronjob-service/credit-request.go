@@ -1,6 +1,7 @@
 package CronjobService
 
 import (
+	"context"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -10,12 +11,13 @@ import (
 	"net/http"
 	"os"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/utils"
 	"time"
 
 	creditService "prime-erp-core/internal/services/credit-service"
 )
 
-func CreditRequestEffectiveDtm() (interface{}, error) {
+func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 
 	url := os.Getenv("base_url_erp") + "/credit/GetCreditRequestCronjob"
 	requestData := map[string]interface{}{
@@ -27,15 +29,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	reqHttp, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -64,15 +65,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
-	reqHttpGetCredit, errGetCredit := http.NewRequest("POST", urlGetCredit, bytes.NewBuffer(jsonDataGetCredit))
+	reqHttpGetCredit, errGetCredit := utils.NewRequest(ctx, "POST", urlGetCredit, bytes.NewBuffer(jsonDataGetCredit))
 	if errGetCredit != nil {
 		return nil, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
 
 	// Create a client and execute the request
-	clientGetCredit := &http.Client{}
+	clientGetCredit := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 	respGetCredit, errGetCredit := clientGetCredit.Do(reqHttpGetCredit)
 	if errGetCredit != nil {
 		return nil, errors.New("Error parsing DateTo : " + err.Error())
@@ -198,15 +198,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 		}
 		fmt.Println("Update Credit Request: ", string(jsonBytesUpdateCreditRequest))
 		urlUpdateCreditRequest := os.Getenv("base_url_erp") + "/credit/UpdateCreditRequest"
-		reqUpdateCreditRequest, err := http.NewRequest("POST", urlUpdateCreditRequest, bytes.NewBuffer(jsonBytesUpdateCreditRequest))
+		reqUpdateCreditRequest, err := utils.NewRequest(ctx, "POST", urlUpdateCreditRequest, bytes.NewBuffer(jsonBytesUpdateCreditRequest))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqUpdateCreditRequest.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
-		clientUpdateCreditRequest := &http.Client{}
+		clientUpdateCreditRequest := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respUpdateCreditRequest, errUpdateCreditRequest := clientUpdateCreditRequest.Do(reqUpdateCreditRequest)
 		if errUpdateCreditRequest != nil {
 			return nil, errors.New("Error parsing DateTo: " + errUpdateCreditRequest.Error())
@@ -241,15 +240,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 		}
 		fmt.Println(string(jsonBytesCredit))
 		urlCreateCredit := os.Getenv("base_url_erp") + "/credit/CreateCredit"
-		reqCreateCredit, err := http.NewRequest("POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
+		reqCreateCredit, err := utils.NewRequest(ctx, "POST", urlCreateCredit, bytes.NewBuffer(jsonBytesCredit))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqCreateCredit.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
-		clientCreateCredit := &http.Client{}
+		clientCreateCredit := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCredit, errCreateCredit := clientCreateCredit.Do(reqCreateCredit)
 		if errCreateCredit != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCredit.Error())
@@ -272,15 +270,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			return nil, err
 		}
 		urlEmailAlert := os.Getenv("base_url_erp") + "/emailAlert/SendEmailAlertForNewBrand"
-		reqEmailAlert, err := http.NewRequest("POST", urlEmailAlert, bytes.NewBuffer(jsonBytesEmailAlert))
+		reqEmailAlert, err := utils.NewRequest(ctx, "POST", urlEmailAlert, bytes.NewBuffer(jsonBytesEmailAlert))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqEmailAlert.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
-		clientEmailAlert := &http.Client{}
+		clientEmailAlert := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respEmailAlert, errEmailAlert := clientEmailAlert.Do(reqEmailAlert)
 		if errEmailAlert != nil {
 			return nil, errors.New("Error parsing DateTo: " + errEmailAlert.Error())
@@ -304,15 +301,14 @@ func CreditRequestEffectiveDtm() (interface{}, error) {
 			return nil, err
 		}
 		urlCreateCreditTransaction := os.Getenv("base_url_erp") + "/credit/CreateCreditTransaction"
-		reqCreateCreditTransaction, err := http.NewRequest("POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
+		reqCreateCreditTransaction, err := utils.NewRequest(ctx, "POST", urlCreateCreditTransaction, bytes.NewBuffer(jsonBytesCreditTransaction))
 		if err != nil {
 			return nil, errors.New("Error parsing DateTo: " + err.Error())
 		}
 
-		reqCreateCreditTransaction.Header.Set("Content-Type", "application/json")
 
 		// Create a client and execute the request
-		clientCreateCreditTransaction := &http.Client{}
+		clientCreateCreditTransaction := &http.Client{Transport: utils.NewOutboundLogTransport("erp")}
 		respCreateCreditTransaction, errCreateCreditTransaction := clientCreateCreditTransaction.Do(reqCreateCreditTransaction)
 		if errCreateCreditTransaction != nil {
 			return nil, errors.New("Error parsing DateTo: " + errCreateCreditTransaction.Error())

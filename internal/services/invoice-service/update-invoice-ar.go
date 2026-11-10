@@ -1,17 +1,20 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
-	depositService "prime-erp-core/internal/services/deposit-service"
+	repositoryInvoice "prime-erp-core/internal/repositories/invoice"
 	interfaceService "prime-erp-core/internal/services/interface-service"
-	"strconv"
+	purchaseService "prime-erp-core/internal/services/purchase-service"
+	"strings"
 
-	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceAR(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -24,82 +27,118 @@ func UpdateInvoiceAR(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		return nil, err
 	}
 
-	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
+	if len(req) == 0 {
+		return nil, errors.New("invoice is required")
 	}
-
-	requestData := map[string]interface{}{
-		"module":    []string{"INVOICE"},
-		"topic":     []string{"AR"},
-		"sub_topic": []string{"UPDATE"},
+	ids := make([]uuid.UUID, 0, len(req))
+	seen := make(map[uuid.UUID]bool, len(req))
+	for _, invoice := range req {
+		if invoice.ID == uuid.Nil || seen[invoice.ID] {
+			return nil, errors.New("invoice IDs must be non-empty and unique")
+		}
+		seen[invoice.ID] = true
+		ids = append(ids, invoice.ID)
 	}
-
-	hookConfig, err := interfaceService.GetHookConfig(requestData)
+	getPayload, err := json.Marshal(GetInvoiceRequest{ID: ids})
 	if err != nil {
 		return nil, err
 	}
-	if len(hookConfig) > 0 {
-		urlHook := ""
-		for _, hookConfigValue := range hookConfig {
-			urlHook = hookConfigValue.HookUrl
-		}
+	value, err := GetInvoice(ctx, string(getPayload))
+	if err != nil {
+		return nil, err
+	}
 
-		requestDataCreateHook := interfaceService.HookInterfaceRequest{
-			RequestData: req,
-			UrlHook:     urlHook,
+	stored, ok := value.(ResultInvoice)
+	if !ok {
+		return nil, errors.New("invalid GetInvoice response")
+	}
+	statuses := make(map[uuid.UUID]string, len(stored.Invoice))
+	for _, invoice := range stored.Invoice {
+		statuses[invoice.ID] = invoice.Status
+	}
+	tempIDs := make([]uuid.UUID, 0, len(req))
+	for _, invoice := range req {
+		status, exists := statuses[invoice.ID]
+		if !exists {
+			return nil, errors.New("invoice not found: " + invoice.ID.String())
 		}
-		_, err := interfaceService.HookInterface(requestDataCreateHook)
-		if err != nil {
-			return nil, err
+		if strings.EqualFold(status, "TEMP") {
+			tempIDs = append(tempIDs, invoice.ID)
+		}
+	}
+	if len(tempIDs) == len(req) {
+		if req[0].Status != "CANCELED" {
+			if err := repositoryInvoice.DeleteInvoice(tempIDs); err != nil {
+				return nil, err
+			}
+			return CreateInvoiceAR(ctx, jsonPayload)
 		}
 	}
 	if req[0].ExternalID != "" {
-		depositMapResult, err := interfaceService.GetDeposit(req[0].ExternalID)
+		requestData := map[string]interface{}{
+			"module":    []string{"INVOICE"},
+			"topic":     []string{"AR"},
+			"sub_topic": []string{"UPDATE"},
+		}
+
+		hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
-		if len(depositMapResult) > 0 {
-			var deposit []models.Deposit
-
-			for _, v := range depositMapResult {
-				depMap, _ := v.(map[string]interface{})
-
-				totalFloat, err := strconv.ParseFloat(depMap["total"].(string), 64)
-				if err != nil {
-					totalFloat = 0
-				}
-				drFloat, err := strconv.ParseFloat(depMap["dr"].(string), 64)
-				if err != nil {
-					totalFloat = 0
-				}
-				crFloat, err := strconv.ParseFloat(depMap["cr"].(string), 64)
-				if err != nil {
-					totalFloat = 0
-				}
-
-				deposit = append(deposit, models.Deposit{
-					DepositCode:  depMap["anchor"].(string),
-					CustomerCode: req[0].PartyCode,
-					AmountTotal:  totalFloat,
-					AmountUsed:   drFloat,
-					AmountRemain: crFloat,
-					Status:       "PENDING",
-				})
+		if len(hookConfig) > 0 {
+			urlHook := ""
+			for _, hookConfigValue := range hookConfig {
+				urlHook = hookConfigValue.HookUrl
 			}
-			if len(deposit) > 0 {
-				jsonBytesCreateDeposit, err := json.Marshal(deposit)
-				if err != nil {
-					return nil, err
-				}
 
-				_, errDeposit := depositService.CreateDepost(ctx, string(jsonBytesCreateDeposit))
-				if errDeposit != nil {
-					return nil, errDeposit
+			var reqHook []models.Invoice
+			if err := json.Unmarshal(jsonBytesCreateInvoice, &reqHook); err != nil {
+				return nil, errors.New("failed to copy invoice request for hook: " + err.Error())
+			}
+			productCodes := []string{}
+			for i := range reqHook {
+				for it := range reqHook[i].InvoiceItem {
+					productCodes = append(productCodes, reqHook[i].InvoiceItem[it].ProductCode)
 				}
 			}
 
+			productReq := models.GetProductRequest{
+				ProductCode: productCodes,
+				SiteCode:    []string{req[0].SiteCode},
+				CompanyCode: []string{req[0].CompanyCode},
+			}
+			mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
+			if errGetProductInterface != nil {
+				return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
+			}
+			for i := range reqHook {
+				for it := range reqHook[i].InvoiceItem {
+					mapProductInterface, exists := mapProductInterface[reqHook[i].InvoiceItem[it].ProductCode]
+					if exists {
+						priceUnit, _ := calculateAPPriceUnit(
+							reqHook[i].InvoiceItem[it].UnitUom, mapProductInterface.UnitInterface,
+							reqHook[i].InvoiceItem[it].PriceUnit, reqHook[i].InvoiceItem[it].Qty, reqHook[i].InvoiceItem[it].TotalWeight,
+						)
+						reqHook[i].InvoiceItem[it].PriceUnit = math.Round(priceUnit*100) / 100
+						reqHook[i].InvoiceItem[it].UnitUom = mapProductInterface.UnitInterface
+					}
+				}
+			}
+
+			requestDataCreateHook := interfaceService.HookInterfaceRequest{
+				RequestData: reqHook,
+				UrlHook:     urlHook,
+			}
+			_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
+			if err != nil {
+				return nil, err
+			}
 		}
+	}
+
+	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
 	}
 
 	return createInvoiceReturn, nil

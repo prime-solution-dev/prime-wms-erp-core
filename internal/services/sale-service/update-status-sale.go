@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -32,7 +33,7 @@ var allowedSaleStatuses = map[string]bool{
 	"COMPLETED": true,
 }
 
-func UpdateStatusSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateStatusSaleRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -91,10 +92,7 @@ func UpdateStatusSale(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		}
 	}
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 

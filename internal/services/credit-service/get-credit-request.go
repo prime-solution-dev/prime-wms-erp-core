@@ -1,8 +1,10 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	models "prime-erp-core/internal/models"
 	repositoryCredit "prime-erp-core/internal/repositories/credit"
 	customerService "prime-erp-core/internal/services/customer-service"
@@ -10,7 +12,6 @@ import (
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -31,11 +32,19 @@ type GetCreditReq struct {
 	ConsumedCreditLike      float64     `json:"consumed_credit_like"`
 	BalanceCreditLimitLike  float64     `json:"balance_credit_limit_like"`
 	CustomerStatus          *bool       `json:"customer_status"`
-	PendingApprove          string      `json:"pending_approve"`
+	PendingApprove          *bool       `json:"pending_approve"`
 	CompletedDateStart      *time.Time  `json:"completed_date_start"`
 	CompletedDateEnd        *time.Time  `json:"completed_date_end"`
 	CreateDateStart         *time.Time  `json:"create_date_start"`
 	CreateDateEnd           *time.Time  `json:"create_date_end"`
+
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	CustomerCodeLikes []CustomerCodeLikeTerm `json:"customer_code_likes"`
+	CustomerNameLikes []CustomerNameLikeTerm `json:"customer_name_likes"`
+
+	// sort_by: customer_code / customer_name, sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
 }
 type ResultCreditRequest struct {
 	Total         int                    `json:"total"`
@@ -45,7 +54,7 @@ type ResultCreditRequest struct {
 	CreditRequest []models.CreditRequest `json:"credit_request"`
 }
 
-func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditRequests(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetCreditReq
 
@@ -58,7 +67,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 			"customer_name_like": req.CustomerNameLike,
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -68,10 +77,10 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	}
 	if req.CustomerStatus != nil {
 		requestData := map[string]interface{}{
-			"active_flg": req.CustomerStatus,
+			"active_flg": []bool{*req.CustomerStatus},
 		}
 
-		customers, err := customerService.GetCustomers(requestData)
+		customers, err := customerService.GetCustomers(ctx, requestData)
 		if err != nil {
 			return nil, err
 		}
@@ -80,9 +89,51 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		}
 	}
 
-	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, req.Page, req.PageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd)
+	// ชื่อลูกค้าอยู่ใน master: resolve เป็นรหัสก่อน แล้ว AND เป็น customer_code IN ใน repository
+	// (ไม่ append เข้า req.CustomerCode เพราะเป็น scope เดิม ต้อง AND แยกกัน)
+	nameCodes, nameFiltered, errName := resolveCustomerNameCodes(req.CustomerNameLikes, fetchCustomerCodesByNameLike(ctx))
+	if errName != nil {
+		return nil, errName
+	}
+	if nameFiltered && len(nameCodes) == 0 {
+		return ResultCreditRequest{
+			Total: 0, Page: req.Page, PageSize: req.PageSize,
+			TotalPages: 0, CreditRequest: []models.CreditRequest{},
+		}, nil
+	}
+
+	// เรียงตามชื่อต้อง resolve ชื่อก่อนตัดหน้า จึงดึงทั้งหมดมาเรียงเองแล้วค่อยตัดหน้า
+	sortByName := req.SortBy == "customer_name"
+	repoPage, repoPageSize := req.Page, req.PageSize
+	if sortByName {
+		repoPage, repoPageSize = 0, 0
+	}
+
+	credit, totalPages, totalRecords, errApproval := repositoryCredit.GetCreditRequestPreload(req.ID, req.CustomerCode, req.IsAction, repoPage, repoPageSize, req.CustomerCodeLike, req.CustomerNameLike, req.CreditLimitLike, req.IncreaseCreditLimitLike, req.StartDate, req.EndDateTime, req.CustomerStatus, req.PendingApprove, req.CompletedDateStart, req.CompletedDateEnd, req.CreateDateStart, req.CreateDateEnd, req.listOptions(nameCodes))
 	if errApproval != nil {
 		return nil, errApproval
+	}
+	if sortByName && len(credit) > 0 {
+		allCodes := make([]string, 0, len(credit))
+		for _, creditValue := range credit {
+			allCodes = append(allCodes, creditValue.CustomerCode)
+		}
+		customers, err := customerService.GetCustomers(ctx, map[string]interface{}{"customer_code": allCodes})
+		if err != nil {
+			return nil, err
+		}
+		names := make(map[string]string, len(customers.Customers))
+		for _, customer := range customers.Customers {
+			names[customer.CustomerCode] = customer.CustomerName
+		}
+		sortCreditRequestsByName(credit, names, req.SortDir == "desc" || req.SortDir == "DESC")
+		credit, totalPages = paginateCreditRequests(credit, req.Page, req.PageSize)
+	}
+	if len(credit) == 0 {
+		return ResultCreditRequest{
+			Total: totalRecords, Page: req.Page, PageSize: req.PageSize,
+			TotalPages: totalPages, CreditRequest: credit,
+		}, nil
 	}
 	customerCode := []string{}
 
@@ -94,7 +145,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 		"customer_code": customerCode,
 	}
 
-	customers, err := customerService.GetCustomers(requestData)
+	customers, err := customerService.GetCustomers(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}
@@ -191,44 +242,35 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 	   		}
 	   	} */
 
-	getDepositRes, errGetDeposit := depositService.GetDeposit(ctx, string(jsonBytesGetCredit))
+	// depositService.GetDeposit ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+	// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+	getDepositRes, errGetDeposit := depositService.GetDeposit(nil, string(jsonBytesGetCredit))
 	if errGetDeposit != nil {
 		return nil, errGetDeposit
 	}
 	getDeposit := getDepositRes.(depositService.ResultDeposit).Deposit
 	remainDepositMap := map[string]float64{}
 	for _, depositValue := range getDeposit {
+		amountRemainVat := math.Round((depositValue.AmountRemain*1.07)*100) / 100
 		remainDepositItemMap, exist := remainDepositMap[depositValue.CustomerCode]
 		if exist {
-			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = remainDepositItemMap + amountRemainVat
 		} else {
-			remainDepositMap[depositValue.CustomerCode] = depositValue.AmountRemain
+			remainDepositMap[depositValue.CustomerCode] = amountRemainVat
 		}
 	}
 
+	consumedTotals, err := summaryService.GetConsumedCreditTotals(ctx, customerCode)
+	if err != nil {
+		return nil, err
+	}
 	for i := range credit {
-
-		requestDataGetConsumend := map[string]interface{}{
-			"customer_code": credit[i].CustomerCode,
-			"paid_invoice":  true,
-		}
-		jsonBytesGetConsumend, err := json.Marshal(requestDataGetConsumend)
-		if err != nil {
-			return nil, err
-		}
-
-		paidInvoice, errApproval := summaryService.GetConsumend(ctx, string(jsonBytesGetConsumend))
-		if errApproval != nil {
-			return nil, errApproval
-		}
-		resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
-
 		conMapCustomer, exist := convertCustomerMap[credit[i].CustomerCode]
 		if exist {
 			credit[i].CustomerName = conMapCustomer.CustomerName
 			credit[i].CustomeStatus = conMapCustomer.ActiveFlg
 		}
-		credit[i].ConsumedCredit = resultGetPaidInvoice.TotalAmount
+		credit[i].ConsumedCredit = consumedTotals[credit[i].CustomerCode]
 		/* credit[i].ConsumedCredit = (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
 		resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR + resultGetPaidInvoice.SumPaymentTotalAmountDN) */
 		conMapremainDeposit, exist := remainDepositMap[credit[i].CustomerCode]
@@ -250,7 +292,7 @@ func GetCreditRequests(ctx *gin.Context, jsonPayload string) (interface{}, error
 
 	return resultApproval, nil
 }
-func GetCreditRequestCronjob(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetCreditRequestCronjob(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetCreditReq
 

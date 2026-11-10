@@ -1,6 +1,7 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +27,7 @@ type VerifyExpiryPriceResponse struct {
 	ExpireDate         time.Time `json:"expire_date"`
 }
 
-func VerifyExpiryPrice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func VerifyExpiryPrice(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []VerifyExpiryPriceRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

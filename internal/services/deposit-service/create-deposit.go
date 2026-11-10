@@ -1,16 +1,16 @@
 package depositService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryDeposit "prime-erp-core/internal/repositories/deposit"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateDepost(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreateDepost(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Deposit
 

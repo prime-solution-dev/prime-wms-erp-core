@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 FROM golang:1.24.0 AS builder
 
 WORKDIR /app
@@ -6,6 +7,27 @@ COPY go.mod go.sum ./
 RUN set -e; \
     for i in 1 2 3 4 5; do \
         if GOPROXY=https://proxy.golang.org,direct go mod download; then \
+=======
+# syntax=docker/dockerfile:1
+FROM golang:1.25 AS builder
+
+WORKDIR /app
+
+ENV GOPRIVATE=github.com/prime-solution-dev/*
+ENV GOPROXY=https://proxy.golang.org,direct
+
+COPY go.mod go.sum ./
+
+RUN --mount=type=secret,id=github_token,required=true \
+    --mount=type=tmpfs,target=/root \
+    set -eu; \
+    test -s /run/secrets/github_token; \
+    umask 077; \
+    printf 'machine github.com\nlogin x-access-token\npassword %s\n' \
+        "$(cat /run/secrets/github_token)" > /root/.netrc; \
+    for i in 1 2 3 4 5; do \
+        if go mod download; then \
+>>>>>>> origin/Crossmax-main
             echo "Go modules downloaded successfully"; \
             break; \
         fi; \
@@ -18,6 +40,10 @@ RUN set -e; \
     done
 
 COPY . .
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/Crossmax-main
 COPY ./cmd/.env .env
 
 ENV CGO_ENABLED=0 \

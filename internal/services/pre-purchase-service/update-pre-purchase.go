@@ -1,28 +1,25 @@
 package prePurchaseService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	prePurchaseRepository "prime-erp-core/internal/repositories/prePurchase"
 	approvalService "prime-erp-core/internal/services/approval-service"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdatePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdatePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
 	}
 
-	userCode := ""
-	if ctx != nil {
-		userCode = ctx.GetString("user")
-	}
+	userCode := requestcontext.GetUserOrDefault(ctx)
 
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
@@ -35,8 +32,21 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	for _, r := range req {
 		prePurchase := MapUpdatePOBigLotRequestToPrePurchase(r)
 
+		// request ของ update ไม่ได้ส่ง pre_purchase_code มา ต้องอ่านจาก DB
+		// ไม่งั้น item ที่เพิ่งเพิ่มจะได้ pre_item ที่ไม่มีรหัส PO นำหน้า
+		prePurchaseCode := ""
+		if err := gormx.Model(&models.PrePurchase{}).
+			Where("id = ?", r.ID).
+			Pluck("pre_purchase_code", &prePurchaseCode).Error; err != nil {
+			return nil, errors.New("failed to get pre-purchase code: " + err.Error())
+		}
+
+		seq := NextPreItemSeq(r.PrePurchaseItems)
 		for _, itemReq := range r.PrePurchaseItems {
-			item := MapUpdatePOBigLotRequestToPrePurchaseItem(itemReq, prePurchase.UpdateBy, time.Now().UTC(), prePurchase.PrePurchaseCode)
+			item := MapUpdatePOBigLotRequestToPrePurchaseItem(itemReq, prePurchase.UpdateBy, time.Now().UTC(), prePurchaseCode, seq)
+			if itemReq.PreItem == nil || *itemReq.PreItem == "" {
+				seq++
+			}
 			prePurchase.PrePurchaseItems = append(prePurchase.PrePurchaseItems, item)
 		}
 
@@ -54,7 +64,7 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
-			autoApprovalRes, err := approvalService.CheckAutoApproval(gormx, autoApprovalReq, userCode)
+			autoApprovalRes, err := approvalService.CheckAutoApproval(ctx, gormx, autoApprovalReq, userCode)
 			if err != nil {
 				return nil, err
 			}
@@ -78,7 +88,7 @@ func UpdatePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	return nil, nil
 }
 
-func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApprovePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := []models.UpdateStatusApprovePOBigLotRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -92,6 +102,34 @@ func UpdateStatusApprovePOBigLot(ctx *gin.Context, jsonPayload string) (interfac
 
 	if err := prePurchaseRepository.UpdateStatusApprovePOBigLot(req); err != nil {
 		return nil, errors.New("failed to update pre purchase status approve: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CompletePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePOBigLotRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := prePurchaseRepository.CompletePOBigLot(req.PrePurchaseCodes); err != nil {
+		return nil, errors.New("failed to complete PO big lot: " + err.Error())
+	}
+
+	return nil, nil
+}
+
+func CancelPOBigLot(ctx context.Context, jsonPayload string) (interface{}, error) {
+	req := models.CompletePOBigLotRequest{}
+
+	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
+		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())
+	}
+
+	if err := prePurchaseRepository.CancelPOBigLot(req.PrePurchaseCodes); err != nil {
+		return nil, errors.New("failed to cancel PO big lot: " + err.Error())
 	}
 
 	return nil, nil

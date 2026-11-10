@@ -1,6 +1,7 @@
 package priceService
 
 import (
+	"context"
 	"fmt"
 
 	externalService "prime-erp-core/external/warehouse-service"
@@ -8,27 +9,19 @@ import (
 	priceDomain "prime-erp-core/internal/services/price-service/domain"
 	"prime-erp-core/internal/utils"
 
-	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 )
 
+// getInventoryWeightByKeyFunc เป็น seam ให้ test/benchmark stub warehouse-core ได้
+var getInventoryWeightByKeyFunc = externalService.GetInventoryWeightByKey
+
 // GetCalculatedPriceListSubGroup calculates price list sub group values using formulas
 // and returns them without persisting to the database.
-func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
+func GetCalculatedPriceListSubGroup(ctx context.Context, jsonPayload string) (interface{}, error) {
 	var req models.UpdateLatestPriceListSubGroupRequest
 
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		if validationErrors, ok := err.(validator.ValidationErrors); ok {
-			var errorMessages []string
-			for _, fieldError := range validationErrors {
-				errorMessages = append(errorMessages, getValidationErrorMessage(fieldError))
-			}
-			return nil, &utils.BindingError{
-				Message: fmt.Sprintf("Validation failed: %v", errorMessages),
-			}
-		}
-		return nil, &utils.BindingError{Message: fmt.Sprintf("Invalid request: %v", err.Error())}
+	if err := bindJSONRequest(jsonPayload, &req); err != nil {
+		return nil, err
 	}
 
 	// Determine update type, defaulting to "subgroup" for backward compatibility
@@ -117,9 +110,30 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		subGroupMap[subGroups[i].ID] = &subGroups[i]
 	}
 
-	// Collect all sub group codes for batch formula fetching
-	subGroupCodes := make([]string, 0, len(subGroups))
+	// subgroup ที่ไม่ได้ flag ตอบด้วยค่าใน DB ล้วน ไม่ใช้สูตร สต็อก หรือ group item
+	// loader ทุกตัวจึงโหลดเฉพาะ subgroup ที่ flag
+	flaggedSubGroups := make([]models.PriceListSubGroup, 0, len(subGroups))
 	for _, subGroup := range subGroups {
+		if subGroup.NeedRecalculate {
+			flaggedSubGroups = append(flaggedSubGroups, subGroup)
+		}
+	}
+
+	if len(flaggedSubGroups) == 0 {
+		responseData := make([]models.GetCalculatedPriceListSubGroupItem, 0, len(subGroupUUIDs))
+		for _, subGroupID := range subGroupUUIDs {
+			responseData = append(responseData, unchangedCalculatedItem(subGroupMap[subGroupID]))
+		}
+		return models.GetCalculatedPriceListSubGroupResponse{
+			Success: true,
+			Message: "Price calculations retrieved successfully",
+			Data:    responseData,
+		}, nil
+	}
+
+	// Collect sub group codes for batch formula fetching
+	subGroupCodes := make([]string, 0, len(flaggedSubGroups))
+	for _, subGroup := range flaggedSubGroups {
 		// Include SubGroupCode in the list, even if it's empty string
 		subGroupCodes = append(subGroupCodes, subGroup.SubGroupCode)
 	}
@@ -128,12 +142,18 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch default price list formulas: %w", err)
 	}
+	// สูตร pcs อ้างผลลัพธ์ของสูตร kg ในคู่เดียวกัน จึงต้องประเมินตามลำดับ dependency
+	// ไม่ใช่ตามลำดับ create_dtm ที่ repository คืนมา
+	// เรียงที่นี่ครั้งเดียวต่อ subgroup code เพื่อไม่ให้ parse JSON และ log warning ซ้ำ
+	for code, formulas := range formulasMap {
+		formulasMap[code] = sortFormulasByDependency(code, formulas)
+	}
 	// Collect all key values from all subgroups for inventory service request
 	keyValues := []externalService.InventoryByProductCodeKeyValue{}
 	companyCodeSet := make(map[string]bool)
 	siteCodeSet := make(map[string]bool)
 
-	for _, subGroup := range subGroups {
+	for _, subGroup := range flaggedSubGroups {
 		// Collect company code and site code
 		if subGroup.PriceListGroup.CompanyCode != "" {
 			companyCodeSet[subGroup.PriceListGroup.CompanyCode] = true
@@ -156,6 +176,8 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 	// Create inventory maps for quick lookup
 	inventoryMap := make(map[string][]models.InventoryWeightResponse)
 	supplierCodeMap := make(map[string]string)
+	// weight_spec มาจาก product master ระดับ result ใช้ได้แม้ subgroup ไม่มีสต็อก
+	weightSpecMap := make(map[string]float64)
 
 	// Call inventory service if we have key values
 	if len(keyValues) > 0 {
@@ -176,7 +198,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		}
 
 		// Call inventory service
-		inventoryResponse, err := externalService.GetInventoryWeightByKey(companyCode, siteCodes, keyValues)
+		inventoryResponse, err := getInventoryWeightByKeyFunc(ctx, companyCode, siteCodes, keyValues)
 		if err != nil {
 			// Log error but continue without inventory data
 			fmt.Printf("Warning: failed to get inventory data: %v\n", err)
@@ -185,8 +207,16 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			for _, invItem := range inventoryResponse {
 				inventoryMap[invItem.ID] = invItem.InventoryWeight
 				supplierCodeMap[invItem.ID] = invItem.SupplierCode
+				weightSpecMap[invItem.ID] = invItem.WeightSpec
 			}
 		}
+	}
+
+	// group_item ของทุก condition_code โหลดครั้งเดียวก่อนเข้า loop
+	// เดิม lookup ทีละแถวเปิด DB connection ใหม่ทุกครั้ง (subgroup × extra ครั้ง)
+	groupItemValues, err := loadGroupItemValueIntsFunc(flaggedSubGroups)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load group item values: %w", err)
 	}
 
 	// Prepare response data for each sub group
@@ -195,6 +225,11 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 	// Process each sub group using the maps
 	for _, subGroupID := range subGroupUUIDs {
 		subGroup := subGroupMap[subGroupID]
+
+		if !subGroup.NeedRecalculate {
+			responseData = append(responseData, unchangedCalculatedItem(subGroup))
+			continue
+		}
 
 		// Capture the current database values as "before" values
 		beforeTotalNetPriceUnit := subGroup.TotalNetPriceUnit
@@ -206,31 +241,26 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		totalNetPriceWeight := subGroup.TotalNetPriceWeight
 
 		// Calculate Extra from price_list_group_extras / group_item (for weight)
-		extraPriceWeight, extraPriceUnit, err := calculateExtraForSubGroup(subGroup)
-		if err != nil {
-			return nil, fmt.Errorf("failed to calculate extra for sub group %s: %w", subGroupID, err)
+		extraPriceWeight, extraPriceUnit := calculateExtraForSubGroup(subGroup, groupItemValues)
+
+		// avg_kg_stock คือน้ำหนักเฉลี่ยต่อชิ้นของ product ใน site นั้น รวมทุก batch
+		// จึงต้องอ่าน AvgProduct ไม่ใช่ AvgWeight ซึ่งเป็นค่าระดับ batch
+		// AvgProduct เป็นค่าเดียวกันทุก entry ของ product/site เดียวกัน จึงหยิบ entry แรกได้
+		//
+		// fallback เป็น 1.0 เมื่อไม่มีสต็อก เป็นพฤติกรรมที่ตกลงกันไว้
+		// ทำให้สูตรที่คูณด้วย avg_kg_stock ให้ผลเหมือนไม่มีตัวคูณ
+		avgKgStock := 1.0
+		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
+			if inventoryWeight[0].AvgProduct != 0 {
+				avgKgStock = inventoryWeight[0].AvgProduct
+			}
 		}
 
-		// Get inventory data for this subgroup
-		avgKgStock := 1.0
-		weightSpec := 1.0
-		pcs := 0.0
-		kg := 0.0
-		if inventoryWeight, ok := inventoryMap[subGroupID.String()]; ok && len(inventoryWeight) > 0 {
-			// Use AvgProduct from first inventory weight response
-			if inventoryWeight[0].AvgWeight == 0 {
-				avgKgStock = 1.0
-			} else {
-				avgKgStock = inventoryWeight[0].AvgWeight
-			}
-			if inventoryWeight[0].TotalWeight == 0 {
-				weightSpec = 1.0
-			} else {
-				weightSpec = inventoryWeight[0].TotalWeight
-			}
-			pcs = inventoryWeight[0].TotalQty
-			kg = inventoryWeight[0].TotalWeight
-		}
+		// weight_spec คือน้ำหนักของ base unit จาก product master ไม่ได้ผูกกับสต็อก
+		// จึงอ่านนอกบล็อก inventory ข้างบน (เดิมอ่าน TotalWeight ซึ่งเป็นตัวเดียวกับ kg)
+		// rawWeightSpec เก็บค่าดิบไว้ส่งกลับใน response ส่วนสูตรใช้ค่าที่ fallback แล้ว
+		rawWeightSpec := weightSpecMap[subGroupID.String()]
+		weightSpec := weightSpecForFormula(rawWeightSpec)
 
 		if len(priceListFormulas) > 0 {
 			// Check for default input formula
@@ -251,13 +281,22 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 					}
 					switch formula.PriceListFormulas.Uom {
 					case "pcs":
+						// สูตร uom pcs ต้องใช้ extra ของหน่วยชิ้น ไม่ใช่ของกิโล
+						// เดิมจับคู่สลับกับ update-latest ทำให้ราคาที่ preview ไม่ตรงกับที่บันทึก
+						// เมื่อใดที่ extra_price_unit กับ extra_price_weight ต่างกัน
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceUnit,
-							Extra:      extraPriceWeight,
+							Extra:      extraPriceUnit,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
+						}
+						// ต้องตรงกับ RunUpdateLatestPriceListSubGroup ไม่งั้น preview กับที่บันทึกจะไม่ตรงกัน
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
 						}
 
 						priceFormula := priceDomain.PriceFormula{
@@ -271,13 +310,19 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 						}
 						totalNetPriceUnit = calculatedTotalNetPriceUnit
 					case "kg":
+						// สูตร uom kg ต้องใช้ extra ของหน่วยกิโล
 						priceData := priceDomain.PriceData{
 							BasePrice:  subGroup.PriceListGroup.PriceWeight,
-							Extra:      extraPriceUnit,
+							Extra:      extraPriceWeight,
 							AvgKgStock: avgKgStock,
 							WeightSpec: weightSpec,
-							Pcs:        pcs,
-							Kg:         kg,
+							// Pcs และ Kg คือราคาต่อชิ้นและราคาต่อกิโลล่าสุด ไม่ใช่จำนวนสต็อก
+							// อ่านจากตัวแปร running ที่ถูกอัปเดตเมื่อสูตรก่อนหน้าคำนวณเสร็จ
+							Pcs: totalNetPriceUnit,
+							Kg:  totalNetPriceWeight,
+						}
+						if skipFormulaWithoutBasePrice(formula.PriceListFormulas, priceData.BasePrice) {
+							continue
 						}
 						priceFormula := priceDomain.PriceFormula{
 							Expression: formula.PriceListFormulas.Expression,
@@ -314,6 +359,7 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 			ExtraPriceWeight:          extraPriceWeight,
 			BeforeTotalNetPriceUnit:   beforeTotalNetPriceUnit,
 			BeforeTotalNetPriceWeight: beforeTotalNetPriceWeight,
+			WeightSpec:                rawWeightSpec,
 			DefaultUom:                defaultUom,
 		})
 	}
@@ -323,4 +369,19 @@ func GetCalculatedPriceListSubGroup(ctx *gin.Context) (interface{}, error) {
 		Message: "Price calculations retrieved successfully",
 		Data:    responseData,
 	}, nil
+}
+
+// unchangedCalculatedItem คืนราคาปัจจุบันใน DB เป็นทั้ง before และ after
+// ใช้กับ subgroup ที่ราคา group ยังไม่ถูกแก้ตั้งแต่ save หน้า detail ครั้งล่าสุด
+// default_uom และ weight_spec ไม่ส่งกลับ (omitempty หรือ 0) หน้า detail จะคงค่าเดิมไว้
+func unchangedCalculatedItem(subGroup *models.PriceListSubGroup) models.GetCalculatedPriceListSubGroupItem {
+	return models.GetCalculatedPriceListSubGroupItem{
+		SubGroupID:                subGroup.ID.String(),
+		TotalNetPriceUnit:         subGroup.TotalNetPriceUnit,
+		TotalNetPriceWeight:       subGroup.TotalNetPriceWeight,
+		ExtraPriceUnit:            subGroup.ExtraPriceUnit,
+		ExtraPriceWeight:          subGroup.ExtraPriceWeight,
+		BeforeTotalNetPriceUnit:   subGroup.TotalNetPriceUnit,
+		BeforeTotalNetPriceWeight: subGroup.TotalNetPriceWeight,
+	}
 }

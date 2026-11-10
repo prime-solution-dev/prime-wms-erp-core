@@ -1,19 +1,22 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryApproval "prime-erp-core/internal/repositories/approval"
+	"prime-erp-core/internal/requestcontext"
 
 	//authenticationService "prime-erp-core/internal/services/authentication-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// CreateApproval รับ context.Context เพื่อให้ sale-service/quotation-service (แปลงแล้ว) เรียกได้ตรงๆ
+// ดู comment เดียวกันที่ GetApproval — เดิมอ่าน user ผ่าน ctx.Get ด้วยคีย์ "user" เปลี่ยนเป็น requestcontext.GetUserOrDefault
+func CreateApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Approval
 
@@ -26,11 +29,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	//approvalItemPermissionValue := []models.ApprovalItemPermission{}
 	approvalIDForReturn := []uuid.UUID{}
 	mdiItemCode := []string{}
-	conUserID, _ := ctx.Get("user")
-	userID := ""
-	if conUserID != nil {
-		userID = conUserID.(string)
-	}
+	userID := requestcontext.GetUserOrDefault(ctx)
 	for _, approval := range req {
 		mdiItemCode = append(mdiItemCode, approval.MDItemCode)
 	}
@@ -39,7 +38,7 @@ func CreateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		"md_item_code": mdiItemCode,
 		"action_code":  []string{"APPROVE"},
 	}
-	requester, errGetRequester := authenticationService.GetRequester(requestData)
+	requester, errGetRequester := authenticationService.GetRequester(ctx, requestData)
 	if errGetRequester != nil {
 		return nil, errGetRequester
 	} */

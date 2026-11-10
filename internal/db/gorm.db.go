@@ -14,7 +14,7 @@ func ConnectGORM(databaseName string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("not found database_gorm_url")
 	}
 
-	db, err := gorm.Open(postgres.Open(dabaseUrl), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dabaseUrl), &gorm.Config{Logger: gormLoggerFromEnv()})
 	if err != nil {
 		return nil, fmt.Errorf("not connect gorm")
 	}

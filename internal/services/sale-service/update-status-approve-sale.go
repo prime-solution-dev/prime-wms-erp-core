@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,10 +9,11 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type UpdateStatusApproveSaleRequest struct {
@@ -21,7 +23,7 @@ type UpdateStatusApproveSaleRequest struct {
 	Remark     string    `json:"remark"`
 }
 
-func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateStatusApproveSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateStatusApproveSaleRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -104,22 +106,49 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		updateFields["is_approved"] = true
 	}
 
-	if err := gormx.Model(&models.Sale{}).
-		Where("id = ?", req.ID).
-		Updates(updateFields).Error; err != nil {
-		return nil, fmt.Errorf("failed to update sale status: %v", err)
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 
-	// If status is REJECT, also update sale_item status to CANCELED
-	if req.Status == "REJECT" {
-		if err := gormx.Model(&models.SaleItem{}).
-			Where("sale_id = ?", req.ID).
-			Updates(map[string]interface{}{
-				"status":      "CANCELED",
-				"update_date": nowDateOnly,
-			}).Error; err != nil {
-			return nil, fmt.Errorf("failed to update sale items status: %v", err)
+	// งานฝั่ง DB ทั้งหมดต้องอยู่ใน transaction เดียวกัน (spec 2026-09-10 ข้อ 2)
+	// ไม่งั้นถ้าพังคาระหว่างทาง ใบจะกลายเป็น "อนุมัติแล้วแต่ราคายังเป็นของเก่า"
+	// หมายเหตุ: approvalService.UpdateApproval เป็น service call ภายนอก rollback ไม่ได้
+	// จึงยิงไปก่อนหน้านี้แล้วและต้องอยู่นอก transaction เหมือนเดิม
+	err = gormx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Sale{}).
+			Where("id = ?", req.ID).
+			Updates(updateFields).Error; err != nil {
+			return fmt.Errorf("failed to update sale status: %v", err)
 		}
+
+		// อนุมัติผ่านแล้วให้ราคาที่ใช้จริงกลับไปเป็นราคาจาก quotation
+		// บรรทัดที่ไม่มีราคาจาก quotation (0) ไม่แตะ เพราะไม่มีอะไรให้ยึด
+		if shouldAdoptQuotationPrice(req.Status) {
+			if err := tx.Model(&models.SaleItem{}).
+				Where("sale_id = ? AND old_price_list_unit > 0", req.ID).
+				Updates(map[string]interface{}{
+					"price_list_unit": gorm.Expr("old_price_list_unit"),
+					"update_date":     nowDateOnly,
+					"update_by":       user,
+				}).Error; err != nil {
+				return fmt.Errorf("failed to adopt quotation price for sale %v: %v", req.ID, err)
+			}
+		}
+
+		// If status is REJECT, also update sale_item status to CANCELED
+		if req.Status == "REJECT" {
+			if err := tx.Model(&models.SaleItem{}).
+				Where("sale_id = ?", req.ID).
+				Updates(map[string]interface{}{
+					"status":      "CANCELED",
+					"update_date": nowDateOnly,
+				}).Error; err != nil {
+				return fmt.Errorf("failed to update sale items status: %v", err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return map[string]interface{}{
@@ -127,4 +156,10 @@ func UpdateStatusApproveSale(ctx *gin.Context, jsonPayload string) (interface{},
 		"status":            "success",
 		"message":           "Approval updated successfully",
 	}, nil
+}
+
+// shouldAdoptQuotationPrice บอกว่าผลอนุมัตินี้ทำให้ใบยึดราคาจาก quotation หรือยัง
+// อนุมัติผ่าน = ผู้อนุมัติยอมรับราคาที่ห่างจาก price list master แล้ว (SA เคาะ 2026-09-10)
+func shouldAdoptQuotationPrice(status string) bool {
+	return status == "COMPLETED"
 }

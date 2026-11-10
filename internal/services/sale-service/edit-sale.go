@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"prime-erp-core/internal/models"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +17,7 @@ type EditSaleRequest struct {
 	SaleCode string `json:"sale_code"`
 }
 
-func EditSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func EditSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := EditSaleRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

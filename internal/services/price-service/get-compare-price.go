@@ -1,13 +1,12 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"sort"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetComparePriceRequest struct {
@@ -57,7 +56,7 @@ type ItemComparePrice struct {
 	IsPassPriceWeight              bool    `json:"is_pass_price_weight"`
 }
 
-func GetComparePrice(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetComparePrice(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetComparePriceRequest{}
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
 		return nil, errors.New("failed to unmarshal JSON into struct: " + err.Error())

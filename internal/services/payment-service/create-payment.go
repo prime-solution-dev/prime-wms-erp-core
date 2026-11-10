@@ -1,16 +1,16 @@
 package paymentService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositorypayment "prime-erp-core/internal/repositories/payment"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func CreatePayment(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func CreatePayment(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Payment
 

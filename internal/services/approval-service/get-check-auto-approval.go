@@ -1,6 +1,7 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/db"
@@ -8,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -26,7 +26,18 @@ type CheckAutoApprovalResponse struct {
 	Message        string `json:"message"`
 }
 
-func CheckAutoApprovalRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// CheckAutoApprovalRest เป็นเส้นที่ไม่มีตัวตนฝั่ง server ส่งเข้า CheckAutoApproval เลย
+// ตัวตนมาจาก request_user_code ใน body เท่านั้น ไม่ส่งมา = ตอบ 400 ตามเดิม
+//
+// ของเดิมประกาศตัวแปร user แล้วอ่าน ctx.GetString("user_code") ซึ่งไม่มี middleware ตัวไหน
+// เคย c.Set คีย์นั้นเลย (มีแต่ "user") จึงได้ค่าว่างเสมอมาตั้งแต่ต้น — เป็น fallback ที่หลอกคนอ่าน
+// ว่ามีอยู่จริง จึงลบทิ้ง ไม่ได้เปลี่ยนพฤติกรรมอะไร
+//
+// เจตนาที่ไม่เอา user จาก token มาเป็น fallback: เส้นนี้เป็นด่านสิทธิ์ ถ้าให้มันเดาตัวตนจากคนที่
+// login อยู่ request ที่ลืมส่ง request_user_code จะเปลี่ยนจากถูกปฏิเสธ ไปเป็นอนุมัติผ่านเงียบๆ
+// (เจ้าของตัดสินใจไว้ 2026-09-26) ส่วนผู้เรียกภายในทั้ง 7 จุด — sale, quotation, purchase,
+// pre-purchase, credit — เรียก CheckAutoApproval ตรงๆ พร้อมส่ง user ของตัวเองมาให้อยู่แล้ว
+func CheckAutoApprovalRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := CheckAutoApprovalRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -39,15 +50,11 @@ func CheckAutoApprovalRest(ctx *gin.Context, jsonPayload string) (interface{}, e
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ""
-	if ctx != nil {
-		user = strings.TrimSpace(ctx.GetString("user_code"))
-	}
-
-	return CheckAutoApproval(gormx, req, user)
+	// "" คือ "ไม่มีตัวตนจากฝั่ง server" — ดูเหตุผลใน doc comment ด้านบน
+	return CheckAutoApproval(ctx, gormx, req, "")
 }
 
-func CheckAutoApproval(gormx *gorm.DB, req CheckAutoApprovalRequest, user string) (*CheckAutoApprovalResponse, error) {
+func CheckAutoApproval(ctx context.Context, gormx *gorm.DB, req CheckAutoApprovalRequest, user string) (*CheckAutoApprovalResponse, error) {
 	_ = gormx
 
 	res := &CheckAutoApprovalResponse{
@@ -98,7 +105,7 @@ func CheckAutoApproval(gormx *gorm.DB, req CheckAutoApprovalRequest, user string
 		"is_not_expired":    isNotExpired,
 	}
 
-	userApproval, err := authenticationService.GetUserApproval(requestData)
+	userApproval, err := authenticationService.GetUserApproval(ctx, requestData)
 	if err != nil {
 		return nil, err
 	}

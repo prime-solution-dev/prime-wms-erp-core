@@ -67,7 +67,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "total_weight"
         },
@@ -79,7 +79,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "avg_weight"
         },
@@ -91,7 +91,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "market_weight"
         },
@@ -113,7 +113,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "extra_price_weight"
         },
@@ -125,7 +125,7 @@
           "lockPosition": true,
           "suppressMovable": true,
           "cellStyle": {
-            "textAlign": "left"
+            "textAlign": "center"
           },
           "dataMapping": "line_bundle"
         },
@@ -161,7 +161,7 @@
               "headerName": "ราคาขาย before",
               "width": 450,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_weight"
             },
@@ -170,7 +170,7 @@
               "headerName": "ราคาขาย after",
               "width": 450,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_weight"
             }
@@ -186,7 +186,7 @@
               "headerName": "ราคาขาย before",
               "width": 450,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "before_total_net_price_unit"
             },
@@ -195,7 +195,7 @@
               "headerName": "ราคาขาย after",
               "width": 450,
               "cellStyle": {
-                "textAlign": "left"
+                "textAlign": "center"
               },
               "dataMapping": "total_net_price_unit"
             }

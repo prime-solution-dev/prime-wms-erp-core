@@ -30,6 +30,7 @@ type PrePurchase struct {
 	IsApproved                  bool              `json:"is_approved"`
 	StatusApprove               string            `json:"status_approve"`
 	Remark                      string            `json:"remark"`
+	Note                        *string           `gorm:"default:''" json:"note"`
 	CreditTerm                  int               `json:"credit_term"`
 	CreateBy                    string            `json:"create_by"`
 	CreateDtm                   time.Time         `json:"create_dtm"`
@@ -103,6 +104,7 @@ type Purchase struct {
 	IsApproved                  bool           `json:"is_approved"`
 	StatusApprove               string         `json:"status_approve"`
 	Remark                      string         `json:"remark"`
+	Note                        *string        `gorm:"default:''" json:"note"`
 	CreditTerm                  int            `json:"credit_term"`
 	StatusPayment               string         `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	UsedType                    string         `json:"used_type"`      // GR
@@ -199,19 +201,34 @@ type CreatePOBigLotRequest struct {
 	IsApproved      bool                        `json:"is_approved"`
 	StatusApprove   string                      `json:"status_approve"`
 	Remark          string                      `json:"remark"`
+	Note            *string                     `json:"note"`
 	CreditTerm      int                         `json:"credit_term"`
 	Items           []CreatePOBigLotItemRequest `json:"items"`
 }
 
 type GetPOBigLotListRequest struct {
-	PrePurchaseCodes  []string `json:"pre_purchase_codes"`
-	SupplierCodes     []string `json:"supplier_codes"`
-	ProductGroupCodes []string `json:"product_group_codes"`
-	StatusApprove     []string `json:"status_approve"`
-	CompanyCode       string   `json:"company_code"`
-	SiteCode          string   `json:"site_code"`
-	Page              int      `json:"page"`
-	PageSize          int      `json:"page_size"`
+	PrePurchaseCodes     []string `json:"pre_purchase_codes"`
+	SupplierCodes        []string `json:"supplier_codes"`
+	ProductGroupCodes    []string `json:"product_group_codes"`
+	StatusApprove        []string `json:"status_approve"`
+	Status               []string `json:"status"`
+	PrePurchaseCodeLike  string   `json:"pre_purchase_code_like"`
+	SupplierCodeLike     string   `json:"supplier_code_like"`
+	ProductGroupCodeLike string   `json:"product_group_code_like"`
+	ProductGroupNameLike string   `json:"product_group_name_like"`
+	SupplierNameLike     string   `json:"supplier_name_like"`
+	CompanyCode          string   `json:"company_code"`
+	SiteCode             string   `json:"site_code"`
+	Page                 int      `json:"page"`
+	PageSize             int      `json:"page_size"`
+
+	// OnlyRemaining = คัด Big lot ที่โควตารวมทุกบรรทัดถูกใช้จนหมด (remaining รวม <= 0)
+	// ออกจากผลลัพธ์ ใช้กับ picker "Ref. Big lot PO#" หน้า Create PO เพื่อไม่ให้เลือกใบที่หมดโควตา
+	// (มิเรอร์ pattern only_remaining_pick ของ STO) — default false เพื่อไม่กระทบ caller อื่น
+	OnlyRemaining bool `json:"only_remaining"`
+
+	StartCreateDate *time.Time `json:"start_create_date"`
+	EndCreateDate   *time.Time `json:"end_create_date"`
 }
 
 type GetPOBigLotItemResponse struct {
@@ -267,6 +284,7 @@ type GetPOBigLotResponse struct {
 	IsApproved                  bool                      `json:"is_approved"`
 	StatusApprove               string                    `json:"status_approve"`
 	Remark                      string                    `json:"remark"`
+	Note                        string                    `json:"note"`
 	CreditTerm                  int                       `json:"credit_term"`
 	CreateBy                    string                    `json:"create_by"`
 	CreateDtm                   string                    `json:"create_dtm"`
@@ -322,6 +340,7 @@ type UpdatePOBigLotRequest struct {
 	IsApproved       bool                        `json:"is_approved"`
 	StatusApprove    string                      `json:"status_approve"`
 	Remark           string                      `json:"remark"`
+	Note             *string                     `json:"note"`
 	CreditTerm       int                         `json:"credit_term"`
 	DeliveryAddress  string                      `json:"delivery_address"`
 	PrePurchaseItems []UpdatePOBigLotItemRequest `json:"pre_purchase_items"`
@@ -332,6 +351,13 @@ type UpdateStatusApprovePOBigLotRequest struct {
 	PrePurchaseCode string    `json:"pre_purchase_code"`
 	IsApproved      bool      `json:"is_approved"`
 	StatusApprove   string    `json:"status_approve"`
+	Remark          string    `json:"remark"`
+}
+
+// CompletePOBigLotRequest is the payload for both Close (Complete) and Cancel of
+// Big lot POs — a list of pre_purchase_code to act on.
+type CompletePOBigLotRequest struct {
+	PrePurchaseCodes []string `json:"pre_purchase_codes"`
 }
 
 // Supplier DTOs
@@ -424,6 +450,7 @@ type PurchaseFormRequest struct {
 	IsApproved      bool                      `json:"is_approved"`
 	StatusApprove   string                    `json:"status_approve"`
 	Remark          string                    `json:"remark"`
+	Note            *string                   `json:"note"`
 	CreditTerm      int                       `json:"credit_term"`
 	Items           []PurchaseItemFormRequest `json:"items"`
 }
@@ -441,6 +468,8 @@ type GetPurchaseRequest struct {
 	StatusPayment                []string   `json:"status_payment"` // PENDING, COMPLETED for check invoice
 	StatusPaymentIncomplete      bool       `json:"status_payment_incomplete"`
 	Status                       []string   `json:"status"`
+	UsedStatus                   []string   `json:"used_status"`
+	UsedStatusNot                []string   `json:"used_status_not"`
 	ProductCodes                 []string   `json:"product_codes"`
 	PurchaseType                 []string   `json:"purchase_type"`
 	DocRef                       []string   `json:"doc_ref"`
@@ -458,6 +487,60 @@ type GetPurchaseRequest struct {
 	ItemsProductGroupOneNameLike string     `json:"items_product_group_one_name_like"`
 	StartCreateDate              *time.Time `json:"start_create_date"`
 	EndCreateDate                *time.Time `json:"end_create_date"`
+
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	PurchaseCodeLikes             []PurchaseCodeLikeTerm             `json:"purchase_code_likes"`
+	DocRefLikes                   []DocRefLikeTerm                   `json:"doc_ref_likes"`
+	SupplierCodeLikes             []SupplierCodeLikeTerm             `json:"supplier_code_likes"`
+	SupplierNameLikes             []SupplierNameLikeTerm             `json:"supplier_name_likes"`
+	ItemsProductCodeLikes         []ItemsProductCodeLikeTerm         `json:"items_product_code_likes"`
+	ItemsProductDescLikes         []ItemsProductDescLikeTerm         `json:"items_product_desc_likes"`
+	ItemsProductGroupOneNameLikes []ItemsProductGroupOneNameLikeTerm `json:"items_product_group_one_name_likes"`
+
+	// sort_by: purchase_code / doc_ref / supplier_code / supplier_name / items_product_code /
+	// items_product_desc / items_product_group_one_name, sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
+}
+
+// ค้นด้วย ILIKE อย่างเดียว ไม่มี _in / _not
+type PurchaseCodeLikeTerm struct {
+	Like string `json:"purchase_code_like"`
+}
+
+type DocRefLikeTerm struct {
+	Like string `json:"doc_ref_like"`
+}
+
+// *_in / *_not เป็นรหัสของคอลัมน์เสมอ แม้ entry จะอยู่ในคอลัมน์ชื่อ (คอลัมน์ชื่อแสดงชื่อแต่ส่งรหัส)
+type SupplierCodeLikeTerm struct {
+	Like string   `json:"supplier_code_like"`
+	In   []string `json:"supplier_code_in"`
+	Not  []string `json:"supplier_code_not"`
+}
+
+type SupplierNameLikeTerm struct {
+	Like string   `json:"supplier_name_like"`
+	In   []string `json:"supplier_code_in"`
+	Not  []string `json:"supplier_code_not"`
+}
+
+type ItemsProductCodeLikeTerm struct {
+	Like string   `json:"items_product_code_like"`
+	In   []string `json:"items_product_code_in"`
+	Not  []string `json:"items_product_code_not"`
+}
+
+type ItemsProductDescLikeTerm struct {
+	Like string   `json:"items_product_desc_like"`
+	In   []string `json:"items_product_code_in"`
+	Not  []string `json:"items_product_code_not"`
+}
+
+type ItemsProductGroupOneNameLikeTerm struct {
+	Like string   `json:"items_product_group_one_name_like"`
+	In   []string `json:"items_product_group_one_code_in"`
+	Not  []string `json:"items_product_group_one_code_not"`
 }
 
 type PurchaseItemResponse struct {
@@ -523,6 +606,7 @@ type PurchaseResponse struct {
 	UsedType                    string                 `json:"used_type"`      // GR
 	UsedStatus                  string                 `json:"used_status"`    // PENDING, COMPLETED
 	Remark                      string                 `json:"remark"`
+	Note                        string                 `json:"note"`
 	CreditTerm                  int                    `json:"credit_term"`
 	CreateBy                    string                 `json:"create_by"`
 	CreateDtm                   string                 `json:"create_dtm"`
@@ -545,6 +629,7 @@ type UpdateStatusApprovePurchaseRequest struct {
 	PurchaseCode  string    `json:"purchase_code"`
 	IsApproved    bool      `json:"is_approved"`
 	StatusApprove string    `json:"status_approve"`
+	Remark        string    `json:"remark"`
 }
 
 type CompleteStatusPaymentPurchaseRequest struct {
@@ -561,6 +646,7 @@ type GetProductRequest struct {
 	ProductCode []string `json:"product_code"`
 	SiteCode    []string `json:"site_code"`
 	CompanyCode []string `json:"company_code"`
+	ProductType []string `json:"product_type"`
 }
 
 type GetProductsDetailResponse struct {
@@ -647,6 +733,8 @@ type GetProductsDetailComponent struct {
 	ExternalID                    string                         `json:"external_id"`
 	GRTolerance                   float64                        `json:"gr_tolerance"`
 	GRToleranceActive             bool                           `json:"gr_tolerance_active"`
+	GRWeightTolerance             float64                        `json:"gr_weight_tolerance"`
+	GRWeightToleranceActive       bool                           `json:"gr_weight_tolerance_active"`
 	UnitInterface                 string                         `json:"unit_interface"`
 	Attributes                    []GetAttributesDetailComponent `json:"attributes"`
 	Tags                          []GetTagsDetailComponent       `json:"tags"`

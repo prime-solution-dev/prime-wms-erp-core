@@ -6,12 +6,13 @@ import (
 	orderExternalService "prime-erp-core/external/order-service"
 )
 
-func buildOrder(deliveryCode string, deliveryItem string, outbounds []orderExternalService.OutboundItemWithGoodsIssue) orderExternalService.GetOrderDeliveryResponse {
+func buildOrder(deliveryCode string, deliveryItem string, orderItemStatus string, outbounds []orderExternalService.OutboundItemWithGoodsIssue) orderExternalService.GetOrderDeliveryResponse {
 	return orderExternalService.GetOrderDeliveryResponse{
 		DocumentRef: deliveryCode,
 		OrderItem: []orderExternalService.GetOrderItemDeliveryResponse{
 			{
 				DocumentRefItem: deliveryItem,
+				Status:          orderItemStatus,
 				OutboundItem:    outbounds,
 			},
 		},
@@ -29,16 +30,16 @@ func buildOutbound(status string, issuedQty ...float64) orderExternalService.Out
 	return outbound
 }
 
-func TestFoldWmsProgressMarksFullyIssuedItemAsClosed(t *testing.T) {
+func TestFoldWmsProgressMarksCompletedOrderItemAsClosed(t *testing.T) {
 	issued, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
-		buildOrder("DBS-1", "ITEM-1", []orderExternalService.OutboundItemWithGoodsIssue{
+		buildOrder("DBS-1", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
 			buildOutbound("COMPLETED", 8),
 		}),
 	})
 
 	key := "DBS-1|ITEM-1"
 	if !closed[key] {
-		t.Fatalf("closed[%s] = false, want true when every outbound is COMPLETED", key)
+		t.Fatalf("closed[%s] = false, want true when the CO line is COMPLETED", key)
 	}
 
 	if issued[key] != 8 {
@@ -46,51 +47,65 @@ func TestFoldWmsProgressMarksFullyIssuedItemAsClosed(t *testing.T) {
 	}
 }
 
-// นี่คือเคสที่พังก่อนหน้านี้: มี outbound ปิดไปแล้วหนึ่งตัวแต่ยังมีอีกตัวค้างอยู่
-// ของเดิมจะนับแค่ที่ตัดจริงแล้วปล่อยส่วนที่ยังจองค้างให้จองซ้ำได้
-func TestFoldWmsProgressKeepsItemOpenWhileAnyOutboundIsPending(t *testing.T) {
+// CO ยังทำงานอยู่ ถึงจะมี outbound ปิดไปแล้วบางตัว ของก็ยังต้องถูกกันไว้เต็มจำนวน
+func TestFoldWmsProgressKeepsItemOpenWhileOrderItemIsPending(t *testing.T) {
 	_, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
-		buildOrder("DBS-1", "ITEM-1", []orderExternalService.OutboundItemWithGoodsIssue{
+		buildOrder("DBS-1", "ITEM-1", "PENDING", []orderExternalService.OutboundItemWithGoodsIssue{
 			buildOutbound("COMPLETED", 8),
 			buildOutbound("PENDING"),
 		}),
 	})
 
 	if closed["DBS-1|ITEM-1"] {
-		t.Fatal("closed = true while an outbound is still PENDING, the booking must stay held in full")
+		t.Fatal("closed = true while the CO line is still PENDING, the booking must stay held in full")
 	}
 }
 
-func TestFoldWmsProgressTreatsCancelledOutboundAsClosed(t *testing.T) {
+// เคส CO2608-00005-002: outbound ถูกปิดเป็น COMPLETED ทั้งที่ไม่เคย pack/GI เลย
+// ถ้าตัดสินจาก outbound ยอดจะถูกปล่อยคืนทั้งที่ CO ยังรอของอยู่
+func TestFoldWmsProgressKeepsItemOpenWhenOutboundClosedWithoutIssuing(t *testing.T) {
+	_, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "PENDING", []orderExternalService.OutboundItemWithGoodsIssue{
+			buildOutbound("COMPLETED"),
+		}),
+	})
+
+	if closed["DBS-1|ITEM-1"] {
+		t.Fatal("an outbound that closed without issuing must not release a CO line that is still open")
+	}
+}
+
+func TestFoldWmsProgressTreatsCancelledOrderItemAsClosed(t *testing.T) {
 	issued, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
-		buildOrder("DBS-1", "ITEM-1", []orderExternalService.OutboundItemWithGoodsIssue{
+		buildOrder("DBS-1", "ITEM-1", "CANCELED", []orderExternalService.OutboundItemWithGoodsIssue{
 			buildOutbound("CANCELED"),
 		}),
 	})
 
 	key := "DBS-1|ITEM-1"
 	if !closed[key] {
-		t.Fatal("a cancelled outbound should close the line so the qty returns to the pool")
+		t.Fatal("a cancelled CO line should close the line so the qty returns to the pool")
 	}
 
 	if issued[key] != 0 {
-		t.Errorf("issued[%s] = %v, want 0 for a cancelled outbound", key, issued[key])
+		t.Errorf("issued[%s] = %v, want 0 for a cancelled line", key, issued[key])
 	}
 }
 
-func TestFoldWmsProgressIgnoresItemWithoutOutbound(t *testing.T) {
-	issued, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
-		buildOrder("DBS-1", "ITEM-1", nil),
+// TEMP คือ CO ที่ยังร่างอยู่ ยังไม่จบ ต้องกันของไว้
+func TestFoldWmsProgressKeepsDraftOrderItemOpen(t *testing.T) {
+	_, closed := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
+		buildOrder("DBS-1", "ITEM-1", "TEMP", nil),
 	})
 
-	if len(closed) != 0 || len(issued) != 0 {
-		t.Fatalf("an order item with no outbound must stay unknown, got issued=%v closed=%v", issued, closed)
+	if closed["DBS-1|ITEM-1"] {
+		t.Fatal("a TEMP (draft) CO line must keep holding the booking")
 	}
 }
 
 func TestFoldWmsProgressSumsEveryGoodsIssueLine(t *testing.T) {
 	issued, _ := foldWmsProgress([]orderExternalService.GetOrderDeliveryResponse{
-		buildOrder("DBS-1", "ITEM-1", []orderExternalService.OutboundItemWithGoodsIssue{
+		buildOrder("DBS-1", "ITEM-1", "COMPLETED", []orderExternalService.OutboundItemWithGoodsIssue{
 			buildOutbound("COMPLETED", 3, 2),
 			buildOutbound("COMPLETED", 1),
 		}),

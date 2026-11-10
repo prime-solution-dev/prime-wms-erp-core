@@ -46,6 +46,10 @@ func GetDeposit(extelnalID string) ([]interface{}, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Origin", "PRIME")
 
+	// ห้ามแปะ utils.NewOutboundLogTransport (หรือ apilog.NewLoggingTransport ตรงๆ) ที่ client นี้
+	// เด็ดขาด — ปลายทางคือ tmi.trcloud.co ซึ่งเป็น third party ภายนอก body ของ request/response นี้
+	// เป็นบทสนทนากับ vendor ภายนอก ไม่ใช่ของเราเอง ต้องไม่มีทางหลุดลง MongoDB ของเรา (ดู
+	// internal/guard/no_apilog_on_deposit_clients_test.go ที่กันไว้ไม่ให้ใครเผลอเติมทีหลัง)
 	client := &http.Client{
 		Timeout: 15 * time.Second,
 	}

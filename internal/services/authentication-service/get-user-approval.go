@@ -2,12 +2,15 @@ package authenticationService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+
+	"prime-erp-core/internal/utils"
 )
 
 type GetUserApprovalRequest struct {
@@ -46,22 +49,20 @@ type GetUserApprovalResponse struct {
 	Data         []UserApprovalDataResult `json:"data"`
 }
 
-func GetUserApproval(requestData map[string]interface{}) (GetUserApprovalResponse, error) {
+func GetUserApproval(ctx context.Context, requestData map[string]interface{}) (GetUserApprovalResponse, error) {
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
 
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_authorization")+"/author/get-user-approval", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_authorization")+"/author/get-user-approval", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return GetUserApprovalResponse{}, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
-
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("authentication")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return GetUserApprovalResponse{}, errors.New("Error parsing DateTo : " + err.Error())
@@ -70,15 +71,13 @@ func GetUserApproval(requestData map[string]interface{}) (GetUserApprovalRespons
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetUserApproval: read body failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
 	var requesters GetUserApprovalResponse
 	err = json.Unmarshal(body, &requesters)
 	if err != nil {
-		fmt.Println("Response Status:", err)
+		fmt.Printf("GetUserApproval: decode response failed: status=%d err=%v\n", resp.StatusCode, err)
 	}
-
-	fmt.Println("Response Status:", resp.Status)
 
 	return requesters, nil
 

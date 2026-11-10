@@ -1,13 +1,13 @@
 package creditService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	depositService "prime-erp-core/internal/services/deposit-service"
 	summaryService "prime-erp-core/internal/services/summary-credit"
 	"strings"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetSummaryCreditRequest struct {
@@ -21,7 +21,7 @@ type ResultGetSummaryCredit struct {
 	BalanceCreditLimit  float64 `json:"balance_credit_limit"`
 }
 
-func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetSummaryCredit(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req GetApprovalRequest
 
@@ -51,24 +51,19 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 		creditLimit += creditValue.Amount
 		for _, creditExtraValue := range creditValue.CreditExtra {
 			increaseCreditLimit += creditExtraValue.Amount
-			/* if creditValue.EffectiveDtm == nil {
-				increaseCreditLimit += creditExtraValue.Amount
-			} else {
-				if creditValue.EffectiveDtm.After(time.Now()) || creditValue.EffectiveDtm.Equal(time.Now()) {
-					increaseCreditLimit += creditExtraValue.Amount
-				}
-			} */
-
 		}
 	}
 
-	getDepositRes, errGetDeposit := depositService.GetDeposit(ctx, string(jsonBytesCustomerCode))
+	// depositService.GetDeposit ยังไม่แปลง (นอก scope) แต่ ctx ไม่ถูกใช้ในตัวฟังก์ชันเลย
+	// ส่ง nil ตรงได้โดยพฤติกรรมไม่เปลี่ยน
+	getDepositRes, errGetDeposit := depositService.GetDeposit(nil, string(jsonBytesCustomerCode))
 	if errGetDeposit != nil {
 		return nil, errGetDeposit
 	}
 	getDeposit := getDepositRes.(depositService.ResultDeposit).Deposit
 	for _, depositValue := range getDeposit {
-		remainDeposit += depositValue.AmountRemain
+		amountRemainVat := math.Round((depositValue.AmountRemain*1.07)*100) / 100
+		remainDeposit += amountRemainVat
 	}
 
 	requestDataGetConsumend := map[string]interface{}{
@@ -87,17 +82,14 @@ func GetSummaryCredit(ctx *gin.Context, jsonPayload string) (interface{}, error)
 	resultGetPaidInvoice := paidInvoice.(summaryService.ResultGetPaidInvoices)
 
 	totalCreditLimit := creditLimit + increaseCreditLimit
-	/* consumedCredit := (resultGetPaidInvoice.TotalAmount - resultGetPaidInvoice.SumInvoiceTotalAmountDN +
-	resultGetPaidInvoice.SumInvoiceTotalAmountCN + resultGetPaidInvoice.SumPaymentTotalAmountAR - resultGetPaidInvoice.SumPaymentTotalAmountDN) - remainDeposit */
-	consumedCredit := resultGetPaidInvoice.TotalAmount - remainDeposit
+	consumedCredit := resultGetPaidInvoice.PaidInvoice - remainDeposit
 
 	resultSummaryCredit := ResultGetSummaryCredit{
 		CreditLimit:         creditLimit,
 		IncreaseCreditLimit: increaseCreditLimit,
 		TotalCreditLimit:    totalCreditLimit,
-		ConsumedCredit:      consumedCredit, /* math.Round(consumedCredit*100) / 100 */
-
-		BalanceCreditLimit: totalCreditLimit - consumedCredit,
+		ConsumedCredit:      consumedCredit,
+		BalanceCreditLimit:  totalCreditLimit - consumedCredit,
 	}
 
 	return resultSummaryCredit, nil

@@ -2,7 +2,6 @@ package patterns
 
 import (
 	"fmt"
-	"sort"
 
 	"prime-erp-core/internal/models"
 
@@ -38,25 +37,16 @@ func BuildGroup1Item9Response(priceListData []models.GetPriceListResponse, group
 		}, nil
 	}
 
+	productGroup2Code := getGroupCodeFromConfig(config, pattern, "productGroup2", "PRODUCT_GROUP2")
+	productGroup7Code := getGroupCodeFromConfig(config, pattern, "productGroup7", "PRODUCT_GROUP7")
+	productGroup6Code := getGroupCodeFromConfig(config, pattern, "productGroup6", "PRODUCT_GROUP6")
+
+	// เรียงที่ต้นทางด้วย group_item.value แล้ว mergeGroup1Item9Rows จะรักษาลำดับ
+	// ที่เจอครั้งแรกไว้ให้เอง จึงไม่ต้อง sort ซ้ำหลัง merge
+	SortSubGroupsByValue(allSubGroups, productGroup2Code, productGroup7Code, productGroup6Code)
 	columns := buildDynamicColumns(pattern, allSubGroups)
 	rowData := buildDynamicRows(config, pattern, allSubGroups)
 	mergedRows := mergeGroup1Item9Rows(rowData)
-
-	sort.SliceStable(mergedRows, func(i, j int) bool {
-		productGroupI := fmt.Sprintf("%v", mergedRows[i]["product_group_2"])
-		productGroupJ := fmt.Sprintf("%v", mergedRows[j]["product_group_2"])
-		if productGroupI == productGroupJ {
-			lengthI := fmt.Sprintf("%v", mergedRows[i]["product_group_7"])
-			lengthJ := fmt.Sprintf("%v", mergedRows[j]["product_group_7"])
-			if lengthI == lengthJ {
-				sizeI := fmt.Sprintf("%v", mergedRows[i]["product_group_6"])
-				sizeJ := fmt.Sprintf("%v", mergedRows[j]["product_group_6"])
-				return sizeI < sizeJ
-			}
-			return lengthI < lengthJ
-		}
-		return productGroupI < productGroupJ
-	})
 
 	tableData := make([]map[string]interface{}, len(mergedRows))
 	for i, row := range mergedRows {

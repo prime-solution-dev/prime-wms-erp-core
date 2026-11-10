@@ -1,7 +1,7 @@
 package verifyService
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -59,12 +59,12 @@ type VerifyInventoryCalculation struct {
 	IsPass          bool    `json:"is_pass"`
 }
 
-func GetSystemConfigWarehouse() ([]string, error) {
+func GetSystemConfigWarehouse(ctx context.Context) ([]string, error) {
 	getSystemConfigWarehouseRequest := externalService.GetSystemConfigRequest{
 		TopicCodes:  []string{"ATP"},
 		ConfigCodes: []string{"ATP_CONDITION"},
 	}
-	systemConfigData, err := externalService.GetSystemConfigWarehouse(getSystemConfigWarehouseRequest)
+	systemConfigData, err := externalService.GetSystemConfigWarehouse(ctx, getSystemConfigWarehouseRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func GetSystemConfigWarehouse() ([]string, error) {
 	return warehouseCodes, nil
 }
 
-func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse, error) {
+func VerifyInventoryLogic(ctx context.Context, req VerifyInventoryRequest) (*VerifyInventoryResponse, error) {
 	res := &VerifyInventoryResponse{}
 	res.IsPassInventory = true
 	res.InventoryCalculations = []VerifyInventoryCalculation{}
@@ -101,7 +101,7 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 	if len(warehouseCodes) == 0 {
 		// ถ้า request ไม่ระบุ warehouse ให้ใช้ค่า default จาก system config
 		var err error
-		warehouseCodes, err = GetSystemConfigWarehouse()
+		warehouseCodes, err = GetSystemConfigWarehouse(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get warehouse config: %v", err)
 		}
@@ -131,11 +131,7 @@ func VerifyInventoryLogic(req VerifyInventoryRequest) (*VerifyInventoryResponse,
 		}
 	}
 
-	requestJSON, _ := json.MarshalIndent(reqAtp, "", "  ")
-	fmt.Println("CreateGoodsIssueRequest JSON:")
-	fmt.Println(string(requestJSON))
-
-	resAtp, err := externalService.GetInventoryATP(reqAtp)
+	resAtp, err := externalService.GetInventoryATP(ctx, reqAtp)
 	if err != nil {
 		return nil, err
 	}

@@ -1,15 +1,16 @@
 package approvalService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	models "prime-erp-core/internal/models"
 	repositoryApproval "prime-erp-core/internal/repositories/approval"
-
-	"github.com/gin-gonic/gin"
 )
 
-func UpdateApproval(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+// UpdateApproval รับ context.Context เพื่อให้ sale-service/quotation-service (แปลงแล้ว) เรียกได้ตรงๆ
+// ตัวฟังก์ชันเองไม่ได้ใช้ ctx เลย (ดู comment เดียวกันที่ GetApproval)
+func UpdateApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Approval
 

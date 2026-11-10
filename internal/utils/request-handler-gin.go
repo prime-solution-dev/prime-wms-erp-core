@@ -1,0 +1,165 @@
+package utils
+
+import (
+	"context"
+	"errors"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"strings"
+
+	"prime-erp-core/internal/apperr"
+	"prime-erp-core/internal/requestcontext"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+// buildContext ย้ายข้อมูลจากฝั่ง gin มาใส่ context ก่อนส่งให้ service
+//
+// middleware ตัวใหม่ใส่ user/token ลง c.Request.Context() ให้อยู่แล้ว ส่วนที่เติมตรงนี้
+// เป็นตาข่ายรองสำหรับกรณีที่ middleware ยังเป็นตัวเก่า (เก็บด้วย c.Set อย่างเดียว)
+// หรือ token มากับ request แต่ middleware แกะ JWT ไม่ผ่าน
+func buildContext(c *gin.Context) context.Context {
+	ctx := c.Request.Context()
+
+	if _, ok := requestcontext.GetUser(ctx); !ok {
+		if user := c.GetString("user"); user != "" {
+			ctx = requestcontext.WithUser(ctx, user)
+		}
+	}
+
+	if _, ok := requestcontext.GetToken(ctx); !ok {
+		if token := c.GetHeader("Authorization"); token != "" {
+			ctx = requestcontext.WithToken(ctx, token)
+		}
+	}
+
+	// middleware.RequestLogMiddleware ใส่ trace id ให้ทุก route อยู่แล้ว (รวมเส้นที่
+	// AuthMiddleware ปฏิเสธด้วย) จุดนี้จึงเป็นแค่ตาข่ายรองเหมือน user/token ด้านบน: ถ้า context
+	// มี trace id อยู่แล้วห้ามทับ ถ้าไม่มีเลย (เช่น route ที่ไม่ได้ผ่าน RequestLogMiddleware) ค่อย
+	// ออกเลขจาก header หรือสร้างใหม่
+	if _, ok := requestcontext.GetTraceID(ctx); !ok {
+		ctx = requestcontext.WithTraceID(ctx, traceIDOf(c))
+	}
+
+	return ctx
+}
+
+// TraceIDHeader คือ header ที่ใช้ส่งต่อ trace id ข้าม service ทุก repo ต้องใช้ชื่อเดียวกัน
+const TraceIDHeader = "X-Trace-ID"
+
+// traceIDOf ใช้ trace id ที่ service ต้นทางส่งมา ถ้าไม่มีแปลว่าเราเป็นต้นทาง จึงออกเลขใหม่
+//
+// เลขนี้ไว้ไล่ดูว่า request เดียวของผู้ใช้วิ่งผ่าน service ไหนบ้าง utils.NewRequest
+// จะแปะมันกลับเป็น header ให้เองตอนยิงออก
+func traceIDOf(c *gin.Context) string {
+	if traceID := strings.TrimSpace(c.GetHeader(TraceIDHeader)); traceID != "" {
+		return traceID
+	}
+
+	return uuid.NewString()
+}
+
+// BindingError represents a binding/validation error
+type BindingError struct {
+	Message string
+}
+
+func (e *BindingError) Error() string {
+	return e.Message
+}
+
+// writeError ตอบ error ตาม status ที่ error พกมา
+func writeError(c *gin.Context, err error) {
+	// service เขียน response ไปเองแล้ว ไม่ต้องเขียนซ้ำ
+	if c.Writer.Written() {
+		return
+	}
+
+	var appErr *apperr.AppError
+	if errors.As(err, &appErr) {
+		c.JSON(appErr.HTTPStatus, gin.H{"code": appErr.Code, "error": appErr.Message})
+		return
+	}
+
+	// price-service ยังคืน *BindingError จาก 4 endpoint: 3 ตัวที่เดิมใช้ ProcessRequestWithBinding
+	// (UpdatePriceListSubGroup, UpdateLatestPriceListSubGroup, GetCalculatedPriceListSubGroup —
+	// ตอนนี้ validate เองด้วย validator.New().SetTagName("binding") แทน ctx.ShouldBindJSON) และ
+	// UpdateExtras (/price/UpdatePriceListExtra ซึ่งเป็น ProcessRequest ธรรมดา) ที่คืน
+	// *utils.BindingError ตรงๆ จาก validateExtras โดยไม่เคยผ่าน ShouldBindJSON มาก่อนเลย
+	// ตัดสาขานี้ทิ้งเมื่อไหร่ทั้ง 4 endpoint จะกลายเป็น 500 ทันที
+	// รูป response ต้องเหมือนเดิมทุก byte ไม่งั้นหน้าเว็บที่อ่าน body["details"] จะพัง
+	var bindingErr *BindingError
+	if errors.As(err, &bindingErr) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Validation failed",
+			"details": bindingErr.Message,
+		})
+		return
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+}
+
+// ProcessContextRequest อ่าน JSON payload จาก body แล้วส่งต่อให้ service ที่รับ context.Context
+//
+// ใช้แทน ProcessRequest ในทุก route ที่ service ถูกแปลงเป็น context.Context แล้ว
+func ProcessContextRequest(
+	c *gin.Context,
+	serviceFunc func(context.Context, string) (interface{}, error),
+) {
+	jsonData, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	response, err := serviceFunc(buildContext(c), string(jsonData))
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	if c.Writer.Written() {
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// MultipartInput คือไฟล์และ form ที่แยกออกมาจาก request แล้ว
+// service จึงไม่ต้องรู้จัก gin
+type MultipartInput struct {
+	Files map[string][]*multipart.FileHeader
+	Form  map[string][]string
+}
+
+// ProcessContextRequestMultipart ใช้กับ route ที่รับไฟล์ เช่น upload pricelist
+func ProcessContextRequestMultipart(
+	c *gin.Context,
+	serviceFunc func(context.Context, MultipartInput) (interface{}, error),
+) {
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to get multipart form: " + err.Error()})
+		return
+	}
+
+	input := MultipartInput{
+		Files: form.File,
+		Form:  form.Value,
+	}
+
+	response, err := serviceFunc(buildContext(c), input)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+
+	if c.Writer.Written() {
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

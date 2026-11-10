@@ -18,7 +18,6 @@ type GetPriceDetailRequest struct {
 	EffectiveDateTo   *time.Time `json:"effective_date_to"`
 }
 
-
 type PriceFormula struct {
 	Expression string          `json:"expression"`
 	Params     json.RawMessage `json:"params"`

@@ -40,6 +40,7 @@ type DeliveryItem struct {
 	DeliveryItem    string    `json:"delivery_item"`
 	DeliveryID      uuid.UUID `json:"delivery_id"`
 	ProductCode     string    `json:"product_code"`
+	ProductDesc     string    `json:"product_desc"`
 	Qty             float64   `json:"qty"`
 	UnitCode        string    `json:"unit_code"`
 	PriceListUnit   float64   `json:"price_list_unit"`

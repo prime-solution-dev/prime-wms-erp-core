@@ -1,15 +1,14 @@
 package deliveryService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -70,7 +69,7 @@ type GetDeliveryItemSOResponse struct {
 	Sale            models.Sale `gorm:"-" json:"sale"`
 }
 
-func GetDeliverySO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetDeliverySO(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var res []GetDeliverySOResponse
 	var req GetDeliverySORequest
@@ -83,7 +82,6 @@ func GetDeliverySO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	gormx, err := db.ConnectGORM("prime_erp")
 	if err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to database"})
 		return nil, err
 	}
 	defer db.CloseGORM(gormx)
@@ -99,7 +97,6 @@ func GetDeliverySO(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	if err := query.Find(&res).Error; err != nil {
 		fmt.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve data"})
 		return nil, err
 	}
 

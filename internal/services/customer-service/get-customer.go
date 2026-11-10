@@ -2,6 +2,7 @@ package customerService
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"prime-erp-core/internal/utils"
 
 	"github.com/google/uuid"
 )
@@ -138,22 +141,20 @@ type ResultCustomerResponse struct {
 	Customers  []GetCustomerResponse `json:"customers"`
 }
 
-func GetCustomers(requestData map[string]interface{}) (ResultCustomerResponse, error) {
+func GetCustomers(ctx context.Context, requestData map[string]interface{}) (ResultCustomerResponse, error) {
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		errors.New("Error marshalling data :")
 	}
 
-	reqHttp, err := http.NewRequest("POST", os.Getenv("base_url_customer")+"/Customer/GetCustomers", bytes.NewBuffer(jsonData))
+	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_customer")+"/Customer/GetCustomers", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error parsing DateTo: " + err.Error())
 	}
 
-	reqHttp.Header.Set("Content-Type", "application/json")
-
 	// Create a client and execute the request
-	client := &http.Client{}
+	client := &http.Client{Transport: utils.NewOutboundLogTransport("customer")}
 	resp, err := client.Do(reqHttp)
 	if err != nil {
 		return ResultCustomerResponse{}, errors.New("Error parsing DateTo : " + err.Error())

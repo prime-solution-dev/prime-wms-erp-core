@@ -1,6 +1,7 @@
 package xService
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -13,7 +14,6 @@ import (
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
 
-	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -72,6 +72,7 @@ type GetPurchaseItemRemainResponseResult struct {
 	StatusApprove               string   `json:"status_approve"`
 	StatusPayment               string   `json:"status_payment"`
 	DeliveryDate                string   `json:"delivery_date"`
+	Note                        string   `json:"note"`
 	ID                          string   `json:"id"`
 	PurchaseItem                string   `json:"purchase_item"`
 	DocRefItem                  string   `json:"doc_ref_item"`
@@ -118,7 +119,7 @@ type documentData struct {
 	UnitCode           string
 }
 
-func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPurchaseItemRemainRest(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetPurchaseItemRemainRequest{}
 	if strings.TrimSpace(jsonPayload) != "" {
 		if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -135,7 +136,7 @@ func GetPurchaseItemRemainRest(ctx *gin.Context, jsonPayload string) (interface{
 	return GetPurchaseItemRemain(ctx, gormx, req)
 }
 
-func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
+func GetPurchaseItemRemain(ctx context.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (*GetPurchaseItemRemainResponse, error) {
 	selectedQty, err := preparePurchaseRemainRequest(&req)
 	if err != nil {
 		return nil, err
@@ -160,7 +161,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	poItems := []string{}
 	poItemsCheck := map[string]bool{}
 
-	poMap, err := getPurchase(gormx, req)
+	poMap, err := getPurchase(ctx, gormx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +209,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 		return &res, nil
 	}
 
-	ibDocMap, err := getInbound(req, poCodes, poItems)
+	ibDocMap, err := getInbound(ctx, req, poCodes, poItems)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +256,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 			return nil, err
 		}
 
-		grDocMap, err = getGoodsReceive(ibCodes, ibItems)
+		grDocMap, err = getGoodsReceive(ctx, ibCodes, ibItems)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +297,7 @@ func GetPurchaseItemRemain(ctx *gin.Context, gormx *gorm.DB, req GetPurchaseItem
 	})
 
 	paged, page, pageSize, total, totalPages := paginateResults(results, req.Page, req.PageSize)
-	productMasterMap, err := getProductMasterMap(req, paged)
+	productMasterMap, err := getProductMasterMap(ctx, req, paged)
 	if err != nil {
 		return nil, err
 	}
@@ -601,6 +602,7 @@ func ConvertToResponse(
 				StatusApprove:        po.StatusApprove,
 				StatusPayment:        po.StatusPayment,
 				DeliveryDate:         po.DeliveryDate,
+				Note:                 po.Note,
 				ID:                   it.ID,
 				PurchaseItem:         it.PurchaseItem,
 				DocRefItem:           it.DocRefItem,
@@ -643,7 +645,7 @@ func ConvertToResponse(
 	return rs, nil
 }
 
-func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]models.PurchaseResponse, error) {
+func getPurchase(ctx context.Context, gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]models.PurchaseResponse, error) {
 	rs := map[string]models.PurchaseResponse{}
 
 	company := strings.TrimSpace(req.CompanyCode)
@@ -660,7 +662,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 
 	if strings.TrimSpace(req.ProductNameLike) != "" {
 		var err error
-		productNameSet, err = getProductCodesByNameLike(req)
+		productNameSet, err = getProductCodesByNameLike(ctx, req)
 		if err != nil {
 			return rs, err
 		}
@@ -753,7 +755,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 			"delivery_date",
 			"status", "status_approve", "status_payment",
 			"total_amount", "total_weight", "total_discount", "total_vat", "subtotal_excl_vat",
-			"remark",
+			"remark", "note",
 			"create_by", "create_dtm", "update_by", "update_dtm",
 		}).
 		Order("purchase_code ASC").
@@ -854,7 +856,7 @@ func getPurchase(gormx *gorm.DB, req GetPurchaseItemRemainRequest) (map[string]m
 	return rs, nil
 }
 
-func getInbound(req GetPurchaseItemRemainRequest, poCodes []string, poItems []string) (map[string]documentData, error) {
+func getInbound(ctx context.Context, req GetPurchaseItemRemainRequest, poCodes []string, poItems []string) (map[string]documentData, error) {
 	rs := map[string]documentData{}
 
 	reqIb := goodsReceiveService.InboundFilter{
@@ -863,7 +865,7 @@ func getInbound(req GetPurchaseItemRemainRequest, poCodes []string, poItems []st
 		Status:                     []string{"PENDING"},
 	}
 
-	resIb, err := goodsReceiveService.GetInbounds(reqIb)
+	resIb, err := goodsReceiveService.GetInbounds(ctx, reqIb)
 	if err != nil {
 		return rs, err
 	}
@@ -907,7 +909,7 @@ func getInbound(req GetPurchaseItemRemainRequest, poCodes []string, poItems []st
 	return rs, nil
 }
 
-func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentData, error) {
+func getGoodsReceive(ctx context.Context, ibCodes []string, ibItems []string) (map[string]documentData, error) {
 	rs := map[string]documentData{}
 
 	reqGr := goodsReceiveService.GoodsReceiveFilter{
@@ -916,7 +918,7 @@ func getGoodsReceive(ibCodes []string, ibItems []string) (map[string]documentDat
 		Status:          []string{"COMPLETED"},
 	}
 
-	resGr, err := goodsReceiveService.GetGoodsReceives(reqGr)
+	resGr, err := goodsReceiveService.GetGoodsReceives(ctx, reqGr)
 	if err != nil {
 		return rs, err
 	}
@@ -1082,7 +1084,7 @@ func getInvoiceAp(gormx *gorm.DB, req GetPurchaseItemRemainRequest, poCodes []st
 	return rs, nil
 }
 
-func getProductCodesByNameLike(req GetPurchaseItemRemainRequest) (map[string]bool, error) {
+func getProductCodesByNameLike(ctx context.Context, req GetPurchaseItemRemainRequest) (map[string]bool, error) {
 	rs := map[string]bool{}
 
 	company := strings.TrimSpace(req.CompanyCode)
@@ -1096,7 +1098,7 @@ func getProductCodesByNameLike(req GetPurchaseItemRemainRequest) (map[string]boo
 	totalPages := 1
 
 	for page := 1; page <= totalPages; page++ {
-		productRes, err := externalProductService.GetProduct(externalProductService.GetProductRequest{
+		productRes, err := externalProductService.GetProduct(ctx, externalProductService.GetProductRequest{
 			CompanyCode:     []string{company},
 			SiteCode:        []string{site},
 			ProductNameLike: productNameLike,
@@ -1128,6 +1130,7 @@ func getProductCodesByNameLike(req GetPurchaseItemRemainRequest) (map[string]boo
 }
 
 func getProductMasterMap(
+	ctx context.Context,
 	req GetPurchaseItemRemainRequest,
 	results []GetPurchaseItemRemainResponseResult,
 ) (map[string]externalProductService.GetProductsComponent, error) {
@@ -1158,7 +1161,7 @@ func getProductMasterMap(
 		pageSize = 50
 	}
 
-	productRes, err := externalProductService.GetProduct(externalProductService.GetProductRequest{
+	productRes, err := externalProductService.GetProduct(ctx, externalProductService.GetProductRequest{
 		CompanyCode: []string{strings.TrimSpace(req.CompanyCode)},
 		SiteCode:    []string{strings.TrimSpace(req.SiteCode)},
 		ProductCode: productCodes,
@@ -1291,6 +1294,11 @@ func paginateResults(
 }
 
 func toPurchaseResponse(p models.Purchase) models.PurchaseResponse {
+	note := ""
+	if p.Note != nil {
+		note = *p.Note
+	}
+
 	delivery := ""
 	if p.DeliveryDate != nil && !p.DeliveryDate.IsZero() {
 		delivery = p.DeliveryDate.Format("2006-01-02")
@@ -1306,6 +1314,7 @@ func toPurchaseResponse(p models.Purchase) models.PurchaseResponse {
 		StatusApprove: p.StatusApprove,
 		StatusPayment: p.StatusPayment,
 		DeliveryDate:  delivery,
+		Note:          note,
 		Items:         []models.PurchaseItemResponse{},
 	}
 }

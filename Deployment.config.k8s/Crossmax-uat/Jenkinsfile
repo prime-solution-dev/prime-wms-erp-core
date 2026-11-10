@@ -124,8 +124,15 @@ stage('Fetch .env from Vault (Remote)') {
             steps {
                 script {
                     echo 'Building Docker image on remote server...'
+<<<<<<< HEAD
                     sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
                     'cd ${REPO_NAME} && docker build --no-cache -t ${IMAGE_NAME}:latest .'"""
+=======
+                    withCredentials([string(credentialsId: 'GITTOKEN', variable: 'GIT_TOKEN')]) {
+                        sh """ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} \\
+                        'cd ${REPO_NAME} && docker build --no-cache --build-arg GIT_TOKEN=${GIT_TOKEN} -t ${IMAGE_NAME}:latest .'"""
+                    }
+>>>>>>> origin/Crossmax-main
                 }
             }
         }
@@ -138,6 +145,7 @@ stage('Fetch .env from Vault (Remote)') {
                 }
             }
         }
+<<<<<<< HEAD
         stage('Deploy Container') {
             steps {
                 script {
@@ -147,6 +155,27 @@ stage('Fetch .env from Vault (Remote)') {
                 }
             }
         }
+=======
+stage('Deploy Container') {
+    steps {
+        script {
+            echo 'Deploying container on remote server...'
+            sh """
+                ssh -i ${SSH_KEY_PATH} ${REMOTE_USER}@${REMOTE_HOST} '
+                    docker run -d \
+                        -p ${PORT} \
+                        --cpus=1.0 \
+                        --name ${CONTAINER_NAME} \
+                        -m 4g \
+                        --memory-swap 4g \
+                        ${IMAGE_NAME}:${env.BUILD_NUMBER} &&
+                    docker tag ${IMAGE_NAME}:${env.BUILD_NUMBER} ${IMAGE_NAME}:latest
+                '
+            """
+        }
+    }
+}
+>>>>>>> origin/Crossmax-main
 stage('Clean Up Repository') {
     steps {
         script {

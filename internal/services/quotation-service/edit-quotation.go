@@ -1,6 +1,7 @@
 package quotationService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"prime-erp-core/internal/models"
 	approvalService "prime-erp-core/internal/services/approval-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +17,7 @@ type EditQuotationRequest struct {
 	QuotationCode string `json:"quotation_code"`
 }
 
-func EditQuotation(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func EditQuotation(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := EditQuotationRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

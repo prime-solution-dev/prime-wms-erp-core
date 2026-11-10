@@ -1,21 +1,21 @@
 package invoiceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	models "prime-erp-core/internal/models"
-	systemConfigRepository "prime-erp-core/internal/repositories/systemConfig"
 	interfaceService "prime-erp-core/internal/services/interface-service"
 	prePurchaseService "prime-erp-core/internal/services/pre-purchase-service"
 	purchaseService "prime-erp-core/internal/services/purchase-service"
-	"strconv"
-
-	"github.com/gin-gonic/gin"
+	xService "prime-erp-core/internal/services/x-service"
+	"slices"
+	"strings"
 )
 
-func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, error) {
 
 	var req []models.Invoice
 
@@ -26,11 +26,13 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 	companyCode := ""
 	siteCode := ""
 	supplierReq := models.GetSupplierListRequest{}
+	productCodes := []string{}
 	for _, invoice := range req {
+		companyCode = invoice.CompanyCode
+		siteCode = invoice.SiteCode
 		for _, invoiceItem := range invoice.InvoiceItem {
 			poNumber = append(poNumber, invoiceItem.DocumentRef)
-			companyCode = invoice.CompanyCode
-			siteCode = invoice.SiteCode
+			productCodes = append(productCodes, invoiceItem.ProductCode)
 		}
 		supplierReq.SupplierCodes = append(supplierReq.SupplierCodes, invoice.PartyCode)
 	}
@@ -42,7 +44,7 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 
 	jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	po, errGetPO := purchaseService.GetPO(ctx, string(jsonBytesGetPO))
 	if errGetPO != nil {
@@ -53,70 +55,85 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 		for _, poItemsValue := range poValue.Items {
 			keyConvert := fmt.Sprintf("%s|%s", poValue.PurchaseCode, poItemsValue.PurchaseItem)
 			poMap[keyConvert] = POData{
-				QTY:    poItemsValue.Qty,
-				Weight: poItemsValue.TotalWeight,
+				QTY:          poItemsValue.Qty,
+				Weight:       poItemsValue.TotalWeight,
+				PurchaseUnit: poItemsValue.PurchaseUnit,
 			}
 		}
 	}
 
-	topicCodes := []string{"INVOICE"}
-	configCodes := []string{"AP"}
+	validateRequest := xService.ValidateAPOverPurchaseRequest{}
+	for _, invoice := range req {
+		for _, invoiceItem := range invoice.InvoiceItem {
+			key := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.DocumentRefItem)
+			validateUnit := ""
+			if poItem, ok := poMap[key]; ok {
+				switch strings.ToUpper(strings.TrimSpace(poItem.PurchaseUnit)) {
+				case "KG":
+					validateUnit = "WEIGHT"
+				default:
+					validateUnit = "UNIT"
+				}
+				validateRequest.Datas = append(validateRequest.Datas, xService.ValidateAPOverPurchaseRequestData{
+					PurchaseCode: invoiceItem.DocumentRef,
+					PurchaseItem: invoiceItem.DocumentRefItem,
+					Qty:          invoiceItem.Qty,
+					TotalWeight:  invoiceItem.Weight,
+					ValidateUnit: validateUnit,
+				})
+			}
 
-	invoiceConfigs, err := systemConfigRepository.GetSystemConfig(topicCodes, configCodes)
-	if err != nil {
-		return nil, err
-	}
-	invoiceConfigsMap := make(map[string]models.SystemConfig)
-	tolerance := 0.0
-	for _, invoiceConfigsValue := range invoiceConfigs {
-		invoiceConfigsMap[fmt.Sprintf("%s|%s", invoiceConfigsValue.TopicCode, invoiceConfigsValue.ConfigCode)] = invoiceConfigsValue
-		floatVal, err := strconv.ParseFloat(invoiceConfigsValue.Value, 64)
-		if err != nil {
-			log.Fatalf("Invalid float value: %v", err)
 		}
-		tolerance = floatVal
 	}
-
-	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(supplierReq)
+	toleranceErrorResponse := ToleranceErrorResponse{}
+	if len(validateRequest.Datas) > 0 {
+		validateRequest.InvoiceCode = req[0].InvoiceCode
+		validatePayload, err := json.Marshal(validateRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal AP over-purchase validation request: %w", err)
+		}
+		fmt.Println(string(validatePayload))
+		validateResult, err := xService.ValidateAPOverPurchaseRest(ctx, string(validatePayload))
+		if err != nil {
+			return nil, err
+		}
+		validateResponse, ok := validateResult.(*xService.ValidateAPOverPurchaseResponse)
+		if !ok {
+			return nil, errors.New("invalid AP over-purchase validation response")
+		}
+		for _, validation := range validateResponse.Datas {
+			if validation.Status == "ERROR" {
+				errorType := strings.ToLower(validation.ValidateUnit)
+				if validation.ValidateUnit == "UNIT" {
+					errorType = "qty"
+				}
+				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
+					Index:   validation.Index,
+					Message: validation.Message,
+					Status:  "error",
+					Type:    errorType,
+				})
+			}
+		}
+		if len(toleranceErrorResponse.ToleranceError) > 0 {
+			return toleranceErrorResponse, nil
+		}
+	}
+	mapSupplier, errGetSupplierByCode := prePurchaseService.GetSupplierByCode(ctx, supplierReq)
 	if errGetSupplierByCode != nil {
 		return nil, errors.New("failed to get supplier list: " + errGetSupplierByCode.Error())
 	}
 
-	requestDataGetInvoice := map[string]interface{}{
-		"status":                    []string{"COMPLETED"},
-		"invoice_item_document_ref": poNumber,
+	productReq := models.GetProductRequest{
+		ProductCode: productCodes,
+		SiteCode:    []string{siteCode},
+		CompanyCode: []string{companyCode},
+	}
+	mapProductInterface, errGetProductInterface := purchaseService.GetProductInterface(ctx, productReq)
+	if errGetProductInterface != nil {
+		return nil, errors.New("failed to get product interface: " + errGetProductInterface.Error())
 	}
 
-	jsonBytesGetInvoice, err := json.Marshal(requestDataGetInvoice)
-	if err != nil {
-		return nil, err
-	}
-	getInvoice, errCreateInvoice := GetInvoice(ctx, string(jsonBytesGetInvoice))
-	if errCreateInvoice != nil {
-		return nil, errCreateInvoice
-	}
-	resultInvoice := getInvoice.(ResultInvoice).Invoice
-	resultInvoiceMap := map[string]POData{}
-	for _, resultInvoiceValue := range resultInvoice {
-		for _, resultInvoiceItemValue := range resultInvoiceValue.InvoiceItem {
-			invoiceItemMapResult, exist := resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem]
-			if exist {
-				resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem] = POData{
-					QTY:    invoiceItemMapResult.QTY + resultInvoiceItemValue.Qty,
-					Weight: invoiceItemMapResult.Weight + resultInvoiceItemValue.Weight,
-				}
-			} else {
-				resultInvoiceMap[resultInvoiceItemValue.DocumentRefItem] = POData{
-					QTY:    resultInvoiceItemValue.Qty,
-					Weight: resultInvoiceItemValue.Weight,
-				}
-			}
-		}
-	}
-
-	toleranceErrorResponse := ToleranceErrorResponse{}
-	completePOItem := []models.PurchaseItemUsed{}
-	partialPOItem := []string{}
 	for i, invoice := range req {
 		if supplier, ok := mapSupplier[req[i].PartyCode]; ok {
 			req[i].PartyName = supplier.SupplierName
@@ -127,118 +144,91 @@ func UpdateInvoiceAP(ctx *gin.Context, jsonPayload string) (interface{}, error) 
 			req[i].PartyTaxID = supplier.TaxID
 			req[i].PartyExternalID = supplier.ExternalID
 		}
-		for it, invoiceItem := range invoice.InvoiceItem {
-			keyConvert := fmt.Sprintf("%s|%s", invoiceItem.DocumentRef, invoiceItem.PurchaseItem)
-			poQTYMapResult, exist := poMap[keyConvert]
-			if exist {
-				poQTY := poQTYMapResult.QTY + (poQTYMapResult.QTY * tolerance / 100)
-				invoiceItemMapResult, existInvoice := resultInvoiceMap[invoiceItem.DocumentRefItem]
-				if existInvoice {
-					invoiceItem.Qty += invoiceItemMapResult.QTY
-					invoiceItem.Weight += invoiceItemMapResult.Weight
-				}
-				if invoiceItem.Qty > poQTY {
-
-					toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
-						Index:   it,
-						Message: "เกินจำนวนสูงสุด : " + strconv.FormatFloat(poQTY, 'f', -1, 64),
-						Status:  "error",
-						Type:    "qty",
-					})
-
-				}
-				/* if invoiceItem.Qty == poQTYMapResult.QTY {
-
-				} */
-				completePOItem = append(completePOItem, models.PurchaseItemUsed{
-					PurchaseCode:     invoiceItem.DocumentRef,
-					PurchaseItemCode: invoiceItem.DocumentRefItem,
-					QTY:              invoiceItem.Qty,
-					Weight:           invoiceItem.Weight,
-					Tolerance:        tolerance,
-				})
-				if invoiceItem.Qty < poQTY {
-					partialPOItem = append(partialPOItem, invoiceItem.DocumentRefItem)
-				}
-				if invoiceItem.Weight > 0 {
-					if invoiceItem.Weight > poQTYMapResult.Weight {
-						toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
-							Index:   it,
-							Message: "เกินน้ำหนักสูงสุด :  " + strconv.FormatFloat(poQTYMapResult.Weight, 'f', -1, 64),
-							Status:  "error",
-							Type:    "weight",
-						})
-					}
-				}
-			} /*  else {
-
-				toleranceErrorResponse.ToleranceError = append(toleranceErrorResponse.ToleranceError, ToleranceErrorItem{
-					Index:   it,
-					Message: "ไม่มี PO นี้ในระบบ",
-					Status:  "error",
-					Type:    "po",
-				})
-			} */
+		for it := range invoice.InvoiceItem {
+			if productInterface, ok := mapProductInterface[req[i].InvoiceItem[it].ProductCode]; ok {
+				req[i].InvoiceItem[it].UnitUom = productInterface.UnitInterface
+			}
 			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
 			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
 		}
 	}
-	if len(toleranceErrorResponse.ToleranceError) == 0 {
 
-		if len(completePOItem) > 0 {
-			requestDataGetPO := map[string]interface{}{
-				"used_type":          "GR",
-				"purchase_item_used": completePOItem,
-			}
-
-			jsonBytesGetPO, err := json.Marshal(requestDataGetPO)
-			if err != nil {
-				errors.New("Error marshalling data :")
-			}
-			_, errCompletePOItem := purchaseService.CompletePOItem(ctx, string(jsonBytesGetPO))
-			if errCompletePOItem != nil {
-				return nil, errCompletePOItem
-			}
-		}
-
-		jsonBytesCreateInvoice, err := json.Marshal(req)
-		if err != nil {
-			return nil, err
-		}
-		createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
-		if errCreateInvoice != nil {
-			return nil, errCreateInvoice
-		}
-		requestData := map[string]interface{}{
-			"module":    []string{"INVOICE"},
-			"topic":     []string{"AP"},
-			"sub_topic": []string{"UPDATE"},
-		}
-
-		hookConfig, err := interfaceService.GetHookConfig(requestData)
-		if err != nil {
-			return nil, err
-		}
-		if len(hookConfig) > 0 {
-			urlProduct := ""
-			for _, hookConfigValue := range hookConfig {
-				urlProduct = hookConfigValue.HookUrl
-			}
-
-			requestDataCreateHook := interfaceService.HookInterfaceRequest{
-				RequestData: req,
-				UrlHook:     urlProduct,
-			}
-			_, err := interfaceService.HookInterface(requestDataCreateHook)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return createInvoiceReturn, nil
+	requestData := map[string]interface{}{
+		"module":    []string{"INVOICE"},
+		"topic":     []string{"AP"},
+		"sub_topic": []string{"UPDATE"},
 	}
 
-	return toleranceErrorResponse, nil
+	hookConfig, err := interfaceService.GetHookConfig(ctx, requestData)
+	if err != nil {
+		return nil, err
+	}
+	if len(hookConfig) > 0 {
+		urlProduct := ""
+		for _, hookConfigValue := range hookConfig {
+			urlProduct = hookConfigValue.HookUrl
+		}
+
+		productReq := models.GetProductRequest{
+			ProductType: []string{"PROD_SERVICE"},
+			SiteCode:    []string{siteCode},
+			CompanyCode: []string{companyCode},
+		}
+
+		mapProduct, errmapProduct := purchaseService.GetProductByCode(ctx, productReq)
+		if errmapProduct != nil {
+			return nil, errors.New("failed to get product list: " + errmapProduct.Error())
+		}
+		firstProduct := models.GetProductsDetailComponent{}
+		hasProduct := false
+		for _, product := range mapProduct {
+			firstProduct = product
+			hasProduct = true
+			break
+		}
+		// Keep hook-only product substitutions separate from the persisted request.
+		hookReq := slices.Clone(req)
+		if hasProduct {
+			for r := range hookReq {
+				if hookReq[r].DocumentRefType == "FABRICATION" {
+					hookReq[r].InvoiceItem = slices.Clone(hookReq[r].InvoiceItem)
+					for it := range hookReq[r].InvoiceItem {
+						hookReq[r].InvoiceItem[it].ProductCode = firstProduct.ProductCode
+						hookReq[r].InvoiceItem[it].ProductName = firstProduct.ProductName
+					}
+				}
+			}
+		}
+
+		requestDataCreateHook := interfaceService.HookInterfaceRequest{
+			RequestData: hookReq,
+			UrlHook:     urlProduct,
+		}
+		_, err := interfaceService.HookInterface(ctx, requestDataCreateHook)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	jsonBytesCreateInvoice, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	createInvoiceReturn, errCreateInvoice := UpdateInvoice(ctx, string(jsonBytesCreateInvoice))
+	if errCreateInvoice != nil {
+		return nil, errCreateInvoice
+	}
+
+	// Auto-close PO from AP: after the GRA is persisted, reconcile every referenced
+	// PO from the cumulative COMPLETED-AP state (product-master tolerance per unit_uom).
+	// The invoice is already saved here; a reconcile failure must NOT fail the request
+	// (a 5xx after save would invite a duplicate GRA on retry). Log and continue — the
+	// next GRA on this PO, or a manual reconcile, self-heals.
+	if err := reconcilePOAfterAPSave(ctx, req); err != nil {
+		log.Printf("UpdateInvoiceAP: reconcilePOAfterAPSave failed (invoice saved, PO not closed): %v", err)
+	}
+
+	return createInvoiceReturn, nil
 }

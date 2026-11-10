@@ -1,15 +1,14 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"prime-erp-core/internal/models"
 	priceListRepository "prime-erp-core/internal/repositories/priceList"
-
-	"github.com/gin-gonic/gin"
 )
 
-func DeletePriceListBase(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func DeletePriceListBase(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := models.DeletePriceListBaseRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {

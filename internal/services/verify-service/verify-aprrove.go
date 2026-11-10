@@ -1,6 +1,7 @@
 package verifyService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -8,7 +9,6 @@ import (
 	"prime-erp-core/internal/db"
 	priceService "prime-erp-core/internal/services/price-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
@@ -60,6 +60,16 @@ type VerifyApproveItem struct {
 	//Option
 	TransportCostUnit       *float64 `json:"transport_cost_unit"`
 	TransportCostUnitWeight *float64 `json:"transport_cost_unit_weight"`
+	// PriceCheckAmount ยอดที่ใช้เทียบ price list เมื่อไม่ตรงกับ TotalAmount ที่ใช้คิด credit
+	// (Convert to SO: เทียบราคาด้วยยอดก่อน VAT แต่ credit ต้องรวม VAT) — nil = ใช้ TotalAmount
+	PriceCheckAmount *float64 `json:"price_check_amount,omitempty"`
+}
+
+func priceCheckAmount(item VerifyApproveItem) float64 {
+	if item.PriceCheckAmount != nil {
+		return *item.PriceCheckAmount
+	}
+	return item.TotalAmount
 }
 
 type VerifyApproveResponse struct {
@@ -73,7 +83,7 @@ type VerifyApproveResponse struct {
 	Documents             []VerifyApproveDocument      `json:"documents"`
 }
 
-func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func VerifyApprove(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := VerifyApproveRequest{}
 
 	if err := json.Unmarshal([]byte(jsonPayload), &req); err != nil {
@@ -92,10 +102,10 @@ func VerifyApprove(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	return VerifyApproveLogic(gormx, sqlx, req)
+	return VerifyApproveLogic(ctx, gormx, sqlx, req)
 }
 
-func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
+func VerifyApproveLogic(ctx context.Context, gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest) (*VerifyApproveResponse, error) {
 	res := VerifyApproveResponse{
 		CreditDetails:         []VerifyCreditCustomer{},
 		ProductAtps:           []VerifyInventoryProductAtp{},
@@ -187,7 +197,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 				Unit:          docItem.Unit,
 				PriceUnit:     docItem.PriceUnit,
 				PriceListUnit: docItem.PriceListUnit,
-				TotalAmount:   docItem.TotalAmount,
+				TotalAmount:   priceCheckAmount(docItem),
 				TotalWeight:   docItem.TotalWeight,
 				SaleUnit:      docItem.SaleUnit,
 				SaleUnitType:  docItem.SaleUnitType,
@@ -292,7 +302,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 			creditReq.Customers = append(creditReq.Customers, cust)
 		}
 
-		creditRes, err := VerifyCreditLogic(sqlx, creditReq)
+		creditRes, err := VerifyCreditLogic(ctx, creditReq)
 		if err != nil {
 			return nil, err
 		}
@@ -320,7 +330,7 @@ func VerifyApproveLogic(gormx *gorm.DB, sqlx *sqlx.DB, req VerifyApproveRequest)
 	if req.IsVerifyInventory {
 		res.IsPassInventory = true
 
-		invenRes, err := VerifyInventoryLogic(inventoryReq)
+		invenRes, err := VerifyInventoryLogic(ctx, inventoryReq)
 		if err != nil {
 			return nil, err
 		}

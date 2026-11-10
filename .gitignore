@@ -37,3 +37,6 @@ cmd/.env
 .agent/
 .claude/
 
+
+# oh-my-claudecode operational state - local only
+.omc/

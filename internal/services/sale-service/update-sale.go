@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,11 +9,29 @@ import (
 
 	"prime-erp-core/internal/db"
 	"prime-erp-core/internal/models"
+	"prime-erp-core/internal/requestcontext"
 	verifyService "prime-erp-core/internal/services/verify-service"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
+
+// updateSaleZeroableAmounts writes the header amounts with Updates(map) so a 0 is
+// written too. Same fix as UpdateQuotation (QU202610-0502-R4: transport 12 -> 0 kept 12).
+func updateSaleZeroableAmounts(tx *gorm.DB, sale models.Sale) error {
+	return tx.Model(&models.Sale{}).Where("id = ?", sale.ID).Updates(map[string]interface{}{
+		"ref_po_doc":                     sale.RefPoDoc, // ช่องเดียวบนหัวใบ SO ที่ user ล้างเป็นค่าว่างได้
+		"total_transport_cost":           sale.TotalTransportCost,
+		"total_transport_cost_vat":       sale.TotalTransportCostVat,
+		"total_discount":                 sale.TotalDiscount,
+		"total_vat":                      sale.TotalVat,
+		"total_amount":                   sale.TotalAmount,
+		"total_weight":                   sale.TotalWeight,
+		"subtotal_excl_transport":        sale.SubtotalExclTransport,
+		"subtotal_weight_excl_transport": sale.SubtotalWeightExclTransport,
+		"subtotal_excl_vat":              sale.SubtotalExclVat,
+	}).Error
+}
 
 type UpdateSaleRequest struct {
 	IsVerifyPrice      bool                 `json:"is_verify_price"`
@@ -38,7 +57,7 @@ type UpdateSaleResponse struct {
 	SaleCode         string `json:"sale_code"`
 }
 
-func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func UpdateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := UpdateSaleRequest{}
 	res := []UpdateSaleResponse{}
 
@@ -58,10 +77,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	}
 	defer db.CloseGORM(gormx)
 
-	user := ctx.GetString("user")
-	if user == "" {
-		user = `system` // fallback
-	}
+	user := requestcontext.GetUserOrDefault(ctx)
 	now := time.Now()
 	nowDateOnly := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -150,7 +166,7 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 	// Verification
 	if req.IsVerifyPrice || req.IsVerifyCredit || req.IsVerifyInventory {
 		for _, verifyReq := range verifyReqMap {
-			verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+			verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 			if err != nil {
 				return nil, err
 			}
@@ -234,6 +250,12 @@ func UpdateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		if err := tx.Model(&models.Sale{}).
 			Where("id = ?", sale.ID).
 			Updates(sale).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to update sale %s: %v", sale.SaleCode, err)
+		}
+
+		// struct Updates() ข้ามค่า 0 ยอดเงินหัวใบที่กลายเป็น 0 (เช่นค่าขนส่ง) จะค้างค่าเดิม
+		if err := updateSaleZeroableAmounts(tx, sale); err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to update sale %s: %v", sale.SaleCode, err)
 		}

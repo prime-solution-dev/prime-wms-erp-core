@@ -1,6 +1,7 @@
 package saleService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,6 @@ import (
 	verifyService "prime-erp-core/internal/services/verify-service"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
 )
 
 // ValidateSaleRequest - เฉพาะข้อมูลที่จำเป็นสำหรับการ validate
@@ -27,6 +26,9 @@ type SaleValidationDocument struct {
 	CustomerCode string               `json:"customer_code"`
 	DeliveryDate *time.Time           `json:"delivery_date"`
 	Items        []SaleValidationItem `json:"items"`
+	// ค่าขนส่งของใบ: INCL หักออกก่อนเทียบ price list (เหมือน Submit QU), EXCL บวกเข้า credit
+	TransportCost float64 `json:"transport_cost"`
+	TransportType string  `json:"transport_type"`
 }
 
 type SaleValidationItem struct {
@@ -36,9 +38,54 @@ type SaleValidationItem struct {
 	TotalWeight   float64 `json:"total_weight"`
 	PriceUnit     float64 `json:"price_unit"`
 	PriceListUnit float64 `json:"price_list_unit"`
-	TotalAmount   float64 `json:"total_amount"`
+	TotalAmount   float64 `json:"total_amount"` // รวม VAT ใช้คิด credit
 	SaleUnit      string  `json:"sale_unit"`
 	SaleUnitType  string  `json:"sale_unit_type"`
+	// ยอดก่อน VAT ใช้เทียบ price list ให้ตรงกับตอน Submit QU — ไม่ส่งมา = ใช้ TotalAmount แบบเดิม
+	SubtotalExclVat *float64 `json:"subtotal_excl_vat"`
+}
+
+func buildValidateApproveItem(item SaleValidationItem) verifyService.VerifyApproveItem {
+	return verifyService.VerifyApproveItem{
+		ItemRef:          fmt.Sprintf("temp_item_%s", item.ProductCode),
+		ProductCode:      item.ProductCode,
+		Qty:              item.Qty,
+		Unit:             item.Unit,
+		TotalWeight:      item.TotalWeight,
+		PriceUnit:        item.PriceUnit,
+		PriceListUnit:    item.PriceListUnit,
+		TotalAmount:      item.TotalAmount,
+		SaleUnit:         item.SaleUnit,
+		SaleUnitType:     item.SaleUnitType,
+		PriceCheckAmount: item.SubtotalExclVat,
+	}
+}
+
+// buildValidateApproveDocument ประกอบใบที่ส่งเข้า verify
+//
+// TotalAmount ของใบใช้เกลี่ยค่าขนส่ง INCL ลงแต่ละแถว จึงต้องเป็นผลรวมของยอดที่ใช้เทียบราคา
+// (ก่อน VAT) ไม่ใช่ยอดรวม VAT — ตรงกับ UpdateQuotation ที่ส่ง SubtotalExclVat ทั้งใบและรายแถว
+func buildValidateApproveDocument(saleReq SaleValidationDocument) verifyService.VerifyApproveDocument {
+	doc := verifyService.VerifyApproveDocument{
+		DocRef:        fmt.Sprintf("TEMP_%s_%s", saleReq.CompanyCode, saleReq.SiteCode),
+		CustomerCode:  saleReq.CustomerCode,
+		TransportCost: saleReq.TransportCost,
+		TransportType: saleReq.TransportType,
+		Items:         []verifyService.VerifyApproveItem{},
+	}
+
+	for _, item := range saleReq.Items {
+		apprItem := buildValidateApproveItem(item)
+		if apprItem.PriceCheckAmount != nil {
+			doc.TotalAmount += *apprItem.PriceCheckAmount
+		} else {
+			doc.TotalAmount += apprItem.TotalAmount
+		}
+		doc.TotalWeight += item.TotalWeight
+		doc.Items = append(doc.Items, apprItem)
+	}
+
+	return doc
 }
 
 type ValidateSaleResponse struct {
@@ -62,7 +109,7 @@ type ValidateSaleResponse struct {
 }
 
 // ValidateSale - ตรวจสอบเงื่อนไขการสร้าง Sale Order โดยไม่สร้างข้อมูลจริง
-func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func ValidateSale(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := ValidateSaleRequest{}
 	var responses []ValidateSaleResponse
 
@@ -103,27 +150,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 			verifyReq = newVerifyReq
 		}
 
-		newApprDoc := verifyService.VerifyApproveDocument{
-			DocRef:       fmt.Sprintf("TEMP_%s_%s", saleReq.CompanyCode, saleReq.SiteCode),
-			CustomerCode: saleReq.CustomerCode,
-			Items:        []verifyService.VerifyApproveItem{},
-		}
-
-		for _, item := range saleReq.Items {
-			newApprItem := verifyService.VerifyApproveItem{
-				ItemRef:       fmt.Sprintf("temp_item_%s", item.ProductCode),
-				ProductCode:   item.ProductCode,
-				Qty:           item.Qty,
-				Unit:          item.Unit,
-				TotalWeight:   item.TotalWeight,
-				PriceUnit:     item.PriceUnit,
-				PriceListUnit: item.PriceListUnit,
-				TotalAmount:   item.TotalAmount,
-				SaleUnit:      item.SaleUnit,
-				SaleUnitType:  item.SaleUnitType,
-			}
-			newApprDoc.Items = append(newApprDoc.Items, newApprItem)
-		}
+		newApprDoc := buildValidateApproveDocument(saleReq)
 
 		verifyReq.Documents = append(verifyReq.Documents, newApprDoc)
 		verifyReqMap[verifyReqKey] = verifyReq
@@ -131,7 +158,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 
 	// ตรวจสอบเงื่อนไขต่างๆ
 	for _, verifyReq := range verifyReqMap {
-		verifyRes, err := verifyService.VerifyApproveLogic(gormx, sqlx, verifyReq)
+		verifyRes, err := verifyService.VerifyApproveLogic(ctx, gormx, sqlx, verifyReq)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +196,7 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 		// จ่ายเงินสดจะไม่ส่ง is_verify_credit มา VerifyApproveLogic เลยไม่คำนวณเครดิตให้
 		// แต่หน้าจอต้องโชว์ Balance ทุกกรณี จึงดึงเพิ่มแบบ best-effort
 		if creditCalculation == nil {
-			creditCalculation = lookupCreditBalance(sqlx, verifyReq)
+			creditCalculation = lookupCreditBalance(ctx, verifyReq)
 		}
 
 		responses = append(responses, ValidateSaleResponse{
@@ -192,8 +219,8 @@ func ValidateSale(ctx *gin.Context, jsonPayload string) (interface{}, error) {
 // lookupCreditBalance ดึงยอดเครดิตคงเหลือมาโชว์อย่างเดียว ไม่มีผลกับ can_create_so
 // ใช้เมื่อ VerifyApproveLogic ไม่ได้คำนวณเครดิตให้ (is_verify_credit = false เช่นจ่ายเงินสด)
 // ตั้งใจกลืน error เพราะเป็นข้อมูลสำหรับแสดงผล ห้ามทำให้ validate ทั้งใบพัง
-// ลูกค้าที่ไม่มีข้อมูลใน credit master จะได้ balance 0 (GetCreditCurrent seed แถวศูนย์ให้ทุกราย)
-func lookupCreditBalance(sqlxDB *sqlx.DB, verifyReq verifyService.VerifyApproveRequest) *verifyService.VerifyCreditCalculation {
+// ลูกค้าที่ไม่มีข้อมูลใน credit master จะได้ balance 0
+func lookupCreditBalance(ctx context.Context, verifyReq verifyService.VerifyApproveRequest) *verifyService.VerifyCreditCalculation {
 	if len(verifyReq.Documents) == 0 {
 		return nil
 	}
@@ -208,7 +235,7 @@ func lookupCreditBalance(sqlxDB *sqlx.DB, verifyReq verifyService.VerifyApproveR
 		needAmount += doc.TransportCost
 	}
 
-	creditRes, err := verifyService.VerifyCreditLogic(sqlxDB, verifyService.VerifyCreditRequest{
+	creditRes, err := verifyService.VerifyCreditLogic(ctx, verifyService.VerifyCreditRequest{
 		Customers: []verifyService.VerifyCreditCustomer{
 			{CustomerCode: doc.CustomerCode, NeedAmount: needAmount},
 		},

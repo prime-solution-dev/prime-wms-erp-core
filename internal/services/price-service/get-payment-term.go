@@ -1,14 +1,13 @@
 package priceService
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"prime-erp-core/internal/db"
-
-	"github.com/gin-gonic/gin"
 )
 
 type GetPaymentTermRequest struct {
@@ -22,7 +21,7 @@ type GetPaymentTermResponse struct {
 	TermName string `json:"term_name"`
 }
 
-func GetPaymentTerm(ctx *gin.Context, jsonPayload string) (interface{}, error) {
+func GetPaymentTerm(ctx context.Context, jsonPayload string) (interface{}, error) {
 	req := GetPaymentTermRequest{}
 	res := []GetPaymentTermResponse{}
 
