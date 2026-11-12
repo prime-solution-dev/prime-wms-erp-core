@@ -312,7 +312,11 @@ docker run --rm --network host --env-file .migration-secrets \
         printf "machine github.com\nlogin x-access-token\npassword %s\n" "$GIT_TOKEN" > /root/.netrc
         trap "rm -f /root/.netrc" EXIT
         go run ./cmd/migrate -set "$SEED_DIR" -command up
-        go run ./cmd/migrate -set "cron-config/$SEED_DIR" -command up
+        if [ -d "seeds/$SEED_DIR" ]; then
+    go run ./cmd/migrate -set "$SEED_DIR" -command up
+else
+    echo "Seed folder seeds/$SEED_DIR not found; skipping"
+fi
     ' || run_status=$?
 rm -f .env .migration-secrets
 exit "$run_status"
