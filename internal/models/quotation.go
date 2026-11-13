@@ -23,6 +23,7 @@ type Quotation struct {
 	ShipToAddress               string     `json:"ship_to_address"`
 	DeliveryMethod              string     `json:"delivery_method"`
 	RefPoDoc                    string     `json:"ref_po_doc"`
+	ContactPerson               string     `json:"contact_person"` // ผู้ติดต่อที่กรอกบนใบเสนอราคา ว่าง = ใช้ของ customer master
 	TransportCostType           string     `json:"transport_cost_type"`
 	TotalTransportCost          float64    `json:"total_transport_cost"`
 	PassPrice                   bool       `json:"pass_price"`
