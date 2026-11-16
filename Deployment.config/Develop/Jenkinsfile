@@ -24,10 +24,10 @@ pipeline {
     }
 
     environment {
-        REPO_NAME = 'prime-wms-document-core'        
-        IMAGE_NAME = 'wms-document-core'
-        PORT = '9106:9106'  
-        CONTAINER_NAME = 'wms-reports-core-container'
+        REPO_NAME = 'prime-wms-erp-core'        
+        IMAGE_NAME = 'wms-erp-core'
+        PORT = '9115:9115'  
+        CONTAINER_NAME = 'wms-erp-core-container'
         TARGET_BRANCH = 'Develop'
         VAULT_PATH = 'JenkinsWMS/jenkins.developWMS'
         ENV_FILE_KEY = 'Develop.env.erp' 
