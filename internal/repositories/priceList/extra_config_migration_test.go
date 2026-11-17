@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	extraConfigMigrationFile = "../../../migrations/2026-10-05-extra-item3-item5-use-item4-config.sql"
+	extraConfigMigrationFile = "testdata/2026-10-05-extra-item3-item5-use-item4-config.sql"
 	extraConfigBackupTable   = "price_list_extra_config_backup_20261005"
 
 	extraConfigItem4 = `[{"group_code":"PG01","is_condition":false,"priority":1},{"group_code":"PG02","is_condition":false,"priority":2},{"group_code":"PG04","is_condition":false,"priority":3},{"group_code":"PG06","is_condition":true,"priority":4}]`

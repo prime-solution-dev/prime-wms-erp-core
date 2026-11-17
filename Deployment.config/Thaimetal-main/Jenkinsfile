@@ -12,7 +12,7 @@ pipeline {
         SSH_KEY_PATH = '/home/ec2-user/key/TMI-Prod.pem'
         VAULT_PATH = 'JenkinsWMS/jenkins.PRDTMIWMS'
         ENV_FILE_KEY = 'thaimetalprd.env.erp'
-        DOCKERFILEPATH = 'Deployment.config/Thaimetal-uat/Dockerfile'
+        DOCKERFILEPATH = 'Deployment.config/Thaimetal-main/Dockerfile'
     }
 
     parameters {

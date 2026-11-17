@@ -1,26 +1,13 @@
-# =========================================================
-# Stage 1: Builder
-# =========================================================
-
 FROM golang:1.25 AS builder
+
+ARG GIT_TOKEN
 
 WORKDIR /app
 
+ENV GOPRIVATE=github.com/prime-solution-dev/*
 ENV GOPROXY=https://proxy.golang.org,direct
 
-ENV CGO_ENABLED=0 \
-    GOOS=linux \
-    GOARCH=amd64
-
-# GOPRIVATE makes the go tool skip the public proxy for this module path and
-# fetch it straight from GitHub over git, which is why the token has to be here.
-# The token stays in this builder stage only: the final alpine stage copies just
-# the compiled binary and the .env, so nothing lands in the shipped image.
-ARG GIT_TOKEN
-ENV GOPRIVATE=github.com/prime-solution-dev/*
-RUN if [ -n "$GIT_TOKEN" ]; then \
-        git config --global url."https://x-access-token:${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"; \
-    fi
+RUN git config --global url."https://${GIT_TOKEN}@github.com/".insteadOf "https://github.com/"
 
 COPY go.mod go.sum ./
 
@@ -40,53 +27,23 @@ RUN set -e; \
 
 COPY . .
 
-COPY ./cmd/.env /app/.env
+COPY ./cmd/.env .env
 
-RUN go build \
-    -trimpath \
-    -ldflags="-s -w" \
-    -o /out/wms-reports-core \
-    ./cmd
+ENV CGO_ENABLED=0 \
+    GOOS=linux \
+    GOARCH=amd64
 
+RUN go build -o wms-erp-core ./cmd
 
-# =========================================================
-# Stage 2: Runtime
-# =========================================================
-
-FROM debian:bookworm-slim
+FROM alpine:3.20
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        fontconfig \
-        tzdata \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates nano
 
-COPY --from=builder \
-    /out/wms-reports-core \
-    /app/wms-reports-core
+COPY --from=builder /app/wms-erp-core .
+COPY --from=builder /app/.env .
 
-COPY --from=builder \
-    /app/assets \
-    /app/assets
+EXPOSE 9115
 
-# เก็บ .env สำหรับ Docker runtime
-COPY --from=builder \
-    /app/.env \
-    /app/.env
-
-COPY assets/ /app/assets/
-
-RUN mkdir -p /app/assets/fonts/truetype/sukhumvit \
-    /usr/share/fonts/truetype/sukhumvit \
-    && cp /app/assets/fonts/*.ttf /app/assets/fonts/truetype/sukhumvit/ \
-    && cp /app/assets/fonts/truetype/sukhumvit/*.ttf /usr/share/fonts/truetype/sukhumvit/ \
-    && fc-cache -f
-
-ENV FONT_PATH_PREFIX=/app/
-
-EXPOSE 9106
-
-CMD ["./wms-reports-core"]
+CMD ["./wms-erp-core"]
