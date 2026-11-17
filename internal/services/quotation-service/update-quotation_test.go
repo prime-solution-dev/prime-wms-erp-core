@@ -158,3 +158,29 @@ func TestUpdateQuotationAmountsClearToZero(t *testing.T) {
 		}
 	}
 }
+
+// contact_person (ผู้ติดต่อที่ผู้ใช้กรอกบนใบเสนอราคา — TMI issue log #40/#42) ลบออกได้
+// ต้องเขียนลง DB แม้เป็นค่าว่าง ไม่งั้นลบแล้ว PDF ยังพิมพ์ชื่อเดิม
+func TestUpdateQuotationContactPersonClearsToEmptyString(t *testing.T) {
+	db, statements := dryRunDB(t)
+
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: uuid.New()}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
+	}
+
+	if sql := (*statements)[0]; !strings.Contains(sql, "contact_person") {
+		t.Errorf("UPDATE ไม่มีคอลัมน์ contact_person แม้ค่าจะเป็นค่าว่าง: %s", sql)
+	}
+}
+
+func TestUpdateQuotationContactPersonSetsNonEmptyValue(t *testing.T) {
+	db, statements := dryRunDB(t)
+
+	if err := updateQuotationClearableFields(db, models.Quotation{ID: uuid.New(), ContactPerson: "คุณสมชาย"}); err != nil {
+		t.Fatalf("updateQuotationClearableFields error = %v", err)
+	}
+
+	if sql := (*statements)[0]; !strings.Contains(sql, "contact_person") || !strings.Contains(sql, "คุณสมชาย") {
+		t.Errorf("UPDATE ต้องตั้งค่า contact_person ที่ส่งมา: %s", sql)
+	}
+}

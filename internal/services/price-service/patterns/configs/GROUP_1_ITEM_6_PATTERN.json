@@ -35,7 +35,7 @@
         },
         {
           "field": "brand",
-          "headerName": "ยี่ห้อ",
+          "headerName": "เกรด",
           "width": 140,
           "pinned": "left",
           "lockPosition": true,

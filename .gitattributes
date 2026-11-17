@@ -1,3 +1,0 @@
-cmd/.env merge=ours
-Dockerfile merge=ours
-Jenkinsfile merge=ours

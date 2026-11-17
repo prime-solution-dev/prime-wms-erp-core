@@ -49,6 +49,20 @@ type GetDeliveryRequest struct {
 	PaymentFilter            []string   `json:"payment_filter"`
 	Page                     int        `json:"page"`
 	PageSize                 int        `json:"page_size"`
+
+	// Multi Select ที่หัวคอลัมน์ (1 entry = 1 คำค้น, optional ทุกตัว)
+	DeliveryCodeLikes  []DeliveryCodeLikeTerm  `json:"delivery_code_likes"`
+	DocumentRefLikes   []DocumentRefLikeTerm   `json:"document_ref_likes"`
+	CustomerCodeLikes  []CustomerCodeLikeTerm  `json:"customer_code_likes"`
+	CustomerNameLikes  []CustomerNameLikeTerm  `json:"customer_name_likes"`
+	ShipToAddressLikes []ShipToAddressLikeTerm `json:"ship_to_address_likes"`
+	LicensePlateLikes  []LicensePlateLikeTerm  `json:"license_plate_likes"`
+	ContactNameLikes   []ContactNameLikeTerm   `json:"contact_name_likes"`
+
+	// sort_by: delivery_code / document_ref / customer_code / customer_name / ship_to_address /
+	// license_plate / contact_name, sort_dir: asc / desc (ว่าง = เรียงแบบเดิม)
+	SortBy  string `json:"sort_by"`
+	SortDir string `json:"sort_dir"`
 }
 
 func (GetDeliveryResponse) TableName() string { return "delivery_booking" }
@@ -348,8 +362,7 @@ func GetDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 		Joins("LEFT JOIN sale ON delivery_booking.document_ref = sale.sale_code").
 		Preload("Items").
 		Preload("SaleOrder").
-		Preload("SaleOrder.SaleItem").
-		Order("delivery_booking.update_date DESC")
+		Preload("SaleOrder.SaleItem")
 
 	if len(req.ID) > 0 {
 		query = query.Where("delivery_booking.id IN ?", req.ID)
@@ -463,6 +476,10 @@ func GetDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	if condition, args := buildPaymentFilterCondition(req.PaymentFilter); condition != "" {
 		query = query.Where(condition, args...)
 	}
+
+	// Multi Select + ลำดับการเรียง อยู่ก่อนทั้ง path pick_pack_filter และ path ปกติ
+	// กรองก่อน page / page_size และ total นับหลังกรอง (countQuery ใช้ตัวกรองชุดเดียวกัน)
+	query = applyDeliveryMultiSelect(query, req).Order(deliveryOrderClause(req.SortBy, req.SortDir))
 
 	// pick_pack_filter: กรอง delivery ตาม pick/pack status ที่คำนวณจากข้อมูล order (in-memory)
 	// เพราะ status นี้ไม่ได้เก็บใน DB ตรงๆ ต้องดึงข้อมูลมาคำนวณก่อนถึงจะรู้
@@ -657,6 +674,8 @@ func GetDelivery(ctx context.Context, jsonPayload string) (interface{}, error) {
 	if condition, args := buildPaymentFilterCondition(req.PaymentFilter); condition != "" {
 		countQuery = countQuery.Where(condition, args...)
 	}
+
+	countQuery = applyDeliveryMultiSelect(countQuery, req)
 
 	var count int64
 	countQuery.Count(&count)

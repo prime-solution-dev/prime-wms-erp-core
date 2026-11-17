@@ -702,6 +702,24 @@ func GetPriceListSubGroupFormulasMapBySubGroupCode(subGroupCode string) ([]model
 	return priceListSubGroupFormulasMap, nil
 }
 
+// GetPriceListFormulas returns all formulas ordered from newest to oldest.
+func GetPriceListFormulas() ([]models.PriceListFormulas, error) {
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+
+	formulas := []models.PriceListFormulas{}
+	if err := gormx.Model(&models.PriceListFormulas{}).
+		Order("create_dtm DESC").
+		Find(&formulas).Error; err != nil {
+		return nil, err
+	}
+
+	return formulas, nil
+}
+
 // GetPriceListSubGroupFormulasMapBySubGroupCodes loads price list formulas for multiple sub group codes.
 // Returns a map keyed by sub group code for efficient lookup.
 func GetPriceListSubGroupFormulasMapBySubGroupCodes(subGroupCodes []string) (map[string][]models.PriceListSubGroupFormulasMap, error) {
