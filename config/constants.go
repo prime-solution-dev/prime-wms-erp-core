@@ -20,6 +20,7 @@ var (
 	GET_PACK_SO_ENDPOINT                   string
 	GET_INBOUND_ENDPOINT                   string
 	GET_GOODS_RECEIVE_ENDPOINT             string
+	GET_COMPANY_ENDPOINT                   string
 	GET_ORDER_DELIVERY_ENDPOINT            string
 	GET_CUSTOMER_MASTER_ENDPOINT           string
 	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT   string
@@ -37,6 +38,7 @@ func Initialize() {
 	GET_PACK_SO_ENDPOINT = GetBaseURL() + "/packing/packing/get-packing-so"
 	GET_INBOUND_ENDPOINT = GetBaseURL() + "/goods-receive/get-inbounds"
 	GET_GOODS_RECEIVE_ENDPOINT = GetBaseURL() + "/goods-receive/get-goods-recieves"
+	GET_COMPANY_ENDPOINT = GetBaseURL() + "/goods-receive/master/get-company"
 	GET_ORDER_DELIVERY_ENDPOINT = GetBaseURL() + "/order/Order/GetOrdersDelivery"
 	GET_CUSTOMER_MASTER_ENDPOINT = GetBaseURL() + "/customer/Customer/GetCustomers"
 	GET_SYSTEM_CONFIG_WAREHOUSE_ENDPOINT = GetBaseURL() + "/warehouse/Warehouse/get-system-config"

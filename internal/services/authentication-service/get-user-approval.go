@@ -53,7 +53,7 @@ func GetUserApproval(ctx context.Context, requestData map[string]interface{}) (G
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return GetUserApprovalResponse{}, errors.New("Error marshalling data :")
 	}
 
 	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_authorization")+"/author/get-user-approval", bytes.NewBuffer(jsonData))

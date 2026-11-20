@@ -25,6 +25,7 @@ func main() {
 
 	ginEngine := gin.Default()
 
+	routes.RegisterHealthz(ginEngine)
 	middleware.RegisterMiddlewares(ginEngine)
 
 	routes.RegisterRoutes(ginEngine)
