@@ -145,7 +145,7 @@ func GetCustomers(ctx context.Context, requestData map[string]interface{}) (Resu
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return ResultCustomerResponse{}, errors.New("Error marshalling data :")
 	}
 
 	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_customer")+"/Customer/GetCustomers", bytes.NewBuffer(jsonData))
