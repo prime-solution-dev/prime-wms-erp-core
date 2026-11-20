@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -118,4 +119,107 @@ func TestIntegration_FolderSetUsesSlugTable(t *testing.T) {
 
 	require.Equal(t, 1, count(t, db, `SELECT count(*) FROM goose_seed_pacifica_uat_version WHERE version_id = 1`))
 	require.Equal(t, 1, count(t, db, `SELECT count(*) FROM information_schema.tables WHERE table_name = 'demo_client'`))
+}
+
+const restoreKeysVersion = 20261120120000
+
+// restoredIndexes คือ index ที่ 20261120120000_restore_missing_unique_keys.sql ต้องทำให้มี
+var restoredIndexes = []string{
+	"quotation_quotation_code_key", "sale_sale_code_key", "delivery_booking_delivery_code_key",
+	"ux_system_config_running",
+	"idx_price_list_sub_group_price_list_group_id", "idx_price_list_sub_group_key_sub_group_id",
+}
+
+func indexExists(t *testing.T, db *sql.DB, name string) bool {
+	t.Helper()
+	return count(t, db, `SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1`, name) == 1
+}
+
+// gooseTo ย้าย schema ไปที่ version ที่ระบุ (Execute ไม่มี up-to/down-to)
+func gooseTo(t *testing.T, db *sql.DB, up bool, version int64) {
+	t.Helper()
+	dir, err := FindDir("migrations")
+	require.NoError(t, err)
+	require.NoError(t, goose.SetDialect("postgres"))
+	goose.SetTableName("goose_db_version")
+	if up {
+		require.NoError(t, goose.UpTo(db, dir, version))
+	} else {
+		require.NoError(t, goose.DownTo(db, dir, version))
+	}
+}
+
+func TestIntegration_RestoreKeys_FreshDBRejectsDuplicateCodes(t *testing.T) {
+	db := startPostgres(t)
+	require.NoError(t, Execute(Options{Command: "up", Set: "schema"}))
+	for _, ix := range restoredIndexes {
+		require.True(t, indexExists(t, db, ix), ix)
+	}
+
+	for _, q := range []string{
+		`INSERT INTO quotation (id, quotation_code) VALUES (gen_random_uuid(), 'QU-1'), (gen_random_uuid(), 'QU-1')`,
+		`INSERT INTO sale (id, sale_code) VALUES (gen_random_uuid(), 'SO-1'), (gen_random_uuid(), 'SO-1')`,
+		`INSERT INTO delivery_booking (id, delivery_code) VALUES (gen_random_uuid(), 'DB-1'), (gen_random_uuid(), 'DB-1')`,
+		`INSERT INTO system_config (topic_code, config_code) VALUES ('RUNNING', 'RUNNING_X'), ('RUNNING', 'RUNNING_X')`,
+	} {
+		_, err := db.Exec(q)
+		require.ErrorContains(t, err, "duplicate key", q)
+	}
+	// unique เฉพาะ RUNNING: topic อื่นใช้ config_code ซ้ำได้เหมือนเดิม
+	_, err := db.Exec(`INSERT INTO system_config (topic_code, config_code) VALUES ('OTHER', 'C1'), ('OTHER', 'C1')`)
+	require.NoError(t, err)
+
+	// down แล้ว up ซ้ำได้
+	gooseTo(t, db, false, restoreKeysVersion-1)
+	for _, ix := range restoredIndexes {
+		require.False(t, indexExists(t, db, ix), ix)
+	}
+	_, err = db.Exec(`DELETE FROM system_config WHERE topic_code = 'OTHER'`)
+	require.NoError(t, err)
+	require.NoError(t, Execute(Options{Command: "up", Set: "schema"}))
+	require.True(t, indexExists(t, db, "ux_system_config_running"))
+}
+
+func TestIntegration_RestoreKeys_DedupesSystemConfigAndKeepsPreexistingIndex(t *testing.T) {
+	db := startPostgres(t)
+	gooseTo(t, db, true, restoreKeysVersion-1)
+
+	// จำลอง env เดิม: RUNNING ซ้ำ (คนละ period), config อื่นซ้ำทุกคอลัมน์, และ index ที่มีอยู่ก่อนแล้ว
+	_, err := db.Exec(`
+INSERT INTO system_config (topic_code, config_code, "json") VALUES
+  ('RUNNING', 'RUNNING_PO', '{"year":"2026","month":"02","current_running":26}'),
+  ('RUNNING', 'RUNNING_PO', '{"year":"2026","month":"03","current_running":1}'),
+  ('RUNNING', 'RUNNING_SO', '{"year":"2026","month":"02","current_running":12}'),
+  ('RUNNING', 'RUNNING_SO', '{"year":"2026","month":"02","current_running":12}'),
+  ('RUNNING', 'RUNNING_QU', '{"year":"2026","month":"02","current_running":21}');
+INSERT INTO system_config (topic_code, config_code, value) VALUES ('VAT', 'VAT', '7'), ('VAT', 'VAT', '7'), ('VAT', 'VAT', '10');
+CREATE UNIQUE INDEX sale_sale_code_key ON public.sale (sale_code);`)
+	require.NoError(t, err)
+
+	require.NoError(t, Execute(Options{Command: "up", Set: "schema"}))
+
+	require.Equal(t, 3, count(t, db, `SELECT count(*) FROM system_config WHERE topic_code = 'RUNNING'`))
+	require.Equal(t, 1, count(t, db, `SELECT count(*) FROM system_config WHERE config_code = 'RUNNING_PO' AND "json"->>'month' = '03'`))
+	require.Equal(t, 2, count(t, db, `SELECT count(*) FROM system_config WHERE topic_code = 'VAT'`))
+	for _, ix := range restoredIndexes {
+		require.True(t, indexExists(t, db, ix), ix)
+	}
+
+	// Down ถอดเฉพาะที่ไฟล์นี้สร้าง: sale_sale_code_key มีมาก่อน ต้องอยู่ต่อ
+	gooseTo(t, db, false, restoreKeysVersion-1)
+	require.True(t, indexExists(t, db, "sale_sale_code_key"))
+	require.False(t, indexExists(t, db, "quotation_quotation_code_key"))
+	require.False(t, indexExists(t, db, "ux_system_config_running"))
+}
+
+func TestIntegration_RestoreKeys_FailsOnDuplicateDocumentCode(t *testing.T) {
+	db := startPostgres(t)
+	gooseTo(t, db, true, restoreKeysVersion-1)
+	_, err := db.Exec(`INSERT INTO quotation (id, quotation_code) VALUES (gen_random_uuid(), 'QU-1'), (gen_random_uuid(), 'QU-1')`)
+	require.NoError(t, err)
+
+	require.Error(t, Execute(Options{Command: "up", Set: "schema"}))
+	// ล้มทั้งไฟล์: ไม่มีข้อมูลธุรกิจถูกลบ และไม่มี index ค้างครึ่งทาง
+	require.Equal(t, 2, count(t, db, `SELECT count(*) FROM quotation`))
+	require.False(t, indexExists(t, db, "ux_system_config_running"))
 }
