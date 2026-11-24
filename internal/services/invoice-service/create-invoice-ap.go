@@ -54,6 +54,8 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 	// and skip creation entirely if nothing new remains. Scoped to AP-FAB only —
 	// regular AP invoices keep their current behavior.
 	{
+		// GRA ที่บันทึกแล้วแต่ยิง TRCloud ไม่สำเร็จ (external_id ว่าง) — retry ต้องส่งใบเดิมซ้ำ ไม่ใช่ข้ามเฉย ๆ
+		unsentAPFab := map[uuid.UUID]models.Invoice{}
 		filtered := req[:0]
 		for _, invoice := range req {
 			if invoice.InvoiceType != "AP-FAB" {
@@ -88,6 +90,9 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 					for _, exItem := range ex.InvoiceItem {
 						existing[exItem.DocumentRef+"|"+exItem.DocumentRefItem] = true
 					}
+					if len(ex.InvoiceItem) > 0 && strings.TrimSpace(ex.ExternalID) == "" {
+						unsentAPFab[ex.ID] = ex
+					}
 				}
 			}
 
@@ -104,6 +109,9 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			}
 		}
 		req = filtered
+		if err := resendUnsentAPFab(ctx, unsentAPFab); err != nil {
+			return nil, err
+		}
 		if len(req) == 0 {
 			return map[string]interface{}{
 				"status":  "success",
@@ -368,7 +376,13 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 				})
 			} */
 
-			req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
+			// req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
+			// AP-FAB: ราคาค่าบริการต่อหน่วย (ต่อ kg / ต่อชิ้น) ต้อง 3 ตำแหน่ง ไม่งั้นยอดเพี้ยนเมื่อคูณจำนวน ; AP อื่นคง 2 ตำแหน่งเดิม
+			if req[i].InvoiceType == "AP-FAB" {
+				req[i].InvoiceItem[it].PriceUnit = round3(req[i].InvoiceItem[it].PriceUnit)
+			} else {
+				req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
+			}
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
 			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
@@ -478,4 +492,8 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 }
 func round2(val float64) float64 {
 	return math.Round(val*100) / 100
+}
+
+func round3(val float64) float64 {
+	return math.Round(val*1000) / 1000
 }
