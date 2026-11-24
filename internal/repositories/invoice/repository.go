@@ -326,3 +326,20 @@ func DeleteInvoiceItem(id []uuid.UUID) (err error) {
 
 	return
 }
+
+// GetInvoicesWithItemsByIDs — invoice พร้อม item ทั้งใบ (ใช้ส่ง GRA ใบเดิมเข้า TRCloud ซ้ำ)
+func GetInvoicesWithItemsByIDs(ids []uuid.UUID) ([]models.Invoice, error) {
+	invoices := []models.Invoice{}
+	if len(ids) == 0 {
+		return invoices, nil
+	}
+	gormx, err := db.ConnectGORM("prime_erp")
+	if err != nil {
+		return nil, err
+	}
+	defer db.CloseGORM(gormx)
+	if err := gormx.Preload("InvoiceItem").Where("id IN ?", ids).Find(&invoices).Error; err != nil {
+		return nil, err
+	}
+	return invoices, nil
+}

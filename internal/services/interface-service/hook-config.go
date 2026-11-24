@@ -30,7 +30,7 @@ func GetHookConfig(ctx context.Context, requestData map[string]interface{}) ([]H
 
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 
 	reqHttp, err := utils.NewRequest(ctx, "POST", os.Getenv("base_url_document")+"/interface/get-hook-config", bytes.NewBuffer(jsonData))
