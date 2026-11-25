@@ -383,6 +383,17 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 			} else {
 				req[i].InvoiceItem[it].PriceUnit = round2(req[i].InvoiceItem[it].PriceUnit)
 			}
+			// AP-FAB ไม่มี PO → ไม่เข้า block คิดยอดด้านบน (หน้า GR for Accounting เคยขึ้น Total Cost 0)
+			// ยอด = ราคา × kg (unit_uom KG) หรือ × จำนวน แบบเดียวกับที่ TRCloud คิด
+			if !exist && req[i].InvoiceType == "AP-FAB" {
+				sub, vat := apFabLineAmount(req[i].InvoiceItem[it])
+				req[i].InvoiceItem[it].SubtotalExclVat = sub
+				req[i].InvoiceItem[it].TotalVat = vat
+				req[i].InvoiceItem[it].TotalAmount = round2(sub + vat)
+				subtotalExclVat += sub
+				totalVat += vat
+				totalAmount += req[i].InvoiceItem[it].TotalAmount
+			}
 			req[i].InvoiceItem[it].Qty = round2(req[i].InvoiceItem[it].Qty)
 			req[i].InvoiceItem[it].TotalVat = round2(req[i].InvoiceItem[it].TotalVat)
 			req[i].InvoiceItem[it].TotalDiscount = round2(req[i].InvoiceItem[it].TotalDiscount)
@@ -492,6 +503,17 @@ func CreateInvoiceAP(ctx context.Context, jsonPayload string) (interface{}, erro
 }
 func round2(val float64) float64 {
 	return math.Round(val*100) / 100
+}
+
+// apFabLineAmount — ยอดก่อน VAT และ VAT 7% ของบรรทัด AP-FAB (ไม่มีส่วนลด)
+func apFabLineAmount(item models.InvoiceItem) (subtotal, vat float64) {
+	base := item.Qty
+	if strings.EqualFold(strings.TrimSpace(item.UnitUom), "KG") {
+		base = item.Weight
+	}
+	subtotal = round2(item.PriceUnit * base)
+	vat = round2(subtotal * 0.07)
+	return subtotal, vat
 }
 
 func round3(val float64) float64 {

@@ -167,3 +167,16 @@ func TestRound3(t *testing.T) {
 		t.Fatalf("round2 must stay 2 digits for non AP-FAB, got %v", got)
 	}
 }
+
+func TestAPFabLineAmount(t *testing.T) {
+	// KG: ราคา × kg (GRA2611-0001: 0.62 × 102.272)
+	sub, vat := apFabLineAmount(models.InvoiceItem{UnitUom: "KG", Qty: 1, Weight: 102.272, PriceUnit: 0.62})
+	if sub != 63.41 || vat != 4.44 {
+		t.Fatalf("KG: sub=%v vat=%v", sub, vat)
+	}
+	// PC: ราคา × จำนวน (GRA2611-0004 line 1: 2.114 × 30)
+	sub, vat = apFabLineAmount(models.InvoiceItem{UnitUom: "PC", Qty: 30, Weight: 102.272, PriceUnit: 2.114})
+	if sub != 63.42 || vat != 4.44 {
+		t.Fatalf("PC: sub=%v vat=%v", sub, vat)
+	}
+}
