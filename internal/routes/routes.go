@@ -48,6 +48,9 @@ func RegisterRoutes(ctx *gin.Engine) {
 	price.POST("/GetPaymentTerm", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, priceService.GetPaymentTerm)
 	})
+	price.POST("/GetPriceListFormulas", func(c *gin.Context) {
+		utils.ProcessContextRequest(c, priceService.GetPriceListFormulas)
+	})
 	price.POST("/GetComparePrice", func(c *gin.Context) {
 		utils.ProcessContextRequest(c, priceService.GetComparePrice)
 	})

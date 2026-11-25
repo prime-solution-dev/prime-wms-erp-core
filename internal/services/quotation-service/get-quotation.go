@@ -60,6 +60,7 @@ type GetQuotationResponse struct {
 	ShipToAddress               string     `gorm:"type:varchar(255)" json:"ship_to_address"`
 	DeliveryMethod              string     `gorm:"type:varchar(50)" json:"delivery_method"`
 	RefPoDoc                    string     `gorm:"type:varchar" json:"ref_po_doc"`
+	ContactPerson               string     `gorm:"type:varchar(255)" json:"contact_person"`
 	TransportCostType           string     `gorm:"type:varchar(50)" json:"transport_cost_type"`
 	TotalTransportCost          float64    `gorm:"type:numeric" json:"total_transport_cost"`
 	PassPrice                   bool       `gorm:"type:boolean" json:"pass_price"`

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const fkIndexesMigrationFile = "../../../migrations/2026-10-16-price-list-fk-indexes.sql"
+const fkIndexesMigrationFile = "testdata/2026-10-16-price-list-fk-indexes.sql"
 
 // รัน migration ทีละ statement เพราะ CREATE INDEX CONCURRENTLY รันใน multi-statement/transaction ไม่ได้
 func TestMigration_PriceListFkIndexes(t *testing.T) {

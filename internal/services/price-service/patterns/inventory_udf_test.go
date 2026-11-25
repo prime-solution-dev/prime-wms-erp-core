@@ -53,8 +53,8 @@ func TestGetAvgKgStockFromInventoryZeroValues(t *testing.T) {
 	}
 
 	sg := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 22222.224, AvgProduct: 11111.114})
-	if got := getAvgKgStockFromInventory(sg, false); got != 11111.11 {
-		t.Fatalf("want 11111.11, got %v", got)
+	if got := getAvgKgStockFromInventory(sg, false); got != 11111.114 {
+		t.Fatalf("want 11111.114, got %v", got)
 	}
 
 	zero := sgWithInventory(models.InventoryWeightResponse{AvgWeight: 0, AvgProduct: 0})

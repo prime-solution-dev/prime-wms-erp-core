@@ -27,7 +27,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 	}
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	reqHttp, err := utils.NewRequest(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -63,7 +63,7 @@ func CreditRequestEffectiveDtm(ctx context.Context) (interface{}, error) {
 	}
 	jsonDataGetCredit, err := json.Marshal(requestDataGetCredit)
 	if err != nil {
-		errors.New("Error marshalling data :")
+		return nil, errors.New("Error marshalling data :")
 	}
 	reqHttpGetCredit, errGetCredit := utils.NewRequest(ctx, "POST", urlGetCredit, bytes.NewBuffer(jsonDataGetCredit))
 	if errGetCredit != nil {

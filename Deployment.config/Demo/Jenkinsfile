@@ -6,7 +6,7 @@ pipeline {
         IMAGE_NAME = 'wms-erp-core'
         PORT = '9115:9115' 
         CONTAINER_NAME = 'wms-erp-core-container'
-        TARGET_BRANCH = 'Demo'
+        TARGET_BRANCH = 'Crossmax-main'
         REMOTE_USER = 'ec2-user'
         REMOTE_HOST = '18.139.159.17'
         SSH_KEY_PATH = '/home/ec2-user/key/Demo-Linux.pem'
@@ -15,8 +15,8 @@ pipeline {
         DOCKERFILEPATH = 'Deployment.config/Demo/Dockerfile'
     }
     parameters {
-        choice(name: 'MIGRATE', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ migrations/ หรือ cron_config/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
-        choice(name: 'SEED', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ seeds/<SEED_SET>/ หรือ cron_config/seeds/<SEED_SET>/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
+        choice(name: 'MIGRATE', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ migrations/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
+        choice(name: 'SEED', choices: ['auto', 'force', 'skip'], description: 'auto = รันเมื่อ seeds/<SEED_SET>/ เปลี่ยน (deploy ครั้งแรกรันเสมอ), force = รันแน่นอน, skip = ไม่รัน')
         string(name: 'SEED_SET', defaultValue: '', description: 'folder ใต้ seeds/ ที่จะรัน (ว่าง = TARGET_BRANCH)')
     }
     stages {
@@ -230,6 +230,7 @@ EOF
         }
     }
 }
+
 stage('Run Database Migrations') {
     when { expression { env.RUN_MIGRATE == 'true' } }
     steps {
@@ -414,5 +415,3 @@ stage('Clean Up Repository') {
         }
     }
 }
-
-
