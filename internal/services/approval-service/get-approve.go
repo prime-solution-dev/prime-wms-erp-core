@@ -7,6 +7,7 @@ import (
 	models "prime-erp-core/internal/models"
 	repositoryApproval "prime-erp-core/internal/repositories/approval"
 	authenticationService "prime-erp-core/internal/services/authentication-service"
+	"slices"
 	"sort"
 
 	"github.com/google/uuid"
@@ -75,6 +76,9 @@ func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 	if errGetUserApproval != nil {
 		return nil, errGetUserApproval
 	}
+	if err := applyPurchaseApprovalPermissions(ctx, approval, userApproval.Data, userCode, req.CondRangeMin); err != nil {
+		return nil, err
+	}
 	sort.Slice(userApproval.Data, func(i, j int) bool {
 		if userApproval.Data[i].CondRangeMin == nil {
 			return false
@@ -112,6 +116,9 @@ func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	for a := range approval {
+		if isPurchaseApproval(approval[a].ApproveTopic) {
+			continue
+		}
 		approvalItemPermissionResult, existsapprovalItemPermission := approvalItemPermission[approval[a].MDItemCode]
 		if existsapprovalItemPermission {
 			for ai := range approval[a].ApprovalItem {
@@ -129,4 +136,95 @@ func GetApproval(ctx context.Context, jsonPayload string) (interface{}, error) {
 	}
 
 	return resultApproval, nil
+}
+
+func isPurchaseApproval(approveTopic string) bool {
+	return approveTopic == "PO" || approveTopic == "PPOL"
+}
+
+func applyPurchaseApprovalPermissions(ctx context.Context, approval []models.Approval, rules []authenticationService.UserApprovalDataResult, userCode map[string]string, amount float64) error {
+	multipleItemCodes := false
+	for _, document := range approval {
+		if document.MDItemCode != approval[0].MDItemCode {
+			multipleItemCodes = true
+			break
+		}
+	}
+
+	approversByItem := make(map[string]map[string]string)
+	for i := range approval {
+		document := &approval[i]
+		if !isPurchaseApproval(document.ApproveTopic) {
+			continue
+		}
+
+		rule := selectPurchaseApprovalRule(document, rules, amount)
+		approvers := userCode
+		if rule != nil && multipleItemCodes {
+			// GetRequester combines all items in the request, so look up this PO item alone.
+			approvers = approversByItem[document.MDItemCode]
+			if approvers == nil {
+				requesters, err := authenticationService.GetRequester(ctx, map[string]interface{}{
+					"md_item_code": []string{document.MDItemCode},
+					"action_code":  []string{"APPROVE"},
+				})
+				if err != nil {
+					return err
+				}
+				approvers = make(map[string]string, len(requesters))
+				for _, requester := range requesters {
+					approvers[requester.RequesterCode] = requester.RequesterCode
+				}
+				approversByItem[document.MDItemCode] = approvers
+			}
+		}
+		permissions := approvalPermissionsForRule(rule, approvers)
+		for j := range document.ApprovalItem {
+			document.ApprovalItem[j].ApprovalItemPermission = permissions
+		}
+	}
+	return nil
+}
+
+func selectPurchaseApprovalRule(document *models.Approval, rules []authenticationService.UserApprovalDataResult, amount float64) *authenticationService.UserApprovalDataResult {
+	var selected *authenticationService.UserApprovalDataResult
+	for i := range rules {
+		rule := &rules[i]
+		minimum := rule.CondRangeMin
+		if rule.UserCode != document.CreateBy || rule.ModuleItemCode != document.MDItemCode ||
+			!rule.Active || minimum == nil || !(amount >= float64(*minimum)) {
+			continue
+		}
+		specific := len(rule.DocumentCodes) > 0
+		if specific && !slices.Contains(rule.DocumentCodes, document.DocumentType) {
+			continue
+		}
+		if selected == nil || *minimum > *selected.CondRangeMin ||
+			(*minimum == *selected.CondRangeMin && specific && len(selected.DocumentCodes) == 0) {
+			selected = rule
+		}
+	}
+	return selected
+}
+
+func approvalPermissionsForRule(rule *authenticationService.UserApprovalDataResult, approvers map[string]string) []models.ApprovalItemPermission {
+	if rule == nil {
+		return nil
+	}
+	var permissions []models.ApprovalItemPermission
+	if _, ok := approvers[rule.ApproveCode]; ok {
+		permissions = append(permissions, models.ApprovalItemPermission{
+			UserCode:    rule.ApproveCode,
+			AutoApprove: rule.AutoApprove,
+		})
+	}
+	for _, secondary := range rule.Secondarys {
+		if _, ok := approvers[secondary.ApproveCode]; ok {
+			permissions = append(permissions, models.ApprovalItemPermission{
+				UserCode:    secondary.ApproveCode,
+				AutoApprove: rule.AutoApprove,
+			})
+		}
+	}
+	return permissions
 }
