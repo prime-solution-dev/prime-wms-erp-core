@@ -6,6 +6,7 @@ import (
 	"errors"
 	"prime-erp-core/internal/db"
 	authenticationService "prime-erp-core/internal/services/authentication-service"
+	"slices"
 	"sort"
 	"strings"
 
@@ -18,6 +19,7 @@ type CheckAutoApprovalRequest struct {
 	TopicCode       string  `json:"topic_code"`
 	MdItemCode      string  `json:"md_item_code"`
 	CondRangeMin    float64 `json:"cond_range_min"`
+	PODocumentType  *string `json:"-"`
 }
 
 type CheckAutoApprovalResponse struct {
@@ -116,23 +118,34 @@ func CheckAutoApproval(ctx context.Context, gormx *gorm.DB, req CheckAutoApprova
 		return res, nil
 	}
 
-	sort.Slice(userApproval.Data, func(i, j int) bool {
-		if userApproval.Data[i].CondRangeMin == nil && userApproval.Data[j].CondRangeMin == nil {
+	sortRules := sort.Slice
+	if req.PODocumentType != nil {
+		// Keep Authentication's order among equally specific rules with the same minimum.
+		sortRules = sort.SliceStable
+	}
+	sortRules(userApproval.Data, func(i, j int) bool {
+		left, right := userApproval.Data[i], userApproval.Data[j]
+		if left.CondRangeMin == nil {
 			return false
 		}
-		if userApproval.Data[i].CondRangeMin == nil {
-			return false
-		}
-		if userApproval.Data[j].CondRangeMin == nil {
+		if right.CondRangeMin == nil {
 			return true
 		}
-		return *userApproval.Data[i].CondRangeMin > *userApproval.Data[j].CondRangeMin
+		if req.PODocumentType != nil && *left.CondRangeMin == *right.CondRangeMin {
+			return len(left.DocumentCodes) > 0 && len(right.DocumentCodes) == 0
+		}
+		return *left.CondRangeMin > *right.CondRangeMin
 	})
 
 	var matched *authenticationService.UserApprovalDataResult
 	for i := range userApproval.Data {
 		item := &userApproval.Data[i]
 		if item.CondRangeMin == nil {
+			continue
+		}
+
+		if req.PODocumentType != nil && len(item.DocumentCodes) > 0 &&
+			!slices.Contains(item.DocumentCodes, *req.PODocumentType) {
 			continue
 		}
 

@@ -85,6 +85,7 @@ func CreatePO(ctx context.Context, jsonPayload string) (interface{}, error) {
 				TopicCode:       "CUSTOMIZE",
 				MdItemCode:      "CTM-CTM3",
 				CondRangeMin:    p.TotalAmount,
+				PODocumentType:  &p.PurchaseType,
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 

@@ -31,6 +31,7 @@ type UserApprovalDataResult struct {
 	ModuleItemName       string                           `json:"module_item_name"`
 	ModuleItemSection    string                           `json:"module_item_section"`
 	ModuleItemSubSection string                           `json:"module_item_sub_section"`
+	DocumentCodes        []string                         `json:"document_codes"`
 	CondRangeMin         *int                             `json:"cond_range_min"`
 	Active               bool                             `json:"active"`
 	AutoApprove          bool                             `json:"auto_approve"`
