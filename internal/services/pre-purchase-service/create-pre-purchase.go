@@ -56,12 +56,14 @@ func CreatePOBigLot(ctx context.Context, jsonPayload string) (interface{}, error
 
 		if prePurchase.Status == "PENDING" {
 			// Check auto approval for PENDING status
+			poDocumentType := "PPO"
 			autoApprovalReq := approvalService.CheckAutoApprovalRequest{
 				RequestUserCode: userCode,
 				ModuleCode:      "CUSTOMIZE",
 				TopicCode:       "CUSTOMIZE",
 				MdItemCode:      "CTM-CTM3",
 				CondRangeMin:    prePurchase.TotalAmount,
+				PODocumentType:  &poDocumentType,
 				// TODO: Add module_code, topic_code, md_item_code
 			}
 
